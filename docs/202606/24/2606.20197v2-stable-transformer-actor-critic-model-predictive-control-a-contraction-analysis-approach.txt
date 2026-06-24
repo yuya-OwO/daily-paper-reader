@@ -1,0 +1,1083 @@
+Title: Stable Transformer-Actor-Critic Model Predictive Control: A Contraction Analysis Approach
+
+URL Source: https://arxiv.org/pdf/2606.20197v2
+
+Published Time: Tue, 23 Jun 2026 03:44:18 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Stable Transformer-Actor-Critic Model Predictive Control: A Contraction Analysis Approach 
+
+Antonio Marino 1, Valerio Modugno 2, and Marco Cognetti 3
+
+Abstract — Actor-Critic Model Predictive Control (MPC) ef-fectively addresses complex, non-convex control problems, but guaranteeing the closed-loop stability of sequence-based learn-ing models within these pipelines remains challenging. This paper introduces a novel Transformer-Actor-Critic MPC archi-tecture with formal robustness guarantees. First, we prove that Transformer networks can satisfy global incremental Input-to-State Stability ( δISS). We then leverage Riemannian contraction theory to analyze the interconnected dynamics between the physical plant and the predictive neural network. Finally, we integrate these theoretical bounds as a training regularizer to yield a certifiably robust policy. The framework is validated on a nonlinear 3D drone model executing target-reaching and obstacle-avoidance maneuvers. 
+
+Index Terms — Learning-based Control, Contraction theory, Neural networks 
+
+I. I NTRODUCTION 
+
+Synthesizing control strategies for nonlinear systems remains fundamentally challenging. While pure learning methodologies [1] approximate dynamic programming effi-ciently, they notoriously lack rigorous stability guarantees. This deficiency has motivated hybrid optimization-learning frameworks [2], [3] that integrate learning components into Model Predictive Control (MPC) to improve computational tractability while maintaining certifiable properties. Conse-quently, establishing theoretical guarantees for these hybrid systems is an active research area. Recent efforts have explored learned neural dynamics [4] and contraction the-ory, which guarantees robust closed-loop stability without restrictive terminal conditions [5], [6]. Even with known dynamics, non-convex optimization of-ten necessitates constraint relaxation. While learning refer-ence trajectories shifts this complexity out of the online solver, Actor-Critic MPC [7] generalizes this approach by dynamically adjusting the linear and quadratic coefficients of the MPC cost function. Enabled by differentiable MPC formulations [8], [9], [10], this network shapes the local op-timization landscape. However, formal guarantees for Actor-Critic MPC remain remarkably scarce, and current imple-mentations rely on simple Multi-Layer Perceptrons (MLPs). MLPs inherently struggle to capture the temporal consis-tencies required in environments with time-correlated dis-turbances. Sequence models like Transformers [11], [12] provide a natural framework to predict context-aware MPC  
+
+> 1
+
+University of Cambridge, email: am3507@cam.ac.uk; 2University College London, email: v.modugno@ucl.ac.uk; 3LAAS-CNRS, Universit´ ede Toulouse, CNRS, UPS, Toulouse, France, email: marco.cognetti@laas.fr. Project page: https://seaingant.github.io/stac-mpc/     
+
+> Predictive Network ( θ)
+> Controlled System
+> Ref xd
+> Noise nk
+> +
+> Initial MLP
+> (Feature Ext.)
+> Transformer Sequence Model
+> Final MLP
+> (Projection)
+> Predicted
+> ˆQ, ˆP
+> Model Predictive Controller +
+> dk
+> +
+> uk
+> +
+> xk+1
+> +
+> xk
+
+Fig. 1: Closed-loop architecture mapping the predicted pa-rameters to the MPC. weights from state trajectories. Furthermore, integrating Transformers into optimization frameworks is highly relevant for future applications, as they form the backbone of modern Vision-Language-Action (VLA) models [13]. While recent ODE-based analyses have proved asymptotic stability for Transformers [14], [15], these results rely heavily on restric-tive unit-norm projections. A critical gap remains in estab-lishing fundamental robustness notions—such as incremental Input-to-State Stability ( δISS) [16], [17] and contraction [18] for feedback systems. To address this gap, this paper makes two intertwined contributions. First, we prove that Transformer architectures can be mathematically constrained to satisfy global δISS with respect to the induced infinity norm. Second, we propose a novel hybrid Transformer-Actor-Critic MPC architecture. We demonstrate that the derived δISS Lipschitz bounds for the Transformer directly enable a coupled small-gain condition for the physical plant. By enforcing this closed-loop contraction stability during training, our framework yields a control policy that is both highly performant and certifiably robust. II. P RELIMINARIES AND PROBLEM FORMULATION 
+
+Consider the following discrete-time nonlinear system: 
+
+xk+1 = Φ( xk, u k) + dk(xk) (1) where xk ∈ X ⊆ Rnx is the system state, uk ∈ U ⊆ Rnu
+
+is the control input, and dk : X → Rnx is an additive disturbance acting on the system. The disturbance is assumed to be uniformly bounded, i.e., there exists ¯d ∈ R>0 such that 
+
+sup x∈X , k ∈Z≥0 ∥dk(x)∥∞ ≤ ¯d.
+
+Assumption 1: The system state x ∈ X is uniformly bounded by a constant limit constraint satisfying ∥x∥∞ ≤ ˜X,
+
+> arXiv:2606.20197v2 [cs.RO] 22 Jun 2026
+
+and analogously, the action space mandates that the applied control is subject to ∥u∥∞ ≤ ˜U .
+
+Lemma 1 ([18]): Let x1 
+
+> k
+
+and x2 
+
+> k
+
+be two state trajectories of the system (1). If there exists a uniform positive definite contraction matrix M (xk) ⪰ 0 such that the following condition holds for a contraction rate α ∈ (0 , 1) and ∀x ∈ X :
+
+∂Φk
+
+∂x k
+
+> ⊤
+
+Mk+1 (xk+1 ) ∂Φk
+
+∂x k
+
+⪯ α2Mk (xk ) (2) 
+
+then the path integral of the geodesic distance ℓ(·) connecting 
+
+x1 
+
+> k
+
+and x2
+
+> k
+
+, dM(x1
+
+> k
+
+, x 2
+
+> k
+
+) ≜ inf ℓ
+
+R 10   
+
+> ∂ℓ (s,k )
+> ∂s M(ℓ(s,k ))
+
+ds is contracting on the Riemannian manifold with contraction rate 
+
+α:
+
+dM(x1 
+
+> k
+
+, x 2 
+
+> k
+
+) ≤ αk dM(x10, x 20) + ¯d√ ¯m (1 − αk )(1 − α) (3) 
+
+With ¯m = sup X ,k λmax (Mk) and λmax (·) max eigenvalue. Let (·)i|k denote a prediction i steps ahead from the current step k, initialized by the measured state x0|k ≜ xk. Given a desired state xdk ∈ X and the predicted state-action pair 
+
+ωi|k = [ x⊤
+
+> i|k
+
+, u ⊤
+
+> i|k
+
+]⊤, we formulate the MPC problem over horizon T as: 
+
+min  
+
+> ω
+
+JY =
+
+> T
+
+X
+
+> i=0
+
+ω⊤ 
+
+> i|k
+
+Qi|k (xk , x dk )ωi|k + Pi|k (xk , x dk )ωi|k
+
+subject to xi+1 |k = Φ( xi|k , u i|k ); 
+
+h(ωi|k ) ≤ 0; ui|k ∈ U ; xi|k ∈ X ;
+
+(4) 
+
+where ω = [ω⊤
+
+> 0|k
+
+, . . . , ω ⊤ 
+
+> T|k
+
+]⊤ concatenates the predicted state and control sequences over the optimization horizon. The generalized boundary constraints are represented by 
+
+h(ωi|k), while the cost matrices Qi|k ∈ R(nx+nu)×(nx+nu)
+
+and Pi|k ∈ Rnx+nu shape the closed-loop behavior. While standard actor-critic MPC [7] predicts Qi|k and Pi|k strictly from the current state via an MLP, we propose a history-aware neural architecture predicting the ordered set Y =
+
+{(Qi|k, P i|k)}Ti=0 from L-step past states ( xk−L:k) and ref-erences ( xdk−L:k). As depicted in Figure 1, an initial layer maps these physical histories into latent sequence variables 
+
+zk, p k ∈ RL×D . These variables act exclusively as inputs to a core Transformer block, whose output is subsequently processed by a final layer to yield Y . To ensure bounded closed-loop behavior, the internal stability of this central Transformer block is rigorously analyzed in Section III. To minimize the network output dimension while guaranteeing positive semi-definiteness, Q is structurally constrained as 
+
+diag( Q) = So (Qd(xk, x dk)) via the softplus operator So (·).Efficient training of a network predicting Y requires gradient backpropagation through the MPC solution, lever-aging differentiable MPC frameworks within an Actor-Critic pipeline. To ensure smooth gradients and bypass piecewise active set discontinuities, the inequality constraints h(ω)
+
+are relaxed from hard boundaries and integrated into the objective function via a smooth Softplus penalty So (·) with scaling factor γ > 0:
+
+JY =
+
+> T
+
+X
+
+> i=0
+
+h
+
+ω⊤ 
+
+> i|k
+
+Qi|k ωi|k + Pi|k ωi|k + γSo (h(ωi|k )) 
+
+i
+
+(5) 
+
+By adopting the dual multiplier sequence β strictly for the equality constraints G(ω) = Φ( xi|k, u i|k) − xi+1 |k = 0 , the associated Lagrangian evaluates to: 
+
+L(ω, β ) = JY + 
+
+> T−1
+
+X
+
+> i=0
+
+β⊤ 
+
+> i+1 |k
+
+(Φ( xi|k , u i|k ) − xi+1 |k ) (6) 
+
+We make the following assumption: 
+
+Assumption 2 (Strong Convexity and Regularity): The system dynamics Φ( x, u ) and the generalized inequality constraints h(ω) are twice continuously differentiable. Furthermore, we assume that the parameterized baseline cost Q is sufficiently large to strictly dominate any negative curvature introduced by the nonlinear dynamics and non-convex constraint boundaries. Specifically, the Hessian of the Lagrangian satisfies a strict strong convexity bound such that: 
+
+H ≜ ∇2 
+
+> ωω
+
+L ⪰ 2μ2I ≻ 0 (7) where μ2 > 0 is defined as the minimum eigenvalue of the unpenalized spatial cost min k λmin (Qk).To define the exact local sensitivity with respect to the cost matrices Q and P , we apply the Implicit Function Theorem (IFT) to the Karush-Kuhn-Tucker (KKT) residual root-finding function F (η) = 0 , where η = [ ω⊤, β ⊤]⊤. As-suming the system dynamics and Softplus-relaxed constraints are twice continuously differentiable (Assumption 2), the derivative with respect to the solution variables yields the fundamental KKT Matrix, K = ∇η F :
+
+K =
+
+2Q + ∇2
+
+> ωω
+
+ β⊤G(ω) + γSo (h(ω))  ∇ω G(ω)⊤
+
+∇ω G(ω) 0
+
+ (8) 
+
+Assumption 2 ensures the KKT matrix remains non-singular globally along the optimal trajectory. Isolating the differen-tial mapping via the IFT provides the closed-form optimal control sensitivity with respect to the network outputs: 
+
+∂η ∗
+
+∂Y = −K−1∇Y F = −K−1
+
+2 diag( ω∗) I
+
+0 0
+
+ (9) 
+
+To study the transformer behavior in this problem, we introduce also the following definition: 
+
+Definition 1 ( δISS [19]): A dynamical system is incre-mentally input-to-state stable with respect to the induced infinite norm if there exist functions βδ ∈ KL and γδ ∈ K ∞
+
+such that, for any k ∈ Z≥0, any initial states x10, x 20 ∈ X 
+
+defining the initial state deviation δx 0 ≜ x10 − x20, and any input sequences u1, u 2 ∈ U defining the input deviation 
+
+δu ≜ u1 − u2, the state deviation δx k ≜ x1 
+
+> k
+
+− x2 
+
+> k
+
+satisfies: 
+
+∥δx k ∥∞ ≤ βδ (∥δx 0∥∞, k ) + γδ (∥δu ∥∞) (10) 
+
+III. δISS T RANSFORMER NETWORK 
+
+To analyze the transformer layer, we can rely on its discrete dynamical system interpretation [15]. For the se-quence zk ∈ RL×D and the input sequence pk ∈ RL×D , the transformer block model follows: 
+
+zk+1 = α2g(α1zk + A(zk, p k)) + f (g(α1zk + A(zk, p k))) (11) With α1, α 2 < 1, f denoting a Multi-Layer Perceptron (MLP) network, g representing the layer normalization with parameters c and β, and A(·, ·) the multi-head attention mechanism between z and u. Drawing upon the architecture of standard multi-head attention with H heads, we formulate 
+
+A(zk, p k) as follows: 
+
+A(zk, p k) = Concat (H1, . . . , HH )WO (12) 
+
+Hh(zk, p k) = softmax (zkW (h) 
+
+> Q
+
+)( pkW (h) 
+
+> K
+
+)T
+
+√Dh
+
+!
+
+(pkW (h) 
+
+> V
+
+)
+
+(13) where Dh = D/H represents the hidden dimension of each head. The matrices W (h) 
+
+> Q
+
+, W (h) 
+
+> K
+
+, W (h) 
+
+> V
+
+∈ RD×Dh denote the linear projection weights for the queries, keys, and values for head h, and WO ∈ RH·Dh×D is the output projection matrix. Note that this architecture, used mostly in reinforcement learning [20], does not have a LayerNorm as the final layer, but α < 1 to get residual connections. 
+
+Assumption 3: The control input sequence p is uniformly bounded by unity: p ∈ P ⊆ [−1, 1] L×D , such that ∥p∥∞ ≤ 1.
+
+Theorem 1: Under Assumption 3, a sufficient condition for the system (11) to be δISS is Aδ < 1; where 
+
+Aδ ≜ α2 +
+
+> M
+
+Y
+
+> i=1
+
+∥Wi∥∞
+
+!  ∥c∥∞
+
+σmin + ϵ
+
+ α1 + LM HA,z 
+
+
+
+,
+
+with 
+
+LM HA,z ≜
+
+∥WO ∥∞
+
+> H
+
+X
+
+> h=1
+
+ L
+
+2√Dh
+
+∥W (h) 
+
+> V
+
+∥∞∥W (h) 
+
+> Q
+
+∥∞∥W (h) 
+
+> K
+
+∥∞
+
+
+
+.
+
+Proof: Given two sequence trajectories z1
+
+> k
+
+, z 2 
+
+> k
+
+with de-viation δz k ≜ z1 
+
+> k
+
+− z2
+
+> k
+
+, and corresponding inputs p1
+
+> k
+
+, p 2 
+
+> k
+
+with deviation δp k ≜ p1 
+
+> k
+
+− p2
+
+> k
+
+, the next-step deviation δz k+1 ≜
+
+z1 
+
+> k+1
+
+− z2 
+
+> k+1
+
+is expressed as: 
+
+δz k+1 = α2g(α1z1 
+
+> k
+
++ A(z1 
+
+> k
+
+, p 1 
+
+> k
+
+)) + f (g(α1z1 
+
+> k
+
++ A(z1 
+
+> k
+
+, p 1 
+
+> k
+
+))) 
+
+− α2g(α1z2 
+
+> k
+
++ A(z2 
+
+> k
+
+, p 2 
+
+> k
+
+)) + f (g(α1z2 
+
+> k
+
++ A(z2 
+
+> k
+
+, p 2 
+
+> k
+
+))) .
+
+Owing to the Lipschitz constants of the LayerNorm [21] operation g being ∥c∥∞ 
+
+> σmin +ϵ
+
+where σmin denotes the mini-mum standard deviation of their arguments and ϵ > 0 is a small stabilization constant, the magnitude of the state difference ∥δz k+1 ∥∞ is upper-bounded as follows (letting 
+
+δA k ≜ A(z1
+
+> k
+
+, p 1
+
+> k
+
+) − A(z2
+
+> k
+
+, p 2
+
+> k
+
+) denote the attention deviation): 
+
+∥δz k+1 ∥∞ ≤ α2∥g(α1z1 
+
+> k
+
++ A(z1 
+
+> k
+
+, p 1 
+
+> k
+
+)) − g(α1z2 
+
+> k
+
++ A(z2 
+
+> k
+
+, p 2 
+
+> k
+
+)) ∥∞
+
++ ∥f (g(α1z1 
+
+> k
+
++ A(z1 
+
+> k
+
+, p 1 
+
+> k
+
+))) − f (g(α1z2 
+
+> k
+
++ A(z2 
+
+> k
+
+, p 2 
+
+> k
+
+))) ∥∞ ≤
+
+α2 +
+
+> M
+
+Y
+
+> i=1
+
+∥Wi∥∞
+
+!  ∥c∥∞
+
+σmin + ϵ (α1∥δz k ∥∞ + ∥δA k ∥∞)
+
+
+
+(14) 
+
+The final inequality follows from bounding the MLP f ,assuming it consists of M layers equipped with 1-Lipschitz activation functions (e.g., ReLU or Tanh) and associated weight matrices Wi.Next, we bound the attention deviation δA k. By the submultiplicativity of the infinity norm, and observing that the infinity norm of horizontally concatenated matrices is bounded by the sum of their individual infinity norms, we have: 
+
+∥δA k ∥∞ ≤ ∥ WO ∥∞
+
+> H
+
+X
+
+> h=1
+
+∥δHh,k ∥∞ (15) 
+
+where δHh,k ≜ Hh(z1
+
+> k
+
+, p 1
+
+> k
+
+) − H h(z2
+
+> k
+
+, p 2
+
+> k
+
+) is the deviation for head h. For a single head h, we evaluate the infin-ity norms of the projected queries, keys, and values as follows: ∥zW (h) 
+
+> Q
+
+∥∞ ≤ ∥z∥∞∥W (h) 
+
+> Q
+
+∥∞, ∥(uW (h) 
+
+> K
+
+)T ∥∞ ≤
+
+L∥u∥∞∥W (h) 
+
+> K
+
+∥∞, and ∥uW (h) 
+
+> V
+
+∥∞ ≤ ∥u∥∞∥W (h) 
+
+> V
+
+∥∞. Let-ting Hh,k ≜ PkVk, with softmax matrix Pk and val-ues Vk ≜ pkW (h) 
+
+> V
+
+, the product rule yields ∥δHh,k ∥∞ ≤∥δP k∥∞∥Vk∥∞ + ∥δV k∥∞, since ∥Pk∥∞ = 1 . Because δp k
+
+perturbs both the values ( ∥δV k∥∞ ≤ ∥ δp k∥∞∥W (h) 
+
+> V
+
+∥∞) and the keys within Pk, their bounded contributions sum together. Expanding ∥δP k∥∞ via the 12 -Lipschitz continuity of softmax and applying Assumption 3, we group the δz k and δp k terms to obtain: 
+
+∥δHh,k ∥∞ ≤
+
+ L
+
+2√Dh
+
+∥W (h) 
+
+> V
+
+∥∞∥W (h) 
+
+> Q
+
+∥∞∥W (h) 
+
+> K
+
+∥∞
+
+
+
+∥δz k ∥∞+
+
+
+
+∥W (h) 
+
+> V
+
+∥∞ + L
+
+2√Dh
+
+∥W (h) 
+
+> V
+
+∥∞∥W (h) 
+
+> Q
+
+∥∞∥W (h) 
+
+> K
+
+∥∞∥zk ∥∞
+
+
+
+∥δp k ∥∞
+
+Substituting this bound back into (14), we obtain: 
+
+∥δz k+1 ∥∞ ≤ α2 +
+
+> M
+
+Y
+
+> i=1
+
+∥Wi∥∞
+
+! ∥c∥∞
+
+σ1min + ϵ
+
+
+
+(α1 + LM HA,z )∥δz k ∥∞ + LM HA,p ∥δp k ∥∞
+
+
+
+where LM HA,z is defined in Theorem 1and LM HA,p ≜ ∥WO ∥∞
+
+PHh=1 
+
+ ∥W (h) 
+
+> V
+
+∥∞ +
+
+> L
+> 2√Dh
+
+∥W (h) 
+
+> V
+
+∥∞∥W (h) 
+
+> Q
+
+∥∞∥W (h) 
+
+> K
+
+∥∞∥zk∥∞
+
+.
+
+By defining Bδ ≜  α2 + QMi=1 ∥Wi∥∞
+
+  ∥c∥∞ 
+
+> σmin +ϵ
+
+LM HA,p 
+
+,we extract the incremental state bound stated in Theorem 1 (where δz 0 ≜ z10 − z20 denotes the initial state deviation): 
+
+∥δz k ∥∞ ≤ A kδ ∥δz 0∥∞ + (1 − A δ )−1Bδ ∥δp ∥∞. (16) 
+
+Consequently, the maximum distance between the state tra-jectories admits an asymptotic bound given by γδ = (1 −Aδ )−1Bδ ∥δp ∥∞. This concludes the proof, demonstrating that the system is incrementally ISS according to Defini-tion 1. Note that the condition ∥zk∥∞ ≤ 1 holds for non-causal Transformer blocks. The standard deviation σmin may be-come arbitrarily small during training and result in overly conservative stability bounds. A practical mitigation strategy is to assign an appropriately large stabilization constant, such as ϵ ≃ 0.1.IV. C LOSED LOOP STABILITY 
+
+To guarantee closed-loop stability, we evaluate the inter-connected dynamics of the physical plant coupled with the predictive neural network. Defining A ≜ ∇xΦ and B ≜ ∇uΦ
+
+as the open-loop Jacobians of the physical plant evaluated along the predicted trajectory, the exact differential of the system dynamics (1) is: 
+
+dx k+1 = ( A + B∇xu∗)dx k + B∇Y u∗dY k (17) Let Acl ≜ A − BK represent the nominal closed-loop Jacobian of the MPC policy with ∇xu∗ the optimal state feedback gain. A. Contraction Metric Sequence 
+
+To evaluate the physical transition stability without relying on overly conservative infinity-norm bounds, we anchor the closed-loop system in a Riemannian manifold defined by a sequence of contraction matrices M . We extract the specific dynamic target intended by the Transformer at the end of the horizon, ω∗  
+
+> T|k
+
+= [( x∗ 
+
+> T|k
+
+)⊤, (u∗ 
+
+> T|k
+
+)⊤]⊤, analytically by finding the target minimum of the terminal cost stage: 
+
+ω∗  
+
+> T|k
+
+= − 12 Q−1 
+
+> T|k
+
+P ⊤  
+
+> T|k
+
+(18) Evaluating the system Jacobians at this terminal target (AT , B T ), we construct the infinite-horizon terminal contrac-tion metric MT |k by solving the steady-state Discrete Alge-braic Riccati Equation (DARE) using the terminal predicted weights ( Qx,T |k, Q u,T |k): 
+
+MT |k =A⊤ 
+
+> T
+
+MT |k AT − A⊤ 
+
+> T
+
+MT |k BT (Qu,T |k
+
++ B⊤ 
+
+> T
+
+MT |k BT )−1B⊤ 
+
+> T
+
+MT |k AT + Qx,T |k
+
+(19) 
+
+From this mathematically guaranteed anchor, we compute the time-varying contraction matrices backward along the pre-dicted trajectory by solving the Dynamic Difference Riccati Equation (DRE) for i = T − 1 down to 0:
+
+Mi|k =A⊤ 
+
+> i|k
+
+Mi+1 |k Ai|k − A⊤ 
+
+> i|k
+
+Mi+1 |k Bi|k (Qu,i |k
+
++ B⊤ 
+
+> i|k
+
+Mi+1 |k Bi|k )−1B⊤ 
+
+> i|k
+
+Mi+1 |k Ai|k + Qx,i |k
+
+(20) 
+
+The root matrix M0|k serves as the exact Riemannian metric utilized to bound the physical control action at step k.
+
+Lemma 2 (Bounded Metric Shift): Under the receding horizon control scheme, the temporal shift of the contraction metric at the current physical step, defined as ∆Mshif t ≜ M0|k+1 − M1|k, is strictly upper-bounded by the physical state differential. 
+
+Proof: As the physical state transitions to xk+1 , the Transformer dynamically updates the weights Yk+1 , in-troducing a temporal perturbation ∆Mshif t distinct from standard static-target MPC. Because the DARE and DRE are locally Lipschitz continuous mappings (with constant 
+
+LDRE ), and the Transformer is incrementally Input-to-State Stable ( δISS) with Lipschitz constant Aδ , the metric shift is strictly bounded by the physical state deviation evaluated in the M -norm: 
+
+∥∆Mshif t ∥2 ≤ LDRE κ(M )Aδ ∥dx k∥M (21) where κ(M ) is the condition number of the metric. For the physical state transition to be autonomously contractive, the true closed-loop Jacobian must satisfy 
+
+A⊤
+
+> cl
+
+M0|k+1 Acl − M0|k ⪯ 0. Decomposing the updated metric yields A⊤
+
+> cl
+
+M1|kAcl − M0|k + A⊤
+
+> cl
+
+∆Mshif t Acl . Assuming the stage cost Qx, 0|k strictly dominates the bounded perturbation defined in Lemma 2, the unperturbed physical loop contracts at a nominal rate ρmpc ∈ (0 , 1) , such that ∥Acl ∥M ≤ ρmpc .We can extract the contraction rate of the closed-loop MPC policy analytically by the following lemma: 
+
+Lemma 3 (Global Uniform Contraction Rate): Under Assumption 2 and Lemma 1, the nominal unperturbed closed-loop system is globally exponentially contractive in the M -weighted Riemannian manifold, with a strict, uniform contraction rate bounded by: 
+
+ρmpc ≤
+
+r
+
+1 − μ2
+
+¯m < 1 (22) 
+
+Proof: For the nominal physical state transition to be autonomously contractive, the true closed-loop Jacobian must satisfy A⊤
+
+> cl
+
+M1|kAcl − M0|k ⪯ 0. By utilizing the algebraic identities of the optimal feedback gain K0|k from the Riccati recursion, the Difference Riccati Equation (20) can be algebraically rearranged into its equivalent closed-loop form: 
+
+M0|k = A⊤
+
+> cl
+
+M1|kAcl + K⊤
+
+> 0|k
+
+Qu, 0|kK0|k + Qx, 0|k (23) Rearranging this identity yields the exact nominal energy dissipation: 
+
+A⊤
+
+> cl
+
+M1|kAcl − M0|k = −(Qx, 0|k + K⊤
+
+> 0|k
+
+Qu, 0|kK0|k) (24) Because the control effort penalty K⊤
+
+> 0|k
+
+Qu, 0|kK0|k ⪰ 0
+
+strictly adds to the energy dissipation, we can conservatively drop it to establish a strict upper bound on the contraction rate. The nominal contraction requirement evaluates to: 
+
+A⊤
+
+> cl
+
+M1|kAcl ⪯ M0|k − Qx, 0|k ⪯ ρ2
+
+> mpc
+
+M0|k (25) Applying the Rayleigh quotient, the required scalar ρ2
+
+> mpc
+
+that satisfies this inequality is bounded by the minimum eigenvalue of the stage cost and the maximum eigenvalue of the current metric: 
+
+ρ2 
+
+> mpc
+
+≤ 1 − λmin (Qx, 0|k)
+
+λmax (M0|k) (26) Substituting the global limits λmin (Q) ≥ μ2 and λmax (M ) ≤
+
+¯m, we obtain the global, uniform contraction rate ρmpc ≤q
+
+1 − q/ ¯m. Because q > 0 and ¯m < ∞, the fraction is strictly positive, structurally guaranteeing ρmpc < 1 for all bounded trajectories. 
+
+B. Interconnected Stability 
+
+To rigorously evaluate the interconnected system, we first evaluate the coupled sensitivity mapping linking the neural parameter space to the physical Riemannian manifold. We evaluate G ≜ B∇Y u∗ 
+
+> 0|k
+
+using the mixed induced operator norm from the L∞ space to the Riemannian M -space: 
+
+SY ≜ ∥B∇Y u∗ 
+
+> 0|k
+
+∥∞→ M = sup  
+
+> dY ̸=0
+
+∥B∇Y u∗ 
+
+> 0|k
+
+dY ∥M
+
+∥dY ∥∞
+
+(27) 
+
+Knowing that ∥ · ∥ M ≤ pλmax (M )∥ · ∥ 2, we apply the sub-multiplicativity of the induced 2-norm yields an intermediate bound: ∥B∇Y u∗
+
+> 0|k
+
+dY ∥M ≤ pλmax (M )∥B∥2∥∇ Y u∗
+
+> 0|k
+
+dY ∥2.Crucially, under the Receding Horizon Control (RHC) paradigm, the physical plant is only subjected to the first optimal control action u∗
+
+> 0|k
+
+. Let Π0 denote the linear selection matrix such that u∗ 
+
+> 0|k
+
+= Π0ω∗, allowing us to expand the variation as ∇Y u∗ 
+
+> 0|k
+
+= Π 0∇Y ω∗. By substituting this expansion into our intermediate bound and factoring out the induced norms with respect to ∥dY ∥∞, the mixed sensitivity norm is strictly bounded by the submultiplicative cascade mapping the Euclidean solver sensitivity into the physical metric: 
+
+SY ≤ pλmax (M )∥B∥2∥Π0∥2∥∇ Y ω∗∥∞→ 2 (28) The solver sensitivity ∥∇ Y ω∗∥∞→ 2 is governed by the top-left sub-block of the inverse KKT matrix, denoted K−111 ,mapped against the parameter Jacobian J ≜ [2 diag( ω∗) I].By exploiting the strict strong convexity established in Assumption 2 ( ∥K−111 ∥2 ≤ (2 μ2)−1), the mixed sensitivity structurally evaluates to:    
+
+> SY≤
+> pλmax (M)2μ2
+> ∥B∥2∥J∥∞→ 2(29)
+
+By integrating the exact differential dx k+1 (17) along the geodesic ℓ(s), the true Riemannian trajectory transition bounded via the fundamental theorem of calculus seamlessly incorporates the mixed-norm sensitivity:         
+
+> dM(x1
+> k+1 , x 2
+> k+1 )≤ρmpc dM(x1
+> k, x 2
+> k) + SY∥dY ∥∞(30)
+
+Denoting the initial and final MLP weight matrices of the Transformer as WΓ and WΨ respectively, with aggregate  
+
+> L∞
+
+Lipschitz bounds LΓ and LΨ, the natively decoupled transition bounds are:                    
+
+> dM(x1
+> k+1 , x 2
+> k+1 )≤ρmpc dM(x1
+> k, x 2
+> k) + γz∥δz k∥∞+γd¯d
+> ∥δz k+1 ∥∞≤ A δ∥δz k∥∞+γxdM(x1
+> k, x 2
+> k) + γdx∥δd ∥∞
+> (31)
+
+Where the term ¯d absorbs the maximum disturbance on the system (1) induced by ∥δd ∥∞ and ∥δx ∥∞, and the cross-coupled perturbation gains are analytically defined as     
+
+> γz=SYLΨAδ
+
+, γd = SY LΨBδ LΓ. Conversely, mapping the Riemannian state distance back into the neural network input layer requires bridging from M -norm back to the L∞ space, structurally bounding γx = 1√λmin (M ) Bδ LΓ and γdx = Bδ LΓ.
+
+Theorem 2 (Interconnected Closed-Loop Contraction): 
+
+Consider the coupled dynamical system composed of the physical plant (1) controlled by the parameterized differentiable MPC (4), and the predictive Transformer network evaluating the internal state zk. The interconnected closed-loop system is contractive (cf. Lemma 1) with respect to the reference trajectory if           
+
+> (1 −ρmpc )(1 − A δ)−γzγx>0(32)
+
+Proof: We construct a joint mixed-norm error state vector preserving the local topology,    
+
+> Ek=[dM(x1
+> k, x 2
+> k),∥δz k∥∞]⊤
+
+. Stacking the term ¯d and  
+
+> ∥δd ∥∞
+
+in ∆d yields the unified state-space representation of the interconnected error dynamics Ek+1 ≤ M sg Ek + Ψ ext ∆d,where Ψext = [ γd, γ dx]⊤ and Msg =    
+
+> 
+> ρmpc γz;γxAδ
+> 
+
+Because the matrix Msg and the vector Ψext are strictly non-negative, the sequence Ek is contractive if and only if the spectral radius is ρ(Msg ) < 1 [22]. Since (1 −  
+
+> ρmpc ), γ z, γ x
+
+are structurally positive, the condition (32) dictates the strict small-gain condition for the fully coupled loop. Notably, by tracking the physical distance naively via the Riemannian path integral, the condition number of the metric space avoids arbitrarily polluting the autonomous physical Lipschitz bound. Instead, the metric conversions analytically consolidate entirely within the cross-coupling product ( γz · γx ∝ pλmax (M )/λ min (M ) = pκ(M )). In strict accordance with true interconnected contraction theory, the metric’s condition number isolates correctly as a localized boundary penalty strictly scaling the additive cross-domain disturbance, thereby gracefully preserving the nominal expo-nential contraction rate ρmpc .V. V ALIDATION 
+
+To illustrate the proposed methodology, we consider a drone modeled as a 3D flying rigid body. The discrete-time state vector at step k is defined as xk = [ p⊤     
+
+> k, v ⊤
+> k, q ⊤
+> k, ω ⊤
+> k]⊤∈
+> R13
+
+, encompassing position, linear velocity, orientation quaternion, and angular velocity. The control input uk =[fk, τ ⊤    
+
+> k]⊤∈R4
+
+consists of the total thrust scalar and the body torque vector. Applying a second-order discretization with sampling time 
+
+> ∆t
+
+, the system dynamics are evaluated inline as pk+1 =     
+
+> pk+vk∆t+∆t2
+> 2ak
+
+, vk+1 = vk + ak∆t, qk+1 = qk ⊗  
+
+> exp([0 ,∆t
+> 2ωk]⊤)
+
+, and ωk+1 = ωk + ∆ tJ −1(τk − ωk × Jω k).The translational acceleration is defined as ak = −ge 3 + 
+
+> fk
+> mR(qk)e3
+
+, where m is the mass, J ∈ R3×3 is the inertia matrix, g is gravity, e3 = [0 , 0, 1] ⊤, R(qk) is the rotation matrix, and ⊗ denotes quaternion multiplication. Because the orientation evolves on the SO (3) manifold, the state penalty within the MPC cost function is formulated using the attitude error with respect to the identity quaternion  
+
+> qI
+
+as xe = 2 sgn (qew )qev , where the relative error quaternion is qe = q−1    
+
+> I⊗q= [ qew , q ⊤
+> ev ]⊤
+
+.We deploy the differentiable MPC [10] ( T = 10 ) to maneuver the UAV toward a target, with and without obstacle avoidance. The Transformer-MPC is trained following [7] (vanilla baseline) which we enforce the condition (32) as a structural regularization loss. To rigorously test robustness, the closed-loop system is subjected to severe uniform ob-servation noise nk ∼ U(−0.4, 0.4) 12 and uniform process disturbances dk ∼ U(−0.5, 0.5) 12 , injected as illustrated in the architecture diagram (Figure 1). Under these conditions, we execute 10 randomized validation episodes per scenario, reporting the mean and standard deviation of the resulting tracking errors in Figure 2. The proposed stable network robustly converges to the target location in both the unconstrained and obstacle-cluttered environments, maintaining flight stability despite the high magnitude of injected disturbances. Conversely, the unregularized vanilla network [7] systematically fails to reject the noise, leading to severe positional divergence and catastrophic flight instability (see Figures 2a and 2c). Furthermore, the stable network exhibits tightly bundled trajectory rollouts when initialized from identical starting conditions (Figure 2d). This highly correlated spatial evo-lution serves as strong empirical validation of the theoretical 
+
+> δ
+
+ISS property proven in Section III, demonstrating that the maximum state deviation remains strictly bounded propor-tional to the exogenous disturbances. In the obstacle avoid-ance scenario, the theoretical robustness translates directly to safety. Under maximal disturbance conditions, the stable network achieved a 0% collision rate, successfully navigating the environment, whereas the flight profile of the vanilla approach resulted in a 30% collision rate. Finally, we analyze the attitude tracking error, depicted in Figures 2a and 2c. While the stable network maintains (a) (b) 
+
+(c) (d) 
+
+Fig. 2: Target reaching 3D trajectories and tracking errors under uniform noise nk ∼ U(−0.4, 0.4) 12 and process distur-bance dk ∼ U(−0.5, 0.5) 12 . (a,b) Obstacle-free scenario. (c,d) Scenario with an intervening obstacle. a bounded orientation error (standard deviation ≈ 0.12 rad), the unregularized network generally achieves tighter nominal attitude tracking, prior to its ultimate divergence in the obsta-cle scenario. This observation indicates that strictly enforcing the rigid global contraction bounds marginally restricts the network’s flexibility to execute aggressive transient rotational maneuvers during training. Relaxing these bounds via lo-calized or state-dependent contraction metrics represents a promising direction for future research to enhance transient agility in practical applications. VI. C ONCLUSION 
+
+This paper introduced a certifiably robust Transformer-Actor-Critic Model Predictive Control architecture. We es-tablished that sequence-modeling Transformers can be math-ematically constrained to satisfy global incremental Input-to-State Stability ( δISS). By integrating these neural Lipschitz bounds with Riemannian contraction theory, we derived a coupled small-gain condition that guarantees uniform closed-loop contraction for the fully interconnected system. Nu-merical validation on a highly nonlinear 3D drone model demonstrated that enforcing this theoretical bound during training yields a robust control policy, successfully navi-gating obstacle-cluttered environments under severe distur-bances where unregularized baselines catastrophically fail. Future work will explore state-dependent contraction metrics to mitigate the observed trade-offs between strict global stability bounds and transient rotational agility. REFERENCES [1] D. P. Bertsekas, “Model predictive control and reinforcement learn-ing: A unified framework based on dynamic programming,” IFAC-PapersOnLine , vol. 58, no. 18, pp. 363–383, 2024. [2] L. Hewing, K. P. Wabersich, M. Menner, and M. N. Zeilinger, “Learning-based model predictive control: Toward safe learning in control,” Annual Review of Control, Robotics, and Autonomous Sys-tems , vol. 3, pp. 269–296, 2020. [3] K. Dzhumageldyev, F. Airaldi, and A. Dabiri, “Safe model-based reinforcement learning via model predictive control and control barrier functions,” arXiv preprint arXiv:2512.04856 , 2025. [4] F. Bonassi, A. La Bella, M. Farina, and R. Scattolini, “Nonlinear mpc design for incrementally iss systems with application to gru networks,” 
+
+Automatica , vol. 159, p. 111381, 2024. [5] M. Alamir, “Contraction-based nonlinear model predictive control formulation without stability-related terminal constraints,” Automatica ,vol. 75, pp. 288–292, 2017. [6] L. Wei, R. McCloy, J. Bao, and J. Cranney, “Discrete-time contraction constrained nonlinear model predictive control using graph-based geodesic computation,” AIChE Journal , vol. 68, no. 11, p. e17830, 2022. [7] A. Romero, Y. Song, and D. Scaramuzza, “Actor-critic model predic-tive control,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 14 777–14 784. [8] E. Adabag, M. Greiff, J. Subosits, and T. Lew, “Differentiable model predictive control on the gpu,” arXiv preprint arXiv:2510.06179 , 2025. [9] B. Amos, I. Jimenez, J. Sacks, B. Boots, and J. Z. Kolter, “Differen-tiable mpc for end-to-end planning and control,” Advances in neural information processing systems , vol. 31, 2018. [10] L. Amatucci, J. Sousa-Pinto, G. Turrisi, D. Orban, V. Barasuol, and C. Semini, “Primal-dual ilqr for gpu-accelerated learning and control in legged robots,” IEEE Robotics and Automation Letters , vol. 11, no. 1, pp. 1010–1017, 2025. [11] N. Geneva and N. Zabaras, “Transformers for modeling physical systems,” Neural Networks , vol. 146, pp. 272–289, 2022. [12] X. Wang, S. Wang, and B. Huang, “Transformer is inherently a causal learner,” arXiv preprint arXiv:2601.05647 , 2026. [13] K. Kawaharazuka, J. Oh, J. Yamada, I. Posner, and Y. Zhu, “Vision-language-action models for robotics: A review towards real-world applications,” IEEE Access , 2025. [14] Y. D. Zhong, T. Zhang, A. Chakraborty, and B. Dey, “A neural ode interpretation of transformer layers,” CoRR , vol. abs/2212.06011, 2022. [15] ´A. R. Abella, J. P. Silvestre, and P. Tabuada, “The asymptotic behavior of attention in transformers,” arXiv preprint arXiv:2412.02682 , 2024. [16] W. D’Amico, A. La Bella, and M. Farina, “An incremental input-to-state stability condition for a class of recurrent neural networks,” IEEE Transactions on Automatic Control , vol. 69, no. 4, pp. 2221–2236, 2023. [17] A. Marino, C. Pacchierotti, and P. R. Giordano, “Input state stability of gated graph neural networks,” IEEE Transactions on Control of Network Systems , vol. 11, no. 4, pp. 2052–2063, 2024. [18] H. Tsukamoto, S.-J. Chung, and J.-J. E. Slotine, “Contraction theory for nonlinear stability analysis and learning-based control: A tutorial overview,” Annual Reviews in Control , vol. 52, pp. 135–169, 2021. [19] F. Bayer, M. B¨ urger, and F. Allg¨ ower, “Discrete-time incremental iss: A framework for robust nmpc,” in 2013 European Control Conference (ECC) . IEEE, 2013, pp. 2068–2073. [20] E. Parisotto, F. Song, J. Rae, R. Pascanu, C. Gulcehre, S. Jayakumar, M. Jaderberg, R. L. Kaufman, A. Clark, S. Noury et al. , “Stabilizing transformers for reinforcement learning,” in International conference on machine learning . PMLR, 2020, pp. 7487–7498. [21] J. Xu, X. Sun, Z. Zhang, G. Zhao, and J. Lin, “Understanding and improving layer normalization,” Advances in neural information processing systems , vol. 32, 2019. [22] G. Russo, M. Di Bernardo, and E. D. Sontag, “A contraction approach to the hierarchical analysis and design of networked systems,” IEEE Transactions on Automatic Control , vol. 58, no. 5, pp. 1328–1331, 2012.

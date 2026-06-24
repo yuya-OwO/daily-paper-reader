@@ -1,0 +1,1160 @@
+Title: Hierarchical Reinforcement Learning for Sparse-Reward Search in Commutative Algebra
+
+URL Source: https://arxiv.org/pdf/2606.22922v1
+
+Published Time: Tue, 23 Jun 2026 03:17:34 GMT
+
+Number of Pages: 21
+
+Markdown Content:
+# Hierarchical Reinforcement Learning for Sparse-Reward Search in Commutative Algebra 
+
+Giorgi Butbaia 1 Paul Orland 1 Coco Huang 2 Davide Passaro 1 Lucas Fagan 1 Michele Tarquini 1
+
+Hailong Dao 3 David Eisenbud 4 Ali Shehper 1 Sergei Gukov 1
+
+Abstract 
+
+Applying machine learning techniques to solv-ing long-standing mathematical conjectures can be particularly challenging due to their extreme reward sparsity. As an illustrative example, we consider Kalai’s algebraic Hirsch conjecture and recast the construction of its counterexamples as a sparse-reward reinforcement learning problem on graphs. We propose a constrained options-based HRL framework with an equivariant graph neural network policy, which allows us to learn useful temporal abstractions for this task. We evaluate our approach over a wide range of degrees and demonstrate that it consistently outperforms clas-sical RL algorithms as well as greedy search. By exploiting the hierarchical structure of the prob-lem, we effectively provide a first-of-its-kind ap-plication of HRL to a problem in commutative algebra. 
+
+1. Introduction 
+
+Reinforcement learning has emerged as a powerful tool for tackling combinatorial search problems in mathematics, from discovering matrix multiplication algorithms (Fawzi et al., 2022) to generating counterexamples in geome-try (Swirszcz et al., 2025). However, many fundamental problems in pure mathematics present an extreme challenge: the objects being sought are so rare that random exploration almost never encounters them, leading to reward signals that are essentially zero throughout training. This paper addresses one such problem in commutative algebra — the search for rare monomial ideals that violate an algebraic 
+
+> 1
+
+Department of Mathematics, California Institute of Technol-ogy, Pasadena, CA 2Department of Mathematics, Temple Univer-sity, Philadelphia, PA 3Department of Mathematics, University of Kansas, Lawrence, KS 4Department of Mathematics, University of California, Berkeley, Berkeley, CA. Correspondence to: Giorgi Butbaia <gbutbaia@caltech.edu>. 
+
+Proceedings of the 43 rd International Conference on Machine Learning , Seoul, South Korea. PMLR 306, 2026. Copyright 2026 by the author(s). d d + 1 Diameter  
+
+> 0.00.20.40.60.81.0
+> Probability that
+> Iis linear Non-Hirsch ideals
+
+Figure 1. Probability that an ideal I is linear as a function of the diameter diam( I). The probability rapidly decays as the diameter approaches d + 1 , which is where non-Hirsch ideals live. 
+
+analogue of the Hirsch diameter bound — and demonstrates that hierarchical reinforcement learning (HRL), when com-bined with domain-specific constraints, can succeed where standard RL methods fail entirely. The Hirsch conjecture, proposed in 1957, concerns the di-ameter of polytope graphs and has deep connections to the complexity of the Simplex algorithm for linear program-ming (Dantzig, 1963). While the original conjecture was disproven after 50 years (Santos, 2012), an algebraic gener-alization due to Kalai remains open. This algebraic version asks whether the diameter of graphs associated with linearly-presented monomial ideals 1 can exceed the degree of their generators — objects we call non-Hirsch ideals — and by how much. Finding such ideals is extremely difficult: as illustrated in Figure 1, the probability that a random ideal satisfies both the linearity and large-diameter conditions decays rapidly, making this a canonical example of a sparse-reward environment. Our choice of problem is motivated in part by its mathe-matical significance: commutative algebraists have been 
+
+> 1
+
+In this manuscript we will use linearly-presented monomial ideals and linear monomial ideals interchangeably. 
+
+1
+
+> arXiv:2606.22922v1 [cs.LG] 22 Jun 2026 HRL for Sparse-Reward Search in Commutative Algebra
+
+very interested in linearity properties of monomial ideals (linear presentation/resolution/regularity) for a long time, and there is a large literature; see e.g. (Fröberg, 1990; Eagon & Reiner, 1998; Jahan & Zheng, 2010; Dao & Eisenbud, 2022) for a tiny sample. From the machine learning perspective, our problem shares key characteristics with notoriously difficult RL benchmarks like Montezuma’s Revenge (Ecoffet et al., 2021): rewards are extremely sparse, the state space grows combinatorially, and success requires discovering a precise sequence of ac-tions. Standard algorithms such as PPO and SAC fail to find any solutions beyond the smallest problem instances (Ta-ble 1). This motivates our central question: can we design an HRL framework that exploits the mathematical structure of the problem to enable effective learning? 
+
+Our key insight comes from analyzing the trajectories of trained agents: successful paths consistently pass through a particular class of intermediate states that we call spines 
+
+— simple graphs satisfying the diameter constraint. This observation suggests a natural temporal abstraction: first construct a spine, then “linearize” it by adding generators to satisfy the algebraic condition. We formalize this as a 
+
+Chained Constrained Options framework, where two op-tions are executed in sequence, each with intra-option policy constraints that prune invalid actions while preserving the ability to reach all solutions. This framework addresses several well-known challenges in HRL. The instability that typically arises when learning multiple policy levels simultaneously (Levy et al., 2019) is mitigated by our constraint structure, which provides stable sub-goal definitions. Unlike methods that struggle to learn meaningful sub-goals end-to-end (Vezhnevets et al., 2017; Nachum et al., 2018), our mathematically-motivated decomposition yields interpretable intermediate states. The constraints themselves act as a form of curriculum, guiding exploration toward the sparse region of state space where solutions exist. 
+
+Contributions. We make the following contributions: • We formulate sparse-reward counterexample search for non-Hirsch ideals as a graph-based RL environment, and provide strong baselines from both RL and classical search. • We propose a Chained Constrained Options HRL frame-work that leverages empirically identified bottlenecks (spines) and enforces algebraic constraints within options to mitigate HRL instability and subgoal-specification is-sues. • We design an equivariant graph neural policy with syzygy-aware message passing and obstruction features, and show that the resulting agent consistently outperforms standard RL and greedy search across a range of degrees, representing the first successful application of HRL to a problem in commutative algebra. 
+
+Roadmap. Section 2 provides minimal mathematical background (more details can be found in Appendix A). Section 3 defines the search and RL formulations and estab-lishes classical search baselines. In section 4 we introduce 
+
+syzygy-aware message passing and describe our graph neu-ral network architecture. Section 5 analyzes why standard RL approaches fail and identifies bottleneck states. Sec-tion 6 presents our constrained options HRL framework and experimental results. We conclude in Section 7 with limita-tions and directions for extending HRL-style agentic search to other problems. The repository containing additional materials is available at https://github.com/Math-AI-Caltech/a lghirsch-hrl .
+
+Conflict of Interest Disclosure 
+
+The authors declare no financial conflicts of interest. 
+
+2. Preliminaries: Algebraic Hirsch Conjecture 
+
+The combinatorial version of the Hirsch conjecture is well known to be tractable with computational tools. In fact, one of the first counterexamples was produced via a com-puter search, generating a polytope with 36,442 vertices (Santos, 2012). Recent approaches, such as (Swirszcz et al., 2025), have successfully utilized machine learning tools to construct a large number of counterexamples. The algebraic version of the conjecture can be similarly formulated as an extremal problem. To construct coun-terexamples, one seeks to construct homogeneous square-free monomial ideals I, called non-Hirsch ideals, that are 
+
+linearly-presented , and satisfy a large diameter constraint: 
+
+diam( I) > d , (1) where d is the degree of the generators of I and diam( I) is the diameter of the graph GI associated to the ideal I.Homogeneous square-free monomial ideals I of degree d
+
+in n variables can be conveniently characterized by their generators, sets of words of fixed length d, consisting of non-repeating (square-free) letters from an alphabet of size 
+
+n. For example, given an alphabet of n = 3 letters x1, x2,
+
+x3, a homogeneous square-free monomial ideal I of degree 
+
+d = 2 can be constructed by choosing generators of the form xixj , for i̸ = j. A graph GI can be associated to an ideal I by assigning a vertex to each generator of the ideal I,with edges connecting generators that differ by at most one letter. The linearity condition is defined using commutative 2HRL for Sparse-Reward Search in Commutative Algebra 
+
+Initial node 
+
+Construct spine 
+
+# ωSpine 
+
+Linearize 
+
+# ωLinear    
+
+> πSpine (a1|s)
+> πSpine (a2|s)πSpine (a3|s)
+> πLinear (a1|s)
+> πLinear (a2|s)
+
+a) 
+
+b) c) 
+
+Figure 2. The two-step process with constrained options ωSpine and ωLinear is shown on a). The red nodes in b) and c) denote invalid actions as they violate the intra-option constraints, while yellow and green nodes denote valid and terminal actions, respectively. The intra-option policies for ωSpine and ωLinear are πSpine and πLinear , respectively. The red edges in a) and c) denote irreducible edges. For brevity, we shall use πS (and ωS ) in place of πSpine and πL in place of πLinear .
+
+algebra; one can think of linearity as an algebraic complexity measure of the ideal (see Appendix A for details). Homogeneous square-free monomial ideals satisfying the large-diameter condition and the linearity condition individ-ually (1) are abundant, but satisfying both conditions at the same time is highly non-trivial; ideals that are linear and have a diameter exceeding the degree are exceedingly rare (see Fig. 1). In the RL setting, this scarcity translates to a sparse reward environment, making learning non-Hirsch ideals very challenging. We conclude this part with a summary of the key mathemat-ical notations used throughout the paper: 
+
+I (square-free) monomial ideal 
+
+GI graph associated to In number of variables 
+
+d degree 
+
+diam( I) diameter (of the graph GI )
+
+3. Search Algorithms for Constructing non-Hirsch Ideals 
+
+Our primary goal is to find an optimal search algorithm for linearly-presented ideals satisfying the large-diameter condition (1) . To that end, we present two different classes of search strategies: • Classical Search , including greedy-search algorithms such as Best-first search, A*, etc. These strategies are used to establish baselines. • Reinforcement Learning , which learn useful patterns for constructing non-Hirsch ideals. These strategies are the main focus of our work. We define the state space S as the set of all monomial ideals of a given degree d. We use this state space for both strategy classes. We take the action space A to be the set of moves which toggle the inclusion of a generator in a state ideal. Since the number of variables is fixed and the monomial ideals are square-free, the state and action spaces have sizes 
+
+|S| = 2 N (n,d ), |A| = N (n, d ) := 
+
+nd
+
+
+
+, (2) where n is the number of variables and d is the degree of the monomials. The combinatorial growth in the degree d of the monomials and in the number n of variables makes brute-force ap-proaches intractable. To amend this growth the following design choices are employed: 
+
+1. Feature representation : Let Imax (d, n ) be the ideal gen-erated by all possible square-free monomials of degree d
+
+in n variables. This ideal can be represented by a graph 
+
+Gmax (d, n ) with nodes that are decorated with textual fea-3HRL for Sparse-Reward Search in Commutative Algebra  
+
+> Table 1. Performance comparisons of constructing non-Hirsch ideals by different algorithms. The effective success rate is defined as a count of successful environment terminations over the number of environment interactions.
+
+Algorithm Type Effective Success Rate ( ↑)
+
+d = 4 d = 5 d = 6 d = 7 
+
+PPO (Schulman et al., 2017) — 1.94 × 10 −6 ✘ ✘ ✘
+
+SAC (Haarnoja et al., 2018) — 9.56 × 10 −6 ✘ ✘ ✘
+
+SAC+HuRL (Cheng et al., 2021) Spine priors 11 .16 × 10 −6 ✘ ✘ ✘
+
+SAC+HER (Andrychowicz et al., 2017) Spine priors 7.78 × 10 −5 ✘ ✘ ✘
+
+SAC+Priors Spine priors — 0.15 × 10 −6 ✘ ✘
+
+SAC+Buffer (Swirszcz et al., 2025) Spine priors — 2.27 × 10 −6 ✘ ✘
+
+Best-first search Brute-force 2.03 × 10 −2 1.55 × 10 −3 6.59 × 10 −4 3.9 × 10 −4
+
+Constrained Options HRL 1.08 × 10 −1 8.74 × 10 −2 6.78 × 10 −2 3.16 × 10 −2
+
+tures corresponding to the word representations of monomi-als. The graph GI corresponding to an ideal I is a subgraph of Gmax (d, n ).Motivated by this construction, we represent each ideal with a mask which picks out the nodes from Gmax (d, n )
+
+corresponding to the generators of the ideal I. This repre-sentation allows to process the ideals using message-passing algorithms, similar to those of graph attention. We demon-strate that this provides sufficient expressivity to capture relevant features for solving environments, provided that the graph associated to an ideal contains sufficient information. 
+
+2. Environment Shaping : The graph features associated with an ideal are insufficient to reliably determine whether the ideal is linearly-presented and to predict whether a long-horizon action will produce a linearly-presented ideal. In Appendix A, we provide an extension of these graphs by augmenting them with irreducible edges . The irre-ducible edges quantitatively measure how far a given ideal is from being linearly-presented, and also provide topologi-cal information regarding the location of these obstructions. The topological information can then be picked up by the message-passing protocol, providing crucial information to the RL agents. This information allows us to shape the ob-servations and, through a heuristic h(I), the reward function. We take the heuristic to be 
+
+h(I) = 
+
+(
+
+e ∈ [
+
+> l> 1
+
+El(I) e is irreducible 
+
+)
+
+, (3) where El is the set of edges connecting nodes corresponding to the generators in I which differ by l variables. 2 For an efficient algorithm for checking if a given edge is reducible, see Alg. 1. 
+
+3. Constraints : Equation (2) shows that the domain on which RL agents operate scales combinatorially. Naive ap- 
+
+> 2See Appendix A for a more detailed definition of El.
+
+proaches, which we will discuss in Sec. 5, suffer from poor performance as the agents rarely get any positive reward, even with the aid of the heuristic from Equation (3). In order to identify useful constraints, we first observe the behavior of the agents and identify the bottleneck states 
+
+(Solway et al., 2014) that lie on the high-probability paths toward non-Hirsch ideals, which exhibit a particularly sim-ple structure. We then introduce a set of chained constraints 
+
+to sequentially prune the state-action spaces by introducing a subgoal leading to the spines bottleneck states, without preventing the agent from reaching any valid non-Hirsch ideal. This suggests recasting the problem in the framework of HRL, where the resulting temporal abstractions (Fig. 2) define a useful option set for constructing such ideals. 
+
+4. Features and Syzygy-aware Message Passing 
+
+Any ideal I can be represented by a subgraph GI ⊆
+
+Gmax (d, n ). However using the subgraph alone as the state representation causes the model to fail at capturing the long-term effects of introducing new nodes. Introducing new nodes is critical for removing irreducible edges, as irre-ducibility depends on the existence of paths between the edges’ endpoints. Therefore the model requires explicit knowledge of the topology of the full graph Gmax (d, n ),with all possible generators, in order to capture both proce-dural and predictive knowledge. By identifying each graph 
+
+GI with a subgraph of Gmax (d, n ), we may represent each state by decorating the nodes of Gmax (d, n ) with an inclu-sion bit, which indicates if the node is part of the subgraph. We further augment the resulting decorated graph with a set of irreducible edges corresponding to the ideal I, ensur-ing that the network has direct access to the obstructions preventing the ideal from being linearly-presented. Each action corresponds to flipping the inclusion bit of the corresponding generator. We therefore parametrize both 4HRL for Sparse-Reward Search in Commutative Algebra 
+
+the policy and the Q-function with a GNN which has a single-dimensional output for each node. For the policy, these output features are converted to softmax probabilities, while for the Q-function, they provide a direct estimate of expected return of flipping each generator in a given state. This approach ensures that both functions remain equivariant under permutation of the nodes of the graph. Attention Attention  
+
+> 3456 1345 0356 1245 Inactive node 0235 0234
+> Figure 3. Syzygy-aware message-passing architecture used for processing node features. Blue nodes belong to the current state, while the gray nodes do not. The red edges denote the irreducible edges.
+
+Out of two main objectives, computing the diameter requires only the topological information of the graph, whereas ver-ifying if an ideal is linearly-presented further requires the textual information associated to the nodes. From the reduc-tion algorithm 1, it is evident that an effective method for representing the textual information is via binary encoding of generators. In particular, we use the map: 
+
+xi1 xi2 . . . x id 7 −→ 
+
+> d
+
+X
+
+> j=1
+
+2ij −1 , (4) and use the binary sequences of length n of the result-ing number to represent the features associated to each node. Noting that the reduction algorithm 1, requires pair-wise features, which consist of binary logical operations such as & and | on pairs of nodes, we create a message-passing layer, which we call Syzygy-aware message-passing (SConv), which leverages cross-attention to compute the aggregation function. In particular, we compute the cross attention for an edge connecting a source node with a tar-get node with binary sequence representations vsrc and vtgt 
+
+respectively 3:
+
+Aggr( vsrc , v tgt ) = CrossAttn( vsrc , v tgt , v tgt ) . (5) We combine the resulting features with multiple layers of GAT (Veliˇ ckovi´ c et al., 2017) using a GPS transformer (Rampášek et al., 2022). We demonstrate the effectiveness of this model via a brief ablation study in Fig. 6. 0 2 4 6 8 10 12          
+
+> Number of cycles
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30 fπ(n)
+> Figure 4. Frequency fπ(n)in (7) of the simplest graphs encoun-tered in the trajectories sampled via behavioral policy πtrained using SAC.
+
+5. Agentic Search for non-Hirsch Ideals 
+
+We formulate the problem of constructing non-Hirsch ideals as an MDP M = ( S, A, p, r, γ ) where the transition proba-bilities p are non-stochastic p(s′|s, a ) = δa(s)(s′), where δ
+
+is the delta distribution: δa(b) = 1 if a = b and 0 otherwise. Given that an arbitrary state in general is neither linearly presented nor does it have diameter exceeding the degree as in Equation (1) , we first consider a “naive” reward function defined as a cumulative penalty of the required conditions: 
+
+r(s, a, s ′) = rL(s, a, s ′)+ rD (s, a, s ′) where rD (s, a, s ′) = 
+
+−1 if diam( s′) ≤ d and 0 otherwise. Similarly: 
+
+rL(s, a, s ′) = 
+
+(
+
+1 s′ is linear and diam( s′) > d 
+
+0 otherwise . (6) Linearity checks were initially done via Macaulay2 (Grayson & Stillman), which posed a significant compu-tational bottleneck. To circumvent this, we trained a super-vised model to predict if a given ideal is linearly presented, which we then used for approximating rL reward function. We find that both PPO and SAC require large amount of iterations to produce solutions (as indicated in Table. 1), rendering them infeasible for scaling. We instead use the results to identify bottleneck states (Solway et al., 2014). Standard techniques, such as eigenoptions (Machado et al., 2018) and successor representations, use state-visitation statistics to identify the bottleneck states. Instead we focus on identifying the simplest graph in each trajectory since tabular methods are infeasible and we do not have useful feature-level representations for the purposes of eigenop-tions. We use the number of cycles b1(G) as a measure of “complexity” of a graph G. Instead of counting the fre-quency of visitations of a given state (as in SR), we focus  
+
+> 3See Appendix D.1 for a more detailed definition of SConv .
+
+5HRL for Sparse-Reward Search in Commutative Algebra 
+
+on the distribution of the least complex graphs over all tra-jectories. Let π be a behavioral policy; we consider the probability that the graph has n cycles along a trajectory sampled via π, : 
+
+fπ (n) = Eτ ∼π
+
+
+
+1
+
+
+
+min  
+
+> t≥0
+
+b1(st) = n
+
+ 
+
+. (7) Using the trajectories collected with SAC, we construct a Monte-Carlo approximation of the distribution of fπ (n)
+
+in Equation (7) , shown in Fig. 4. Trees and tadpole-like graphs emerge as the most common types of least-complex graphs encountered along the trajectories. This motivates introduction of temporal abstractions which focus solely on constructing these bottleneck states, which we will discuss in-depth in the next section. 
+
+6. Spines and Temporal Abstractions 
+
+While standard RL algorithms with a naive reward function (6) are able to produce some non-Hirsch ideals in lowest non-trivial degree d = 4 , they fail at producing results for larger degrees. Based on the results, we have identified a prevalence of certain path graphs which appear in the ma-jority of trajectories sampled via the optimized behavior policy. In this section, we first quantitatively assess the effectiveness of the approach and then reformulate the prob-lem within options framework to significantly accelerate the construction of non-Hirsch ideals. 
+
+6.1. Spines 
+
+One of the main conditions for identifying non-Hirsch ideals is the large diameter condition in (1) . The results of Section 5 motivate the following definition: 
+
+Definition 6.1. An ideal I is a spine if the graph GI asso-ciated to the ideal is a path graph whose diameter diam( I)
+
+satisfies the large diameter condition in (1). As part of the ablation study of spines, we evaluate the impact on performance of replacing the prior distribution 
+
+p(s0) with a “uniform” distribution of spines pS (s0). Uni-formly distributed spines are constructed procedurally using random-DFS on the graph Gmax (d, n ) (as defined in Sec-tion 3) with a random-uniform node selection. Instead of the naive rewards in (6) , we construct and shape rewards using different approaches. 
+
+1. Step-cost reward : Given a randomly initialized spine, our goal is to find nearest non-Hirsch ideals. In order to ensure that the optimal value function V ∗ is equivalent to the cost-to-go function of the environment, we assign a −1
+
+penalty for each step, effectively turning the reward function to r(s, a, s ′) = −1. Using the spines s0 ∼ pS (s0) as initial states in lieu of p(s0) = U{ 0, 1}N (n,d ), where U{ 0, 1} is the uniform distribution on {0, 1}, the agents are able to find non-Hirsch ideals of degree d = 5 .
+
+2. HuRL (Cheng et al., 2021) : Since a heuristic (3) can be efficiently computed, we may use it for shaping the reward function r(s, a ) = −1 in real time. There are two major ap-proaches for potential-based shaping: a PBRS shaping (Ng et al., 1999), which provides an optimal policy-preserving transformation of the reward function: 
+
+r(s, a, s ′) → r(s, a, s ′) + γϕ (s′) − ϕ(s) , (8) using a potential function ϕ, and a Heuristic-Guided RL (Cheng et al., 2021), which transforms the original MDP 
+
+M to a [0 , 1] ∋ λ-scheduled family of MDPs ˜Mλ =(S, A, p, ˜rλ, λγ ) where: 
+
+r(s, a, s ′) → r(s, a, s ′) + (1 − λ)γϕ (s′) , (9) where λ moves from 0 to 1. While we’ve observed some marginal improvement in the performance for d = 4 , we were not able to substantially improve the performance for higher degrees d > 4, as indicated in the Table 1. 
+
+3. Population Buffer (Swirszcz et al., 2025) : Another tech-nique that leverages the heuristic is to maintain a priority buffer, with priority function given by the heuristic in (3) .In (Swirszcz et al., 2025), the authors describe the “Hop-per” algorithm, wherein the procedure involves sampling an element from the priority buffer, attempting to improve it (as measured by improvement in the heuristic) and, if successful, storing the improved state back to the buffer. If the heuristic provides useful intermediate goals, the average score of the buffer increases. For non-Hirsch ideals, we de-fine priority function P (I) as a combination of the number 
+
+h(I) of irreducible ideals defined in (3) and the diameter 
+
+diam( I) of the graph associated to the ideal: 
+
+P (I) := −h(I) − | diam( I) − (d + 1) | . (10) While we observe that this approach outperforms previous techniques by making d = 5 non-Hirsch ideals accessible by RL, it struggles to scale to larger degrees. In particular, we observe in Fig. 5 that while the average priority score is initially monotonically increasing, it stops once the buffer consists of graphs which satisfy the diameter constraint but have a single irreducible edge. This indicates that for larger degrees, the heuristic alone does not provide sufficiently even-spaced goals to allow the model to reduce the last remaining edge while still satisfying the diameter constraint. 
+
+4. Hindsight Experience Replay (Andrychowicz et al., 2017) : Given a state s, we construct a goal gs associated to the state s as gs = (diam( s), h (s)) where h is the heuristic (3) . The target goal is gtgt = ( d + 1 , 0) . We shape the goal-based reward function as: 
+
+rg (s, a, s ′) = −[gs′̸ = g] . (11) 6HRL for Sparse-Reward Search in Commutative Algebra 0 200 400 600 800 1000            
+
+> Step
+> −5.0
+> −4.5
+> −4.0
+> −3.5
+> −3.0
+> −2.5
+> −2.0
+> −1.5
+> −1.0Priority P(I)
+> Figure 5. Mean priority P(I)of ideals Iin the buffer during training for degree d= 6 .
+
+We observe some improvement for constructing ideals in degree d = 4 (See SAC+HER in Table 1), however, the approach struggles to construct ideals in higher degrees. 
+
+6.2. Chained Constrained Options 
+
+Every non-Hirsch ideal contains a spine. Therefore, given that the agent defined in 6.1 builds a non-Hirsch ideal from spines, we may ask whether, given a spine, there always exists a non-Hirsch ideal I for which the spine is a diameter-realizing path for (1) . If this holds, we call the spine a 
+
+supporting spine. For any supporting spine s0, we can construct a trajectory 
+
+τ = ( s0, . . . , s T ) where sT is a non-Hirsch ideal, such that every intermediate state st satisfies the diameter constraint 
+
+diam( st) > d (See Thm. A.8). By measuring the likelihood of randomly sampled spine being a supporting spine in the sense defined above, we find that ≪ 1% of spines have this property (see Best-first search in Table 1). This observation motivates us to reformulate the reinforcement learning framework within constrained options framework with two chained temporal abstractions: spines (S) and linearizations (L). We illustrate this procedure in Fig. 2. In particular, we extend the notion of options by incorporating intra-option policy constraints. More specifi-cally, we introduce options: 
+
+ωS = ( IS , π S , CS , β S ), ωL = ( IL, π L, CL, β L) , (12) where CS and CL are constraints on the intra-option policies 
+
+πS and πL, respectively. We define the initialization set 
+
+IS of the spine policy to consist of single-node graphs and 
+
+βS = IL as the set of all path graphs of diameter strictly larger than the degree. The constraint CS for procedurally constructing a supporting spine is essentially restricting the intra-option policy πS to ensure monotonicity of the diameter: 
+
+CS (st) = {at ∈ A | diam( st) < diam ( at(st)) < ∞} ,
+
+(13) whereas, for the linearization option ωL, the constraint CL
+
+ensures that the diameter of the subsequent states remain above the degree: 
+
+CL(st) = {at ∈ A | diam ( at(st)) > d } . (14) Due to a specific choice of the terminations βS and βL,the distribution p(τ ) of the trajectories (Bacon et al., 2017) sampled using options ωS and ωL takes a particularly simple form: 
+
+p(τ ) = p(s0) 
+
+> TS+TL−1
+
+Y
+
+> t′=TS
+
+p(st′+1 |st′ , a t′ )πL(at′ |st′ )· (15)  
+
+> TS−1
+
+Y
+
+> t=0
+
+p(st+1 |st, a t)πS (at|st) ,
+
+where TS denotes the number of steps required for an agent to construct a spine of diameter > d starting from a sin-gle node. Generally, for stability purposes, we choose the threshold on the diameter to be slightly above d and allow the agent to execute the linearization option ωL at each step satisfying (1). We establish the baseline by letting πbaseline  
+
+> S
+
+(at|st) =
+
+U(CS (st)) , the uniform distribution on CS (st), and 
+
+πbaseline  
+
+> L
+
+(at|st) be restricted A* search policy πA∗,h L (at|st)
+
+using heuristic h(I) from (3) with intra-option constraint 
+
+CL from (14) . While likelihood of randomly constructing a supporting spine via a baseline policy πbaseline  
+
+> S
+
+is small, the linearization policy πA∗,h L using heuristic h from (3) successfully terminates in all cases that we have tested. This is mostly due to the fact that heuristic seems to provide suffi-cient information for introducing new nodes which eliminate irreducible edges. Furthermore, we observe that the mean number of steps required to linearize a supporting spine using the policy πA∗,h L scales linearly with the degree d (see Fig. 8). Therefore, we shall fix πL = πbaseline  
+
+> L
+
+and focus on optimizing the spine policy πS . For assigning the rewards, we use goal-hitting sparse-reward function: 
+
+r(s, a, s ′) = 
+
+(
+
+1 if s′ is non-Hirsch 
+
+0 otherwise . (16) While PPOC (Klissarov et al., 2017) extends PPO to op-timize the terminations, given that we do not parametrize terminations, we focus only on update rules corresponding to the policies. 7HRL for Sparse-Reward Search in Commutative Algebra 0 10 20 
+
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Return
+
+Degree d = 4   
+
+> 0100 200
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+
+Degree d = 5   
+
+> 0100 200
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+
+Degree d = 6    
+
+> 0200 400 600
+
+Step 
+
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+
+Degree d = 7   
+
+> SConv GAT Baseline
+
+Figure 6. Average episodic return over degrees d = 4 to d = 7 . The SConv (Section 4) consistently outperforms the baseline and GAT models. Both SConv and GAT were trained by optimizing πS intra-option hard-constrained policy. We used 1/10 the learning rate for 
+
+d = 7 to mitigate stability issues. The inflection points of GAT for degrees d > 5 occur far beyond the number of steps displayed in the figures and are therefore omitted. 0 5 10 15 20 25 30 
+
+> Action Index
+> 01234567
+> Step
+
+b)        
+
+> Selected action (sampled) Invalid action (masked out)
+> 01234567
+> Step
+> 0
+> 1
+> 2
+> Entropy
+
+c) 
+
+> 0.20.40.60.81.0
+> Probability
+
+a) 
+
+Figure 7. (a) Visualization of a trajectory sampled using learned intra-option spine policy for d = 4 , with the policy shown in (b). (c) shows the entropy of the admissible actions is decreasing as the number of cycle-free actions decreases with the number of nodes. 4 5 6 7 8
+
+Degree d
+
+> 5
+> 10
+> 15
+> 20
+> Mean path length
+
+Figure 8. Mean path length of the heuristic h-based linearization policy πA∗,h L constructing non-Hirsch ideal from a supporting spine. 
+
+A major difficulty is correctly constraining the policies with-out sacrificing the stability of the training. This leads us to consider two different strategies for enforcing the con-straints CS and CL: hard constraints and soft constraints ,which we discuss in depth below. 
+
+Hard Constraints (Huang & Ontañón, 2022) : Given a state st at step t > 0, we define a mask which replaces the logits of the actions at /∈ C S (st) by a large negative number M ≈ −∞ . This effectively restricts the allowed set of actions whilst maintaining well-define policy-gradients (Huang & Ontañón, 2022). However, the key difficulty is the computational complexity of verifying set membership 
+
+at
+
+> ?
+
+∈ C S (st) due to the combinatorial scaling (2) of the number of actions A. Since this is unavoidable, we address this by parallelizing the membership checks over multiple cores. 
+
+Soft Constraints (Ray et al., 2019) : An alternative ap-proach is to add a adaptive penalty to the agent for violating the constraints. However, we observe that this approach doesn’t produce solutions faster than the baseline. See Ap-pendix C for more details. Therefore, we mainly focus on policies with hard constraints. The average episodic returns of agents trained using the hard constraints are shown in Fig. 6. We observe that despite masking out invalid actions in the policy, the training re-mains stable. The agents are able to learn useful intra-option policy πS , which significantly outperforms the baseline. Fur-thermore, both the baseline and constrained options policy outperform other RL approaches, as evidenced by the results in Table 1. In Fig. 6, we also present a brief comparison of the Syzygy-Aware graph convolutions (Section 4) versus regular Graph 8HRL for Sparse-Reward Search in Commutative Algebra 
+
+Attentions. We observe that SConv exhibits earlier conver-gence compared to Graph Attention, which we attribute to the fact that the attention matrices between pairs of nodes resemble the bit-wise binary operations required in syzygy reduction algorithm 1. Visualizing the actions performed by the agent in Fig. 7, we observe that the constraints significantly reduce the space of valid actions. Furthermore, as the agent builds a spine, this space continues to shrink, as indicated by decreasing en-tropy. We list some of the examples of non-Hirsch ideals of degree d = 7 constructed using RL agent in the Appendix B. 
+
+7. Conclusion 
+
+In this work, we demonstrate that temporal abstractions are not only beneficial but also crucial for solving an extremely sparse-rewards search problem in commutative algebra. By analyzing the failure modes of the standard end-to-end RL algorithms, we were able to identify rare bottleneck states, called supporting spines, which have allowed us to refor-mulate the problem within the framework of constrained options in HRL. Our results show that while the linearization of a supporting spine can be easily accomplished via available heuristics, the key difficulty lies in discovering such spines in the first place. Learning a dedicated policy for constructing such spines is therefore the primary objective and leads to sub-stantial gains compared to what was previously accessible. To our knowledge, this is the first demonstration that learned temporal abstractions enable sparse-reward search in com-mutative algebra and, more broadly, in similar environments where solutions are vanishingly rare. Beyond this specific application, our work motivates a gen-eral paradigm for approaching “needle-in-a-haystack” agen-tic search problems in mathematics: identify the bottleneck states by observing the behavior of standard RL algorithms and design temporal abstractions which significantly reduce the complexity of the problem. 
+
+Acknowledgements 
+
+The project was sponsored by the Defense Advanced Research Projects Agency under cooperative agreement HR0011262E017, by the NSF AIMing grant 2522494, by the DRW Foundation, and by a philanthropic gift from Les Kohn. M.T. is also supported by the U.S. Department of Energy (Grant No. DE-SC0011632) and by the Walter Burke Institute for Theoretical Physics. Additionally, this work was supported with Cloud TPUs from Google’s TPU Research Cloud (TRC), with GPUs from the NVIDIA Aca-demic Grant Program, by cloud computing resources pro-vided by Nebius through the Research Program of Nebius Academy, and by Advanced Micro Devices, Inc. under the AMD University Program’s AI & HPC Cluster. The content of the information does not necessarily reflect the position or the policy of the Government, and no official endorsement should be inferred. 
+
+Approved for public release; distribution is unlimited. 
+
+Impact Statement 
+
+This paper presents work whose goal is to advance the field of machine learning and mathematical reasoning. There are many potential societal consequences of our work, none of which we feel must be specifically highlighted here. 
+
+References 
+
+Andrychowicz, M., Wolski, F., Ray, A., Schneider, J., Fong, R., Welinder, P., McGrew, B., Tobin, J., Pieter Abbeel, O., and Zaremba, W. Hindsight experience replay. Advances in neural information processing systems , 30, 2017. Bacon, P.-L., Harb, J., and Precup, D. The option-critic architecture. In Proceedings of the AAAI conference on artificial intelligence , volume 31, pp. 1726–1734, 2017. doi: 10.1609/aaai.v31i1.10916. URL https://ojs. aaai.org/index.php/AAAI/article/view /10916 .Cheng, C.-A., Kolobov, A., and Swaminathan, A. Heuristic-guided reinforcement learning. Advances in Neural Infor-mation Processing Systems , 34:13550–13563, 2021. Dantzig, G. B. Linear Programming and Extensions . Prince-ton University Press, Princeton, NJ, 1963. Dao, H. and Eisenbud, D. Linearity of free resolutions of monomial ideals. Research in the Mathematical Sciences ,9(2):35, 2022. Eagon, J. A. and Reiner, V. Resolutions of Stanley-Reisner rings and Alexander duality. Journal of Pure and Applied Algebra , 130(3):265–275, 1998. doi: 10.1016/S0022-4 049(97)00097-2. Ecoffet, A., Huizinga, J., Lehman, J., Stanley, K. O., and Clune, J. First return, then explore. Nature , 590(7847): 580–586, 2021. doi: 10.1038/s41586-020-03157-9. Eisenbud, D. Commutative algebra with a view toward algebraic geometry / David Eisenbud. Graduate texts in mathematics ; 150. Springer-Verlag, New York, 1995. ISBN 0387942688. Fawzi, A., Balog, M., Huang, A., Hubert, T., Romera-Paredes, B., Barekatain, M., Novikov, A., Ruiz, F. J. R., Schrittwieser, J., Swirszcz, G., Silver, D., Hassabis, D., 9HRL for Sparse-Reward Search in Commutative Algebra 
+
+and Kohli, P. Discovering faster matrix multiplication al-gorithms with reinforcement learning. Nature , 610(7930): 47–53, 2022. doi: 10.1038/s41586-022-05172-4. Fröberg, R. On Stanley-Reisner rings. Topics in Algebra, Part 2 (Warsaw, 1988), Banach Center Publications , 26: 57–70, 1990. Gebauer, R. and Möller, H. M. On an installation of buchberger’s algorithm. Journal of Symbolic Compu-tation , 6(2):275–286, 1988. ISSN 0747-7171. doi: https://doi.org/10.1016/S0747-7171(88)80048-8. URL 
+
+https://www.sciencedirect.com/scienc e/article/pii/S0747717188800488 .Grayson, D. R. and Stillman, M. E. Macaulay2, a software system for research in algebraic geometry. Available at 
+
+http://www2.macaulay2.com .Haarnoja, T., Zhou, A., Abbeel, P., and Levine, S. Soft actor-critic: Off-policy maximum entropy deep reinforce-ment learning with a stochastic actor. In International conference on machine learning , pp. 1861–1870. Pmlr, 2018. Huang, S. and Ontañón, S. A closer look at invalid action masking in policy gradient algorithms. In The Inter-national FLAIRS Conference Proceedings , volume 35, 2022. Jahan, A. S. and Zheng, X. Ideals with linear quotients. 
+
+Journal of Combinatorial Theory, Series A , 117(1):104– 110, 2010. doi: 10.1016/j.jcta.2009.03.012. Kalai, G. The polynomial hirsch conjecture, a proposal for polymath3 (cont.). Blog post, 2009. URL https: //gilkalai.wordpress.com/2009/07/28/ polymath3-abstract-polynomial-hirsc h-conjecture-aphc/ . Accessed: 2026-01-25. Klissarov, M., Bacon, P.-L., Harb, J., and Precup, D. Learn-ings Options End-to-End for Continuous Action Tasks. 
+
+arXiv e-prints , art. arXiv:1712.00004, November 2017. doi: 10.48550/arXiv.1712.00004. Levy, A., Konidaris, G., Platt, R., and Saenko, K. Learning multi-level hierarchies with hindsight. In International Conference on Learning Representations , 2019. Machado, M. C., Rosenbaum, C., Guo, X., Liu, M., Tesauro, G., and Campbell, M. Eigenoption discovery through the deep successor representation. In International Confer-ence on Learning Representations , 2018. Morales, M., Nejad, A. N., Yazdan Pour, A. A., and Zaare-Nahandi, R. Monomial ideals with 3-linear resolutions. 
+
+Annales de la Faculté des sciences de Toulouse: Mathé-matiques , 23(4):877–891, 2014. doi: 10.5802/afst.1428. Nachum, O., Gu, S. S., Lee, H., and Levine, S. Data-efficient hierarchical reinforcement learning. In Advances in Neural Information Processing Systems , volume 31, pp. 3303–3313, 2018. Ng, A. Y., Harada, D., and Russell, S. J. Policy invariance under reward transformations: Theory and application to reward shaping. In Proceedings of the Sixteenth Inter-national Conference on Machine Learning , ICML ’99, pp. 278–287, San Francisco, CA, USA, 1999. Morgan Kaufmann Publishers Inc. ISBN 1558606122. Pathak, D., Agrawal, P., Efros, A. A., and Darrell, T. Curiosity-driven exploration by self-supervised predic-tion. In International conference on machine learning ,pp. 2778–2787. PMLR, 2017. Rampášek, L., Galkin, M., Dwivedi, V. P., Luu, A. T., Wolf, G., and Beaini, D. Recipe for a general, powerful, scal-able graph transformer. In Proceedings of the 36th Inter-national Conference on Neural Information Processing Systems , NIPS ’22, Red Hook, NY, USA, 2022. Curran Associates Inc. ISBN 9781713871088. Ray, A., Achiam, J., and Amodei, D. Benchmarking safe exploration in deep reinforcement learning.(2019). URL https://cdn. openai. com/safexp-short. pdf , 3:14–28, 2019. Santos, F. A counterexample to the hirsch conjecture. Ann. Math. , 176(1):383–412, July 2012. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimization algorithms. 
+
+arXiv preprint arXiv:1707.06347 , 2017. Solway, A., Diuk, C., Córdova, N., Yee, D., Barto, A., Niv, Y., and Botvinick, M. Optimal behavioral hierarchy. PLoS computational biology , 10(8), August 2014. ISSN 1553-734X. doi: 10.1371/journal.pcbi.1003779. Publisher Copyright: © 2014 Solway et al. Swirszcz, G., Wagner, A. Z., Williamson, G., Blackwell, S., Georgiev, B., Davies, A., Eslami, A., Racaniere, S., Weber, T., and Kohli, P. Advancing geometry with ai: Multi-agent generation of polytopes. arXiv preprint arXiv:2502.05199 , 2025. Veliˇ ckovi´ c, P., Cucurull, G., Casanova, A., Romero, A., Liò, P., and Bengio, Y. Graph attention networks. 6th International Conference on Learning Representations ,2017. Vezhnevets, A. S., Osindero, S., Schaul, T., Heess, N., Jaderberg, M., Silver, D., and Kavukcuoglu, K. FeU-dal networks for hierarchical reinforcement learning. In 
+
+Proceedings of the 34th International Conference on Ma-chine Learning , volume 70 of ICML ’17 , pp. 3540–3549. PMLR, 2017. 10 HRL for Sparse-Reward Search in Commutative Algebra 
+
+A. Mathematical Problem: Relevant Background 
+
+Monomial ideals serve as a bridge between commutative algebra and combinatorics. A direct connection between the Hirsch conjecture and the linear presentation of monomial ideals is implicated in a conjecture proposed by Gil Kalai in an algebraic form (Kalai, 2009): Consider the collection G′(k, n ) of graphs G whose vertices are labeled by k-subsets of an n element set, in such a way that if v is a vertex labeled by the set S and u is a vertex labeled by the set T , then there is a path between 
+
+u and v so that all labels of its vertices are sets containing S ∩ T .
+
+Conjecture A.1. Kalai’s Abstract Polynomial Hirsch Conjecture (APHC): If G ∈ G (k, n ) is connected, then the diameter of G is bounded above by a polynomial in k and n.
+
+The original Hirsch conjecture is related to this as follows. Let P be a polytope in N -space, with facets labeled 1 . . . , n , and let each vertex be labeled by the sets of N facets that intersect in it (thus a vertex may have several labels). If v is a vertex labeled by a set S and u is a vertex labeled by a set T and S ∩ T is non-empty, then u and v lie on the same facet and are obviously connected by a path traversing the edges of this facet. Thus, Kalai’s conjecture would say that the diameter of the 1-skeleton of P is bounded by a polynomial in n and k. Of course, the graph formed by the skeletons of polytopes is very special. Let d = n − k, and consider a relabeling of the vertices of graphs in G′(k, n ) with the complements of the original labels. Thus, we arrive at the set G(d, n ) of connected graphs whose vertices are labeled by d-element subsets of 1, . . . , n in such a way that If there is a path between vertices u and v, then there is a path consisting of vertices whose labels are subsets of 
+
+A ∪ B.
+
+Proposition A.2. (Dao & Eisenbud, 2022) Let G be a graph whose vertices are labeled by d-element subsets of 1, . . . , n as above, and let I be the (square-free) monomial ideal in a polynomial ring k[x1, . . . , x n] generated by monomials 
+
+{xi1 · · · xid | { i1, . . . , i d} is the label of a vertex of G}
+
+corresponding to the vertex labels. The graph G belongs to G(d, n ) if and only if the ideal I has a linear presentation. 
+
+Let I be the (square-free) monomial ideal in a polynomial ring k[x1, . . . , x n] generated by monomials corresponding to the vertex labels, 
+
+{xi1 · · · xid | { i1, . . . , i d} is the label of a vertex of G}
+
+Given any square-free monomial ideal I ⊂ k[x1, . . . , x n] we form a labeled graph GI whose vertices are the minimal monomial generators, and whose labels are the indices of the factors of the generators. With this language we may restate Kalai’s conjecture as: 
+
+Conjecture A.3. If I is a square-free monomial ideal in n variables, generated in degree d and having a linear presentation, then the diameter of GI is bounded above by a polynomial in d.Remark A.4 . The process of polarization can be used to replace any monomial ideal by a square-free one with a similar presentation, so the conjecture is equivalent to the same statement for all monomial ideals, taking the labels as multisets or as the monomials themselves. For very small d, the Conjecture A.3 holds true and even satisfies the original Hirsch-style bound diam( I) ≤ d, cf. (1) . For example, with d = 2 , consider any two vertices ab, cd . By local connectedness, there is a path between them involving only variables a, b, c, d , which is easily seen to be, up to renaming, ab, bc, cd . For d = 3 , see (Morales et al., 2014). More generally, for each d, there is a finite list of “obstructions” to linearity. But these lists grow rapidly with d and so far have not been very useful for d > 3.A central problem in addressing Conjecture A.3, and more generally in studying the linear presentation of monomial ideals, is to find examples of monomial ideals I generated in degree d having linear presentation where the diameter of GI , divided by d, is as large as possible. So far, the best we can do “by hand” is an ideal in 10 variables a, . . . j for which d = 7 and the diameter of GI is 9, shown in Fig. 9. 11 HRL for Sparse-Reward Search in Commutative Algebra defghij,befghij,aefghij,acefgij,acdfgij,abdfgij,abdegij,bcdegij, 
+
+> bcdefij,acdefhj,abefghj,abdfghj,bcdfghj,acdeghj,bcdeghj,abcdefj,
+> bcefghi,bcdfghi,acdfghi,acdeghi,abdeghi,abdefhi,abcdefi,abcdefg
+
+Figure 9. A non-Hirsch ideal of degree d = 7 for which the diameter is 9.
+
+A.1. Edge Reduction Algorithm 
+
+Let R = k[x1, . . . x n] be a polynomial ring. By applying Hilbert Syzygy Theorem to I treated as a finitely generated 
+
+R-module, we may construct its minimal finite resolution: 
+
+0 −→ Fn −→ · · · −→ F1
+
+> ϕ1
+
+−→ F0
+
+> ϕ0
+
+−→ I −→ 0 , (17) where each R-module Fi for 0 ≤ i ≤ n is finitely generated and free. Each F0≤i≤n may further be decomposed into a direct sum of degree-shifted modules: 
+
+Fi ≃
+
+> mi
+
+M
+
+> j=0
+
+R(−i − j)βij , (18) where βij = dim k Tor Ri (I, k )j are the Betti numbers and Pmi 
+
+> j=0
+
+βij = rank Fi. A monomial ideal I is linear if all maps in (17) are of degree one. We are interested in a slightly weaker condition, where we are mainly focused on the linearity of the presentation of the ideal I in the resolution. In particular, we define I to be linearly presented if the map ϕ1 in the resolution (17) has degree one. We may check if an ideal is linearly presented by computing the reduced Gröbner basis of the first syzygy module Syz 1(I), defined as ker ϕ0. While generally this can be accomplished using standard computer algebra frameworks, such as Macaulay2 (Grayson & Stillman), we observe that these methods are typically infeasible for ideals generated by a large number of monomials. This is especially important for reinforcement learning applications, where any computational cost during environment interactions may lead to prohibitively slow training as each action requires us to perform a linear presentation test. In order to mitigate the computational costs associated to the environment, we propose an alternative parallelized algorithm which allows us to utilize the computational advantages offered by modern CUDA-enabled GPUs. Let I = ( fi)gi=1 where each fi is a monomial in variables {x1, . . . , x n}, such that no two generators are the same and 
+
+deg fi = d. Note that the set of monomials {fi}gi=1 is a Gröbner basis of I as by construction in >fi = fi, thus Buchberger’s criterion is trivially satisfied. Furthermore, by applying Schreyer’s theorem (Eisenbud, 1995) to I, it is easy to see that an unreduced Gröbner basis of Syz 1(I) is given by: 
+
+Sij := lcm( fi, f j )
+
+fj
+
+ϵj − lcm( fi, f j )
+
+fi
+
+ϵi = mij ϵj − mji ϵi , (19) where {ϵi}gi=1 is the canonical basis of F0 such that ϕ(ϵi) = fi. Unfortunately, such basis is typically far from being minimal. Checking if an ideal I is linearly presented amounts to checking if the generators (19) of degree > d + 1 can be expressed in terms of generators of smaller degree. While general heuristics, such as Gebauer–Möller conditions (Gebauer 12 HRL for Sparse-Reward Search in Commutative Algebra 
+
+Algorithm 1 Edge Reduction Algorithm  
+
+> 1:
+
+Input: edge e = ( v, v ′) ∈ E2. // Or any El> 1 
+
+> 2:
+
+Input: first-level graph G1 = ( V, E 1). 
+
+> 3:
+
+Output: True if e is reducible. False otherwise.  
+
+> 4: 5:
+
+Define : mww ′ := w′ & ¬w for all w, w ′ ∈ V . 
+
+> 6:
+
+Define : Nv (G1) := 1-hop neighborhood of v ∈ V in G1. 
+
+> 7:
+
+V ← ∅ // visited nodes  
+
+> 8:
+
+Initialize empty queue q 
+
+> 9:
+
+Enqueue q ← (v, m vv ′ ) 
+
+> 10:
+
+while q is not empty do  
+
+> 11:
+
+Dequeue (w, m ) ← q.pop()  
+
+> 12:
+
+for each w′ ∈ N w(G1) do  
+
+> 13:
+
+if w′ ∈ V then  
+
+> 13:
+
+continue  
+
+> 14:
+
+end if  
+
+> 15:
+
+if m | mvw ′ = m then  
+
+> 16:
+
+if w′ = v′ then  
+
+> 16:
+
+return True // The edge e was successfully reduced  
+
+> 17:
+
+end if  
+
+> 18:
+
+r ← m & ¬mww ′ // Missing variables coming from w 
+
+> 19:
+
+q ← (w′, r | mw′w) // Append missing variables to mw′w 
+
+> 20:
+
+end if  
+
+> 21:
+
+end for  
+
+> 22:
+
+V ← V ∪ { w} 
+
+> 23:
+
+end while  
+
+> 24:
+
+return False // If no path was found, then edge is irreducible 
+
+& Möller, 1988) exist, those typically do not yield minimal bases. Furthermore, we are interested in refining the obstruction to linearity, in order to define a heuristic measuring how far away a given ideal is from being linearly presented. Therefore, we focus on the following objectives: 
+
+1. Features : Using the data associated to the first syzygy module Syz 1(I), provide an additional set of features which might be useful for the agent to identify useful moves and measure how far ideal I is from being linearly presented. 
+
+2. Parallelization : Design a GPU-accelerated algorithm which efficiently checks if a given ideal I is linearly presented. Inspired by the results of (Dao & Eisenbud, 2022), we design a reduction algorithm which reformulates the problem as graph reduction algorithms and provides a new set of features which we use to augment the graph GI .A.1.1. C OMBINATORIAL DATA OF THE FIRST SYZYGY MODULE 
+
+Given a square-free monomial ideal I = ( fi)gi=1 of degree d > 0, we associate a multi-level graph G1≤l≤d = ( V, E l) to the first syzygy module Syz 1(I) of the ideal I. We define the vertices V of Gl as {v1, . . . , v g }, where g is the number of generators of I. Furthermore, we associate each generator fi with vi via a map θ(vi) = fi. For each level l > 0, we define the set of edges El as: 
+
+El := {(v, w ) ∈ V | deg m (θ(v), θ (w)) = l} , (20) where m(f, g ) := lcm( f,g )/g. Note that the edges El are in one-to-one correspondence with the generators (19): 
+
+El ∋ (θ−1(fi), θ −1(fj )) s
+
+7−→ Sij , (21) therefore, all linear generators of Syz 1(I) correspond to the edges E1 of the first-level component G1 of G. Furthermore, testing if the ideal I is linearly presented amounts to checking the properties of the graphs Gl> 1. In particular, we define: 13 HRL for Sparse-Reward Search in Commutative Algebra 4 5 6 7 8 9 10             
+
+> 7
+> 8
+> 9
+> 10
+> 11
+> 12
+> n
+> CUDA CUDA CUDA CUDA
+> CUDA CUDA CUDA CUDA
+> CUDA CUDA CUDA
+> CUDA CUDA CUDA
+> CUDA CUDA
+> CUDA CUDA
+
+CUDA / M2       
+
+> 40
+> 60
+> 80
+> 100
+> 120
+> 140
+> 45678910
+
+d             
+
+> 7
+> 8
+> 9
+> 10
+> 11
+> 12 CUDA CUDA CUDA CUDA
+> CUDA CUDA CUDA CUDA
+> CUDA CUDA CUDA
+> CUDA CUDA CPU
+> CUDA CPU
+> CPU CPU
+
+CUDA / CPU 
+
+> 2
+> 4
+> 6
+> 8
+> 10
+
+Figure 10. End-to-end timing benchmarks of linear presentation tests across different platforms. 
+
+Definition A.5. An edge e ∈ El> 1 is reducible if the generator s(e) ∈ Syz 1(I) can be written as an R-linear combination: 
+
+s(e) = X
+
+> e′∈E1
+
+r(e′)s(e′) , (22) for some r : E1 → R. Otherwise, we call e irreducible .From this definition, we immediately obtain a characterization of linearly presented ideals in terms of reducible edges: 
+
+Theorem A.6. An ideal I is linearly presented iff every edge e ∈ El> 1 is reducible. Proof. Let I be linearly presented, then Syz 1(I) is generated by linear forms, corresponding to the edges in E1. Since the generators associated to all edges ∪lEl form a Gröbner basis of I, we see that the generators associated to the edges S 
+
+> l> 1
+
+El must be expressible in terms of generators s(E1) via (22) , thus making them reducible. Conversely, if every edge is reducible, then the generators associated to them may be expressed in terms of generators associated to the edges in E1,thereby making s(E1) a linear basis of I.A major consequence of the Theorem A.6 is that we may parallelize the test of whether the ideal is linearly presented over the edges in S 
+
+> l> 1
+
+El. This is possible due to the fact that reducibility of each edge is independent from another. Additionally, the number of irreducible edges measures the extent to which a given ideal fails to be linearly presented, which we use to define heuristic (3). A.1.2. A LGORITHM FOR TESTING REDUCIBILITY OF EDGES 
+
+Noting that the ideals we consider are square-free, we may encode each generator as a binary sequence of length n, where bit at location i is set to 1 if the generator contains variable xi. We denote this encoding by b : {fi}i → N. This is equivalent to the construction described in (4) . Using this representation, the operations lcm and gcd over the generators fj of I reduce to bitwise operations over the binary sequences given by: 
+
+lcm( f, g ) = b(f ) | b(g) (23) 
+
+gcd( f, g ) = b(f ) & b(g)
+
+for f, g generators of I. Note that each cycle in the graph G, consisting of edges E′ ⊂ S 
+
+> l
+
+El corresponds to a relation of form: 
+
+X
+
+> e∈E′
+
+r(e)s(e′) = 0 , (24) 14 HRL for Sparse-Reward Search in Commutative Algebra 
+
+for some r : S 
+
+> l
+
+El → R nonzero no E′ (we take r(e) = 0 for e / ∈ E′). Since for any given edge e ∈ El> 1, we are interested in finding a relation of form (22) , we design an algorithm which verifies if there exists a cycle consisting of edges E1 ∪ { e}
+
+such that the corresponding relation (24) has coefficient r(e) = ±1 for the edge e. Without loss of generality, we focus on reducibility of edges in E2, noting that the extension to higher levels El> 2 is routine. The algorithm is shown in Alg. 1. 
+
+Theorem A.7. An edge e ∈ El> 1 is reducible iff the Edge Reduction Algorithm 1 outputs True .Proof. The algorithm 1 is a BFS search of a cycle consisting of edges E1 ∪ { e} containing e which produces a relation (24) such that r(e) = 1 . Suppose that e is reducible, then there exists a cycle (v0, . . . , v k−1) consisting of edges ei =(vi, v i+1 mod k) ∈ E1 ∪ { e}. W.l.o.g. let e0 = e, and let r : ∪l El → R be the coefficient function with r(e0) = 1 .Note that apart from e0, the only other edge containing v1 is e1, therefore, in order to cancel out the v1 component of the generator s(e0), we must have m2,1 divide m0,1, where for brevity we’ve used mi,j := m(θ(vi), θ (vj )) . We verify this in the m | mww ′ == m step of the algorithm. The ratio r(e1) = m0,1/m2,1 is then stored in variable r of the algorithm. Given 
+
+r(ei), constructing r(ei+1 ) is done similarly by checking if mi+2 ,i +1 divides r(ei)mi,i +1 and storing the ratio in variable r,where i + 1 and i + 2 are mod k. Ultimately, the cycle reaches e0, thus successfully terminating the algorithm to true .Conversely, suppose that the algorithm terminates to true for an edge e ∈ E2. This can only happen if there exists a cycle connecting (v0, v 1, . . . , v k−1) the endpoints of an edge e = ( v0, v 1) such that m2,1 divides m0,1, with ratio being r(e1).Construct the next coefficients recursively using: 
+
+r(ei+1 ) = r(ei)mi,i +1 
+
+mi+2 ,i +1 
+
+, (25) all of which exist and are well-defined by construction. It is easy to see that r(ei)s(ei) forms a telescoping series, leaving: 
+
+> k−1
+
+X
+
+> i=0
+
+r(ei)s(ei) = −m1,0ϵv0 + · · · + r(ek−1)mk−1,0ϵv0 . (26) Since by construction r(ek−1)mk−1,0 divides m1,0 and deg m1,0 = 2 , noting that deg r(ek−1) > 0 (propagated from 
+
+deg r(e0) = 1 ) and deg mk−1,0 = 1 , we must have r(ek−1)mk−1,0 = m1,0, thus r(ek) = 1 . This makes r a well-defined coefficient function, which implies that e is indeed reducible. By encoding the graph structure of each level Gj in CSR format and parallizing the algorithm 1 over the edges S 
+
+> l> 1
+
+El, we are able to utilize the full advantage provided by the CUDA-accelerated hardware. The timing benchmarks are provided in Fig. 10. Furthermore, by counting and retaining the list of irreducible edges, we obtain a useful set of additional features which help guide the agent towards non-Hirsch ideals. 
+
+A.2. Supporting Spines Theorem A.8. Given a supporting spine s0, there exists a trajectory τ = ( s0, . . . , s T ) to a non-Hirsch ideal sT such that every intermediate state st has diameter diam( st) > d .Proof. This is because we may construct a trajectory from s0 to sT by sequentially adding vertices from sT which are not in st. The fact that s0 is a diameter-realizing path ensures that no new vertex will introduce a strictly shorter path between the endpoints of s0. This can be seen by contradiction: suppose that st does not satisfy the diameter constraint for some 
+
+t < T . This implies that there exists a path in st between the endpoints of s0 which is shorter than d + 1 . However, this path would also be a subgraph of sT , which contradicts the assumption that s0 is diameter-realizing in sT .15 HRL for Sparse-Reward Search in Commutative Algebra 
+
+B. Non-Hirsch Ideals Constructed Using HRL 
+
+Here we provide visualizations of some of the degree d = 7 non-Hirsch ideals in polynomial ring k[a, b, c, d, e, f, g, h, i, j ].cdeghij,cdefgij,cdefghi,befghij,bdefghj, 
+
+bcfghij,bcefhij,bcdfhij,bcdeghi,bcdefgj, 
+
+adefghi,abefgij,abdfhij,abdefij,abdefgh, 
+
+abcfgij,abcefhj,abcdfgj,abcdefh 
+
+defghij,cefghij,bdefgij,bcdfgij,bcdfghj, 
+
+bcdefgh,aefghij,adfghij,acefgij,acdfghi, 
+
+abfghij,abdefgj,abdefgi,abdefgh,abcghij, 
+
+abcfhij,abcehij,abcefgj,abcdfgi 
+
+cefghij,cdefhij,bdeghij,bdefhij,bcfghij, 
+
+bcdfghi,aefghij,adefghi,acefhij,acdfgij, 
+
+acdfghi,abfghij,abdfhij,abdehij,abdefgj, 
+
+abdefgh,abcefhj,abcdfgj,abcdefh 
+
+cefghij,cdefhij,bdeghij,bdefhij,bcfghij, 
+
+bcdfghi,bcdehij,aefghij,adefghi,acefhij, 
+
+acdfgij,acdfghi,abfghij,abdfhij,abdefgj, 
+
+abdefgh,abcefhj,abcdfgj,abcdefh 
+
+cdefghi,bdefghj,bcdefhi,bcdefgh,acdefgh, 
+
+abdfhij,abdfghi,abdehij,abdefgj,abdefgi, 
+
+abcfgij,abcfghj,abcehij,abceghj,abcefgi, 
+
+abcdfhj,abcdefj,abcdefi 
+
+bdefghi,bcefhij,bcefghi,bcdghij,bcdfghj, 
+
+bcdeghj,bcdefhj,acdefgi,acdefgh,abefghj, 
+
+abefghi,abdefhj,abdefhi,abcfhij,abcefgj, 
+
+abcdhij,abcdefi,abcdefg 
+
+bdeghij,bcfghij,bcefghj,bcdfhij,bcdegij, 
+
+bcdefgi,bcdefgh,acdfhij,acdfghj,abdghij, 
+
+abdeghj,abdefgh,abcfgij,abcefgj,abcdghi, 
+
+abcdfhj,abcdfgi,abcdefj 
+
+bdeghij,bdefhij,bcefhij,bcefghj,bcdehij, 
+
+bcdefgj,bcdefgi,bcdefgh,adfghij,adefgij, 
+
+acfghij,acdfgij,abefgij,abefghj,abdefhi, 
+
+abdefgh,abcfghi,abcefgi 
+
+cefghij,bcefghj,bcdfghi,bcdeghj,bcdefgh, 
+
+acefghj,acefghi,acdfghj,acdfghi,abdfgij, 
+
+abdefij,abcfhij,abcfgij,abcefhi,abcdfhj, 
+
+abcdegh,abcdefj 
+
+cdefhij,cdefghj,befghij,bdefhij,bcefhij, 
+
+bcdefgj,adfghij,acfghij,acefhij,acdefhj, 
+
+abefgij,abdfghj,abdefhj,abceghj,abcefgj, 
+
+abcefgh,abcdegh 
+
+bdefghi,bcefghj,bcefghi,bcdfhij,bcdfgij, 
+
+bcdegij,bcdefhj,adefghi,acdefgh,abdfghj, 
+
+abdefgh,abcfghj,abcfghi,abcefhi,abcdfhi, 
+
+abcdegj,abcdefj 
+
+bdefghi,bcefghj,bcefghi,bcdfhij,bcdfgij, 
+
+bcdegij,bcdefhj,adefghj,acdefgh,abdfghj, 
+
+abdefgh,abcfghj,abcfghi,abcefhi,abcdfhi, 
+
+abcdegj,abcdefj 
+
+Figure 11. Some of the d = 7 non-Hirsch ideals generated using HRL approach described in Sec. 6.2. 
+
+16 HRL for Sparse-Reward Search in Commutative Algebra bdefghj,bceghij,bcefghj,bcdghij,adeghij, 
+
+adefghi,aceghij,acdefij,acdefhj,acdefgj, 
+
+acdefgi,abdeghj,abcdehi,abcdegj,abcdegi, 
+
+abcdefh 
+
+cdfghij,cdefghj,bdfghij,bdeghij,bceghij, 
+
+bcefhij,bcdfghj,adefgij,adefghj,acfghij, 
+
+aceghij,acdefgi,abfghij,abefghj,abdefgj, 
+
+abcefgj 
+
+bcdfghj,adfghij,adefgij,acefghj,acdghij, 
+
+acdeghj,acdefhi,acdefgi,abdghij,abdfgij, 
+
+abdefgi,abdefgh,abcfghj,abcfghi,abcdghi, 
+
+abcdegh 
+
+bcefghj,bcefghi,bcdfgij,bcdefij,bcdefhj, 
+
+acdfhij,acdfgij,acdefhj,abdfhij,abcehij, 
+
+abcegij,abcefhi,abcefgh,abcdegj,abcdefi, 
+
+abcdefg 
+
+bdefghj,bcdefhj,bcdefhi,adeghij,abeghij, 
+
+abefghi,abdfhij,abdfghi,abdefij,abdefgj, 
+
+abcfhij,abcfghi,abcdfgh,abcdefi,abcdefg 
+
+bcdfghj,adfghij,adefgij,acefghj,acdghij, 
+
+acdeghj,acdefhi,acdefgi,abdfgij,abdefgi, 
+
+abdefgh,abcfghj,abcfghi,abcdghi,abcdegh 
+
+bcdfgij,bcdehij,bcdefij,acefhij,acefghj, 
+
+acdfhij,acdfghj,abfghij,abefhij,abdfghj, 
+
+abcefgh,abcdfhi,abcdfgi,abcdefj,abcdefh 
+
+bdefhij,bdefgij,bcefhij,bcefghj,bcdefgh, 
+
+aceghij,acdghij,abfghij,abeghij,abefgij, 
+
+abdefhi,abdefgh,abcghij,abcefhi,abcefgi 
+
+bcefhij,bcefghi,bcdefhi,aefghij,adefghi, 
+
+acefgij,acdeghj,acdefgh,abeghij,abdeghi, 
+
+abceghj,abcefgi,abcdfhi,abcdegi 
+
+bcdefgj,adefhij,acdehij,abefgij,abdfgij, 
+
+abdfghj,abdefhi,abdefgh,abcfhij,abcefhj, 
+
+abcefgj,abcdfij,abcdfhj,abcdefi 
+
+bcdefhi,bcdefgi,aceghij,acefghj,acdefgh, 
+
+abeghij,abefghi,abdeghj,abdefgh,abcfghi, 
+
+abcdhij,abcdghj,abcdghi,abcdehi 
+
+bcdefhi,bcdefgi,aceghij,acefghj,acdefgh, 
+
+abeghij,abefghi,abdeghj,abdefgh,abcfghi, 
+
+abcdghj,abcdghi,abcdehi,abcdefi 
+
+Figure 12. Some of the d = 7 non-Hirsch ideals generated using HRL approach described in Sec. 6.2. 
+
+17 HRL for Sparse-Reward Search in Commutative Algebra 
+
+In order to verify that these ideals are indeed linearly presented, use the following Macaulay2 script: 
+
+R = ZZ/101[a,b,c,d,e,f,g,h,i,j]; isLinear = I -> (d := (degree I_*_0)_0; {d+1} == max degrees source syz gens I); I = ideal({insert generators here}); isLinear I
+
+C. Bottleneck States Identified Via Soft Constraints 
+
+A standard approach is to employ PPO-Lagrangian as a “soft-constraint” alternative to “hard-constraint” in (13) with no additional hyperparameters. The constraint dynamically penalizes transitions that fail to efficiently produce spines. Specifically, we define a constraint cost function cS (st) = diam( st−1) − diam( st) if st−1 is not a terminal state, otherwise 
+
+0. Interestingly, PPO-Lagrangian enables the agent to construct a much more general class of bottleneck states, such as trees and tadpole-shaped graphs (See Figure 13). However, we observe that while PPO-Lagrangian learns to satisfy the constraints, the rate at which it produces solutions is significantly lower than that achieved with hard constraints, as expected from prior results (Ray et al., 2019). cefg,bcef,bcdf,aefg,acdg,acde,abfg,abce defg,cdef,bcef,adfg,aceg,abeg,abdf,abde, 
+
+> abcf
+
+Figure 13. Non-spine bottleneck states identified using soft constraints. 
+
+18 HRL for Sparse-Reward Search in Commutative Algebra 
+
+D. Training and Model Details 
+
+D.1. Syzygy-aware Message Passing Algorithm 2 SConv: Preprocessing 
+
+Require: Binary mask m for nodes of GI in Gmax (d, n ).
+
+Require: Node and mask encodings ϕne and ϕme , respectively. Embedding dimension de.
+
+1: Encode masks: 
+
+m ← ϕme (m) ∈ R|m|× de
+
+2: Expand mask features by copying it over n variables: 
+
+m ← Expand( m, n ) ∈ R|m|× n×de
+
+3: Encode node and mask features: 
+
+˜x = ϕne (x) + ϕme (m) ∈ R|m|× n×de
+
+return ˜x ∈ R|m|× n×de
+
+Algorithm 3 SConv: Message Passing 
+
+Require: Base graph Gmax (d, n ). Binary mask m for nodes of GI in Gmax (d, n ). Irreducible edges Eirr .
+
+Require: Embedded features ˜x ∈ R|m|× n×de from 2 
+
+Require: Embedding dimension df . Number of heads H.
+
+Require: Weights WQ, W K , W V ∈ Rde×H×df .
+
+Require: k-layer MLP: fMLP : Rn×H×df → Rdf .
+
+1: for each edge e = ( i, j ) ∈ E1(Gmax (d, n )) ∪ Eirr do 
+
+2: Compute key and value: 
+
+Kj = ˜ xj WK , Vj = ˜ xj WV ∈ Rn×H×df
+
+3: Compute query: 
+
+Qi = ˜ xiWQ ∈ Rn×H×df
+
+4: Compute cross-attention: 
+
+mij = Attention (Qi, K j , V j ) ∈ Rn×H×df
+
+5: Apply MLP: 
+
+mij ← fMLP (mij ) ∈ Rdf
+
+6: end for 
+
+7: Aggregate the features per node: 
+
+yi = MEAN {mij | (i, j ) ∈ E1(Gmax (d, n )) ∪ Eirr } ∈ Rdf
+
+return y ∈ R|m|× df .
+
+D.2. Hyperparameters Hyperparameter Symbol Value 
+
+Number of heads H 4
+
+Node and mask embedding dimension de 64 
+
+SConv embedding dimension df 64 
+
+Table 2. Model Hyperparameters. 
+
+19 HRL for Sparse-Reward Search in Commutative Algebra 
+
+Hyperparameter Value 
+
+d = 4 d = 5 d = 6 d = 7 
+
+# parallel environments 16 16 32 48 
+
+# steps per epoch 128 128 128 128 # improvement epochs 4 4 4 4Learning rate 2.5 × 10 −4 2.5 × 10 −4 2.5 × 10 −4 2.5 × 10 −5
+
+Mini-batch size 64 64 64 64 Max steps for πS 10 11 12 13 Max steps for πL 10 10 15 15  
+
+> Table 3. Training Hyperparameters.
+
+D.3. Intrinsic Curiosity Module (Pathak et al., 2017) 
+
+Standard RL exploration strategies often fail when extrinsic rewards are extremely sparse or delayed. In these cases, intrinsic reward may offer a solution to the exploration bottleneck. The intrinsic curiosity module of (Pathak et al., 2017) is comprised of three networks: a feature embedding states to features ϕ : s 7 → ϕ(s), an inverse model mapping features of consecutive states to a predicted action between them ρ : ( ϕ(s), ϕ (s′)) 7 → ˆa and a forward model mapping an action-feature pair to the predicted features of the next state σ : ( a, ϕ (s)) 7 → ˆϕ(s′). The prediction error of the forward model is used as the basis for the intrinsic reward signal 
+
+ri(s, s ′) = η ˆϕ(s) − ϕ(s′) 22
+
+(27) where η is a scaling factor. The mean-return training curve for an HRL agent, trained using ICM module, is shown in the Figure 14. 0 25 50 75 100 125 150 175 200 
+
+0.0
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+1.0
+
+Degree d = 5 
+
+Without ICM With ICM Baseline  
+
+> Figure 14. Average episodic return of HRL agent with and without ICM module.
+
+E. New Non-Hirsch Ideals From Old 
+
+In this section we describe another direction we have explored for constructing new non-Hirsch ideals by using the list of existing ones. This complements other approaches described in the main text that mainly focus on constructing non-Hirsch ideals of a fixed degree d in a polynomial ring k[Xn] with a fixed number of variables Xn := {x1, . . . , x n} without prior knowledge of other non-Hirsch ideals. 20 HRL for Sparse-Reward Search in Commutative Algebra abcdefj,abcdegh,abcdfhj,abcefhi, 
+
+abcfgij,abcfhij,abdefij,abdfgij, 
+
+acdfghi,acdfghj,acefghi,acefghj, 
+
+bcdefgh,bcdeghj,bcdfghi,bcefghj, 
+
+cefghij x11 abcdefj, x11 abcdegh, x11 abcdfhj, x11 abcefhi, 
+
+> x11 abcfgij, x11 abcfhij, x11 abdefij, x11 abdfgij,
+> x11 acdfghi, x11 acdfghj, x11 acefghi, x11 acefghj,
+> x11 bcdefgh, x11 bcdeghj, x11 bcdfghi, x11 bcefghj,
+> x11 cefghij x11 abcdefj, x11 abcdegh, x11 abcdfhj, x11 abcefhi,
+> x11 abcfgij, x11 abcfhij, x11 abdefij, x11 abdfgij,
+> x11 acdfghi, x11 acdfghj, x11 acefghi, x11 acefghj,
+> x11 bcdefgh, x11 bcdeghj, x11 bcdfghi, x11 bcefghj,
+> x11 cefghij, abdfghij
+
+I 7 → x11 I Brute-force 
+
+Figure 15. Process of constructing new Non-Hirsch ideals from old. 
+
+Let I be a non-Hirsch ideal of degree d in k[Xn] generated by monomials {fi}gi=1 . We may embed this ideal into a polynomial ring k[Xn][ xn+1 ] = k[Xn+1 ] by multiplying each generator of I by xn+1 :
+
+fi 7 −→ xn+1 fi . (28) This produces an ideal ˜I = xn+1 I of degree d + 1 in k[Xn+1 ] which preserves both the diameter and the number of irreducible edges. Since I is non-Hirsch and therefore linearly presented, we must have ˜I also linear. What remains to do is to attach another generator to the ideal ˜I in order to increase the diameter to d + 2 whilst ensuring that no new irreducible edges are introduced by this operation. While the number of possible new generators that may be added to the ideal ˜I grows combinatorially, we find that a simple brute-force search is sufficient. 21

@@ -1,0 +1,2505 @@
+Title: Compensated Splitting For Generalized Lyapunov Equations
+
+URL Source: https://arxiv.org/pdf/2606.22245v1
+
+Published Time: Tue, 23 Jun 2026 02:14:28 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Compensated Splitting For Generalized Lyapunov Equations 
+
+Hongjia Chen ∗ Ren-Cang Li †
+
+June 23, 2026 
+
+Abstract 
+
+The generalized Lyapunov equation has a natural splitting that leads to the stan-dard fixed-point iteration (sFPI) for its numerical solution. sFPI is convergent, for an arbitrarily given initial guess, if and only if the spectral radius of the associated linear operator is smaller than 1. This means that sFPI may diverge if the spectral radius is 1 or bigger. In this paper, we propose a compensated splitting scheme that aims to reduce the spectral radius so that the resulting compensated fixed-point iteration (cFPI) has a better convergence property, namely, cFPI may still converge even if sFPI does not or cFPI converges faster than sFPI does when the latter is also convergent. Numerical results are presented to demonstrate the superiority of cFPI to sFPI. 
+
+Keywords: generalized Lyapunov equation, compensated splitting, fixed-point iter-ation, spectral radius 
+
+Mathematics Subject Classification 65F45, 65F08, 15A06, 15A24 
+
+## 1 Introduction 
+
+Our focus in this paper is the numerical solution to the generalized Lyapunov equation 
+
+AX + XA H +
+
+> m
+
+∑
+
+> j=1
+
+Nj XN H 
+
+> j
+
++ BB H = 0 , (1.1) where the matrices A, N j ∈ Cn×n and B ∈ Cn×ℓ with usually ℓ ≪ n. Such an equation of-ten arises from the model order reduction of bilinear control systems and linear parameter-varying systems, the stability analysis of linear stochastic differential equations, as well as the linearization of stochastic continuous-time algebraic Riccati equations [2, 3, 5, 6, 10]. The constant term in (1.1) takes such a special form BB H because of the sources of the generalized Lyapunov equation in applications. As far as the development in this paper is concerned, the constant term can be replaced with any square matrix C. Imposing that C
+
+is Hermitian will generally imply that the solution X is Hermitian, too. In most existing 
+
+> ∗
+
+Department of Mathematics, Nanchang University, 999 Xuefu Road, Nanchang, Jiangxi, 330031, China. Supported by the National Natural Science Foundation of China under grant No. 12371379 and No. 12361080, and Jiangxi Provincial Natural Science Foundation under grant No. 20224BAB211006. Email: chenhongjia@ncu.edu.cn .
+
+> †
+
+Department of Mathematics, University of Texas at Arlington, Arlington, TX 76019-0408, USA. Sup-ported in part by NSF DMS-2407692. Email: rcli@uta.edu .
+
+1
+
+> arXiv:2606.22245v1 [math.NA] 20 Jun 2026
+
+literature, all matrices in (1.1) are assumed to be real, but we let them be complex for generality and that all matrices are real is simply a special case. Theoretically, (1.1) is an n2-by-n2 linear system of equations and can be turn into the familiar standard form of a linear system of equations: 
+
+A vec( X) ≡
+
+[
+
+In ⊗ A + ¯A ⊗ In +
+
+> m
+
+∑
+
+> j=1
+
+¯Nj ⊗ Nj
+
+]
+
+vec( X) = − vec( BB H), (1.2) where ⊗ is the matrix Kronecker product, ¯A and ¯Nj denote the entrywise complex con-jugate of A and Nj , and vec( ·) vectorizes a matrix into a column vector by stacking up the columns of the matrix. It follows from this standard form that if A ∈ Cn2×n2
+
+is nonsingular then (1.1) has a unique solution and the solution X is Hermitian, but it is not clear if X is definite or not. Another implication of (1.2) is the temptation to solve the original (1.1) via (1.2). Unfortunately, any direct solver such as variants of Gaussian elimination and is not feasible unless n is very small (a few tens) because of its O(n4)storage and O(n6) computational complexity [7, 8]. Usual iterative methods for linear systems [7, 9, 15] are straightforwardly applicable without the need to form A explicitly. The generalized Lyapunov equation (1.1) has received increasing attention over the last decades. The simplest numerical method is through the fixed-point technique, and it is based on splitting the linear terms in X in (1.1) naturally into M (X) = N (X) − BB H,where 
+
+M (X) := AX + XA H, N (X) = −
+
+> m
+
+∑
+
+> j=1
+
+Nj XN H 
+
+> j
+
+. (1.3) Both M (·) and N (·) are linear operators from Cn×n to itself, and in particular, N (X)  0(negative semidefinite) for any X  0 (positive semidefinite). When M is invertible, such a splitting yields the following standard fixed-point iteration (sFPI): given X0, for 
+
+k = 1 , 2, . . . solve 
+
+M (Xk) ≡ AX k + XkAH = N (Xk−1) − BB H (1.4) for Xk until convergence. Suppose that M is invertible. A sufficient condition for the convergence of sFPI (1.4) is 
+
+ρ(M −1N ) < 1, (1.5) where ρ(M −1N ) is the spectral radius of M −1N as a linear operator in Cn×n. The condition implies that necessarily 
+
+M − N = M (Id −M −1N )is invertible, where Id denotes the identity operator in Cn×n. But, if ρ(M −1N ) ≥ 1, then the scheme is in general divergent. Our goal in this paper is to rectify ρ(M −1N ) ≥ 1 to yield a new iterative scheme that may still converge. Roughly speaking, ρ(M −1N ) ≥ 1is caused by the N -part being relative too “heavy”. Hence in order to overcome the violation, we have to take out a portion of the N -part to compensate the M -part. For that purpose, we propose to somehow decompose the N -part as 
+
+−N (X) = EX + XE H − ˜N (X) (1.6) 2in such a way that ˜N (·) is made relatively less “heavy” than before and then compensate 
+
+M (X) with EX + XE H, leading to 
+
+M (X) − N (X) = [ M (X) + EX + XE H]
+
+︸ ︷︷ ︸  
+
+> =: ˜M(X)
+
+− ˜N (X), (1.7) which we will call a compensated splitting . As a result, we can establish the following compensated fixed-point iteration (cFPI): given X0, for k = 1 , 2, . . . solve 
+
+˜M (Xk) ≡ (A + E)Xk + Xk(A + E)H = ˜N (Xk−1) − BB H (1.8) for Xk until convergence. An ideal compensated splitting (1.7) should minimize ρ( ˜M −1 ˜N )subject to ˜M being invertible. Conceivably, seeking such an ideal compensated splitting is utterly impractical. Instead, we seek somehow to “minimize” ˜N (·) optimally in certain sense. In the end, we come up with an optimal E that takes a very elegant form 
+
+E = 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯Nj )
+
+[
+
+Nj − 1
+
+2n tr( Nj ) · In
+
+]
+
+, (1.9) where tr( ·) takes the trace of a matrix, and μ ≥ 0 is a regularizing parameter to control the magnitude of E. How it is derived will be detailed in section 2. FPI-type methods are simple to design and implement. Beyond such methods as we have discussed so far, not surprisingly, modern iterative techniques for linear systems (see, e.g., [7, 8, 9, 15]) have seen their extensions to the generalized Lyapunov equation (1.1), including, for example, the bilinear ADI method [2], the greedy low-rank methods [12], Krylov subspace-type methods [11], and exploitations of the fixed-point iteration [16], a residual-based generalized rational-Krylov-type subspace method [4], and a method based on the Sherman–Morrison–Woodbury formula [5]. However, in this paper we will be focusing solely on rescuing sFPI from its divergence or making it converge faster. Any potential combination of the key idea of this paper with the state-of-the-art subspace-based projection techniques will be investigated in forthcoming studies. The rest of this paper is organized as follows. In section 2, a compensated splitting is proposed and its main result is (1.9). Numerical experiments are reported in section 3, demonstrating the new method’s superiority to sFPI. Finally, we draw conclusion and make comments in section 4. 
+
+Notation . Rm×n and Cm×n denote the sets of real and complex m × n matrices, respectively; Rn = Rn×1 and Cn = Cn×1, and In ∈ Rn×n is the identity matrix. For a matrix X, XT and XH denote its transpose and complex conjugate transpose, respectively, and ‖X‖2 and ‖X‖F are the spectral and Frobenius norms of X. Other notation will be defined at its first appearance. 
+
+## 2 Compensated Splitting 
+
+As we discussed in section 1, an ideal compensated splitting (1.7) should make ρ( ˜M −1 ˜N )as small as possible. Unfortunately, that is not numerically feasible, and so we will have 3to be less ambitious. We start by making ˜N (X) as insignificant as possible over all 
+
+X ∈ Cn×n and seek E ∈ Cn×n by min  
+
+> E
+
+max   
+
+> ‖vec( X)‖2≤1
+
+∥∥∥
+
+> m
+
+∑
+
+> j=1
+
+Nj XN H 
+
+> j
+
+− (EX + XE H)
+
+∥∥∥2F + μ‖EX + XE H‖2F, (2.1) where μ‖EX + XE H‖2F can be regarded as a regularization term on E to keep it from being too “big”, and μ ≥ 0 is the regularizing parameter that has to be chosen properly. Notice that max   
+
+> ‖vec( X)‖2≤1
+
+∥∥∥(
+
+In ⊗ E + ¯E ⊗ In −
+
+> m
+
+∑
+
+> j=1
+
+¯Nj ⊗ Nj
+
+)
+
+vec( X)
+
+∥∥∥22 + μ‖(In ⊗ E + ¯E ⊗ In) vec( X)‖22
+
+≤
+
+∥∥∥In ⊗ E + ¯E ⊗ In −
+
+> m
+
+∑
+
+> j=1
+
+¯Nj ⊗ Nj
+
+∥∥∥22 + μ‖In ⊗ E + ¯E ⊗ In‖22, (2.2) which involves the sum of two spectral norms of two n2 × n2 matrices, and conceivably minimizing the expression in (2.2) over E is a difficult thing to do, if at all possible. Instead, we relax (2.2) to min 
+
+> E
+
+{
+
+f (E) := 
+
+∥∥∥In ⊗ E + ¯E ⊗ In −
+
+> m
+
+∑
+
+> j=1
+
+¯Nj ⊗ Nj
+
+∥∥∥2F + μ‖In ⊗ E + ¯E ⊗ In‖2F
+
+}
+
+. (2.3) It can be seen that the objective f (E) in (2.7) is a non-negative quadratic function in the entries of E and it is convex. Hence any stationary point of (2.3) is a global minimum point. Our main result in this section is stated in the following theorem, where tr( ·) takes the trace of a square matrix. 
+
+Theorem 2.1. An optimal E to (2.3) is given by 
+
+E = 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯Nj )
+
+[
+
+Nj − 1
+
+2n tr( Nj ) · In
+
+]
+
+. (2.4) 
+
+Moreover, the minimizer is unique for the real case, and for the complex case this optimal 
+
+E is the one with the smallest Frobenius norm. 
+
+We will defer the proof of this theorem to subsections 2.1 and 2.2 below. A couple of immediately questions are: 1) what is the invertibility of the operator ˜M ? 2) does E in (2.4) always decrease the spectral radius in question? The answers to both questions are negative, as our later numerical experiments in section 3 suggest. The following identity may provide some understanding as to when E in (2.4) will work better. tr( E) = 1
+
+2n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+| tr( Nj )|2 ≥ 0. (2.5) Suppose that the magnitudes of all Nj are small and then so is that of E in (2.4), and thus E can be considered a perturbation. Since tr( A + E) = tr( A) + tr( E) ≥ tr( A), 4Algorithm 2.1 cFPI: the compensated fixed-point iteration for (1.1) 
+
+Input: A, Nj , B as in (1.1), μ ≥ 0, and tolerance ǫ.
+
+Output: an approximation to the solution of (1.1).  
+
+> 1:
+
+compute E according to (2.4);  
+
+> 2:
+
+X0 = 0.  
+
+> 3:
+
+for k = 1 , 2, . . . do  
+
+> 4:
+
+C = − m∑
+
+> j=1
+
+Nj Xk−1N H 
+
+> j
+
++ EX k−1 + Xk−1EH − BB H; 
+
+> 5:
+
+solve ( A + E)Xk + Xk(A + E)H = C for Xk; 
+
+> 6:
+
+if NRes( Xk) ≤ ǫ then  
+
+> 7:
+
+return Xk. 
+
+> 8:
+
+end if  
+
+> 9:
+
+end for 
+
+E will move some of the eigenvalues rightward. Now if the eigenvalues of A lie in the left-half plane, then collectively these eigenvalues will be moved rightward towards 0, making ˜M “less invertible” than M . In such a case there is a possibility that any gain in “minimizing” ˜N may get offset by worsening in ˜M along the way. On the other hand, if the eigenvalues of A lie in the right-half plane, then collectively the eigenvalues of A will also be moved rightward but further away from 0, making ˜M even “more invertible”. In such a situation, determining E by (2.3) has an implicit effect of serving the purpose of what an ideal compensated splitting (1.7) should achieve. This quantitative explanation is actually reflected in our numerical experiments in section 3. Now with the optimal E in Theorem 2.1, we create a compensated splitting in (1.7) and numerically the fixed-point iterative scheme (1.8) which we will call the compensated fixed-point iteration (cFPI), as outlined in Algorithm 2.1, where all inner Lyapunov equations have the same coefficient matrix A + E and, hence, if solved by the Bartels-Stewart algorithm [1], the Schur decomposition of A + E can be computed outside the for-loop. In the algorithm, the normalized residual NRes( ·) is defined as NRes( X) := 
+
+∥∥∥AX + XA H + ∑mj=1 Nj XN H 
+
+> j
+
++ BB H
+
+∥∥∥F
+
+‖X‖F(2 ‖A‖2 + ∑mj=1 ‖Nj ‖22) + ‖BB H‖F
+
+. (2.6) Since the spectral norm ‖ · ‖ 2 is computationally nontrivial, we will replace ‖A‖2 with √‖A‖1‖A‖∞, and similarly for ‖Nj ‖2. These replacements should work equally well numerically because what is important is the correct magnitude of NRes( ·). In the next two subsections, we will establish (2.4). In theory, the real case is a special one of the complex case when all involved matrices are real matrices. Hence there is no need to consider the real case separately if we can handle the complex case. It turns out that the real case is so much simpler and often the generalized Lyapunov equations (1.1) in applications are real ones, so we will single out the real case first and dive into the complex case separately. Notation E(s,t ) stands for the ( s, t )th entry of E and similarly for ( Nj )(s,t ).52.1 Optimal E for the Real Case 
+
+Consider E ∈ Rn×n and so are all Nj . We have 
+
+f (E) = 
+
+> n
+
+∑
+
+> s=1
+
+∥∥∥E + E(s,s )In −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s )Nj
+
+∥∥∥2F + μ
+
+> n
+
+∑
+
+> s=1
+
+∥∥∥E + E(s,s )In
+
+∥∥∥2F
+
++
+
+> n
+
+∑ 
+
+> s,t =1
+> s6=t
+
+∥∥∥E(s,t )In −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t )Nj
+
+∥∥∥2F + μ
+
+> n
+
+∑ 
+
+> s,t =1
+> s6=t
+
+∥∥∥E(s,t )In
+
+∥∥∥2F. (2.7) We start by finding the stationary points of (2.3). To that end, it suffices to set the partial derivatives of f with respect to each entry of E to 0. We have, for s, t = 1 , 2, . . . , n and 
+
+s 6 = t,0 = 1
+
+4
+
+∂f (E)
+
+∂E (s,s )
+
+= 1
+
+4
+
+∂
+
+∂E (s,s )
+
+∥∥∥E + E(s,s )In −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s )Nj
+
+∥∥∥2F + μ 1
+
+4
+
+∂
+
+∂E (s,s )
+
+∥∥∥E + E(s,s )In
+
+∥∥∥2F
+
++ 1
+
+4
+
+∂
+
+∂E (s,s )
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+∥∥∥E + E(i,i )In −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(i,i )Nj
+
+∥∥∥2F + μ 1
+
+4
+
+∂
+
+∂E (s,s )
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+∥∥∥E + E(i,i )In
+
+∥∥∥2F
+
+= 1
+
+2
+
+[
+
+2E(s,s ) −
+
+> m
+
+∑
+
+> j=1
+
+[(Nj )(s,s )
+
+]2]
+
+2 + 1
+
+2
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[
+
+E(i,i ) + E(s,s ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s )(Nj )(i,i )
+
+]
+
++ μ 1
+
+2
+
+[
+
+2E(s,s )
+
+]
+
+2 + μ 1
+
+2
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[
+
+E(i,i ) + E(s,s )
+
+]
+
++ 1
+
+2
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[
+
+E(s,s ) + E(i,i ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(i,i )(Nj )(s,s )
+
+]
+
++ μ 1
+
+2
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[
+
+E(s,s ) + E(i,i )
+
+]
+
+= ( n + 1)(1 + μ)E(s,s ) + (1 + μ)
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+E(i,i ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s )
+
+> n
+
+∑
+
+> i=1
+
+(Nj )(i,i )
+
+= n(1 + μ)E(s,s ) + (1 + μ)
+
+> n
+
+∑
+
+> i=1
+
+E(i,i ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s ) tr( Nj ), (2.8a) 0 = 1
+
+2
+
+∂f (E)
+
+∂E (s,t )
+
+= 1
+
+2
+
+∂
+
+∂E (s,t )
+
+> n
+
+∑
+
+> i=1
+
+∥∥∥E + E(i,i )In −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(i,i )Nj
+
+∥∥∥2F + μ 1
+
+2
+
+∂
+
+∂E (s,t )
+
+> n
+
+∑
+
+> i=1
+
+∥∥∥E + E(i,i )In
+
+∥∥∥2F
+
++ 1
+
+2
+
+∂
+
+∂E (s,t )
+
+∥∥∥E(s,t )In −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t )Nj
+
+∥∥∥2F + μ 1
+
+2
+
+∂
+
+∂E (s,t )
+
+∥∥∥E(s,t )In
+
+∥∥∥2F
+
+=
+
+> n
+
+∑
+
+> i=1
+
+[
+
+(1 + μ)E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(i,i )(Nj )(s,t )
+
+]
+
++
+
+> n
+
+∑
+
+> i=1
+
+[
+
+(1 + μ)E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t )(Nj )(i,i )
+
+]
+
+6= 2 n(1 + μ)E(s,t ) − 2
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t ) tr( Nj ). (2.8b) First we solve the system of n equations in (2.8a) for 1 ≤ s ≤ n for the diagonal entries of 
+
+E. Sum up the n equations over s = 1 , 2, . . . , n to get 2n(1 + μ)
+
+> n
+
+∑
+
+> s=1
+
+E(s,s ) −
+
+> m
+
+∑
+
+> j=1
+
+[tr( Nj )] 2 = 0 ⇒
+
+> n
+
+∑
+
+> s=1
+
+E(s,s ) = 1
+
+2n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+[tr( Nj )] 2. (2.9) Plugging (2.9) into (2.8a), we find 
+
+E(s,s ) = 1
+
+n(1 + μ)
+
+
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s ) tr( Nj ) − 1
+
+2n
+
+> m
+
+∑
+
+> j=1
+
+[tr( Nj )] 2
+
+ for s = 1 , 2, . . . , n . (2.10) Consider now the off-diagonal entries of E. By (2.8b), we have for s, t = 1 , 2, . . . , n and 
+
+s 6 = t, yielding 
+
+E(s,t ) = 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t ) tr( Nj ) for s, t = 1 , 2, . . . , n and s 6 = t. (2.11) Putting (2.10) and (2.11) together, compactly, we have (2.4) for the real case. Since there is one and only one stationary point given by (2.10) and (2.11) together, and the optimizer must be the global minimizer. 
+
+2.2 Optimal E for the Complex Case 
+
+Consider the case when E and all Nj are complex. We have 
+
+f (E) = 
+
+> n
+
+∑
+
+> s=1
+
+∥∥∥E + ¯E(s,s )In −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,s )Nj
+
+∥∥∥2F + μ
+
+> n
+
+∑
+
+> s=1
+
+∥∥∥E + ¯E(s,s )In
+
+∥∥∥2F
+
++
+
+> n
+
+∑ 
+
+> s,t =1
+> s6=t
+
+∥∥∥ ¯E(s,t )In −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,t )Nj
+
+∥∥∥2F + μ
+
+> n
+
+∑ 
+
+> s,t =1
+> s6=t
+
+∥∥∥ ¯E(s,t )In
+
+∥∥∥2F.
+
+To find the optimal E to (2.3), we will find its stationary points determined by setting the partial derivatives of f with respect to the real and imaginary parts of each entry of E to 0. Write 
+
+E(s,t ) = Ere (s,t ) + ιE im (s,t ), ¯E(s,t ) = Ere (s,t ) − ιE im (s,t ),
+
+where ι is the imaginary unit, and Ere (s,t ), E im (s,t ) ∈ R. It is known that 
+
+∂f (E)
+
+∂E re (s,t )
+
+= ∂f (E)
+
+∂E (s,t )
+
++ ∂f (E)
+
+∂ ¯E(s,t )
+
+, 1
+
+ι · ∂f (E)
+
+∂E im (s,t )
+
+= ∂f (E)
+
+∂E (s,t )
+
+− ∂f (E)
+
+∂ ¯E(s,t )
+
+, (2.12) in which E and ¯E are treated as independent matrix variables. For the diagonal entries, we have 
+
+∂f (E)
+
+∂E (s,s )
+
+= ∂
+
+∂E (s,s )
+
+∥∥∥E + ¯E(s,s )In −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,s )Nj
+
+∥∥∥2F + μ ∂
+
+∂E (s,s )
+
+∥∥∥E + ¯E(s,s )In
+
+∥∥∥2F
+
+7+ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∥∥∥E + ¯E(i,i )In −
+
+m∑
+
+j=1 
+
+( ¯Nj )(i,i )Nj
+
+∥∥∥2F + μ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∥∥∥E + ¯E(i,i )In
+
+∥∥∥2F
+
+= ∂
+
+∂E (s,s )
+
+∣∣∣E(s,s ) + ¯E(s,s ) −
+
+m∑
+
+j=1 
+
+( ¯Nj )(s,s )(Nj )(s,s )
+
+∣∣∣2
+
++ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∣∣∣E(i,i ) + ¯E(s,s ) −
+
+m∑
+
+j=1 
+
+( ¯Nj )(s,s )(Nj )(i,i )
+
+∣∣∣2
+
++ μ ∂
+
+∂E (s,s )
+
+∣∣∣E(s,s ) + ¯E(s,s )
+
+∣∣∣2
+
++ μ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∣∣∣E(i,i ) + ¯E(s,s )
+
+∣∣∣2
+
++ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∣∣∣E(s,s ) + ¯E(i,i ) −
+
+m∑
+
+j=1 
+
+( ¯Nj )(i,i )(Nj )(s,s )
+
+∣∣∣2
+
++ μ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∣∣∣E(s,s ) + ¯E(i,i )
+
+∣∣∣2
+
+= 2 
+
+[
+
+E(s,s ) + ¯E(s,s ) −
+
+m∑
+
+j=1 
+
+( ¯Nj )(s,s )(Nj )(s,s )
+
+]
+
++
+
+n∑
+
+i=1 , i 6 =s
+
+[
+
+E(i,i ) + ¯E(s,s ) −
+
+m∑
+
+j=1 
+
+( ¯Nj )(s,s )(Nj )(i,i )
+
+]
+
++ μ2
+
+[
+
+E(s,s ) + ¯E(s,s )
+
+]
+
++ μ
+
+n∑
+
+i=1 , i 6 =s
+
+[
+
+E(i,i ) + ¯E(s,s )
+
+]
+
++
+
+n∑
+
+i=1 , i 6 =s
+
+[ ¯E(s,s ) + E(i,i ) −
+
+m∑
+
+j=1 
+
+(Nj )(i,i )( ¯Nj )(s,s )
+
+]
+
++ μ
+
+n∑
+
+i=1 , i 6 =s
+
+[ ¯E(s,s ) + E(i,i )
+
+]
+
+= 2 
+
+n∑
+
+i=1 
+
+[
+
+(1 + μ)( ¯E(s,s ) + E(i,i )
+
+) −
+
+m∑
+
+j=1 
+
+(Nj )(i,i )( ¯Nj )(s,s )
+
+]
+
+= 2 n(1 + μ) ¯E(s,s ) + 2(1 + μ)
+
+n∑
+
+i=1 
+
+E(i,i ) − 2
+
+m∑
+
+j=1 
+
+tr( Nj ) ( ¯Nj )(s,s ), (2.13a) 
+
+∂f (E)
+
+∂ ¯E(s,s )
+
+= ∂
+
+∂ ¯E(s,s )
+
+∥∥∥E + ¯E(s,s )In −
+
+m∑
+
+j=1 
+
+( ¯Nj )(s,s )Nj
+
+∥∥∥2F + μ ∂
+
+∂ ¯E(s,s )
+
+∥∥∥E + ¯E(s,s )In
+
+∥∥∥2F
+
++ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∥∥∥E + ¯E(i,i )In −
+
+m∑
+
+j=1 
+
+( ¯Nj )(i,i )Nj
+
+∥∥∥2F + μ ∂
+
+∂E (s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∥∥∥E + ¯E(i,i )In
+
+∥∥∥2F
+
+= ∂
+
+∂ ¯E(s,s )
+
+∣∣∣E(s,s ) + ¯E(s,s ) −
+
+m∑
+
+j=1 
+
+( ¯Nj )(s,s )(Nj )(s,s )
+
+∣∣∣2
+
++ ∂
+
+∂ ¯E(s,s )
+
+n∑
+
+i=1 , i 6 =s
+
+∣∣∣E(i,i ) + ¯E(s,s ) −
+
+m∑
+
+j=1 
+
+( ¯Nj )(s,s )(Nj )(i,i )
+
+∣∣∣2
+
+8+ μ ∂
+
+∂ ¯E(s,s )
+
+∣∣∣E(s,s ) + ¯E(s,s )
+
+∣∣∣2
+
++ μ ∂
+
+∂ ¯E(s,s )
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+∣∣∣E(i,i ) + ¯E(s,s )
+
+∣∣∣2
+
++ ∂
+
+∂ ¯E(s,s )
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+∣∣∣ ¯E(s,s ) + E(i,i ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(i,i )( ¯Nj )(s,s )
+
+∣∣∣2
+
++ μ ∂
+
+∂ ¯E(s,s )
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+∣∣∣ ¯E(s,s ) + E(i,i )
+
+∣∣∣2
+
+= 2 
+
+[
+
+E(s,s ) + ¯E(s,s ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,s )(Nj )(s,s )
+
+]
+
++
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[ ¯E(i,i ) + E(s,s ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s )( ¯Nj )(i,i )
+
+]
+
++ μ2
+
+[
+
+E(s,s ) + ¯E(s,s )
+
+]
+
++ μ
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[ ¯E(i,i ) + E(s,s )
+
+]
+
++
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[
+
+E(s,s ) + ¯E(i,i ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(i,i )(Nj )(s,s )
+
+]
+
++ μ
+
+> n
+
+∑ 
+
+> i=1 , i 6=s
+
+[
+
+E(s,s ) + ¯E(i,i )
+
+]
+
+= 2 
+
+> n
+
+∑
+
+> i=1
+
+[
+
+(1 + μ)(E(s,s ) + ¯E(i,i )
+
+) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(i,i )(Nj )(s,s )
+
+]
+
+= 2 n(1 + μ)E(s,s ) + 2(1 + μ)
+
+> n
+
+∑
+
+> i=1
+
+¯E(i,i ) − 2
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯Nj ) ( Nj )(s,s ). (2.13b) According to (2.12) and upon using (2.13), the first order optimality condition on the diagonal entries of E is given by, for 1 ≤ s ≤ n,0 = ∂f (E)
+
+∂E re (s,s )
+
+= ∂f (E)
+
+∂E (s,s )
+
++ ∂f (E)
+
+∂ ¯E(s,s )
+
+= 2 n(1 + μ)[E(s,s ) + ¯E(s,s )
+
+] + 2(1 + μ)
+
+> n
+
+∑
+
+> i=1
+
+[E(i,i ) + ¯E(i,i )
+
+] − 4
+
+> m
+
+∑
+
+> j=1
+
+ℜ( tr( ¯Nj ) ( Nj )(s,s )
+
+)
+
+= 4 n(1 + μ)Ere (s,s ) + 4(1 + μ)
+
+> n
+
+∑
+
+> i=1
+
+Ere (i,i ) − 4
+
+> m
+
+∑
+
+> j=1
+
+ℜ( tr( ¯Nj ) ( Nj )(s,s )
+
+), (2.14a) 0 = 1
+
+ι · ∂f (E)
+
+∂E im (s,s )
+
+= ∂f (E)
+
+∂E (s,s )
+
+− ∂f (E)
+
+∂ ¯E(s,s )
+
+= −2n(1 + μ)[E(s,s ) − ¯E(s,s )
+
+] + 2(1 + μ)
+
+> n
+
+∑
+
+> i=1
+
+[E(i,i ) − ¯E(i,i )
+
+] + 2 ι
+
+> m
+
+∑
+
+> j=1
+
+ℑ( tr( ¯Nj ) ( Nj )(s,s )
+
+)
+
+= −2n(1 + μ)ιE im (s,s ) + 2(1 + μ)ι
+
+> n
+
+∑
+
+> i=1
+
+Eim (i,i ) + 2 ι
+
+> m
+
+∑
+
+> j=1
+
+ℑ( tr( ¯Nj ) ( Nj )(s,s )
+
+), (2.14b) where ℜ(·) and ℑ(·) take the real and imaginary parts of a complex number, respectively. 9First we solve (2.14a) for 1 ≤ s ≤ n. Summing up (2.14a) over 1 ≤ s ≤ n, we get, after simplifications, 8n(1 + μ)
+
+> n
+
+∑
+
+> i=1
+
+Ere (i,i ) = 4 
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯Nj ) tr( Nj )
+
+⇒
+
+> n
+
+∑
+
+> i=1
+
+Ere (i,i ) = 1
+
+2n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯Nj ) tr( Nj ). (2.15) Plug (2.15) into (2.14a) to get, for s = 1 , 2, . . . , n ,
+
+Ere (s,s ) = 1
+
+n(1 + μ)
+
+
+
+> m
+
+∑
+
+> j=1
+
+ℜ((Nj )(s,s ) tr( ¯Nj )) − 1
+
+2n
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯Nj ) tr( Nj )
+
+ . (2.16) Next, we solve (2.14b) for 1 ≤ s ≤ n, which can be simplified to 
+
+−nE im (s,s ) +
+
+> n
+
+∑
+
+> i=1
+
+Eim (i,i ) = −
+
+> m
+
+∑
+
+> j=1
+
+ℑ( tr( ¯Nj ) ( Nj )(s,s )
+
+) for 1 ≤ s ≤ n, (2.17) or, compactly, 
+
+
+
+n − 1 −1 · · · −1
+
+−1 n − 1 · · · −1... ... . . . ...
+
+−1 −1 · · · n − 1
+
+
+
+Eim (1 ,1) 
+
+Eim (2 ,2) 
+
+...
+
+Eim (n,n )
+
+ = 1
+
+1 + μ
+
+> m
+
+∑
+
+> j=1
+
+
+
+ℑ((Nj )(1 ,1) tr( ¯Nj ))
+
+ℑ((Nj )(2 ,2) tr( ¯Nj ))
+
+...
+
+ℑ((Nj )(n,n ) tr( ¯Nj )) := bbb, (2.18) whose coefficient matrix has rank n − 1 and can be compactly expressed as 
+
+C = n
+
+(
+
+In − 1
+
+neeee eeT)
+
+,
+
+where eee ∈ Rn is the vector of all ones. We make a couple of observations: 1) the linear system (2.18) is consistent because the range of C is the orthogonal comple-ment of span {eee} and bbb is in the orthogonal complement: (1 + μ)eeeTbbb =
+
+> m
+
+∑
+
+> j=1
+> n
+
+∑
+
+> i=1
+
+ℑ((Nj )(i,i ) tr( ¯Nj )) =
+
+> m
+
+∑
+
+> j=1
+
+ℑ( tr( Nj ) tr( ¯Nj )) = 0; 2) Since that In − (1 /n )eeee eeT is an orthogonal projection matrix, its Moore-Penrose pseudo-inverse [8, p.290] is itself and hence the Moore-Penrose pseudo-inverse of C is given by 
+
+C† = 1
+
+> n
+
+(
+
+In − 1
+
+> n
+
+eeee eeT
+
+)
+
+, yielding the minimum norm solution to (2.18): C†bbb = 1
+
+> n
+
+bbb, i.e., 
+
+Eim (s,s ) = 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+ℑ((Nj )(s,s ) tr( ¯Nj )). (2.19) 10 Putting (2.16) and (2.19) together gives 
+
+E(s,s ) = 1
+
+n(1 + μ)
+
+
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,s ) tr( ¯Nj ) − 1
+
+2n
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯Nj ) tr( Nj )
+
+ . (2.20) Now, we consider the off-diagonal entries of E and ¯E. For s 6 = t, we have 
+
+∂f (E)
+
+∂E (s,t )
+
+=
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂E (s,t )
+
+∣∣∣E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(i,i )(Nj )(s,t )
+
+∣∣∣2
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂E (s,t )
+
+∣∣∣E(s,t )
+
+∣∣∣2
+
++
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂E (s,t )
+
+∣∣∣ ¯E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,t )(Nj )(i,i )
+
+∣∣∣2
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂E (s,t )
+
+∣∣∣ ¯E(s,t )
+
+∣∣∣2
+
+=
+
+> n
+
+∑
+
+> i=1
+
+( ¯E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(i,i )( ¯Nj )(s,t )
+
+)
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+¯E(s,t )
+
++
+
+> n
+
+∑
+
+> i=1
+
+( ¯E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,t )(Nj )(i,i )
+
+)
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+¯E(s,t )
+
+= 2 n(1 + μ) ¯E(s,t ) − 2
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,t ) tr( Nj ), (2.21a) 
+
+∂f (E)
+
+∂ ¯E(s,t )
+
+=
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂ ¯E(s,t )
+
+∣∣∣E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(i,i )(Nj )(s,t )
+
+∣∣∣2
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂ ¯E(s,t )
+
+∣∣∣E(s,t )
+
+∣∣∣2
+
++
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂ ¯E(s,t )
+
+∣∣∣ ¯E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(s,t )(Nj )(i,i )
+
+∣∣∣2
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+∂
+
+∂ ¯E(s,t )
+
+∣∣∣ ¯E(s,t )
+
+∣∣∣2
+
+=
+
+> n
+
+∑
+
+> i=1
+
+(
+
+E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+( ¯Nj )(i,i )(Nj )(s,t )
+
+)
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+E(s,t )
+
++
+
+> n
+
+∑
+
+> i=1
+
+(
+
+E(s,t ) −
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t )( ¯Nj )(i,i )
+
+)
+
++ μ
+
+> n
+
+∑
+
+> i=1
+
+E(s,t )
+
+= 2 n(1 + μ)E(s,t ) − 2
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t ) tr( ¯Nj ). (2.21b) According to (2.12) and upon using (2.21), the first order optimality condition on the off-diagonal entries of E is given by, for 1 ≤ s, t ≤ n and s 6 = t,0 = ∂f (E)
+
+∂E re (s,t )
+
+= ∂f (E)
+
+∂E (s,t )
+
++ ∂f (E)
+
+∂ ¯E(s,t )
+
+= 2 n(1 + μ)[ ¯E(s,t ) + E(s,t )
+
+] − 2
+
+> m
+
+∑
+
+> j=1
+
+(
+
+( ¯Nj )(s,t ) tr( Nj ) + ( Nj )(s,t ) tr( ¯Nj )
+
+)
+
+= 4 n(1 + μ)Ere (s,t ) − 4
+
+> m
+
+∑
+
+> j=1
+
+ℜ(( ¯Nj )(s,t ) tr( Nj )), (2.22a) 11 0 = 1
+
+ι · ∂f (E)
+
+∂E im (s,t )
+
+= ∂f (E)
+
+∂E (s,t )
+
+− ∂f (E)
+
+∂ ¯E(s,t )
+
+= 2 n(1 + μ)[ ¯E(s,t ) − E(s,t )
+
+] − 2
+
+> m
+
+∑
+
+> j=1
+
+(
+
+( ¯Nj )(s,t ) tr( Nj ) − (Nj )(s,t ) tr( ¯Nj )
+
+)
+
+= −4n(1 + μ)ιE im (s,t ) − 4ι
+
+> m
+
+∑
+
+> j=1
+
+ℑ(( ¯Nj )(s,t ) tr( Nj )). (2.22b) Equations in (2.22) can be readily solved to yield 
+
+Ere (s,t ) = 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+ℜ(( ¯Nj )(s,t ) tr( Nj )), Eim (s,t ) = − 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+ℑ(( ¯Nj )(s,t ) tr( Nj )).
+
+Putting them together gives 
+
+E(s,t ) = 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+(Nj )(s,t ) tr( ¯Nj ). (2.23) In summary, all Ere (s,s ) and E(s,t ) for s 6 = t are uniquely determined by the first order optimality condition but Eim (s,s ) for 1 ≤ s ≤ n are not as their determining system (2.18) has infinitely many solution. We take a particular one with the minimal Frobenius given by (2.19). Finally, putting (2.20) and (2.23) together, we get (2.4). 
+
+## 3 Numerical Experiments 
+
+In this section, we will test our proposed method cFPI in Algorithm 2.1, along the way we will compare it against the baseline method of similar complexity: sFPI (the standard fixed point iteration) (1.4) from the natural splitting (1.3). There will be three experiments: two for real (1.1) and one complex problem. When randomness is involved, we first generate mentioned random matrices and save them for repetitions. In calling our cFPI (Algorithm 2.1) and sFPI, we stop the iteration as soon as NRes( Xk ) ≤ 10 −10 where NRes( ·) is as defined in (2.6). The spectral radii of M −1N
+
+and ˜M −1 ˜N are estimated by MATLAB’s eigs [13] upon passing operator-vector product functions by M −1N and ˜M −1 ˜N .As far as ρ(M −1N ) is concerned, it is invariant with respect to substitution A ← − A.Earlier in section 1, we commented on that an ideally compensated splitting should be the one that minimizes ρ( ˜M −1 ˜N ) subject to ˜M being invertible, but that is too ambitious to be practical. We therefore settle on a more practical approach: determine E by (2.3) which yields the optimal E as in (2.4). This optimal E is also invariant with respect to substitution A ← − A. Earlier immediately after Theorem 2.1, we commented on a potential quantitative impact by the eigenvalue distribution being in the left-half or right-half complex plane. In order to reflect such a quantitative impact, in each of the following three examples, we actually experiment on two generalized Lyapunov equations (1.1): one with A and other with the opposite of it. At this point, we do not have a way to choose a suitable μ, except letting μ run from 0 to some number bigger than 0. During testing, we played with μ ∈ [0 , 0.5] on the three 12 ξ           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 00.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 spectral radius
+
+standard splitting compensated splitting           
+
+> ξ
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 010 20 30 40 50 60 70 80 90 100
+> the number of iterations
+
+sFPI cFPI           
+
+> ξ
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 0246810 12 14 16 18
+> CPU time (seconds)
+
+sFPI cFPI            
+
+> ξ
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 00.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 spectral radius
+
+standard splitting compensated splitting 
+
+(a) spectral radius           
+
+> ξ
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 010 20 30 40 50 60 70 80 90 100
+> the number of iterations
+
+sFPI cFPI 
+
+(b) number of FP iterations           
+
+> ξ
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 0246810 12 14 16 18
+> CPU time (seconds)
+
+sFPI cFPI 
+
+(c) CPU in seconds 
+
+Figure 3.1: Numerical performance on Example 1 with the first row for A = A0 and the second row for A = −A0, as ξ varies in [0 .5, 1]. experiments. We did not see smaller ρ( ˜M −1 ˜N ) for μ > 0 than for μ = 0. For that reason, in our following experiments, we take μ = 0. How to pick a better μ will be left for future research in the days ahead. 
+
+Example 1. The matrix A is the well-known matrix as in HEAT1 [2]. We take ℓ = 40 and define the mesh size h = 1 /(ℓ + 1), and let eee1, e eeℓ ∈ Rℓ be the first and last columns of Iℓ,respectively, and 
+
+K =
+
+
+
+2 −1
+
+−1 2 −1. . . . . . . . .
+
+−1 2 −1
+
+−1 2
+
+
+
+∈ Rℓ×ℓ, C =
+
+
+
+0 1
+
+−1 0 1. . . . . . . . .
+
+−1 0 1
+
+−1 0
+
+
+
+∈ Rℓ×ℓ,E1 = eee1eeeT1 , Eℓ = eeeℓeeeT
+
+ℓ . We construct A0 as 
+
+A0 = −(Iℓ ⊗ K + K ⊗ Iℓ) + 0 .5( E1 ⊗ Iℓ + Eℓ ⊗ Iℓ)
+
+h2 + Iℓ ⊗ C
+
+2h ∈ Rn×n (3.1) with n = ℓ2. We take B = randn (n, 5), m = 1 and 
+
+N1 = ξ
+
+
+
+7.8 −1 −0.05 
+
+−1 7.8 −1 . . .
+
+−0.05 −1 . . . . . . −0.05 . . . . . . . . . −1
+
+−0.05 −1 7.8
+
+
+
+,
+
+13 where ξ is a parameter varying from 0 .5 to 1. Provably, ρ(M −1N ) = cξ 2 where c > 0is a constant independent of ξ and thus increases as ξ does. This fact holds for the two other examples later. We will solve two parameterized generalized Lyapunov equations (1.1) with A = ±A0,respectively, with ℓ = 40 yielding n = 1600. In Figure 3.1, with respect to the standard splitting (1.3) and our compensated splitting (1.7) with (1.9), we compare, as ξ varies, spectral radius, the number of iterations, and CPU in seconds, for the case A = A0 (frist row) and A = −A0 (second row). We have the following observations: (a) For the range of ξ ∈ [0 .5, 1], both ρ(M −1N ) and ρ( ˜M −1 ˜N ) are less than 1, indicating both sFPI and the proposed cFPI are convergent. (b) It makes no difference in the spectral radius ρ(M −1N ) whether A = A0 or −A0.This is expected because the spectral radius is invariant with respect to A = ±A0.But the story is entirely different for the compensated splitting. Besides ρ( ˜M −1 ˜N )is smaller than ρ(M −1N ) at each ξ in both cases, ρ( ˜M −1 ˜N ) for the case A = −A0
+
+is much smaller than it for the case A = A0 at the same ξ. The phenomenon can be quantitatively explained by our earlier discussion following Theorem 2.1, as the eigenvalues of A0 lie in the left-half plane. (c) For the case A = −A0 whose eigenvalues lie in the right-half plane, ρ( ˜M −1 ˜N ) in-creases very slowly as ξ increases and always stays below 0 .1, while ρ(M −1N ) grows at a much faster pace and ends up being 0 .85 at ξ = 1. As a results, cFPI runs much faster than sFPI, respectively at each ξ.
+
+Example 2. The matrix A = ±A0with A0 being the tridiagonal matrix 
+
+A0 =
+
+
+
+−2 11 −2 1. . . . . . . . .1 −2 11 −2
+
+
+
+∈ Rn×n, (3.2) 
+
+n = 1000, B = randn (n, 2) ∈ Rn×2, m = 5, and Nj = 2 · 10 −4 × ξ × Cj CT 
+
+> j
+
+with each 
+
+Cj = randn (n, 10), where ξ is a parameter varying from .5 to 1. Numerical results are shown in Figure 3.2. We have the following observations: (i) Provably ρ(M −1N ) monotonically increases and it crosses 1 at ξ somewhere between 0.725 and 0 .75. Because of that, sFPI converges for ξ ≤ 0.725 and diverges otherwise. (ii) Interestingly, for the case A = A0, ρ( ˜M −1 ˜N ) shows a “pop-up” starting at ξ = 0 .75 until ξ = 0 .9. Excluding the period of the “pop-up”, it appears ρ( ˜M −1 ˜N ) is less than ρ(M −1N ). The sudden “pop-up” may be explained by our earlier discussion following Theorem 2.1: A0 is negative definite and its eigenvalues lie in the left-half plane, and E collectively moves the eigenvalues of A = A0 rightward towards 0, potentially crossing over to the right-side of 0. (iii) Before ξ = 0 .75 and after ξ = 0 .9, ρ( ˜M −1 ˜N ) is smaller than 1, and thus cFPI converges for ξ before 0 .75 and after 0 .90. 14 ξ           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 0246810 12 spectral radius
+
+standard splitting compensated splitting           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> the number of iterations
+
+sFPI cFPI           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> CPU time (seconds)
+
+sFPI cFPI            
+
+> ξ
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 00.2 0.4 0.6 0.8 11.2 1.4 1.6 1.8 2spectral radius
+
+standard splitting compensated splitting 
+
+(a) spectral radius           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> the number of iterations
+
+sFPI cFPI 
+
+(b) number of FP iterations           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> CPU time (seconds)
+
+sFPI cFPI 
+
+(c) CPU in seconds 
+
+Figure 3.2: Numerical performance on Example 2 with the first row for A = A0 and the second row for A = −A0, as ξ varies in [0 .5, 1]. No numerical result is shown when the associated fixed-point iteration is deemed divergent. (iv) As in Example 1, for the case A = −A0, ρ( ˜M −1 ˜N ) increases very slowly as ξ
+
+increases. It is noted that A = −A0 is positive definite and its eigenvalues lie in the right-half plane. Collectively, E moves the eigenvalues of A = A0 rightward further away from 0. 
+
+Example 3. This is a complex example. We add a small imaginary number to the diagonal of the one in (3.2) to get 
+
+A0 =
+
+
+
+−2 11 −2 1. . . . . . . . .1 −2 11 −2
+
+
+
++ 1i × 10 −8 × In ∈ Cn×n, (3.3) 
+
+n = 1000, B = randn (n, 2) + 1i*randn (n, 2), m = 5, and Nj = 2 · 10 −4 × ξ × Cj CH
+
+j with each 
+
+Cj = randn (n, 5) + 1i*randn (n, 5) ,
+
+where ξ is a parameter varying from .5 to 1. Adding a small imaginary number in (3.3) is to ensure that calling the Schur decomposition of A at the beginning of sFPI yields a complex Schur form. This will equalize the computational complexity per fixed-point iterative steps in both sFPI and cFPI. Numerical results are shown in Figure 3.3. We witness similar things to Figure 3.2: 15 ξ                                          
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 00.5 11.5 22.5 33.5 44.5 spectral radius
+> standard splitting compensated splitting
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> the number of iterations
+> sFPI cFPI
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> CPU time (seconds)
+> sFPI cFPI
+> ξ
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> 00.5 11.5 spectral radius
+> standard splitting compensated splitting
+
+(a) spectral radius           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> the number of iterations
+> sFPI cFPI
+
+(b) number of FP iterations           
+
+> 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1
+> ξ
+> 10 1
+> 10 2
+> CPU time (seconds)
+> sFPI cFPI
+
+(c) CPU in seconds 
+
+Figure 3.3: Numerical performance on Example 3 with the first row for A = A0 and the second row for A = −A0, as ξ varies in [0 .5, 1]. No numerical result is shown when the associated fixed-point iteration is deemed divergent. (1) Provably ρ(M −1N ) monotonically increases and it crosses 1 at ξ somewhere between 0.825 and 0 .85. Because of that, sFPI converges for ξ ≤ 0.825 and diverges otherwise. (2) For the case A = A0, ρ( ˜M −1 ˜N ) shows a “pop-up” starting at ξ = 0 .85 until likely some ξ > 1 if we let it go larger. Once again, the sudden “pop-up” may be explained by our earlier discussion following Theorem 2.1, as the eigenvalues of A = A0 lie in the left-half plane. (3) As in the previous two examples, for the case A = −A0, ρ( ˜M −1 ˜N ) increases very slowly as ξ increases. It is verified numerically that A = −A0 has its eigenvalues lying in the right-half plane. 
+
+## 4 Concluding Remarks 
+
+The generalized Lyapunov equation 
+
+AX + XA H +
+
+m∑
+
+j=1 
+
+Nj XN H
+
+j + BB H = 0 arises frequently in applications. Such an equation is naturally split into M (X) = N (X)−
+
+BB H where M (X) = AX + XA H and N (X) = ∑mj=1 Nj XN H
+
+j , and it has been done frequently to yield the commonly used standard fixed-pointed iteration (sFPI) for solving the equation. The iteration converges if the spectral radius ρ(M −1N ) < 1 but otherwise diverges in general. In this paper, we propose a compensated splitting technique to tackle 16 situations where ρ(M −1N ) ≥ 1 or ρ(M −1N ) < 1 but too close to 1 leading very slow convergence. The basic idea is to compensate M (X) by projecting N (X) into an operator in the form EX + XE H to merge with M (X), yielding the so-called compensated splitting 
+
+˜M (X) = ˜N (X) − BB H for which there is a corresponding fixed-point iteration called the compensated fixed-pointed iteration (cFPI). Ideally, we should minimize ρ( ˜M −1 ˜N ) over matrix E, but that is not practical. Instead we determine E by (2.3). It is shown that (2.3) has a unique global minimizer in the real case and a unique global minimizer with the smallest Frobenius norm in the complex case. Compactly the optimal E is given by 
+
+E = 1
+
+n(1 + μ)
+
+> m
+
+∑
+
+> j=1
+
+tr( ¯ Nj )
+
+[
+
+Nj − 1
+
+2n tr( Nj ) · In
+
+]
+
+,
+
+where μ ≥ 0 is a regularizing parameter to control the magnitude of E. At this point, we have little idea on how to determine a good μ, and in fact in our reported numerical experiments in section 3, we simply take μ = 0 as the default. Unfortunately, our current (2.3) to determine E does not involve the M -part in any way. Quantitatively, we have analyse the interaction between this optimal E and the M -part. Our numerical experiments appear to behave consistently with our analysis, while demonstrating superiority of cFPI to sFPI. In our numerical experiments, we limit the problem sizes, i.e., n, modest so that involved Lyapunov equations in the middle of computations can be solved by the Bartels-Stewart method [1] with ease on everyday personal computers. For that reason, our purpose in this paper is two-fold: one is to demonstrate our compensated splitting can rescue the natural splitting, the commonly used one (1.3) when the resulting sFPI (1.4) diverges, and the other one is to show that the compensated splitting can speed up cFPI when it indeed converges. It is expected the key idea in this paper can be combined with more sophisticated subspace-based projection iterative methods, e.g., [4, 16], to yield more efficient methods for large scale generalized Lyapunov equations. Such investigations will be forthcoming. A similar looking to the generalized Lyapunov equation is the generalized Sylvester equation 
+
+AX + XB H +
+
+> m
+
+∑
+
+> j=1
+
+Nj XM H 
+
+> j
+
++ C = 0 .
+
+It arises from, for example, discretizing certain partial differential equations [14] and per-haps other places, and it too possesses a natural splitting that leads to a natural fixed-point iteration, similarly to the discussions we had in section 1 for the generalized Lyapunov equation. Due to high similarity, our compensated splitting in section 2 can be straight-forwardly attempted for potential improvement. We will leave the detail to another paper. 
+
+## References 
+
+[1] R. H. Bartels and G. W. Stewart , Algorithm 432: The solution of the matrix equation AX − BX = C, Commun. ACM, 15 (1972), pp. 820–826. [2] P. Benner and T. Breiten , Low rank methods for a class of generalized Lyapunov equations and related issues , Numer. Math., 124 (2013), pp. 441–470. 17 [3] P. Benner and T. Damm , Lyapunov equations, energy functionals, and model order reduction of bilinear and stochastic systems , SIAM J. Control Optim., 49 (2011), pp. 686–711. [4] T. Breiten and E. Ringh , Residual-based iterations for the generalized Lyapunov equation , BIT Numer. Math., 59 (2019), pp. 823–852. [5] T. Damm , Direct methods and ADI-preconditioned Krylov subspace methods for gen-eralized lyapunov equations , Numer. Linear Algebra Appl., 15 (2008), pp. 853–871. [6] T. Damm and D. Hinrichsen , Newton’s method for a rational matrix equation occurring in stochastic control , Linear Algebra Appl., 332 (2001), pp. 81–109. [7] J. Demmel , Applied Numerical Linear Algebra , SIAM, Philadelphia, PA, 1997. [8] G. H. Golub and C. F. Van Loan , Matrix Computations , Johns Hopkins Univer-sity Press, Baltimore, Maryland, 4th ed., 2013. [9] A. Greenbaum , Iterative Methods for Solving Linear Systems , SIAM, Philadelphia, 1997. [10] T.-M. Huang, Y.-C. Kuo, R.-C. Li, and W.-W. Lin , Numerical solutions for stochastic continuous-time algebraic Riccati equations , SIAM J. Matrix Anal. Appl., 46 (2025), pp. 1675–1700. [11] E. Jarlebring, G. Mele, D. Palitta, and E. Ringh , Krylov methods for low-rank commuting generalized Sylvester equations , Numer. Linear Algebra Appl., 25 (2018), p. e2176. [12] D. Kressner and P. Sirkovi´ c, Truncated low-rank methods for solving general linear matrix equations , Numer. Linear Algebra Appl., 22 (2015), pp. 564–583. [13] R. Lehoucq, D. C. Sorensen, and C. Yang , ARPACK User’s Guide , SIAM, Philadelphia, 1998. [14] D. Palitta and V. Simoncini , Matrix-equation-based strategies for convection– diffusion equations , BIT Numer. Math., 56 (2016), pp. 751–776. [15] Y. Saad , Iterative Methods for Sparse Linear Systems , SIAM, Philadelphia, 2nd ed., 2003. [16] S. D. Shank, V. Simoncini, and D. B. Szyld , Efficient low-rank solution of generalized Lyapunov equations , Numer. Math., 134 (2016), pp. 327–342. 18

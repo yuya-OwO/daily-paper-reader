@@ -1,0 +1,896 @@
+Title: Mathematical perspective on genetic algorithms with optimization guided operators
+
+URL Source: https://arxiv.org/pdf/2606.12279v1
+
+Published Time: Thu, 11 Jun 2026 01:26:39 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+MATHEMATICAL PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+ANNA BRANDENBERGER, ILAN DORON-ARAD, AND ELCHANAN MOSSEL 
+
+Abstract. Recent work in ML applies genetic algorithms at inference time to iteratively improve solutions to optimization problems. The basic mutation and recombination operators involved are qualitatively different from those studied classically. Mutations are no longer random; an ML algorithm mutates a solution with the goal of improving an objective. Similarly, recombination is not based on random collages of parent solutions. Instead, it is an ML optimization-based operator whose goal is to synthesize improved solutions from its inputs. Thus, these mutation and recombination operators are more likely to improve the objective, but their computational cost is much higher. We introduce a general model of genetic algorithms and formulating optimization in this model as a query-complexity problem, using the language of reinforcement learning. We then study specialized models. We show that some optimization problems require generation, mutation, and recombination to be solved. We then obtain qualitatively tight algorithms for a family of problems within this framework that captures the nontrivial role of diversity in the solution pool, a key feature of practical ML genetic algorithms. 
+
+1. Introduction 
+
+Recent work has shown strong empirical success in using large language models (LLMs) as iterative search procedures for mathematical and algorithmic discovery. Important examples include AlphaEvolve [Novikov et al., 2025], FunSearch [Romera-Paredes et al., 2024], Mind Evolution Lee et al. [2025], EvoPrompt [Guo et al., 2023] and PromptBreeder [Fernando et al., 2023]. These processes are often described as genetic algorithms : the operations executed by an LLM commonly include: (i) generating a fresh solution to the given problem; (ii) mutating a given solution; and (iii) recombining two or more solutions to synthesize a new solution. While described in the language of classical genetic algorithms (GAs), these LLM operations are quite different from the random mutations and recombinations used by standard genetic algorithms. In classical GAs, mutation and recombination are stochastic, syntactic operators over a fixed representation such as bit strings, real vectors, permutations, or program trees [Holland, 1992, Goldberg, 1989, Koza, 1994]. Both operators are uninformed: they shuffle and perturb symbols without any understanding of what the genome means. Then, once the population is large after many generations, selection pressure sorts the results. The division of labor in classical GAs is clean: recombination exploits existing variation by recombining what the population has already discovered, while mutation explores by injecting truly new material [Eiben and Smith, 2015]. In contrast, in LLM-driven evolution, both operators are reimplemented as prompted LLM calls. The candidate is usually something the model can natively read and write: a Python function, a prompt, a heuristic, a reward function, or a chain-of-thought template. Mutating a parent now produces a new candidate that is semantically informed: the LLM is prompted with instructions such as “here is a solution that scores X; produce a modified 
+
+Department of Mathematics, MIT 
+
+E-mail address : {abrande,ilanda,elmos}@mit.edu . 
+
+> 1
+> arXiv:2606.12279v1 [cs.NE] 10 Jun 2026 2MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS
+
+version that might score better”, sometimes augmented with the task description, recent failure traces, or the parent’s behavioral signature [Lehman et al., 2023, Meyerson et al., 2024]. Recombination likewise goes beyond positional crossover, it now implements a semantic synthesis : given multiple parents, an LLM is asked to synthesize a candidate that combines their strengths or learns from their differences. For example, FunSearch [Romera-Paredes et al., 2024] and AlphaEvolve [Novikov et al., 2025] sample multiple high-scoring programs from an island and concatenate them in the prompt as exemplars before asking for a new one, while Promptbreeder [Fernando et al., 2023] and EvoPrompt [Guo et al., 2023] explicitly ask the model to “cross over” two prompts into a hybrid. Thus, mutation and recombination are better viewed as learned proposal operators than as blind random perturbations. This increased flexibility has a computational cost. Classical operators are essentially free, so GAs run millions of cheap evaluations over large populations [Goldberg, 1989]. LLM operators are expensive, so modern systems often shrink the population to dozens or low hundreds of candidates to accommodate a limited inference-time budget. This shift raises a fundamental question: under a fixed budget of expensive operator calls, how should one allocate queries among generation, mutation, and recombination to approach the performance of the best possible search strategy? Answering this question requires a framework that treats these operators on equal footing and makes their trade-offs explicit. 
+
+Our Contribution. The above motivate this work, in which we develop a theoretical framework for analyzing ML-guided genetic algorithms. Our contributions are as follows. First, we introduce the generation–mutation–recombination (GMR) framework, which models generation from scratch, mutation of one candidate, and recombination of several candidates as stochastic operators. We formulate optimization in this framework as a query-complexity problem: for a reference budget n, how many queries are needed to match, up to accuracy ε, the value attainable by the best n-query policy, and how should the query budget be allocated among generation, mutation, and recombination? This is aligned with the empirical challenge of deciding how to spend a fixed budget of LLM calls on a hard optimization problem. We give a simple one-dimensional example in which optimal policies can be analyzed explicitly. This example shows that optimization-guided mutation or recombination can achieve much faster improvement than averaging-based operators. We then show that generation, mutation, and recombination can each be indispensable. We give a simple two-dimensional construction in which an N -query policy can get close to the optimal N -query benchmark, but any policy that uses too few generations, too few mutations, or too few recombinations cannot reach the corresponding approximation target. Second, we introduce an instantiation of the model that isolates the role of diversity in ML-guided genetic search. This model is based on parity learning and captures learning an unknown hidden string given valid linear equations, which is difficult if an insufficiently amount of equations can be generated/stored. Concretely, candidates are valid linear equations a · x = b for an unknown x ∈ { 0, 1}n: generation uniformly randomly samples new valid equations, and recombination XORs two existing equations coordinate-wise. The 
+
+diversity of a policy is defined in terms of the size of its live-pool, that is, the number of queried candidates that can be retained to affect the actions of the policy; candidates that are deleted from the live-pool cannot influence the future actions of the policy. Informally, our main result for the parity learning model states that a linear live-pool size is necessary for any policy to be able to generate the target x in subexponential time; a concrete polynomial time algorithm also shows that a linear (up to constants) sized live-pool is sufficient. The formal statements are given in section 6. MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 3
+
+Organization. Section 2 defines the GMR framework and the query-complexity objective. Section 3 discusses related work. Section 4 gives a one-dimensional example showing how optimization-guided operators can outperform averaging-type operators. In Section 5 we give a simple construction showing that generation, mutation, and recombination can each be necessary. Section 6 studies the parity learning instantiation, proving that diversity in the set of generated candidates is necessary. Section 7 concludes. Additional examples, full proofs, and illustrative simulations are deferred to the appendices. 2. A Formal Model of Genetic Algorithms 
+
+We give the formal definition of the model below. At a high level, generation captures producing a fresh candidate from the model; mutation describes refinements of one existing solution; recombination depicts synthesizing a new solution from two or more existing ones. As our main objective, we study the framework through the lens of query complexity. Concretely, for a given budget n, we ask how many queries a policy needs in order to achieve performance within ε of the optimal value attainable in n rounds. This viewpoint is especially natural in our setting, where a policy interacts with a hidden optimization problem and may observe only limited feedback about the candidates it produces. The objective U plays the role of the reward function: it assigns a scalar value to each queried candidate, and the policy aims to maximize the best value seen over its query budget. 
+
+Definition 1. A generation–mutation–recombination (GMR) framework is a tuple 
+
+G = ( X, U, (Dk)k∈K , Obs ),
+
+where X is a space of candidate solutions, U : X → R is a hidden objective, K ⊆ Z≥0 with 
+
+0 ∈ K, and, for each k ∈ K, Dk is a collection of k-input distribution rules. Each D ∈ D k
+
+assigns to every (x1, . . . , x k) ∈ Xk a distribution D(x1, . . . , x k) over X. For k = 0 , D0 is the unique distribution for generating a new solution independently. The case k = 0 corresponds to generation from scratch. The case k = 1 corresponds to mutation or refinement of one existing candidate. The cases k ≥ 2 correspond to 
+
+recombination or synthesis from several existing candidates. All expectations below are assumed to be well-defined. 
+
+Feedback model: The map Obs specifies the feedback observed by the policy. After a candidate zt ∈ X is produced, the policy observes ot = Obs (zt; z1, . . . , z t−1). The policy need not observe zt itself; feedback may include scores, labels, or similarities to previously generated candidates. For example, full feedback is the case ot = ( zt, U (zt)) , while objective-only feedback is the case ot = U (zt). In the latter case, the policy may still refer to previously queried candidates by index when applying mutation or recombination. 
+
+Policies: Let Πobs  
+
+> G
+
+denote the set of possibly randomized policies that use only the public operator families and the feedback history generated by Obs . In particular, policies do not access the hidden objective U except through observed feedback. A policy π ∈ Πobs  
+
+> G
+
+, at each round t ∈ N, after observing the feedback history o1, . . . , o t−1, chooses an integer k ∈ K and a distribution rule D ∈ D k. If k = 0 , it queries zt ∼ D. If k ≥ 1, it chooses previous indices 
+
+i1, . . . , i k < t , not necessarily distinct, and queries zt ∼ D(zi1 , . . . , z ik ). At round t = 1 , only generation from some D ∈ D 0 is feasible. 
+
+Query Complexity: Define the best expected value found by a policy as 
+
+V πn (G) := E
+
+
+
+max  
+
+> t∈[n]
+
+U (zt)
+
+
+
+.4 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+Define the best value obtainable by an n-query policy as 
+
+V ∗ 
+
+> n
+
+(G) := sup 
+
+> π∈Πobs
+> G
+
+V πn (G).
+
+For ε ≥ 0, the query complexity of a policy π relative to the optimal n-round benchmark is the minimum number of queries it applies to get ε-close to the optimum n-query value: 
+
+Nε(π, n ; G) := min 
+
+n
+
+m ∈ N : V πm(G) ≥ V ∗ 
+
+> n
+
+(G) − ε
+
+o
+
+,
+
+with Nε(π, n ; G) = ∞ if the set is empty. The corresponding additive ε-optimal query complexity is 
+
+N ∗ 
+
+> ε
+
+(n; G) := inf 
+
+> π∈Πobs
+> G
+
+Nε(π, n ; G).
+
+When the framework is fixed, we suppress it from the notation. 
+
+Remark 1. In our model, the value of the objective at a point x ∈ X can only be observed if x is produced by one of the allowed distributions. In particular, the policy cannot query an arbitrary point directly. Moreover, depending on Obs , the policy may not observe the internal candidate x at all. Thus, the problem is not purely one of optimizing an explicitly accessible search space, but also of generating candidate points and learning from the revealed feedback. This is natural in our setting, where points in X represent candidate solutions or algorithms, and arbitrary points are not assumed to be directly accessible. 
+
+Examples. In practice, the distributions in Dk may be interpreted as those induced by fixed prompts or model calls for generation, mutation, and recombination. A generation step samples z ∼ D for some D ∈ D 0, for example by asking the model to solve the task from scratch. A mutation step samples z ∼ D(x) for some D ∈ D 1 and input x ∈ X, which may correspond to a local revision such as fixing a bug in a program, improving one step in a proof, or refining part of a plan while keeping the rest unchanged. A recombination step samples z ∼ D(x1, . . . , x k) for some k ≥ 2 and D ∈ D k, which may correspond to synthesizing several partial solutions that contain different useful ingredients. For instance, in code generation, different candidates may contain a correct data structure, a correct update rule, and useful tests, and recombination aims to produce a solution combining them. Similarly, in mathematical reasoning, different candidates may contain the right reduction, the right intermediate lemma, and the right final argument, and recombination aims to synthesize them into a stronger solution. Specific instantiations of Dk can yield many familiar stochastic search and model training procedures, such as stochastic gradient descent, bandits, evolution search and more; see details in Appendix A. 3. Related Work 
+
+Classical Genetic Algorithms and Fitness Landscapes. The formalization of search and optimization in evolutionary computation originates in the biological concept of “fitness landscapes,” introduced by Sewall Wright in 1932 to describe evolution as populations navigating peaks and valleys across a high-dimensional surface Wright [1932]. This paradigm was significantly expanded by Kauffman’s work on self-organization and the NK model, which explores how epistasis impacts the ruggedness of optimization landscapes and influences evolutionary traversability Kauffman [1992]. Building on these biological underpinnings, classical genetic algorithms emerged as stochastic search methods to navigate these complex spaces Holland [1992], Goldberg [1989], Lu et al. [2014]. Closely related developments in evolutionary computation include the evolution-strategies line of Rechenberg and Schwefel and later covariance-adaptive variants such as CMA-ES Rechenberg [1973], Schwefel [1977], MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 5
+
+Hansen and Ostermeier [2001]. In these traditional models, mutation blindly perturbs an existing solution, and recombination randomly splices parent solutions. 
+
+Machine Learning-Guided Evolutionary Operators. Evolutionary methods have long been used within machine learning, including neuroevolution, large-scale evolution strategies, neural architecture search, population-based training and model fine-tuning [Stanley and Miikkulainen, 2002, Salimans et al., 2017, Such et al., 2017, Real et al., 2019, Jaderberg et al., 2017, Qiu et al., 2025]. The recent LLM-centered line includes program-evolution systems such as FunSearch and AlphaEvolve [Romera-Paredes et al., 2024, Novikov et al., 2025, Nagda et al., 2026], language-model evolution and crossover [Lehman et al., 2023, Meyerson et al., 2024], prompt optimization and model merging [Guo et al., 2023, Zhao et al., 2023, Akiba et al., 2025], and reasoning-oriented frameworks such as Lyria, FlowBoost, and PatternBoost [Tang et al., 2025, Bérczi et al., 2026, Charton et al., 2024]. In these modern architectures, mutations and recombinations are qualitatively different from classical genetics. Our framework provides a theoretical query-complexity language for analyzing the orchestration of these new, directed genetic operators. 
+
+Reinforcement Learning, MDPs, and Sequential Search. Our framework is also closely related to reinforcement learning. For each fixed objective U , the GMR process induces a finite-horizon MDP in which the state is the observed history, the actions are admissible generation, mutation, and recombination choices, and the terminal reward is the best value found [Puterman, 1994, Sutton and Barto, 1998]. From the learner’s perspective, however, the objective U is hidden and only queried values are observed, so the policy-design problem can also be viewed as a POMDP, or, under a prior over objectives, as Bayesian reinforcement learning [Kaelbling et al., 1998, Ghavamzadeh et al., 2015]. This viewpoint is natural in our broad setting, and it highlights that the framework encompasses many familiar ML problems: e.g., stochastic bandits correspond to generation-only action sets [Bubeck and Cesa-Bianchi, 2012], and stochastic approximation and first-order optimization fit mutation-only dynamics [Robbins and Monro, 1951]. It also relates our framework to modern RL-based language-model training and test-time improvement pipelines [Schulman et al., 2017, Ouyang et al., 2022, Bai et al., 2022, Shao et al., 2024, Guo et al., 2025]. 4. Beyond Averaging Operators: A One-Dimensional Example 
+
+We first give a simple one-dimensional instantiation of the GMR framework illustrating how optimization-guided operators can be much stronger than averaging-type mutation and recombination operators. Let G = ( X, U, (Dk)k∈K , Obs ) be defined as follows. Let 
+
+X = R, let U (x) = x, and use full feedback, i.e., ot = ( zt, U (zt)) . Fix μ, λ 1, λ 2 ≥ 0 and 
+
+σM , σ R > 0. Generation samples an independent standard Gaussian N (0 , 1) random variable, mutation maps x 7 → μx + σM Z, and recombination maps (x, y ) 7 → λ1x + λ2y + σRZ, where the Z ∼ N (0 , 1) variables are independent. Thus K = {0, 1, 2}, and D0, D1, D2 respectively contain these three rules. 
+
+Theorem 1. Assume μ < 1 and λ1 + λ2 < 1. Let α := min 
+
+n
+
+1, 1−μσM , 1−λ1−λ2
+
+> σR
+
+o
+
+. Then we have V ∗ 
+
+> n
+
+(G) = (1 + o(1)) α−1√2 log n. Moreover, if either μ = 1 or λ1 + λ2 = 1 , then 
+
+V ∗ 
+
+> n
+
+(G) ≥ Ω( n), while if either μ > 1 or λ1 + λ2 > 1, then V ∗ 
+
+> n
+
+(G) ≥ exp(Ω( n)) .
+
+The contractive case, where μ < 1 and λ1 + λ2 < 1, shows that contractive averaging-type mutation or recombination still gives only the usual Gaussian extreme-value rate, up to the sharp constant. In contrast, once mutation or recombination preserves or amplifies the parent value, repeated guided improvement can be linear or exponential. This demonstrates 6 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+a basic distinction between classical GAs, where recombination is typically an averaging or random-splicing operation, compared to ML GAs with optimization-guided operators. 
+
+Proof sketch. For the upper bound, look at the first time the best value exceeds a value 
+
+u ∈ R. If all previous values are at most u, then generation, mutation, and recombination can exceed u only through Gaussian fluctuations of sizes u, (1 − μ)u/σ M , and (1 − λ1 − λ2)u/σ R,respectively. A union bound over n queries gives the upper tail. The lower bound repeatedly applies the operator attaining the minimum in α and climbs through logarithmically many levels. The non-contractive lower bounds follow by repeatedly applying the non-contractive operator. Details are in Appendix B. This example captures one distinction between classical and ML-guided genetic algorithms: directed mutation or recombination can improve solution quality beyond what blind averaging can achieve. At the same time, it is too simple to explain why generation, mutation, and recombination may all be needed simultaneously, or why a diverse solution pool is necessary. These phenomena require the richer constructions that we develop in the following sections. 5. All Three Operators Are Necessary 
+
+Next, we give a simple setting where all three operators, namely generation, mutation, and recombination, are necessary to obtain a good solution. 
+
+Theorem 2 (All three operators are necessary) . There exists a universal constant c > 0
+
+such that the following holds. For all positive integers G, R, M , there exists an explicit two-dimensional GMR framework G with objective U : X → [0 , 3] such that, under full feedback, for N := 10 G + R + M :
+
+i) An explicit policy shows N ∗
+
+> 1/10
+
+(N ; G) ≤ N .
+
+ii) If a policy π uses fewer than cG generations, cR recombinations, or cM mutations on every execution path, then N1/4(π, N ; G) = ∞.
+
+In particular, even when one can get within 1/10 of the optimal N -round benchmark within N queries, a shortage of any one of the three operators makes the 1/4-approximation target unreachable.         
+
+> Figure 1. Illustration of the two-dimensional construction. Generation provides the (green) points (0 ,0) and (1 ,0) ; re-combination (blue) is midpoint recombination, allowing one to scan the x-axis; mutation (red) lifts these locations to-ward height 1/2. The bold red point indicates the unique peak of the hidden objective, while the other faint red points illustrate intermediate dyadic locations.
+
+Proof sketch. Generation produces the point (0 , 0) with high probability and the point 
+
+(1 , 0) with low probability. The recombination rule is midpoint, so once both generated points are available, one can query a1 = (1 /2, 0) , and then repeatedly recombining with (0 , 0) gives 
+
+aj = (2 −j , 0) for j = 1 , . . . , R . The objective is U (x, y ) = 3 · 2−Λ|x−2−R| · max {0, 1 − | y − 1/2|} MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 7
+
+for a sufficiently large Λ, and the feedback is full feedback: Obs (z; z1, . . . , z t−1) = ( z, U (z)) .Thus, U has its unique peak at b = (2 −R, 1/2) , and its value decays exponentially in the horizontal error and linearly in the vertical error. Hence, generation is needed to see (1 , 0) ,recombination is needed to reach the required horizontal location 2−R, and mutation is needed to climb from height 0 to height 1/2. The upper-bound policy performs these three phases in sequence. For the lower bound, too few generations miss (1 , 0) with high probability; too few recombinations keep all queried x-coordinates away from the required location 2−R,so choosing Λ sufficiently large makes their objective value too small; and too few mutations keep all queried points far below height 1/2. See Figure 1 for an illustration. The full proof appears in Appendix C. 6. A Model where Diversity is Necessary: Parity Learning 
+
+In this section, we present an instantiation of the GMR framework in which solution diver-sity is necessary. That is, this problem requires keeping a large and sufficiently independent pool of intermediate candidates alive. This model is parity learning, where each generated candidate is a random linear equation satisfied by an unknown string x ∈ { 0, 1}n, and recombination corresponds to XORing candidates. The objective of the policy is to recover the unknown x. This model clearly illustrates a diversity bottleneck: the recombination operation cannot increase the span of the set of existing equations, so any policy cannot recover the hidden target x without generating and maintaining a sufficiently large pool of linearly independent candidates. Formally, we define the diversity of a policy by the size of its live pool : a policy is w-pool-based up to time m if, at every round t ≤ m, its full internal state is a list Pt of at most w
+
+live queried candidates. Conditional on Pt and the current round t, the distribution of all future actions is independent of the earlier history. In particular, once a candidate is deleted from the pool, it cannot influence future actions of the policy. Formally, we formulate parity learning as a family of GMR instances indexed by the hidden target x ∈ { 0, 1}n. Fix x, and define Gpar  
+
+> x
+
+= ( X, U x, (Dk)k∈K , Obs ) as follows. Let 
+
+X = {0, 1}n × { 0, 1}, K = {0, 2, n }, Ux(a, b ) := 1{a = x}.
+
+Thus, the only rewarding candidate is the target pair (x, x · x).Each candidate (a, b ) ∈ X should be interpreted as the linear equation a · x = b over F2,where x is the hidden target string and a · x denotes parity. Next, we define generation to produce a fresh random valid equation satisfied by x, and recombination produces a new valid equation by XORing two equations. 
+
+Generation. D0 = {Gen x}, where Gen x samples a ∼ Unif( {0, 1}n) and returns 
+
+(a, b ) where b = a · x. 
+
+Recombination. D2 = {XOR }, where 
+
+XOR  (a, b ), (a′, b ′) := ( a ⊕ a′, b ⊕ b′).
+
+This preserves validity, since (a ⊕ a′) · x = ( a · x) ⊕ (a′ · x) = b ⊕ b′.Also, we have a wide recombination for terminal decoding, Dn = {Sum }, where 
+
+Sum(( a1, b 1), . . . , (an, b n)) = 
+
+ nM
+
+> i=1
+
+biai ,
+
+> n
+
+M
+
+> i=1
+
+bi
+
+
+
+In particular, this combines (e1, x 1), . . . , (en, x n) into (x, x · x). Note that this particular definition of Sum is not essential to the theorem. 
+
+Feedback model. We use full feedback, Obs (z; z1, . . . , z t−1) = ( z, U x(z)) .8 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+For a policy π, let Gπm and Rπm denote the numbers of generation and recombination steps, respectively, used by π within its first m rounds on a given execution path. Since the objective Ux is an indicator, the value of a policy is simply its success probability 
+
+V πm := Pr 
+
+> x∼Unif( {0,1}n)
+
+π queries (x, x · x) within m rounds .
+
+Example. A simple illustrating example in n = 3 is as follows. Take the hidden target to be x = (1 , 0, 1) . A generated candidate could be (a = 110 , b = 1) , meaning that x1 ⊕ x2 = 1 ,and another might be (011 , 1) , meaning that x2 ⊕ x3 = 1 . Recombination of these two candidates via XOR gives (101 , 0) , which encodes the valid equation x1 ⊕ x3 = 0 . In this case (101 , 0) = ( x, x · x), so the policy has succeeded. The main result of this section states that, first, there is an explicit algorithm that is n-pool based using polynomially many generation and recombination operations that retrieves x.The second part of the theorem shows that this is, up to constants, necessary: any policy that has a live-pool of size at most cn has exponentially small probability of retrieving the target x within exp (Θ( n)) steps. Note that this subexponential requirement is necessary, since a policy can always simply generate the target equation (x, x · x) with high probability if given exp(Ω( n)) budget. 
+
+Theorem 3. The parity learning family Gpar  
+
+> x
+
+satisfies the following. 
+
+i) Achievability. For every n ∈ N, there is an explicit policy π that is n-pool-based up to time 2n + n2 with 
+
+Gπ 
+
+> 2n+n2
+
+= 2 n and Rπ 
+
+> 2n+n2
+
+≤ n2,
+
+such that 
+
+V π 
+
+> 2n+n2
+
+≥ 1 − 2−n.
+
+ii) Diversity lower bound. For any c < 140 , there exists α > 0 such that the following holds for every n ∈ N. For any m ≤ 2αn , for any policy π that is cn -pool-based up to time m,
+
+V πm ≤ O(2 −αn ).
+
+Proof. For the achievability bound, we prove a more general statement: for any m > n , there is a policy π that is n-pool-based up to time m + n2 with Gπm+n2 = m and Rπm+n2 ≤ n2 such that V πm+n2 ≥ 1 − 2−(m−n).Fix m > n and generate m independent equations (ai, b i)mi=1 . The probability that (ai)mi=1 
+
+fails to span Fn 
+
+> 2
+
+is at most 2−(m−n). Indeed, if a1, . . . , a m do not span Fn 
+
+> 2
+
+, then there exists a nonzero y ∈ Fn 
+
+> 2
+
+such that ai · y = 0 for all i. For each fixed nonzero y, this event has probability 2−m. Hence, by a union bound, 
+
+Pr span( a1, . . . , a m)̸ = Fn
+
+> 2
+
+ ≤ (2 n − 1)2 −m ≤ 2−(m−n).
+
+On the event that (ai)mi=1 spans Fn 
+
+> 2
+
+, the retained live pool contains n linearly independent equations. Then, Gaussian elimination over F2 can be implemented using XOR recombi-nations: each row operation replaces one equation by the XOR of two existing equations. Using Gauss–Jordan elimination on n independent equations, for each pivot column one needs to eliminate that coordinate from at most n − 1 other rows, so at most n(n − 1) XOR recombinations suffice to obtain (e1, x 1), . . . , (en, x n). This gives us (e1, x 1), . . . , (en, x n),after which one final Sum step yields (x, x · x).For the lower bound, we use Theorem 1 of Raz [2018] in the following form. For every 
+
+¯c < 1/20 , there exists ¯α > 0 such that any streaming algorithm which receives random samples (a, b = a · x), uses at most ¯cn 2 bits of memory, and sees at most 2¯αn samples, outputs the hidden vector x with probability at most O(2 − ¯αn ).MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 9
+
+The intuition is that a small live pool is a small-memory streaming algorithm: it sees random valid equations a·x = b, but unless it stores a linear number of independent equations, it cannot recover the hidden vector x in subexponential time. Fix c < 1/40 , set ¯c := 2 c < 1/20 , and let ¯α > 0 be the corresponding constant from Raz’s theorem. Set α := ¯ α/ 2.We first remove the reward feedback. Let π(0) denote the coupled execution of π in which every reward bit is replaced by 0, using the same randomness and the same generated equations as in the execution of π. Write q(0)  
+
+> t
+
+= ( a(0)  
+
+> t
+
+, b (0)  
+
+> t
+
+) for the candidate queried by π(0) 
+
+at round t. Since the reward observed by π differs from 0 only when the queried candidate is already (x, x · x), the executions of π and π(0) coincide up to the first successful query. Therefore 
+
+V πm ≤
+
+> m
+
+X
+
+> t=1
+
+Pr q(0)  
+
+> t
+
+= ( x, x · x).
+
+Now fix t ≤ m. We view the first t rounds of π(0) as a streaming algorithm At for parity learning. Generation steps read fresh samples (a, a · x), while recombination steps only update the live pool deterministically by XORing stored equations. Since π is cn -pool-based, At
+
+stores at most cn equations at every time. Each equation has n + 1 bits, so the total memory used is at most 
+
+cn (n + 1) ≤ 2cn 2 = ¯ cn 2.
+
+Moreover, At reads at most t ≤ m ≤ 2αn ≤ 2¯αn fresh samples. Hence Raz’s theorem gives 
+
+Pr a(0)  
+
+> t
+
+= x ≤ O(2 − ¯αn ).
+
+Since q(0)  
+
+> t
+
+= ( x, x · x) implies a(0)  
+
+> t
+
+= x, we also have 
+
+Pr q(0)  
+
+> t
+
+= ( x, x · x) ≤ O(2 − ¯αn ).
+
+Summing over t ≤ m, and using m ≤ 2αn , we obtain 
+
+V πm ≤ m · O(2 − ¯αn ) ≤ O(2 −( ¯ α−α)n) = O(2 −αn ),
+
+as desired. □
+
+Remark 2. The operator Sum is included only as a convenient terminal decoder; its particular definition plays no role in the lower bound. The hard part of the problem is retaining enough linearly independent valid equations to identify x. Once a policy has obtained n independent equations, the set (ei, x i) can be obtained via XOR recombinations. Then x can also be decoded using any other operation that an obtain (x, x · x), such as a bit-shift mutation. 
+
+Remark 3 (Islands) . A useful variant extends the diversity interpretation to islands . Write 
+
+n = nL + nR, where nL := ⌊n/ 2⌋ and nR := ⌈n/ 2⌉. Let generation sample uniformly from one of the two coordinate subspaces 
+
+HL := {(u, 0nR ) : u ∈ { 0, 1}nL }, HR := {(0 nL , v ) : v ∈ { 0, 1}nR },
+
+each with probability 1/2, returning a valid equation a, b with b = a · x as before. Thus, a sample from HL reveals only information about the left block xL = ( x1, . . . , x nL ), while a sample from HR reveals only information about the right block xR = ( xnL+1 , . . . , x n).Interpreting each subspace as an island, a successful policy must generate a linear number of samples from each island. Indeed, since recombination still cannot increase the span, a policy must generate enough independent equations from each island to learn the coordinates of 
+
+x on each subspace. This same construction extends immediately to any fixed number of islands by partitioning the coordinates into blocks and sampling generation vectors from the corresponding coordinate subspaces. 10 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+7. Discussion and Conclusion 
+
+We introduced the GMR framework as a model for ML-guided genetic algorithms. The motivation is that classical genetic-algorithm models do not capture the setting of iterative LLM prompting: mutation and recombination are not blind random perturbations and crossovers, but learned operators whose goal is to improve the input solutions. This leads to a different query-allocation problem: how should a policy spend its budget on generation, mutation, and recombination? Unlike in classical GAs, each operation here may be expensive, so allocating the query budget well becomes central. Our main message is that optimization-guided operators can behave very differently from classical averaging or random-splicing operations, and that generation, mutation, and recombination can play genuinely different roles in theory. Theorem 1 shows that stronger guided operators can lead to much faster improvement than averaging-type operators. Theorem 2 shows a simple construction where each operator is necessary. Finally in the parity learning instantiation of the model, we show that diversity is necessary: successfully generating the hidden target requires maintaining a linear amount of candidates alive and recombining them. Indeed, policies with an insufficiently large live-pool provably fail to find the target in subexponential time. 
+
+Acknowledgments 
+
+AB is supported by NSF GRFP 2141064 and NSERC. IDA is supported by grant NSF DMS-2031883 and Vannevar Bush Faculty Fellowship ONR-N00014-20-1-2826 (PI Mossel). EM is partially supported by NSF DMS-2031883, Vannevar Bush Faculty Fellowship ONR-N00014-20-1-2826, MURI N000142412742, and a Simons Investigator Award. 
+
+References 
+
+Takuya Akiba, Makoto Shing, Yutong Tang, Qiang Sun, and David Ha. Evolutionary optimization of model merging recipes. Nature Machine Intelligence , 7(2):195–204, 2025. 5 Yuntao Bai, Andy Jones, Kamal Ndousse, Amanda Askell, Anna Chen, Nova DasSarma, Dawn Drain, Stanislav Fort, Deep Ganguli, Tom Henighan, et al. Training a helpful and harmless assistant with reinforcement learning from human feedback. arXiv preprint arXiv:2204.05862 , 2022. 5 Gergely Bérczi, Baran Hashemi, and Jonas Klüver. Flow-based extremal mathematical structure discovery. arXiv preprint arXiv:2601.18005 , 2026. 5 Sébastien Bubeck and Nicolò Cesa-Bianchi. Regret analysis of stochastic and nonstochastic multi-armed bandit problems. Foundations and Trends in Machine Learning , 5(1):1–122, 2012. 5 François Charton, Jordan S Ellenberg, Adam Zsolt Wagner, and Geordie Williamson. Pat-ternboost: Constructions in mathematics with a little help from ai. arXiv preprint arXiv:2411.00566 , 2024. 5 Agosten E. Eiben and James E. Smith. Introduction to Evolutionary Computing . Springer, Berlin, 2015. 1 Chrisantha Fernando, Dylan Banarse, Henryk Michalewski, Simon Osindero, and Tim Rocktäschel. Promptbreeder: Self-referential self-improvement via prompt evolution. arXiv preprint arXiv:2309.16797 , 2023. 1, 2 Mohammad Ghavamzadeh, Shie Mannor, Joelle Pineau, and Aviv Tamar. Bayesian reinforce-ment learning: A survey. Foundations and Trends in Machine Learning , 8(5-6):359–483, 2015. 5 David E. Goldberg. Genetic Algorithms in Search, Optimization, and Machine Learning .Addison-Wesley, Reading, MA, 1989. 1, 2, 4 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 11 
+
+Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song, Peiyi Wang, Qihao Zhu, Runxin Xu, Ruoyu Zhang, Shirong Ma, Xiao Bi, et al. DeepSeek-R1: Incentivizing reasoning capability in llms via reinforcement learning. arXiv preprint arXiv:2501.12948 , 2025. 5 Qingyan Guo, Rui Wang, Junliang Guo, Bei Li, Kaitao Song, Xu Tan, Guoqing Liu, Jiang Bian, and Yujiu Yang. Connecting large language models with evolutionary algorithms yields powerful prompt optimizers. arXiv preprint arXiv:2309.08532 , 2023. 1, 2, 5 Nikolaus Hansen and Andreas Ostermeier. Completely derandomized self-adaptation in evolution strategies. Evolutionary computation , 9(2):159–195, 2001. 5 John H Holland. Adaptation in natural and artificial systems: an introductory analysis with applications to biology, control, and artificial intelligence . MIT press, 1992. 1, 4 Max Jaderberg, Valentin Dalibard, Simon Osindero, Wojciech M. Czarnecki, Jeff Donahue, Ali Razavi, Oriol Vinyals, Tim Green, Iain Dunning, Karen Simonyan, et al. Population based training of neural networks. arXiv preprint arXiv:1711.09846 , 2017. 5 Leslie Pack Kaelbling, Michael L Littman, and Anthony R Cassandra. Planning and acting in partially observable stochastic domains. Artificial Intelligence , 101(1-2):99–134, 1998. 5 Stuart A. Kauffman. The Origins of Order: Self-Organization and Selection in Evolution .World Scientific, 1992. 4 John R Koza. Genetic programming as a means for programming computers by natural selection , volume 4. Springer, 1994. 1 Kuang-Huei Lee, Ian Fischer, Yueh-Hua Wu, Dave Marwood, Shumeet Baluja, Dale Schuur-mans, and Xinyun Chen. Evolving deeper LLM thinking. arXiv preprint arXiv:2501.09891 ,2025. 1 Joel Lehman, Jonathan Gordon, Shawn Jain, Kamal Ndousse, Cathy Yeh, and Kenneth O Stanley. Evolution through large models. In Handbook of evolutionary machine learning ,pages 331–366. Springer, 2023. 2, 5 Guanzhou Lu, Jinlong Li, and Xin Yao. Fitness landscapes and problem difficulty in evolutionary algorithms: from theory to applications. In Recent advances in the theory and application of fitness landscapes , pages 133–152. Springer, 2014. 4 Elliot Meyerson, Mark J Nelson, Herbie Bradley, Adam Gaier, Arash Moradi, Amy K Hoover, and Joel Lehman. Language model crossover: Variation through few-shot prompting. 
+
+ACM Transactions on Evolutionary Learning , 4(4):1–40, 2024. 2, 5 Ansh Nagda, Prabhakar Raghavan, and Abhradeep Thakurta. Reinforced generation of combinatorial structures: Ramsey numbers. arXiv preprint arXiv:2603.09172 , 2026. 5 Alexander Novikov, Ngân V˜ u, Marvin Eisenberger, Emilien Dupont, Po-Sen Huang, Alan Z. Wagner, Sergey Shirobokov, Borislav Kozlovskii, Francisco J. R. Ruiz, Abbas Mehrabian, M. Pawan Kumar, Abigail See, Surajit Chaudhuri, George Holland, Aidan Davies, Sebastian Nowozin, Pushmeet Kohli, and Matej Balog. AlphaEvolve: A coding agent for scientific and algorithmic discovery. arXiv preprint arXiv:2506.13131 , 2025. 1, 2, 5 Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex Ray, et al. Training language models to follow instructions with human feedback. Advances in neural information processing systems , 35:27730–27744, 2022. 5 Martin L. Puterman. Markov Decision Processes: Discrete Stochastic Dynamic Programming .John Wiley & Sons, 1994. 5 Xin Qiu, Yulu Gan, Conor F Hayes, Qiyao Liang, Yinggan Xu, Roberto Dailey, Elliot Meyerson, Babak Hodjat, and Risto Miikkulainen. Evolution strategies at scale: Llm fine-tuning beyond reinforcement learning. arXiv preprint arXiv:2509.24372 , 2025. 5 Ran Raz. Fast learning requires good memory: A time-space lower bound for parity learning. 
+
+Journal of the ACM (JACM) , 66(1):1–18, 2018. 8 12 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+Esteban Real, Alok Aggarwal, Yanping Huang, and Quoc V. Le. Regularized evolution for image classifier architecture search. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 33, pages 4780–4789, 2019. 5 Ingo Rechenberg. Evolutionsstrategie. Optimierung technischer Systeme nach Prinzipien der biologischen Evolution , 1973. 4 Herbert Robbins and Sutton Monro. A stochastic approximation method. The Annals of Mathematical Statistics , 22(3):400–407, 1951. 5 Bernardino Romera-Paredes, Mohammadamin Barekatain, Alexander Novikov, Matej Balog, M Pawan Kumar, Emilien Dupont, Francisco JR Ruiz, Jordan S Ellenberg, Pengming Wang, Omar Fawzi, et al. Mathematical discoveries from program search with large language models. Nature , 625(7995):468–475, 2024. 1, 2, 5 Tim Salimans, Jonathan Ho, Xi Chen, Szymon Sidor, and Ilya Sutskever. Evolution strategies as a scalable alternative to reinforcement learning. arXiv preprint arXiv:1703.03864 , 2017. 5John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. 5 Hans-Paul Schwefel. Numerische Optimierung von Computer-Modellen mittels der Evolu-tionsstrategie , volume 57. Springer, 1977. 4 Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haotian Zhang, Mingchuan Zhang, Y. K. Li, Yuxiang Wu, and Daya Guo. DeepSeekMath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300 ,2024. 5 Kenneth O. Stanley and Risto Miikkulainen. Evolving neural networks through augmenting topologies. Evolutionary Computation , 10(2):99–127, 2002. 5 Felipe Petroski Such, Vashisht Madhavan, Edoardo Conti, Joel Lehman, Kenneth O Stanley, and Jeff Clune. Deep neuroevolution: Genetic algorithms are a competitive alternative for training deep neural networks for reinforcement learning. arXiv preprint arXiv:1712.06567 ,2017. 5 Richard S Sutton and Andrew G Barto. Reinforcement Learning: An Introduction , volume 1. MIT press Cambridge, Cambridge, MA, 1998. 5 Weizhi Tang, Kwabena Nuamah, and Vaishak Belle. Lyria: A general llm-driven genetic algorithm framework for problem solving. arXiv preprint arXiv:2507.04034 , 2025. 5 Sewall Wright. The roles of mutation, inbreeding, crossbreeding, and selection in evolution. In Proceedings of the Sixth International Congress of Genetics , volume 1, pages 355–366, 1932. 4 Jiangjiang Zhao, Zhuoran Wang, and Fangchun Yang. Genetic prompt search via exploiting language model probabilities. In IJCAI , pages 5296–5305, 2023. 5 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 13 
+
+Appendix A. Notable Instantiation Examples of the GMR Framework 
+
+Many familiar stochastic search and model training procedures fit into our framework: 
+
+Multi arm bandits. A fixed A-armed bandit instance can be modeled using only D0. Take 
+
+X = [ A] × R, where a point z = ( i, R ) records that arm i was pulled and reward R was observed, and define U (i, R ) = R. Generation: for each arm i ∈ [A], include one generation rule Di ∈ D 0. This rule samples z = ( i, R ), where R ∼ νi and νi is the fixed reward law of arm i. Thus K = {0} and D0 = {Di : i ∈ [A]}. The feedback can be taken to be full feedback, ot = ( zt, U (zt)) . Choosing Di is exactly pulling arm i, and the reward randomness is the randomness of the generation rule. 
+
+Stochastic gradient and first-order methods. These can be modeled using only D0
+
+and D1, for a fixed training problem and a fixed stochastic update procedure. For example, let X be the space of optimization states x = ( θ, h ), where θ ∈ Rd is the current parameter vector and h stores any internal memory, such as momentum variables or Adam statistics. 
+
+Generation: an initialization rule Dinit ∈ D 0 samples the initial state x0 = ( θ0, h 0). Mutation: 
+
+an update rule Dupd ∈ D 1 maps a current state x = ( θ, h ) to the distribution of the next state obtained by one stochastic update: it samples a minibatch, computes the corresponding gradient or finite-difference estimate for the fixed training problem, and returns the updated state x′ = ( θ′, h ′). Thus K = {0, 1}, D0 = {Dinit }, and D1 = {Dupd }. The objective can be taken to be U (θ, h ), the performance of the current iterate, e.g., minus validation loss. The feedback can be taken to be full feedback, ot = ( zt, U (zt)) , or a more limited feedback model depending on the algorithm being represented. The training problem and the stochastic update rule are fixed parts of the framework G; they are not hidden varying objectives. 
+
+Genetic algorithms and evolution strategies. Take X to be a space of individuals, and let U : X → R be the fitness or performance objective. Generation: initial-population distributions D0. Mutation: standard perturbation operators D1. Recombination: crossover or more general multi-parent combination operators Dk for k ≥ 2. The feedback map Obs can represent the information exposed to the policy, such as full candidate and fitness feedback or only objective-value feedback. Furthermore, each fixed GMR framework G = ( X, U, (Dk)k∈K , Obs ) can be viewed as a Markov Decision Process (MDP) as follows. The n-round GMR process induces a finite-horizon controlled process. The state before round t is the full process history 
+
+ht :=  (z1, o 1), . . . , (zt−1, o t−1) ∈ H t−1, h1 = ∅,
+
+where os = Obs (zs; z1, . . . , z s−1). An action at state ht is any admissible GMR choice 
+
+at = ( k, D, i 1, . . . , i k), where k ∈ K, D ∈ D k, and i1, . . . , i k < t when k ≥ 1 (with only 
+
+k = 0 feasible at t = 1 ). Given (ht, a t), the next query is sampled as zt ∼ D(zi1 , . . . , z ik ),
+
+with the convention that D ∈ D 0 is sampled without inputs. The next observation is 
+
+ot = Obs (zt; z1, . . . , z t−1), and the next state is obtained by appending the new pair, ht+1 = ht, (zt, o t). Thus the induced transition kernel is generally stochastic. The objective corresponds to taking zero reward at intermediate rounds and a terminal reward after the n-th query: R(hn+1 ) := max 1≤j≤n U (zj ). Then for every admissible policy 
+
+π,
+
+EMG,π [R(hn+1 )] = E
+
+
+
+max  
+
+> 1≤j≤n
+
+U (zj )
+
+
+
+= V πn (G).
+
+Consequently, 
+
+V ∗ 
+
+> n
+
+(G) = sup 
+
+> π∈Πobs
+> G
+
+V πn (G)14 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+is precisely the optimal value of the induced horizon-n process. Under full feedback this is an MDP observed by the policy; under partial feedback, the same full-history process is an MDP for the environment, while the policy observes only the feedback history generated by 
+
+Obs .
+
+Appendix B. Proof of Theorem 1: A One-Dimensional Gaussian Example 
+
+Theorem 1. Assume μ < 1 and λ1 + λ2 < 1. Let α := min 
+
+n
+
+1, 1−μσM , 1−λ1−λ2
+
+> σR
+
+o
+
+. Then we have V ∗ 
+
+> n
+
+(G) = (1 + o(1)) α−1√2 log n. Moreover, if either μ = 1 or λ1 + λ2 = 1 , then 
+
+V ∗ 
+
+> n
+
+(G) ≥ Ω( n), while if either μ > 1 or λ1 + λ2 > 1, then V ∗ 
+
+> n
+
+(G) ≥ exp(Ω( n)) .Proof. Fix the framework from Section 4. For a policy π, let zt be the point queried at time 
+
+t, and let Mt := max s≤t zs. Since U (x) = x, we have V πn (G) = EMn.We first prove the upper bound in the contractive case μ < 1 and λ1 + λ2 < 1. Fix u > 0.Decompose according to the first time the running maximum exceeds u:
+
+P(Mn > u ) = 
+
+> n
+
+X
+
+> t=1
+
+P(Mt > u, M t−1 ≤ u), (B.1) where M0 = −∞ . Condition on the the filtration Ft−1 generated by all random variables up to time t − 1. Respectively denote the event that the t-th query is a generation, mutation or recombination by {G,M,R }. Then, on a generation event, P(zt > u, G | F t−1) ≤ exp (−u2/2) .If it is a mutation of some previously queried x, then on the event Mt−1 ≤ u we have x ≤ u,and therefore 
+
+P(zt > u, M | F t−1) = P(μx + σM Z > u ) ≤ P
+
+
+
+Z > 1 − μσM
+
+u
+
+
+
+.
+
+If it is a recombination of x, y , then on Mt−1 ≤ u we have x, y ≤ u, and since λ1, λ 2 ≥ 0,
+
+P(zt > u, R | F t−1) = P(λ1x + λ2y + σRZ > u ) ≤ P
+
+
+
+Z > 1 − λ1 − λ2
+
+σR
+
+u
+
+
+
+.
+
+By the definition of α and the Gaussian tail bound P(Z > r ) ≤ exp (−r2/2) , each summand in (B.1) is at most exp( −α2u2/2) . Hence 
+
+P(Mn > u ) ≤ n exp( −α2u2/2) .
+
+Let un = (1 + ε)α−1√2 log n. Then 
+
+EMn ≤ un +
+
+Z ∞
+
+> un
+
+P(Mn > t ) dt ≤ un + n
+
+Z ∞
+
+> un
+
+exp( −α2t2/2) dt = (1 + ε + o(1)) α−1p2 log n. 
+
+Since ε > 0 is arbitrary, V ∗ 
+
+> n
+
+(G) ≤ (1 + o(1)) α−1√2 log n.We next prove the matching lower bound. If α = 1 , the generation-only policy gives n
+
+independent N (0 , 1) samples, so the standard Gaussian maximum asymptotics give EMn =(1 + o(1)) √2 log n.It remains to consider the case where the minimum in α is attained by mutation or recombination. We treat both cases at once. Let q < 1 and σ > 0 denote the coefficient and noise level of the best contractive operator: for mutation, q = μ and σ = σM ; for recombination, q = λ1 + λ2 and σ = σR, using the same previous candidate twice. Thus 
+
+α = (1 − q)/σ .Fix ε ∈ (0 , 1) , and set u = (1 − ε)α−1√2 log n. Let L := ⌈log n⌉, m := ⌊(n − L)/L ⌋, and 
+
+uj := ju/L for j = 0 , . . . , L . The policy first makes L generation queries. With probability at least 1 − 2−L, their maximum is nonnegative; on this event set the current candidate to be any generated point with value at least u0 = 0 .MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 15 
+
+The policy then climbs the levels u1, . . . , u L. At level j, assuming the current candidate has value at least uj−1, it applies the chosen operator m times to the current candidate. In the recombination case it uses the current candidate as both parents. If any of the m outputs has value at least uj , it sets the current candidate to the first such output and moves to level 
+
+j + 1 . Otherwise the policy fails. Conditional on reaching level j − 1, each attempt at level j succeeds with probability at least 
+
+P(qu j−1 + σZ ≥ uj ) = P
+
+
+
+Z ≥ uj − qu j−1
+
+σ
+
+
+
+.
+
+For every j ≤ L,
+
+uj − qu j−1
+
+σ = (1 − q)uj−1 + u/L σ ≤ αu + uσL = (1 − ε)p2 log n + o(1) ≤ (1 − ε/ 2) p2 log n
+
+for all sufficiently large n. Therefore, uniformly over j,
+
+P(qu j−1 + σZ ≥ uj ) ≥ P
+
+
+
+Z ≥ (1 − ε/ 2) p2 log n
+
+
+
+≥ n−(1 −ε/ 2) 2+o(1) .
+
+Since m = n1+ o(1) , the probability of failing at a fixed level is at most 
+
+exp 
+
+
+
+−n1−(1 −ε/ 2) 2+o(1) 
+
+= o(1 /L ).
+
+A union bound over the L levels shows that the policy reaches uL = u with probability 
+
+1 − o(1) . Also, the negative part of the maximum after the initial L generations is negligible: if GL is the maximum of those generations, then 
+
+E[−GL1{GL < 0}] = 
+
+Z ∞
+
+> 0
+
+P(GL < −t) dt =
+
+Z ∞
+
+> 0
+
+Φ( −t)L dt = o(plog n).
+
+Thus this policy satisfies EMn ≥ (1 − o(1)) u. Since ε > 0 was arbitrary, V ∗ 
+
+> n
+
+(G) ≥ (1 −
+
+o(1)) α−1√2 log n. This completes the proof of the tight asymptotic in the contractive case. We now prove the two qualitative lower bounds for non-contractive operators. If μ = 1 , generate one initial candidate. Then repeatedly make two mutation queries from the current candidate and keep the larger of the two children. Each two-query block increases the current candidate in expectation by σM E max {Z1, Z 2} = σM /√π. Hence V ∗ 
+
+> n
+
+(G) ≥ Ω( n).The same argument applies when λ1 + λ2 = 1 , by recombining the current candidate with itself and using σR in place of σM .Finally, suppose μ > 1. Generate two initial candidates and keep the larger one, whose expectation is positive. Then repeatedly mutate the current candidate. If xt denotes the current candidate after t such mutations, then Ext = μtEx0, so V ∗ 
+
+> n
+
+(G) ≥ exp (Ω( n)) . The same argument applies when λ1 + λ2 > 1, again by recombining the current candidate with itself. This proves the theorem. □
+
+Appendix C. Proof of Theorem 2: All Three Operators are Necessary 
+
+In this section, we prove Theorem 2 showing all three operators are essential. 
+
+Theorem 2 (All three operators are necessary) . There exists a universal constant c > 0
+
+such that the following holds. For all positive integers G, R, M , there exists an explicit two-dimensional GMR framework G with objective U : X → [0 , 3] such that, under full feedback, for N := 10 G + R + M :
+
+i) An explicit policy shows N ∗
+
+> 1/10
+
+(N ; G) ≤ N .
+
+ii) If a policy π uses fewer than cG generations, cR recombinations, or cM mutations on every execution path, then N1/4(π, N ; G) = ∞.16 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+Proof. The GMR framework G = ( X, U, (Dk)k≥0, Obs ) is defined as follows. Throughout, policies are allowed full feedback: after each query zt, they observe (zt, U (zt)) . Fix positive integers G, R, M and set N := 10 G + R + M . Set 
+
+X := [0 , 1] 2, η := 12M .
+
+Let Λ := 2 R+10 .Let D0 = {Dgen }, where Dgen ((0 , 0)) = 1 − 12G and Dgen ((1 , 0)) = 12G . Let D1 = {M↑},where M↑(x, y ) :=  x, min {y + η, 1}, and let D2 = {Rmid }, where 
+
+Rmid 
+
+ (x1, y 1), (x2, y 2) := 
+
+ x1 + x2
+
+2 , 0
+
+
+
+.
+
+For k ≥ 3, set Dk = ∅.Define 
+
+xj := 2 −j , aj := ( xj , 0) , j = 1 , . . . , R, 
+
+and let b := ( xR, 1/2) . The hidden objective U : X → [0 , 3] is 
+
+U (x, y ) := 3 · 2−Λ|x−xR| · max 
+
+n
+
+0, 1 − y − 12
+
+o
+
+.
+
+We first prove item (1). Consider the following policy π⋆. It first performs 10 G generations. If both (0 , 0) and (1 , 0) have appeared, it keeps one copy of each. It then queries 
+
+a1 = Rmid 
+
+ (0 , 0) , (1 , 0)  =
+
+ 12 , 0
+
+
+
+.
+
+For j = 2 , . . . , R , it recursively queries 
+
+aj = Rmid 
+
+ (0 , 0) , a j−1
+
+.
+
+A simple induction shows that these points are exactly aj = (2 −j , 0) , for j = 1 , . . . , R . The policy then applies M↑ exactly M times to aR. Since each mutation increases the y-coordinate by η = 1 /(2 M ), after M mutations it reaches b = ( xR, 1/2) , where U (b) = 3 .This policy uses at most 10 G generations, R recombinations, and M mutations, hence at most 10 G + R + M = N queries in total. Its failure event is that at least one of (0 , 0) and (1 , 0) is not seen in the first 10 G generations. By the union bound, 
+
+Pr[failure] ≤
+
+
+
+1 − 12G
+
+10 G
+
++
+
+ 12G
+
+10 G
+
+≤ e−5 + 2 −10 .
+
+Therefore, 
+
+V π⋆ 
+
+> N
+
+(G) ≥ 3(1 − e−5 − 2−10 ).
+
+Since U is bounded from above by 3, we have V ∗ 
+
+> N
+
+(G) ≤ 3. Hence 
+
+V ∗ 
+
+> N
+
+(G) − V π⋆ 
+
+> N
+
+(G) ≤ 3e−5 + 3 · 2−10 < 110 .
+
+Thus N1/10 (π⋆, N ; G) ≤ N , and so N ∗
+
+> 1/10
+
+(N ; G) ≤ N .We now prove item (2). Set c := 1 /100 .
+
+Case 1: too few generations. Assume that π uses fewer than cG generations in total on every execution path. Fix any m ∈ N. Since each generation outputs (1 , 0) with probability 
+
+1/(2 G), the probability that π has seen (1 , 0) by time m is at most c/ 2 by the union bound. On the complementary event, every generation outputs (0 , 0) . Then every queried point has x-coordinate equal to 0: mutation does not change the x-coordinate, and midpoint MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 17 
+
+recombination of points with x-coordinate 0 again has x-coordinate 0. Therefore, for every queried point (x, y ) on this event, 
+
+U (x, y ) ≤ 3 · 2−ΛxR ≤ 3 · 2−Λ2 −R
+
+≤ 3 · 2−1024 .
+
+Hence 
+
+V πm(G) ≤ 3 · c
+
+2 + 3 · 2−1024 .
+
+Using V ∗ 
+
+> N
+
+(G) ≥ 3(1 − e−5 − 2−10 ), we get 
+
+V ∗ 
+
+> N
+
+(G) − V πm(G) ≥ 3(1 − e−5 − 2−10 ) − 3c
+
+2 − 3 · 2−1024 > 14 .
+
+Since m ∈ N was arbitrary, no finite number of queries can achieve the 1/4-approximation target. Therefore 
+
+N1/4(π, N ; G) = ∞.
+
+Case 2: too few recombinations. Assume that π uses fewer than cR recombinations in total on every execution path. Let L := ⌊cR ⌋. Fix any m ∈ N.We claim that every queried point by time m has x-coordinate equal to a dyadic rational whose denominator divides 2L. Indeed, generated points have x-coordinates 0 and 1, so this is true at time 0. Mutation does not change the x-coordinate. If two queried points have 
+
+x-coordinates with denominators dividing 2ℓ, then their midpoint has denominator dividing 
+
+2ℓ+1 . Since along any execution path there are at most L recombination calls in total, an induction on time gives the claim. Since c < 1, we have L < R . The target coordinate xR = 2 −R has exact denominator 2R,so it cannot equal any dyadic rational whose denominator divides 2L. Moreover, for every such dyadic z, we have |z − xR| ≥ 2−R. Hence, for every queried point (x, y ),
+
+U (x, y ) ≤ 3 · 2−Λ2 −R
+
+≤ 3 · 2−1024 .
+
+Thus 
+
+V πm(G) ≤ 3 · 2−1024 .
+
+Using again V ∗ 
+
+> N
+
+(G) ≥ 3(1 − e−5 − 2−10 ), we obtain 
+
+V ∗ 
+
+> N
+
+(G) − V πm(G) ≥ 3(1 − e−5 − 2−10 ) − 3 · 2−1024 > 14 .
+
+By the same argument as in case 1, N1/4(π, N ; G) = ∞.
+
+Case 3: too few mutations. Assume that π uses fewer than cM mutations in total on every execution path. Since every generation and every recombination produces a point with y-coordinate 0, and each mutation increases the y-coordinate by exactly 1/(2 M ), every queried point has y ≤ c/ 2. Therefore, for every queried point (x, y ),
+
+U (x, y ) ≤ 3
+
+
+
+1 − 12 − y
+
+
+
+≤ 3(1 + c)2 .
+
+Hence V πm(G) ≤ 3(1 + c)/2 for every m. Using again that V ∗ 
+
+> N
+
+(G) ≥ 3(1 − e−5 − 2−10 ), we get 
+
+V ∗ 
+
+> N
+
+(G) − V πm(G) ≥ 3(1 − e−5 − 2−10 ) − 3(1 + c)2 > 14 .
+
+By the same argument as in cases 1 and 2, N1/4(π, N ; G) = ∞.
+
+This proves the theorem. □
+
+The next proposition shows that the necessity result above is genuinely tied to richer, higher-dimensional GMR structure. In a natural one-dimensional analogue, under the same full-feedback query-complexity formulation, either mutation alone or recombination alone already suffices up to constant factors. 18 MATH. PERSPECTIVE ON GENETIC ALGORITHMS WITH OPTIMIZATION GUIDED OPERATORS 
+
+Proposition 1 (One-dimensional contrast) . There exists a universal constant C > 0 such that for every n ≥ 2 and every 1-Lipschitz objective U : [0 , 1] → [0 , 1] , there is a one-dimensional GMR framework Gn,U with objective U for which, under full feedback, 
+
+NC/n (π, n ; Gn,U ) ≤ Cn 
+
+for one policy π using no recombinations, and also for another policy π using no mutations. 
+
+Proof. Take C := 4 and fix n ≥ 2 and a 1-Lipschitz objective U : [0 , 1] → [0 , 1] . Let X = [0 , 1] ,let Dgen = 12 δ0 + 12 δ1, let M+(x) := min {x + 1 /n, 1} and M−(x) := max {x − 1/n, 0}, and let Rmid (x, y ) := ( x + y)/2. Define Gn,U = ( X, U, (Dk)k≥0, Obs ) by 
+
+D0 = {Dgen }, D1 = {M+, M −}, D2 = {Rmid }, Dk = ∅ for k ≥ 3,
+
+with full feedback 
+
+Obs (z; z1, . . . , z t−1) = ( z, U (z)) .
+
+A mutation-only policy first generates one endpoint and then repeatedly applies M+ or 
+
+M− toward the other endpoint. After at most n + 1 ≤ 4n queries it has evaluated the grid 
+
+{j/n : 0 ≤ j ≤ n}.A recombination-only policy first makes m0 := ⌈log 2(2 n)⌉ generation queries. With probability at least 1 − 1/n , both endpoints appear. Conditioned on this event, repeated midpoint recombination for k := ⌈log 2 n⌉ dyadic levels evaluates a grid of mesh at most 1/n ,using 2k − 1 ≤ 2n − 1 recombination queries. Hence the total number of queries is at most 
+
+4n.For the fixed objective U , a 1/n -net contains a point z with U (z) ≥ max x U (x) − 1/n ≥
+
+V ∗ 
+
+> n
+
+(Gn,U ) − 1/n . Thus the mutation-only policy is within 1/n of the benchmark. The recombination-only policy has the same guarantee on the success event and loses at most another 1/n from the failure event, since U ∈ [0 , 1] . Therefore both policies are within 4/n 
+
+of V ∗ 
+
+> n
+
+(Gn,U ) using at most 4n queries, which proves the claim. □

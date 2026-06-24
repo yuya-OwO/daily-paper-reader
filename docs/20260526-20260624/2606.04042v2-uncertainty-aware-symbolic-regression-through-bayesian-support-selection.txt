@@ -1,0 +1,340 @@
+Title: Uncertainty-Aware Symbolic Regression through Bayesian Support Selection
+
+URL Source: https://arxiv.org/pdf/2606.04042v2
+
+Published Time: Wed, 10 Jun 2026 01:08:01 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# Uncertainty-Aware Symbolic Regression through Bayesian Support Selection 
+
+Satadeep Bhattacharjee 1, ∗
+
+> 1
+
+Indo Korea Science and Technology Center, Bangalore 
+
+(Dated: June 10, 2026) The Sure Independence Screening and Sparsifying Operator (SISSO) framework is a powerful symbolic-regression method for extracting compact and interpretable descriptors from large non-linear feature spaces. However, standard SISSO is deterministic: it returns a single descriptor and point prediction, without quantifying uncertainty in descriptor selection, regression coefficients, or predictions. Here we introduce a probabilistic extension in which the sure independence screen-ing (SIS) stage is kept deterministic to preserve scalability, while the sparsifying operator (SO) stage is reformulated as Bayesian inference over the SIS-screened support space. The resulting deterministic-SIS/Bayesian-SO framework yields posterior probabilities for competing descriptor supports, feature-inclusion probabilities, Bayesian-model-averaged predictions, and predictive cred-ible intervals, while recovering the deterministic SO descriptor of standard SISSO in the maximum-a-posteriori limit. Applied to an X2Y Z Heusler-alloy magnetic-moment dataset, the approach gives modest improvements in five-fold cross-validation RMSE and near-nominal empirical coverage of the 95% predictive intervals. More importantly, the posterior exposes competing, physically related symbolic descriptor families that would appear artificially unique in a deterministic analysis. These results suggest that deterministic-SIS/Bayesian-SO can be used as an uncertainty-aware diagnos-tic extension of SISSO: a tool for assessing descriptor confidence, stability, and non-uniqueness in small-data materials regression problems. 
+
+> Keywords: Symbolic regression, SISSO, Bayesian, Heusler alloys, magnetic moments
+
+I. INTRODUCTION 
+
+Descriptor-based learning has become a central strat-egy in materials science because it balances predictive performance, data efficiency, and physical interpretabil-ity [1]. More broadly, the growth of materials informatics has also motivated automated approaches for extracting structured material-property information from the litera-ture, including entity–relation extraction frameworks for constructing materials knowledge bases [2]. In many real-istic materials problems, datasets are not large enough to justify purely black-box models, and the scientific creden-tial of a model depends not only on its accuracy but also on whether it reveals an intelligible descriptor-property relationship. Symbolic regression is especially attractive in this setting because it searches for closed-form analyt-ical expressions, typically involving only a few physically meaningful variables—that can be inspected, interpreted, and transferred by the respective domain experts. Among symbolic-regression methods, SISSO is one of the most successful frameworks for navigating ex-tremely large nonlinear feature spaces while retaining in-terpretability [1]. Starting from primary features, it con-structs an enormous symbolic library through algebraic and functional operators, then applies sure independence screening (SIS) followed by sparse optimization (SO) to identify a low-dimensional descriptor. The practical im-pact of this framework is already evident across a broad range of materials problems [3–7]. SISSO-based descrip-tors have been used to guide the discovery of acid-stable  
+
+> ∗s.bhattacharjee@ikst.res.in
+
+oxides for electrocatalysis, rationalize Curie-temperature trends in low-dimensional magnetic materials, and de-rive interpretable predictors for materials hardness [8– 10]. These successes make SISSO particularly compelling for applications where one wants not just a predictor, but a compact analytical model that highlights the dominant physics. The success of SISSO is closely linked to its determinis-tic two-stage structure. SIS aggressively reduces a com-binatorially large feature library to a manageable sub-set, and SO selects a sparse descriptor from that reduced set. However, this deterministic pipeline does not di-rectly provide posterior uncertainty for selected descrip-tors, regression coefficients and therefore the predictions. Such uncertainty is often critical in realistic small-data settings, where multiple highly correlated symbolic de-scriptors can explain the data similarly well. Recent work has shown that SISSO can be embed-ded in Bayesian-optimization workflows for adaptive fea-ture discovery, as in the SARBO framework of Nair et al. [11]. There, SISSO serves primarily as an adap-tive representation-learning or feature-selection tool for the optimization surrogate. Here, we address a differ-ent problem: uncertainty quantification in symbolic de-scriptor selection itself. We therefore keep the SIS step deterministic for scalability, but replace the determinis-tic SO step by Bayesian inference over the SIS-screened symbolic supports. In the present work, we develop a deterministic-SIS/Bayesian-SO variant of SISSO that preserves the practical scalability of the original method while adding uncertainty quantification at the descriptor-selection stage. Specifically, we retain SIS as a deterministic screening step, then perform Bayesian inference over 
+
+> arXiv:2606.04042v2 [cond-mat.mtrl-sci] 9 Jun 2026
+
+2the resulting screened support space to compute pos-terior support probabilities, feature-inclusion probabil-ities, Bayesian-model-averaged predictions, and predic-tive credible intervals. Applied to the X2Y Z Heusler-alloy [12] magnetic-moment dataset, this framework not only recovers the deterministic SO solution within the standard SISSO pipeline in the MAP limit, but also re-veals competing descriptor families and improves cross-validation performance relative to that deterministic SIS+SO baseline. In this way, the method achieves the central goal of this work: uncertainty-aware symbolic re-gression without sacrificing the core computational effi-ciency of SISSO. Because Bayesian SO requires a prior over symbolic supports, the prior should be chosen in a way that reflects the dataset, target property, and amount of available physical knowledge. In Bayesian inference, a prior dis-tribution encodes information or preference about model parameters before observing the current data, and the likelihood updates this prior into a posterior distribution after the data are observed [13, 14]. In the present set-ting, the prior is placed on candidate descriptor supports: it can be chosen uniform, or it can weakly encode phys-ically motivated preferences such as Slater–Pauling type electron-count structure. The Bayesian-SO framework requires a support prior, but the particular priors used here are not intrinsic to the method; they are illustra-tive choices designed to test generic, redundancy-aware, and weakly physics-guided support weighting. In this study, for the Heusler-alloy magnetic-moment data, we compare three support priors: (1) a uniform prior that treats all SIS-screened supports equally, (2) a relevance-diversity prior that favors individually relevant but mu-tually nonredundant features, and (3) a weak Slater– Pauling-inspired prior that encourages a two-dimensional descriptor organized around an electron-count backbone and a residual correction. These priors are specific choices for the present Heusler problem rather than uni-versal prescriptions; other materials datasets may call for different weakly informative or physics-guided priors.   
+
+> II. METHODOLOGY A. Standard SISSO Framework
+
+Following Ouyang et al. [1], SISSO starts from a set of primary features and recursively applies algebraic and functional operators to generate a very large candidate feature space for symbolic regression. For a dataset of 
+
+N samples with targets yi, the resulting symbolic library can be written as 
+
+{Φj (x)}Mj=1 , (1) where M may be enormous. In a regression setting, the target vector is approximated as 
+
+y ≈ Φc , (2)                   
+
+> Input data and settings
+> X, y, d, K
+> Symbolic library
+> {Φj(x)}Mj=1
+> SIS screening
+> ISIS = TopK( sj)
+> K≪M
+> Bayesian SO
+> γ⊂ISIS ,|γ|=dp(γ|D I)
+> ∝p(y|γ)p(γ)
+> Posterior outputs MAP + PIP BMA + CI
+> FIG. 1. Workflow of the deterministic-SIS/Bayesian-SO framework. SISSO constructs a symbolic feature library from the primary descriptors; deterministic SIS screening reduces this library to a tractable subspace; Bayesian SO evaluates sparse supports using marginal likelihoods and support pri-ors. The posterior yields MAP descriptors, feature-inclusion probabilities, Bayesian-model-averaged predictions, and pre-dictive credible intervals.
+
+with sensing matrix Φ ∈ RN ×M and sparse coefficient vector c. Direct optimization over all M candidates is generally intractable, so SISSO proceeds in two stages [1]. First, sure independence screening (SIS) ranks features according to their relevance to the target, or to the resid-uals from the previous descriptor dimension, and retains only a small screened subset. Second, the sparsifying operator (SO) performs an L0-style search within that reduced space to identify the best d-dimensional descrip-tor. The standard SISSO procedure therefore returns a single descriptor support and its associated regression co-efficients. Throughout this manuscript, standard SISSO 
+
+denotes this full deterministic SIS+SO pipeline, whereas 
+
+deterministic SO denotes only the second-stage sparse search performed on a fixed SIS-screened feature set.  
+
+> B. Deterministic SIS Stage
+
+Let sj denote the SIS relevance score for feature Φ j ,for example the absolute correlation with the target or with the residual at a given descriptor dimension. The screened index set is 
+
+ISIS = TopK  {sj }Mj=1 ; K , |I SIS | = K, K ≪ M, 
+
+(3) yielding a reduced design matrix 
+
+ΦI ∈ RN ×K . (4) No probabilistic model is assigned to the discarded fea-tures. This is the central computational approximation that keeps the symbolic-regression problem tractable.  
+
+> C. Bayesian Sparsifying Operator
+
+Bayesian inference is performed only on the SIS-screened space. For a candidate support 
+
+γ ⊂ { 1, . . . , K }, |γ| = d, (5) 3we use the Gaussian linear model 
+
+y = Φ(γ) 
+
+> I
+
+βγ + ε, ε ∼ N (0, σ 2I), (6) where Φ(γ) 
+
+> I
+
+denotes the screened columns indexed by γ.Active coefficients are assigned the prior 
+
+βγ ∼ N (0, τ 2I). (7) Bayes’ theorem gives 
+
+p(γ, βγ | D I ) ∝ p(y | γ, βγ , σ 2)p(βγ | τ 2)p(γ), (8) where DI = {ΦI , y}. Integrating out coefficients yields the closed-form marginal likelihood 
+
+p(y | γ) = 
+
+Z
+
+p(y | γ, βγ , σ 2)p(βγ | τ 2)dβγ . (9) The posterior support probability is therefore [15, 16], 
+
+p(γ | D I ) = p(y | γ)p(γ)
+
+P 
+
+> γ′
+
+p(y | γ′)p(γ′) . (10) In the implementation used for the cross-validation cal-culations, Bayesian inference is performed on the SISSO-screened feature values read from the standard SISSO output; no additional variance standardization of the symbolic features is applied. For each candidate support in a training fold, the active feature columns and the target are mean-centered when evaluating the marginal likelihood, which is equivalent to including an intercept. The intercept is restored as ¯ y − ¯ϕTγ βγ , and validation predictions are then reported on the original magnetic-moment scale using the corresponding screened feature columns. The parameter σ2 is fixed globally to the full-data standard-SISSO RMSE squared for the correspond-ing descriptor dimension: σ2 = 0 .26518 for d = 2 and 
+
+σ2 = 0 .16937 for d = 3. The coefficient-prior scale is fixed globally to the target variance divided by d, using var( y) = 4 .71578, giving τ 2 = 2 .35789 for d = 2 and 
+
+τ 2 = 1 .57193 for d = 3. These scales are not optimized on validation folds. Thus, the CV prediction errors are evaluated strictly on held-out targets, but the reported interval calibration should be interpreted conditional on these preset global variance scales rather than as the result of a fully nested variance-estimation procedure. The predictive variance for each support includes the observation-noise term and posterior coefficient covari-ance, and Bayesian model averaging incorporates support uncertainty through the posterior mixture over supports. Fold-specific quantities such as active-column means, tar-get means, deterministic refits, and the Slater–Pauling residual prior are computed from training data only; val-idation targets are used only for scoring.  
+
+> D. Support Priors and Predictions
+
+For a fixed descriptor dimension d, we consider sup-ports γ ⊂ {1, . . . , K } with |γ| = d. The Bayesian-SO framework itself only requires that a prior p(γ) be specified on this support space. The uniform prior be-low is the generic default, while the relevance-diversity and Slater–Pauling priors are optional examples used to probe how redundancy-aware and weakly physics-guided support weighting affect the Heusler-alloy results. For the two-dimensional Heusler descriptor we compare all three priors, and for the three-dimensional benchmark we restrict the comparison to the generic uniform prior and the optional relevance-diversity prior. The first is a uniform prior , which assigns equal prob-ability to every admissible support and serves as the method’s generic, dataset-agnostic choice: 
+
+punif (γ) = 
+
+( Kd
+
+−1, |γ| = d, 
+
+0, otherwise . (11) This prior expresses no preference among screened fea-tures beyond the deterministic SIS reduction itself. It should be noted here that although the uniform prior assigns equal prior probability to all SIS-screened sup-ports of size d, Bayesian SO is not equivalent to deter-ministic SO. Deterministic SO selects the single support with the best optimization criterion, whereas uniform-prior Bayesian SO converts the marginal likelihoods of all screened supports into posterior probabilities. Thus, the uniform prior removes prior preference among sup-ports but still allows the data likelihood to quantify sup-port competition, descriptor non-uniqueness, and model-averaged prediction uncertainty. The second is the relevance-diversity prior , which fa-vors supports containing individually relevant SIS fea-tures while discouraging redundant, highly correlated de-scriptor components: 
+
+pRD (γ) ∝ exp 
+
+h
+
+λSIS 
+
+X
+
+> k∈γ
+
+log sk − λcorr 
+
+X
+
+> k,l ∈γk<l
+
+|corr(Φ k, Φl)|
+
+i
+
+,
+
+|γ| = d, 
+
+(12) and pRD (γ) = 0 for supports of any other size. Here sk
+
+is the SIS score of screened feature k, λSIS ≥ 0 controls how strongly the prior rewards high-scoring features, and 
+
+λcorr ≥ 0 penalizes supports whose members are strongly correlated with one another. The first term therefore re-wards features with high SIS scores ( sk), while the second term penalizes internal redundancy. The reported relevance-diversity calculations use 
+
+λSIS = 1 and λcorr = 5. These values were chosen as weak diagnostic weights: the SIS term preserves the de-terministic screening order, while the correlation term discourages nearly collinear supports without excluding them. The prior is evaluated as an unnormalized log prior; posterior probabilities are normalized over the enu-merated support set through the evidence denominator in the support-posterior expression above. Because all enumerated supports have the same fixed size d, any support-independent prior normalizing constant cancels in the posterior. 4 
+
+> E. Slater-Pauling prior for two-dimensional Heusler descriptors
+
+For full-Heusler alloys X2Y Z , the total valence elec-tron count is [17, 18] 
+
+Nv = 2 NX + NY + NZ . (13) For full-Heusler alloys, the Slater-Pauling rule is com-monly written as Mt = Zt − 24, reflecting the occupa-tion of 12 minority-spin states. We therefore keep the electron-count slope fixed at unity and allow only family-dependent offsets for Co-, Fe-, and Ni-based compounds. In each cross-validation fold, the Slater–Pauling baseline is fit on the training data only as 
+
+M SP  
+
+> i
+
+= ( Nv,i − 24) + bXi , (14) where Xi ∈ { Co , Fe , Ni } denotes the X-site family and 
+
+bX = ⟨Mi − (Nv,i − 24) ⟩i∈X, train . (15) The residual is then 
+
+rSP  
+
+> i
+
+= Mi − M SP  
+
+> i
+
+. (16) For a two-dimensional support γ, the Slater–Pauling prior is 
+
+pSP (γ) ∝ exp 
+
+h
+
+λNv QNv (γ) + λres Qres (γ) + λsplit Bsplit (γ)
+
+− λcorr Qcorr (γ)
+
+i
+
+,
+
+(17) with 
+
+QNv (γ) = max  
+
+> k∈γ
+
+|corr(Φ k, N v )| , (18) 
+
+Qres (γ) = max  
+
+> k∈γ
+
+corr(Φ k, r SP ) , (19) 
+
+Qcorr (γ) = X
+
+> k,l ∈γk<l
+
+|corr(Φ k, Φl)| . (20) Here Bsplit (γ) = 1 when the feature most aligned with 
+
+Nv differs from the feature most aligned with rSP , and is zero otherwise. This prior is an optional Heusler-specific example rather than a required component of Bayesian SO. It is used only for d = 2 because a two-dimensional support has a clear interpretation as an electron-count backbone plus one symbolic correction term. The prior we consider is weak: it does not impose the ideal Slater-Pauling rule as a hard constraint, but instead organizes the posterior around an electron-count plus residual-correction interpretation. The Slater-Pauling prior is chosen to be weak because the actual Slater-Pauling rule provides a physically motivated electron-counting refer-ence for full-Heusler alloys [17], but it is not expected to hold exactly across the present chemically diverse dataset. Deviations can arise from the loss of ideal half-metallicity, changes in hybridization, chemical-family de-pendence, and finite residual contributions beyond sim-ple valence counting. The prior therefore does not impose the Slater–Pauling rule as a hard constraint. Instead, it mildly favors supports that separate an electron-count-like backbone from a residual correction coordinate, while allowing the likelihood to determine the posterior weight of each symbolic descriptor. For the Slater–Pauling prior we use λNv = 0 .5, λres =1.0, λsplit = 0 .25, and λcorr = 0 .5. The smaller corre-lation penalty relative to the relevance-diversity prior is intentional: the Slater–Pauling prior is meant to orga-nize supports into an electron-count-like coordinate plus a residual-correction coordinate, not to make decorrela-tion the dominant prior preference. As for the relevance-diversity prior, the Slater–Pauling prior is normalized only through the posterior normalization over the enu-merated supports. Posterior inclusion probabilities quantify descriptor stability: 
+
+P (k ∈ γ | D I ) = X
+
+> γ∋k
+
+p(γ | D I ). (21) Predictions are then obtained by Bayesian model averag-ing over all screened supports, 
+
+p(y∗ | x∗, DI ) = X
+
+> γ
+
+p(γ | D I )p(y∗ | x∗, γ, DI ), (22) where each term p(y∗ | x∗, γ, DI ) is the predictive dis-tribution conditioned on one candidate support. The resulting mixture yields both a posterior-mean predic-tion and predictive credible intervals. In the MAP limit, this formulation reduces to deterministic SO selection of the single highest-posterior support on the SIS-screened space, which is the second stage of standard SISSO.  
+
+> III. DATASET: X 2YZ HEUSLER ALLOYS
+
+The dataset used for the SISSO analysis consists of full-Heusler alloys with nominal composition X 2YZ, where X is Co, Fe, or Ni. The compound list and associated materials information were taken from the University of Alabama Heusler Alloy Database [19]. The dataset con-tains 88 compounds: 38 Co-based, 32 Fe-based, and 18 Ni-based alloys. For these X 2YZ compounds, the two X atoms occupy equivalent positions, while Y and Z repre-sent the other distinct sublattices. For each of the X, Y, and Z sites, the descriptor set includes the first ionization energy ( IE ), electronegativity (XP ), covalent radius ( Rc), number of valence electrons (N ), atomic volume ( V ), and number of d electrons ( Nd). This yields 17 site-resolved primary features (we drop 
+
+Nd for Z as they are all zeros) and provides a compact representation of the chemical size, electronic structure, and valence characteristics of the constituent elements. Figure 2 summarizes the distribution of magnetic moments and the Pearson-correlation structure of the primary descriptors. The magnetic-moment histogram 5[Fig. 2(a)] shows a clear separation among the three X-site families. Co-based alloys typically span 1 to 6 μB/f.u. (median 3.58 μB/f.u.). Fe-based alloys show a broader distribution, including both nearly non-magnetic and high-moment compounds (up to 6.60 μB/f.u.). The Ni-based subset is dominated by zero-moment compounds. The Pearson correlation heatmap [Fig. 2(b)] reveals substantial multicollinearity among the site-resolved el-emental descriptors. Clear blocks of positive and neg-ative correlation appear among chemically related vari-ables across the X, Y, and Z sublattices, especially for descriptors associated with valence, atomic size, and d-electron character. This inter-feature correlation is im-portant for symbolic regression because many candidate expressions are built from inputs that are not statistically independent. The direct Pearson correlations with the magnetic mo-ment, are dominated by Y-site descriptors. The strongest positive correlations are NY (0.873), IE,Y (0.834), and 
+
+XP,Y (0.629), whereas the strongest negative correla-tions are Nd,Y (-0.859), Rc,Y (-0.845), and VY (-0.659). The strong negative correlation of Nd,Y with magnetic moment may therefore reflect how progressive filling of the Y-site d shell changes the X-Y hybridization pat-tern [20] and the occupation of spin-resolved d-derived states, rather than a simple one-variable causal effect. In contrast, the reported X- and Z-site descriptors are no-ticeably weaker, with the largest magnitude among them coming from IE,X (0.490). Taken together, the heatmap and target-correlation ranking indicate that the Y sublat-tice carries the most direct correlation for the magnetic moment, while the full descriptor set remains strongly correlated internally.  
+
+> A. Standard SISSO setup
+
+The standard SISSO calculations were carried out us-ing the same primary feature set for both descriptor di-mensions. The regression type was set to single-task re-gression, and all calculations used the full set of N = 88 samples. The symbolic feature space was generated from the primary features using the operators (+) , (−), (∗), (/), (·)−1, (·)2,
+
+with maximum feature complexity of five. The feature-value range was restricted by 1.0e-3 and 1.0e5. Dimen-sional consistency was controlled through the SISSO unit groups. The sparsifying-operator stage used ℓ0 optimization, with an intercept included and RMSE as the selection metric. The SIS screening depth was specified per descriptor dimension. For the two-dimensional search, 200 ranked features were retained in each SIS step, and the union of the two screened sets produced a Bayesian support space with K = 400 candidate features. For the three-dimensional search, 100 ranked features were retained in    
+
+> (a)
+> (b)
+> FIG. 2. Summary of the X 2YZ Heusler alloy dataset. (a) Distribution of magnetic moments for Co-, Fe-, and Ni-based alloys. (b) Pearson correlation heatmap among the 18 site-resolved elemental descriptors used as SISSO inputs.
+
+each SIS step, giving K = 300 candidate features in the union of the three screened sets. We therefore distin-guish the per-step SIS retention depth from K, the total screened feature count used for Bayesian enumeration. The resulting support spaces,  400 2
+
+ = 7 .98 × 10 4 and 
+
+ 300 3
+
+ = 4 .4551 × 10 6, retain the full deterministic SISSO screened unions from the corresponding runs while re-maining tractable for exact posterior enumeration.  
+
+> IV. RESULTS AND DISCUSSION
+
+In this section, Bayesian model averaging (BMA) de-notes posterior-weighted averaging of predictions over 6candidate supports, and posterior inclusion probability (PIP) denotes the posterior probability that a given screened feature appears in the descriptor support. The SISSO calculations use a rung-three symbolic li-brary with addition, subtraction, multiplication, divi-sion, inverse, and square operators. The resulting feature space contains 2 .425 × 10 8 candidate expressions before SIS screening. We test two descriptor dimensions. For 
+
+d = 2, SIS retains K = 400 screened features, giving  400 2
+
+ = 7 .98 × 10 4 candidate supports. For d = 3, SIS retains K = 300 features, giving  300 3
+
+ = 4 .4551 × 10 6
+
+supports. These support spaces are still small enough for exact Bayesian enumeration after deterministic SIS. On the full training set, standard SISSO selects the two-dimensional support (8 , 203) with RMSE 0 .5150, and the three-dimensional support (8 , 101 , 203) with RMSE 0.4115. Feature 8, 
+
+ϕ8 = (( VX )2NX )/(NX + NY + NZ ), (23) appears in both descriptors and remains the most stable Bayesian feature below. It combines the X-site atomic volume and valence count with the total valence-electron scale, consistent with the importance of electron counting for Heusler magnetic moments. We emphasize that feature 8 should not be interpreted as a kind of alternative to the standard Slater-Pauling rule. The latter is an electron-counting relation based on minority-spin band filling and involves the full-Heusler valence count Nv = 2 NX +NY +NZ . By contrast, feature 8 is a SISSO-selected symbolic coordinate with composite units and fitted regression coefficients. Its repeated pos-terior selection should therefore be interpreted more con-servatively: it indicates that X-site size and valence infor-mation, normalized by an electron-count-like scale, pro-vide a statistically stable descriptor component for this dataset. This is physically plausible because X-site chem-istry can influence the lattice scale, d-band bandwidth, hybridization, and magnetic polarization, but the precise 
+
+V 2 
+
+> X
+
+dependence is best viewed as an empirical symbolic representation rather than a microscopic law. The ap-pearance of VX -dependent terms is qualitatively consis-tent with itinerant-magnetism arguments, since increas-ing atomic volume can reduce d-band width and enhance the density of states entering the Stoner criterion [21]. However, the specific V 2 
+
+> X
+
+dependence selected by SISSO should not be interpreted as a microscopic consequence of the Stoner criterion. A simple bandwidth-scaling argu-ment would suggest a volume dependence closer to V 5/3,so the V 2 
+
+> X
+
+factor is best viewed as an empirical symbolic proxy for X-site size, bandwidth, and hybridization ef-fects within the present dataset. Feature indices are inherited from the SISSO-generated symbolic library and are not constrained to respect exact stoichiometric electron counting unless such constraints are explicitly imposed. Therefore, feature 8 should be distinguished from the canonical Slater–Pauling count 
+
+Nv = 2 NX + NY + NZ . As in many SISSO applica-tions, symbolic coordinates may carry composite physical                                                              
+
+> TABLE I. Five-fold cross-validation comparison between the deterministic SIS+SO baseline of standard SISSO and deterministic-SIS/Bayesian-SO on the Heusler-alloy magnetic-moment dataset. The Bayesian entry is the posterior-mean predictor. The deterministic baseline is in-dependent of the Bayesian support prior: RMSE det = 0 .5609 for d= 2 and RMSE det = 0 .4515 for d= 3. Coverage is the empirical coverage of the Bayesian 95% predictive interval.
+> dPrior KSupports Bayesian RMSE Coverage 2uniform 400 7.98 ×10 40.5314 0.9549 2 relevance-diversity 400 7.98 ×10 40.5334 0.9549 2Slater–Pauling 400 7.98 ×10 40.5317 0.9549 3uniform 300 4 .4551 ×10 60.4467 0.9660 3 relevance-diversity 300 4 .4551 ×10 60.4501 0.9660
+
+units; the fitted regression coefficients restore the target units. We therefore interpret the selected expressions as compact empirical descriptors rather than parameter-free analytical laws. The second coordinate in the d = 2 descriptor belongs to the 201/203 family, 
+
+ϕ201 = (( NX VY )/(NZ VX )) − (Nd,Y /N d,X ), (24) and 
+
+ϕ203 = (( NX VY )/V X ) − (( NZ Nd,Y )/N d,X ). (25) Chemically, these expressions are not arbitrary combina-tions of variables: they compare Y-site valence–volume contributions against Z-site valence and X-site d-electron filling. This is a natural structure for full-Heusler com-pounds, where the Y atom strongly tunes the magnetic moment through its valence and d-state occupancy, while the Z atom acts more as a main-group electron reservoir. The posterior competition between features 201 and 203 therefore indicates that the data robustly favor a particu-lar physical motif—a valence/volume contrast modulated by d-electron mismatch, even when the exact algebraic form is not unique. Table I and Fig. 3 show that Bayesianizing the SO stage does not degrade the deterministic SIS+SO base-line of standard SISSO. For d = 2, Bayesian model av-eraging reduces the average validation RMSE from the deterministic baseline 0 .5609 to 0 .5314 under the uni-form prior, 0 .5334 under the relevance-diversity prior, and 0 .5317 under the Slater–Pauling prior. These three Bayesian values are practically indistinguishable. Thus, the validation improvement is not primarily a conse-quence of prior engineering; rather, Bayesian SO replaces a single deterministic SO descriptor by a posterior dis-tribution over a small family of statistically competitive symbolic descriptors. The uniform prior already cap-tures this non-uniqueness, while the relevance-diversity and Slater–Pauling priors provide alternative, physically interpretable organizations of essentially the same poste-rior family. 7   
+
+> FIG. 3. Average validation RMSE for the deterministic SIS+SO baseline of standard SISSO and Bayesian posterior-mean predictions. The deterministic bar is the shared baseline for each descriptor dimension; the Bayesian support prior affects only the Bayesian-SO calculation. For d= 2, the three Bayesian priors give nearly identical RMSEs, showing that prior choice is not the dominant source of the validation improvement.
+
+The improvement is largest in fold 3, where the deter-ministic SO stage selects the different support (4 , 326), while the Bayesian MAP support remains in the recurring (8 , 201) or (8 , 203) family. This is precisely the regime where a single deterministic L0 optimum is fragile and model averaging is useful. For d = 3, both methods operate on a lower error scale, and the Bayesian gain is smaller. The uniform-prior Bayesian RMSE is 0 .4467, compared with 0 .4515 for the deterministic SIS+SO baseline; the relevance-diversity result is 0 .4501. This behavior is expected. The third descriptor component already stabilizes the deter-ministic model, with fold MAP supports concentrated near (8 , 101 , 203) and (8 , 103 , 203), leaving less residual descriptor ambiguity for Bayesian averaging to exploit. The Slater–Pauling prior is not applied to d = 3, be-cause its backbone-plus-correction interpretation is more relevant to two-dimensional supports. The Bayesian 95% predictive intervals are well cali-brated. The empirical coverage is 0 .9549 for all three two-dimensional priors and 0 .9660 for both three-dimensional priors, close to the nominal value. Fold 3 is again the most difficult split, with coverage 0 .8889, but the aver-age coverage remains near 95%. This is a central prac-tical advantage over the deterministic SIS+SO pipeline: the standard SISSO descriptor gives a point prediction, whereas Bayesian SO gives a point prediction and an un-certainty estimate tied directly to coefficient and support uncertainty.                            
+
+> TABLE II. Sensitivity of the two-dimensional uniform-prior CV posterior to the screened-space size K. PIPs are five-fold averages.
+> KSupports Bayesian RMSE Coverage PIP(8) PIP(201) PIP(203) 200 2.01 ×10 40.5206 0.9549 0.9810 0.0000 0.9999 300 4 .485 ×10 40.5313 0.9549 0.9721 0.5348 0.3755 400 7.98 ×10 40.5314 0.9549 0.9717 0.5343 0.3752
+> A. Sensitivity checks
+
+Table II summarizes a two-dimensional K-sensitivity check using the uniform prior and the same five CV splits. The K = 300 and K = 400 results are essentially iden-tical: the average RMSE, coverage, MAP supports, and leading PIPs all remain unchanged within numerical pre-cision. The smaller K = 200 screen is qualitatively differ-ent because feature 201 is not present in that truncated support space; the posterior therefore assigns nearly all second-coordinate probability to feature 203. This result clarifies that the main posterior conclusion is stable once the competing 201/203 descriptor family is included in the screened set. A K = 600 calculation was not possi-ble from the present deterministic SISSO outputs because the saved SIS-screened union contains only 400 features for d = 2; it would require repeating the deterministic SIS stage with a larger per-step screening depth. Additional variance-scale sensitivity and computational-cost details are reported in the Appendix. In brief, the dominant conclusions are unchanged over the tested σ2 and τ 2 ranges: the two-dimensional MAP 8       
+
+> FIG. 4. Two-dimensional uniform-prior PIP stability with re-spect to the screened-space size K. Feature 201 is absent from the K= 200 truncated screen, so the posterior concentrates on feature 203. Once both members of the 201/203 family are available ( K= 300 and K= 400), the leading PIPs are essentially unchanged.
+
+support remains within the (8 , 201)/(8 , 203) family, while the three-dimensional MAP support remains fixed at (8 , 101 , 203) for both the uniform and relevance-diversity priors. Finally, the present calculations use centered but not variance-standardized symbolic features, and they do not implement a Zellner g-prior or column-scaled τk [22]. Such scale-adaptive priors are natural extensions be-cause SISSO expressions can have very different numer-ical scales. We also did not perform bootstrap-SISSO, BIC-weighted deterministic-support averaging, or spike-and-slab regression baselines in this work. The compar-isons reported here are therefore against the deterministic SIS+SO baseline of standard SISSO and the family-offset Slater–Pauling reference; broader UQ-baseline compar-isons remain useful future benchmarks.  
+
+> B. Posterior feature stability and Slater–Pauling-prior comparison
+
+As already mentioned, the Slater-Pauling prior is somewhat weak. Its average RMSE, 0 .5317, is nearly identical to the uniform-prior value 0 .5314, indicating that the fold likelihood still controls the posterior and that the prior does not force the solution away from the data-dominated support family. Its purpose is therefore not to outperform the uniform prior numerically, but to test whether a weak support bias can preserve the same predictive accuracy while making the posterior or-ganization more interpretable. In this sense, it should be treated as a diagnostic or interpretability prior, not as a predictive-performance prior. The MAP supports under this prior remain in the same physically inter-pretable family as the uniform and relevance-diversity analyses: four of the five folds select (8 , 201), and one selects (8 , 203). The family offsets fitted on the train-ing folds are small for Co-based compounds ( −0.014 to 0.007 μB), moderately positive for Fe-based compounds (0 .167 to 0 .423 μB), and strongly negative for Ni-based compounds ( −3.478 to −3.073 μB). The family-corrected Slater-Pauling baseline has an average validation RMSE of 0 .6525, so it captures the electron-count trend but re-mains less accurate than the Bayesian symbolic descrip-tor. The residual-correlation and split-role terms are therefore useful as interpretability biases: they favor a descriptor organization with one electron-count backbone coordinate and one correction coordinate without impos-ing the ideal Slater–Pauling rule as a hard constraint. The feature-stability plots in Fig. 6 show that the pos-terior is not simply smoothing predictions; it identifies a physically interpretable descriptor family. In d = 2, feature 8 has average inclusion probability 0 .972 with the uniform prior and 0 .958 with the relevance-diversity prior. The second coordinate is shared mainly between features 201 and 203, with uniform-prior inclusion proba-bilities 0 .534 and 0 .375. Thus, the deterministic descrip-tor selects one member of the valence–volume-contrast family defined above, but the posterior correctly reports that the data do not uniquely resolve the choice. The same pattern persists in d = 3. For the uni-form prior, the leading inclusion probabilities are 0 .990, 0.757, and 0 .670 for features 8, 101, and 203, respectively; the relevance-diversity prior gives the same ordering with probabilities 0 .979, 0 .746, and 0 .657. Competing features 103, 202, and 201 retain non-negligible posterior weight. Thus the uncertainty is localized within chemically sim-ilar symbolic alternatives rather than spread uniformly over the screened feature space. The physical interpretation of the three-dimensional descriptor is therefore hierarchical rather than com-pletely new. The d = 2 backbone already captures the dominant balance between the magnetic X-site frame-work and the Y/Z-dependent electronic contrast. The additional third coordinate in the d = 3 family, rep-resented most often by feature 101 and sometimes by chemically similar alternatives such as 103 or 202, acts as a refinement term that resolves finer differences among alloys with otherwise similar electron-count and volume balance. In other words, d = 3 does not replace the chem-ical picture learned at d = 2; it sharpens it by account-ing for secondary variations in local electronic structure. This also explains why moving from d = 2 to d = 3 low-ers the overall error but reduces the relative benefit of Bayesian averaging: once the dominant and subleading chemical trends are both represented, there is less resid-ual ambiguity left for model averaging to exploit. The uniform, relevance-diversity, and Slater–Pauling priors lead to nearly the same two-dimensional conclu-sions. The relevance-diversity prior slightly redistributes posterior mass by penalizing strongly correlated sup-ports, while the Slater–Pauling prior mildly favors one electron-count-aligned feature together with one residual-correction feature. In both cases, the main descriptor 9     
+
+> FIG. 5. Diagnostics for the two-dimensional Slater–Pauling prior. Top left: fold-resolved validation RMSE. Top right: average posterior inclusion probabilities. Bottom: magnetic moment versus valence count with the ideal line M=Nv−24 and fold-1 family-offset Slater–Pauling baselines; validation points in that fold are shown but were not used to fit the offsets.
+
+family, the validation RMSE, and the predictive cover-age remain essentially unchanged. This robustness is im-portant: it indicates that the posterior is controlled pri-marily by the data and the SIS-screened symbolic space, not by an overly strong prior. The Slater–Pauling prior is therefore best viewed as an interpretability-preserving diagnostic prior rather than an accuracy-enhancing or predictive-performance prior.  
+
+> V. CONCLUSION
+
+The deterministic-SIS/Bayesian-SO construction is a conservative extension of standard deterministic SISSO. It keeps the scalable deterministic screening step in-tact, recovers the deterministic SO support of standard SISSO as a MAP limit, and restricts Bayesian inference to the tractable SIS-screened support space. In five-fold cross-validation on the Heusler-alloy magnetic-moment dataset, Bayesian model averaging modestly lowers the average validation RMSE for both d = 2 and d = 3 de-scriptors, while the nearly identical d = 2 results under the uniform, relevance-diversity, and Slater–Pauling pri-ors show that the effect is not driven by prior-specific performance gains. Bayesian SO also supplies calibrated predictive intervals and posterior inclusion probabilities. More importantly, the posterior reveals descriptor non-uniqueness that is hidden when the deterministic SO stage returns only a single support: a selected standard-SISSO descriptor may be only one representative of a broader family of statistically competitive and chemically related symbolic expressions. The selected expressions 10    
+
+> FIG. 6. Posterior feature-inclusion probabilities averaged over the five cross-validation folds. Each bar gives the average posterior probability that a screened symbolic feature is included in the Bayesian-SO support. The four panels correspond to different descriptor dimensions and support priors: top left: d=2, uniform prior; top right: d=2, relevance-diversity prior; bottom left: d=3, uniform prior; bottom right: d=3, relevance-diversity prior. Feature 8 has the largest inclusion probability in all cases, while features 101, 201, 202, and 203 form the main competing descriptor family.
+
+should therefore be interpreted as posterior-stable sym-bolic descriptors whose chemical plausibility can be as-sessed a posteriori, rather than as parameter-free micro-scopic laws. The Slater–Pauling prior is best viewed as a diagnostic prior that organizes this family in an electron-count-based way, not as a route to improved accuracy. This makes the approach useful not only as a predictor, but also as a diagnostic tool for assessing descriptor sta-bility in small-data materials problems, where correlated features and nearly degenerate descriptors are common. 
+
+> Appendix A: Additional Sensitivity and Computational Details
+
+We tested the sensitivity of the full-data posterior mean to the variance scales σ2 and τ 2. For d = 2, the grid used σ2 ∈ { 0.1326 , 0.1989 , 0.2652 , 0.3315 , 0.3978 , 0.5304 }
+
+and τ 2 ∈ { 0.5895 , 1.1789 , 2.3579 , 4.7158 , 9.4316 }. Across these 30 combinations, the two-dimensional uniform-prior RMSE varied only from 0.5079 to 0.5148, and the MAP support remained within the (8 , 201)/(8 , 203) family. The relevance-diversity result was similarly sta-ble, with RMSE from 0.5079 to 0.5164 and the same MAP-support family. For d = 3, the grid used 
+
+σ2 ∈ { 0.0847 , 0.1270 , 0.1694 , 0.2117 , 0.2541 , 0.3387 } and 
+
+τ 2 ∈ { 0.3930 , 0.7860 , 1.5719 , 3.1439 , 6.2877 }. The three-dimensional MAP support stayed fixed at (8 , 101 , 203) for all 30 grid points under both the uniform and relevance-diversity priors; the RMSE ranges were 0.3994–0.4120 and 0.4017–0.4119, respectively. These grids were not used to tune the CV results and do not constitute a nested CV optimization; they are reported only as scale-sensitivity diagnostics. The enumeration cost is controlled primarily by  Kd
+
+.On the workstation used for these calculations (Intel Xeon Gold 6240R, 48 logical CPUs, 30 GiB RAM; Python 3.9.12, NumPy 1.26.4, scikit-learn 1.4.2, joblib 1.4.2), a single full-data d = 2, K = 400 uniform-prior enumeration over 7 .98 ×10 4 supports took 2.6 s wall time and 74 MB maximum resident memory. A single d = 3, 
+
+K = 300 enumeration over 4 .4551 × 10 6 supports took 27.2s and 0.76 GB for the uniform prior, and 31.8s and 0.76 GB for the relevance-diversity prior. Five-fold CV multiplies this cost by five for each prior, with small ad-ditional overhead for deterministic refits and plotting. The deterministic full-data SISSO runs took 227s for 
+
+d = 2 and 292s for d = 3 on the same saved calcula-tions. In the present implementation, exact enumeration at d = 3, K ≈ 300 is practical, while d = 4 or sub-stantially larger K would require either more aggressive screening, streaming posterior accumulation, stochastic support sampling, or a different approximation. 11 
+
+[1] R. Ouyang, S. Curtarolo, E. Ahmetcik, M. Scheffler, and L. M. Ghiringhelli, Physical Review Materials 2, 083802 (2018). [2] A. Mullick, A. Ghosh, G. S. Chaitanya, S. Ghui, T. Nayak, S.-C. Lee, S. Bhattacharjee, and P. Goyal, Computational Materials Science 233 , 112659 (2024). [3] S. Wang and J. Jiang, ACS Catalysis 13 , 7428 (2023). [4] S. Bhattacharjee and S.-C. Lee, Journal of Magnetism and Magnetic Materials 563 , 169818 (2022). [5] S. Ram, G. H. Choi, A. S. Lee, S.-C. Lee, and S. Bhat-tacharjee, ACS Applied Materials & Interfaces 15 , 43702 (2023). [6] G. Cao, R. Ouyang, L. M. Ghiringhelli, M. Scheffler, H. Liu, C. Carbogno, and Z. Zhang, Physical Review Materials 4, 034204 (2020). [7] S. R. Xie, G. R. Stewart, J. J. Hamlin, P. J. Hirschfeld, and R. G. Hennig, Physical Review B 100 , 174513 (2019). [8] A. S. Nair, L. Foppa, and M. Scheffler, npj Computa-tional Materials 11 , 150 (2025). [9] Z.-X. Shen, C. Su, and L. He, npj Computational Mate-rials 8, 132 (2022). [10] C. Tantardini, H. A. Zakaryan, Z.-K. Han, T. Altalhi, S. V. Levchenko, A. G. Kvashnin, and B. I. Yakobson, Journal of Computational Science 82 , 102402 (2024). [11] A. S. Nair, L. Foppa, and M. Scheffler, Faraday Discus-sions (2026). [12] S. Tavares, K. Yang, and M. A. Meyers, Progress in Ma-terials Science 132 , 101017 (2023). [13] A. Gelman, J. B. Carlin, H. S. Stern, and D. B. Rubin, 
+
+Bayesian data analysis (Chapman and Hall/CRC, 1995). [14] J. A. Hoeting, D. Madigan, A. E. Raftery, and C. T. Volinsky, Statistical science 14 , 382 (1999). [15] E. I. George and R. E. McCulloch, Journal of the Amer-ican Statistical Association 88 , 881 (1993). [16] E. I. George and R. E. McCulloch, Statistica sinica , 339 (1997). [17] I. Galanakis, P. Dederichs, and N. Papanikolaou, Physi-cal Review B 66 , 174429 (2002). [18] I. Galanakis, P. Mavropoulos, and P. H. Dederichs, Jour-nal of Physics D: Applied Physics 39 , 765 (2006). [19] The University of Alabama, Heusler alloy database, Online database (2026), available at 
+
+http://heusleralloys.mint.ua.edu/ ; accessed April 29, 2026. [20] I. Galanakis, E. S ¸a¸ sıo˘ glu, S. Bl¨ ugel, and K. ¨Ozdo˘ gan, Phys. Rev. B 90 , 064408 (2014). [21] G. Stollhoff, A. M. Ole´ s, and V. Heine, Physical Review B 41 , 7028 (1990). [22] A. Zellner, Journal of Econometrics 75 , 51 (1996).

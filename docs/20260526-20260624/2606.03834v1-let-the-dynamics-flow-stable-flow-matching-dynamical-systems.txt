@@ -1,0 +1,1542 @@
+Title: Let the Dynamics Flow: Stable Flow Matching Dynamical Systems
+
+URL Source: https://arxiv.org/pdf/2606.03834v1
+
+Published Time: Wed, 03 Jun 2026 01:36:07 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+> 1
+
+# Let the Dynamics Flow: Stable Flow Matching Dynamical Systems 
+
+Rodrigo P´ erez-Dattari 1, Francisco Leiva 2, Andrea Testa 3, Leonel Rozo 4, Javier Ruiz-del-Solar 2, No´ emie Jaquier 1
+
+Abstract —Flow matching has recently emerged as a powerful approach for imitation learning, enabling scalable, expressive, and multimodal motion policies. However, incorporating formal stability guarantees into these generative models, a prerequisite to ensure safe and generalizable robot behaviors, remains a significant challenge. While modeling robot motions as dynamical systems allows for such stability-based inductive biases, existing frameworks struggle to capture the rich action distributions inherent in complex robotic tasks. This paper introduces Stable Flow Matching Dynamical Systems (SFMDS), a novel framework that bridges the gap between high-capacity generative modeling and formal Lyapunov stability guarantees. SFMDS parametrizes dynamical systems via flow matching while simultaneously con-straining the model to a family of stable solutions. We propose two variants: a soft constraint based on a penalty term, and a hard structural constraint embedded directly in the model architecture. We further extend both formulations to Lie groups. Experiments on benchmark datasets, in simulation, and on a humanoid robot show that SFMDS learns stable, scalable, and multimodal dynamical systems in low- and high-dimensional state spaces, enabling safe and expressive robot motion generation. 
+
+Index Terms —Flow Matching, Imitation Learning, Dynamical Systems, Lie groups, Lyapunov stability, LaSalle’s invariance principle 
+
+I. I NTRODUCTION 
+
+Flow matching [23, 24] has recently emerged as a powerful generative model in downstream tasks due to its scalability, expressivity, and simple training procedure. In robotics, flow matching policies have demonstrated exceptional performance in synthesizing robot motion skills via imitation learning, efficiently learning complex multimodal action distributions and outperforming classical behavior cloning approaches [4, 7, 12, 41]. Despite its strengths, flow matching is not inherently designed for robot motion generation and control and thus lacks rigorous safety guarantees necessary when generating robot actions. In contrast, previous works on robot motion learning recognized the relevance of introducing stability guar-antees for controlled generalization by representing motion policies as learned dynamical systems [13, 25, 30, 32, 33, 37], thus ensuring safe, robust and generalizable robot behav-iors [2]. Yet, existing dynamical system-based models are 
+
+> 1
+
+Department of Robotics, Perception, and Learning, KTH Royal Institute of Technology, Stockholm, Sweden. {rpd, jaquier }@kth.se 
+
+> 2
+
+Advanced Mining Technology Center (AMTC) and Department of Electrical Engineering, Universidad de Chile, Santiago, Chile. 
+
+{francisco.leiva, jruizd }@ing.uchile.cl 
+
+> 3
+
+Bosch Center for Artificial Intelligence, Renningen, Germany. 
+
+andrea.testa@de.bosch.com 
+
+> 4
+
+Italian Institute of Artificial Intelligence (AI4I), Turin, Italy. 
+
+leonel.rozo@ai4i.it 
+
+Fig. 1. Robot behavior modeled as a stable flow matching dynamical system (SFMDS) on a Lie group. Velocities ˙xt = h1 learned via flow matching. Asymptotic stability is enforced by constraining the solution space of flow matching to a set of admissible velocities ˙XA derived from a latent Lyapunov function. SFMDS generates multimodal behaviors, represented by blue and red arrows. 
+
+often unimodal and feature limited expressivity compared to modern generative models. This paper bridges this gap by introducing flow matching dynamical systems that are stable by design. 
+
+Related work. Khansari-Zadeh and Billard [13] pioneered time-invariant stable dynamical system learning by enforcing structural Lyapunov constraints on the parameters of systems modeled via Gaussian mixture models. To overcome the lim-ited accuracy of this model, several approaches learned Lya-punov functions to shape or correct the target dynamics [14, 22, 10, 17]. Alternatively, another line of works leveraged diffeomorphisms to transfer the stability of a simple system onto the target demonstrated dynamics [32, 33, 37, 43]. In this case, the model accuracy largely depends on the expressivity of the diffeomorphism, typically an invertible neural network. To allow for greater architectural flexibility, some methods opt for weak stability guarantees via regularization, at the expense of stable-by-design guarantees [30, 31]. In this paper, we build on the foregoing approaches and enforce stability either weakly via regularization or strictly via diffeomorphisms. While recent works learned dynamical systems via neural 
+
+> arXiv:2606.03834v1 [cs.RO] 2 Jun 2026 2
+
+networks [30, 31, 33, 37, 42, 43], they have not fully leveraged the power of generative models. Several approaches notably borrow diffeomorphic backbones from normalizing flows [28] for stability mapping [33, 37, 38, 42]. However, their dy-namics remain either deterministic or driven by low-variance unimodal noise, and therefore lack the capacity to encode com-plex, potentially multimodal behavior. In addition, normalizing flows training generally relies on explicit maximum-likelihood estimation that requires computing Jacobian determinants. Flow matching instead simplifies training via a simulation-free objective, leading to state-of-the-art results [23, 24]. Recently, S 2Diff [6] provided weak stability guarantees on diffusion processes by guiding them via learned certificates. S2Diff differs from our work as it aims to optimize control policies with respect to a given cost function, whereas we aim to learn behaviors from demonstrations. Moreover, we exploit the inherent simplicity of flow matching instead of the stochastic differential equations of diffusion to achieve both weak and strict stability. Closer to our work are stable Riemannian flow matching policies [8], which equip the flow matching vector field with stability to the support of the target behavior distribution using LaSalle’s invariance princi-ple [36]. However, this method offers no stability guarantees for the underlying robot motion dynamics. Instead, inspired by [8, 36], we employ LaSalle’s principle to constrain the solution space of flow matching models. This enables the enforcement of stability guarantees for robot trajectories while capturing complex multimodal action distributions. Robotics applications commonly require learned policies to control both end-effector position and orientation, which intrinsically belong to non-Euclidean spaces such as the Lie group SE(3) . Yet, most approaches assume Euclidean state spaces, thereby limiting their practical use. Recent works underscore the importance of geometric formulations for stable dynamical systems, representing states on Lie groups [38, 25] or on Riemannian manifolds [42]. Building on this, we design stable flow matching dynamical systems on Lie groups. 
+
+Contributions. This paper introduces Stable Flow Matching Dynamical Systems (SFMDS) , a novel generative model that combines the scalability and expressivity of flow matching with formal stability guarantees to learn stable and expressive multimodal dynamical systems. Unlike existing approaches that rely on explicit dynamics parameterizations, SFMDS implicitly models the dynamics via flow matching (Sec. III), while constraining the learned solutions to an admissible set, defined by criteria from positive invariance and (global) asymptotic stability analysis (Sec. IV). Inspired by previous work on learning diffeomorphisms for stability [33, 38, 31], SFMDS enforces stability by integrating latent Lyapunov functions into flow matching (Sec. V). The main contributions of this paper are: (1) Soft SFMDS that weakly enforces stability via regularization; (2) Hard SFMDS that guarantees stability via structural constraints; 
+
+(3) The extension of both soft and hard SFMDS to Lie groups, enabling stable learning of robot motions involving position and orientation dynamics; and (4) Two new bench-mark datasets. We test SFMDS on datasets on R2 and T2,and learn realistic motion skills featuring complex full-pose trajectories on SE(3) , both in simulation and with a real humanoid robot. Finally, we demonstrate SFMDS scalability on a 1682 -dimensional state space reaction–diffusion system. II. B ACKGROUND 
+
+A. Learning Stable Dynamical Systems 
+
+We aim to design expressive, scalable, and stable dynamical systems to learn goal-driven robot motions. We represent time-invariant autonomous dynamical systems via an ordinary dif-ferential equation (ODE) defined by a learnable vector field fθ ,
+
+˙xt = dxt
+
+dt = fθ (xt), (1) where xt ∈ X ⊆ Rn denotes the state at time t, ˙xt ∈ ˙X ⊆ Rn
+
+is its time derivative, and θ are the parameters of the vector field fθ : X → ˙X . In this paper, we model the dynamics fθ
+
+implicitly via flow matching and focus on imposing two stability properties, introduced next. 
+
+1) Positive Invariance: A set S ⊆ X is said to be positively invariant w.r.t. fθ if any trajectory initialized in S and evolving according to the dynamical system (1) always remains in S,i.e., x0 ∈ S ⇒ xt ∈ S , ∀ t ≥ 0. Positive invariance provides a set-based stability criterion for characterizing safety and boundedness of dynamical systems. 
+
+2) Asymptotic Stability: Dynamical systems displaying asymptotic stability converge to an equilibrium xe ∈ X for any initial state in X as t → ∞ . They can be characterized via Lyapunov stability analysis as follows. Formally, the equilib-rium xe is asymptotically stable for the dynamical system (1) if there exists a continuously-differentiable Lyapunov function 
+
+V : X → R+ such that 
+
+V (xt) > 0, ∀xt̸ = xe, V (xe) = 0 , and (2) 
+
+˙V (xt) = ∇xV (xt)Tfθ < 0, ∀xt̸ = xe, ˙V (xe) = 0 . (3) 
+
+B. Flow Matching 
+
+Flow matching [23] is a simulation-free approach to train Continuous Normalizing Flows (CNF) [16] that improves both training practicality and generative quality, thus achieving state-of-the-art results. As CNF, flow matching reshapes a simple base distribution p0 into an arbitrarily complex and potentially multimodal target data distribution p1 = pdata .This transformation is represented by a parameterized smooth bijective map, i.e., a diffeomorphism , ϕθ . This diffeomorphism induces a pushforward distribution [ϕθ ]∗p0, which describes the distribution obtained by applying ϕθ to samples from p0
+
+via the change-of-variables formula 
+
+p1(h) = [ ϕθ ]∗p0(h) = p0
+
+ ϕ−1 
+
+> θ
+
+(h) det 
+
+ ∂ϕ −1 
+
+> θ
+
+(h)
+
+∂h
+
+
+
+. (4) The flow ϕθ is constructed via a vector field uθ : Rn ×
+
+[0 , 1] → Rn as the solution of the ODE 
+
+dhτ
+
+dτ = u(hτ , τ ), h0 ∼ p0, (5) 3
+
+where τ ∈ [0 , 1] is an auxiliary time variable, and hτ denotes the state along the flow at time τ . The base distribution p0 is chosen to be simple and easy to sample from (e.g., Gaussian). Given a desired path pτ and its associated vector field u,flow matching regresses a parametrized vector field uθ to the target vector field u, which can be achieved by minimizing 
+
+ℓFM = Eτ ∼Unif (0 ,1) , hτ ∼pτ
+
+h
+
+∥uθ (hτ , τ ) − u(hτ , τ )∥2i
+
+. (6) However, the objective (6) is intractable, since neither pτ nor 
+
+u is available in closed form. Flow matching circumvents this issue by replacing the probability path with a family of conditional paths pτ (hτ |h1), conditioned on the endpoint samples h1 ∼ p1, generated by a tractable conditional target vector field u(hτ , τ ; h1). This leads to the conditional flow matching loss 
+
+ℓCFM = Eτ ∼Unif (0 ,1) , hτ ∼pτ
+
+h
+
+∥uθ (hτ , τ ) − u(hτ , τ ; h1)∥2i
+
+.
+
+Regressing uθ onto the conditional target yields the same gra-dient as the original objective (6), while making the problem tractable [23]. In this work, we adopt a variant of rectified flows [24], in which the conditional path is further conditioned on a base sample h0 ∼ p0, so that the intermediate state follows the deterministic linear interpolation 
+
+hτ = (1 − τ )h0 + τ h1. (7) Differentiating with respect to τ gives the constant-velocity conditional target 
+
+u(h0, h1) = h1 − h0, (8) leading to the conditional flow matching loss 
+
+ℓCFM = E τ ∼Unif (0 ,1)  
+
+> h0∼p0,h1∼p1
+
+h
+
+∥uθ (hτ , τ ) − (h1 − h0)∥2i
+
+, (9) with p0 is typically selected as a Gaussian. Finally, condition-ing the vector field on an external variable x (e.g., a robot’s state) yields a distinct field uθ (hτ , τ ; x) for each x, intuitively enabling a separate generative process to be trained per x.
+
+C. Stable Autonomous Flow Matching 
+
+As we will describe in Sec. III, we implicitly model the dynamics fθ (1) via flow matching through the auxiliary vector field uθ . Consequently, constraining fθ to satisfy the stability properties of Sec. II-A reduces to constraining uθ .To this end, we build on Sprague et al. [36], who proposed a stable autonomous flow matching variant, which builds on 
+
+LaSalle’s invariance principle [18] to stabilize the flow to the support of the target distribution at τ = 1. Although this variant was shown to enhance the robustness of robotic flow matching policies [8], it does not directly translate to the stability properties required for stable dynamical systems fθ
+
+(Sec. II-A. In Sec. IV, we instead apply LaSalle’s principle to constrain uθ to converge to admissible sets aligned with the stability properties required on fθ . Next, we proceed to describe LaSalle’s invariance principle and stable autonomous vector fields as introduced in [36]. 
+
+1) LaSalle’s Invariance Principle: Given a time-invariant vector field uθ , LaSalle’s invariance principle [18] states that if a continuously differentiable function H(hτ ) : Rn → R+
+
+satisfies the conditions 
+
+∇hH(hτ )Tuθ (hτ ) < 0, ∀hτ /∈ S ,
+
+∇hH(hτ )Tuθ (hτ ) = 0 , ∀hτ ∈ S , (10) then, as τ → ∞ , hτ → S ⊆ Rn, i.e., the flow converges to the set S.
+
+2) Stable Autonomous Vector Fields: The function uθ is reparametrized as a time-invariant vector field by augmenting its state space hτ with a pseudo-time variable sτ ∈ R+
+
+encoding the progression of τ . The augmented state is denoted 
+
+zτ = [ hτ , s τ ] ∈ Z with Z = ˙X × R+ and the resulting time-invariant dynamical system is 
+
+˙zτ = ∂ ˙zτ
+
+∂τ = uθ ( ˙ zτ ) = 
+
+ ˙hτ
+
+˙sτ
+
+
+
+. (11) LaSalle’s invariance principle can then used to construct a stable target vector field. Sprague et al. [36] uses the function 
+
+H(zτ , z1) = 12 (zτ − z1)TA(zτ − z1), (12) with A =   λhI 00 λs
+
+ and λh, λ s ∈ R+. Under the conditions in (10), the steepest-descent solution yields the target field 
+
+u(zτ , z1) = −∇ z H(zτ , z1)T
+
+= −A(zτ − z1) = 
+
+λh(h1 − hτ )
+
+λs(s1 − sτ )
+
+
+
+, (13) with the initial and final states for sτ defined as s0 = 0 and 
+
+s1 = 1 . Note that, unlike (8), the target vector field (13) does not have constant speed; instead, its magnitude decreases as the system approaches the target state z1. Substituting τ by s
+
+in the flow generated by (13) leads to the path 
+
+hτ = h1 + ( s1 − sτ ) λh 
+
+> λs
+
+(h0 − h1). (14) Convergence towards z1 by τ = 1 can be enforced by choosing λh and λs such that 
+
+λs ≥ − ln ( ϵs) , λh ≥ − ln 
+
+ ϵh
+
+∥h0 − h1∥
+
+
+
+, (15) where ϵs, ϵ h ∈ R+ are small constants with d(1 , s 1) < ϵ s
+
+and d(h1, ˆh1) < ϵ s, and ˆh1 is the result of integrating uθ
+
+over [0 , 1] . Given that at inference, the quantity ∥h0 − h1∥
+
+is unknown, Sprague et al. [36] propose to first define λs
+
+given some predefined ϵs and then λh = αλ s, where α ∈
+
+R+ controls the convergence speed of hτ relative to sτ . The conditional flow matching loss is finally constructed as 
+
+ℓCFMS = E sτ ∼Unif (0 ,1) , 
+
+> h0∼p0,h1∼p1
+
+uθ (zτ ) − A(z1 − zτ ) 2, (16) with h0 ∼ N (0, I).4
+
+D. Lie Groups 
+
+In robotics, learned dynamical systems are typically re-quired to control both position and orientations. The latter are represented as elements of the space of quaternion, corre-sponding to the hypersphere S3, or of the special orthogonal group SO(3) . Both are instances of Lie group, which we introduce next. A Lie group G is a smooth manifold with a group structure. Specifically, it is endowed with a composition operation that is closed, associative, has an identity element, and holds an inverse to each element [19]. The smoothness of the manifold implies the existence of a tangent space TxX at each state 
+
+xt ∈ X , consisting of all the derivatives of curves on the manifold at xt. A dynamical system on a Lie group X is described as a function that assigns to each xt ∈ X a velocity vector ˙xt ∈ TxX . The dynamics are therefore described in the disjoint union of all tangent spaces to the manifold, known as the tangent bundle T X . A key property of Lie groups is their so-called Lie algebra g, which is the tangent space at the group identity. Elements of the Lie algebra are converted onto elements of the group via the exponential map exp : g → G . The inverse operation is the logarithmic map log : G → g. Moreover, velocities can equivalently be represented as elements of the Lie algebra, ˙xt ∈ g, where a tangent vector expressed in the frame at xt is mapped to its representation in the frame at the identity via the adjoint 
+
+operator Ad x : g → g, a linear map commonly written as a matrix. In the case of SE (3) , the adjoint relates the body-and spatial-frame representations of velocities. III. S TABLE FLOW MATCHING DYNAMICAL SYSTEMS 
+
+We introduce the proposed Stable Flow Matching Dynami-cal Systems (SFMDS), a framework that combines the expres-sivity of flow matching with formal stability guarantees for robot motion generation. This section introduces the core for-mulation, where the dynamics are implicitly modeled through a flow matching process conditioned on system states. Secs. IV and V then describe how stability is enforced by constraining the learned flow to admissible velocity sets derived from the stability properties introduced in Sec. II-A. 
+
+A. Flow Matching Dynamical Systems 
+
+We aim to learn probabilistic dynamical systems defined via a vector field f of the form 
+
+˙xt = f (xt, ωt), with ωt ∼ N (0, I), (17) where the vector field is conditioned on a stochastic input 
+
+ω. We assume a given set of N demonstrated trajectories 
+
+κ corresponding to rollouts of a target dynamical system as in (17). Our objective is to use these demonstrations to learn a parametric function fθ that approximates f , where we require 
+
+fθ to belong to a subset of admissible functions FA exhibiting a predefined stable behavior. By viewing each demonstration as a sample from the target trajectory distribution pf (κ)
+
+induced by f , we aim to optimize 
+
+arg min 
+
+> θ
+
+DKL 
+
+ pf (κ) ∥ pθ (κ) s.t. fθ (xt, ωt) ∈ F A, (18) where pθ (κ) denotes the trajectory distribution induced by fθ
+
+and DKL is the (forward) Kullback-Leibler divergence. We propose to model fθ as the output of a flow trained via flow matching . Concretely, for each state xt, we compute a velocity ˙xt using the flow map ϕθ : ˙X × [0 , 1] × X → ˙X
+
+obtained by integrating the state-conditioned time-invariant 
+
+flow matching vector field uθ (zτ ; xt) (Sec. II-C2) over the auxiliary time τ ∈ [0 , 1] as 
+
+˙xt = fθ (xt, ωt) = ϕθ (h0 = ωt, s 0 = 0 , τ = 1; xt) = h1
+
+=
+
+ωt
+
+0
+
+| {z } 
+
+> z0
+
++
+
+Z 10
+
+uθ (zτ ; xt) dτ. 
+
+(19) The flow’s initial condition is given by 
+
+z0 = [ h0, s 0]T = [ ωt, 0] T, where the stochastic input ωt
+
+is sampled as ωt ∼ N (0, I), and s0 = 0 .Following the flow matching framework, we learn uθ such that fθ is a solution to (18) as described next. The challenge then lies in enforcing fθ ∈ F A, which requires (1) identifying the admissible functions FA (Sec. V), and (2) constraining uθ
+
+so that fθ ∈ F A (Sec. IV). While our framework is general ,we focus on enforcing two properties: (1) positive invariance, and (2) asymptotic stability, leading to the proposed SFMDS, as explained shortly. 
+
+B. Imitation Learning 
+
+We frame the problem in (18) in the context of imitation learning, where the goal is to learn the dynamics f from demonstrated trajectories. Next, we describe how to train flow matching dynamical systems using a standard behavior cloning objective, before enforcing fθ ∈ F A in the next section. 
+
+1) Predefined Pseudo-Time Dynamics: Sprague et al. [36] learns the dynamics of the complete time-invariant sys-tem (11), i.e., both ˙hτ and ˙sτ . However, the dynamics of the pseudo-time sτ are fully specified beforehand as the target state s1 = 1 is fixed and its desired behavior is known a priori. Therefore, we split uθ into two components uhθ and us,as 
+
+˙zτ = uθ (hτ ; xt) = 
+
+uhθ (hτ , s τ ; xt)
+
+us(sτ )
+
+
+
+=
+
+ ˙hτ
+
+˙sτ
+
+
+
+, (20) where we defined uhθ as the only learnable component and set 
+
+us as equal to the target dynamics in (13), i.e., 
+
+us = λs(s1 − sτ ), with s1 = 1 , λ s = − ln ( ϵs) . (21) 
+
+Remark 1. From here on, we drop the superscript h in uhθ ,writing simply uθ , as the remainder of the method concerns only this component. 
+
+2) Loss Function: Next, we proceed to enforce the imita-tion loss only for uhθ . Following the flow matching framework (Sec. II), we optimize (18) via the conditional flow matching loss (16), yielding 
+
+ℓIL = Esτ ∼Unif (0 ,1) , h0∼p0 
+
+> (xt,˙xt)∼pf
+
+∥uθ (hτ , s τ ; xt) − A( ˙ xt − hτ )∥2,
+
+(22) 5
+
+where pf denotes the distribution of demonstration trajectories with h1 = ˙ xt.Similarly to previous works [30, 40], we mitigate the distribution shift inherent to the one-step imitation learning objective (22) by optimizing the policy parameters θ to mini-mize a multi-step prediction error over rollouts of the learned dynamics. In this work, we use the forward Euler integration update ˆxt+1 = ˆ xt +fθ ( ˆ xt)∆ t, where ˆxt denotes the predicted states and ˆx0 = x0. To maintain the simulation-free training procedure of flow matching, we approximate the terminal flow state h1 using a single-step approximation [8] as 
+
+fθ ( ˆ xt) ≈ hτ + uθ (hτ , s τ ; ˆ xt)/λ h, (23) which leads to the loss over predicted positions 
+
+ℓκ 
+
+> IL
+
+= Esτ ∼Unif (0 ,1) , h0∼p0
+
+> (xt,xt+1 )∼pf
+
+∥xt+1 − ˆxt+1 ∥2. (24) computed for each integration step. The total loss is then defined by the sum of (24) over all integration steps. Next, we discuss how to constrain flow matching dynamical systems to admissible sets, a prerequisite to enforce stability properties on the learned dynamics. IV. C ONSTRAINING FLOW MATCHING DYNAMICAL 
+
+SYSTEMS TO ADMISSIBLE SETS 
+
+In this section, we assume a given set of admissible func-tions FA and we aim to learn a vector field fθ (xt, ωt) ∈ F A by constraining its output ˙xt to a corresponding set of admissible velocities ˙XA ⊆ ˙X , see Fig. 2(a). To achieve this, we require the state hτ of the flow matching vector field to converge to 
+
+˙XA at τ = 1 , thus ensuring that ˙xt = h1 ∈ ˙XA, as shown in Fig. 2(b). This can be expressed as satisfying 
+
+d h1, ˙XA
+
+ = 0 , ∀h0 ∈ ˙X , ∀xt ∈ X , (25) with d hτ , ˙XA
+
+ = inf ˙xa∈ ˙XA d(hτ , ˙xa). Crucially, since the evolution of hτ is governed by the learned uθ , enforcing the desired behavior on hτ translates into constraining uθ
+
+accordingly. Hence, we define a subset of admissible values 
+
+UA ⊆ U , see Fig. 2(c). We describe how to constrain uθ next. 
+
+A. Achieving admissible velocities via LaSalle’s principle 
+
+Taking inspiration from Sprague et al. [36], we leverage LaSalle’s invariance principle (see Sec. II-C1) for imposing the convergence of hτ to the set ˙XA. We define the function 
+
+H(hτ ) as the squared distance d2 
+
+> h
+
+to the admissible set ˙XA,
+
+H(hτ ) = d2 
+
+> h
+
+= d(hτ , ˙XA)2 = ∥δh∥2 (26) with δh = Π ˙XA (hτ ) − hτ ,
+
+Π ˙XA (hτ ) = arg min  
+
+> ˙xa∈˙XA
+
+∥hτ − ˙xa∥ , (27) where δh is the vector that projects hτ onto ˙XA [3, Ch. 8.1] and Π ˙XA is the projection mapping. Substituting (26) in LaSalle’s conditions (10) yields 
+
+(∇h ∥δh∥2)Tuθ < 0, ∀hτ /∈ ˙XA(xt; θ),
+
+(∇h ∥δh∥2)Tuθ = 0 , ∀hτ ∈ ˙XA(xt; θ), (28)                      
+
+> (a) (b) (c) Fig. 2. Overview of SFMDS. (a) Velocities ˙xtmust belong to the half-space
+> ˙XA(xt;θ)(). (b) The evolution of hτ, governed by uθ, is constrained to achieve this condition by τ= 1 , as h1= ˙ xt. (c) Hence, uθis constrained to belong to the admissible half-space UA().
+
+thus constraining uθ such that hτ ∈ ˙XA as τ → ∞ . However, for flow-matching dynamical systems, convergence to ˙XA must occur sufficiently fast, i.e., by τ = 1 . We return to this finite-time requirement after deriving the close-form projection for the specific case where ˙XA is a half-space. 
+
+Half-space case. As will be discussed in Sec. V, the admis-sible velocity sets ˙XA considered in this work, for continuous-time systems fθ , are half-spaces whose boundaries contain the origin. The projection to this set, depicted in Fig. 2(b), is given by [3, Ch. 8.1.1] 
+
+δh = −σr (nT
+
+> h
+
+hτ + mh)nh/∥nh∥2, (29) with the outward-pointing normal nh ∈ Rn, a margin mh ∈
+
+R+, and the ReLU function σr . The margin mh = bh∥nh∥ is employed to ensure that the projected vector lies strictly inside 
+
+˙XA, where bh defines the shift of the half-space along −nh,as depicted in Fig. 2(b). The ReLU function ensures that no projection is computed if hτ is already in ˙XA. From (29), it follows that 
+
+∇h ∥δh∥2 = −2δh. (30) 
+
+Convergence by τ = 1 . Next, we ensure convergence to ˙XA
+
+by τ = 1 . To this end, we note that, similarly to ˙XA, the con-ditions (28) define a half-space of admissible values UA(hτ )
+
+for uθ , whose boundary passes through the origin and whose normal direction is given by the vector (30), as depicted in Fig. 2(c). Intuitively, this constrains the vector field uθ so that the flow hτ approaches the set ˙XA as τ progresses. However, this condition still admits arbitrarily low rates of change for 
+
+hτ . We impose a minimum convergence rate by introducing the offset bu (see Fig. 2(c)) to the half-space UA(hτ ) through a margin mu = bu∥nu∥, analogous to the margin in (29). By introducing this margin and substituting (30) into (28), we obtain the half-space convergence conditions with −δh = nu,
+
+− δT
+
+> h
+
+uθ + mu < 0, ∀hτ /∈ ˙XA,
+
+− δT
+
+> h
+
+uθ = 0 , ∀hτ ∈ ˙XA. (31) We determine the value of mu required to ensure con-vergence to ˙XA by τ = 1 by following the convergence criterion from stable autonomous flow matching introduced in Sec. II-C2, see (13)-(15). Specifically, we note that the offset 
+
+bu lower bounds the component of uθ along the steepest-descent direction of the function H, which determines the rate at which hτ approaches ˙XA. Since the stable autonomous 6
+
+target field uh(hτ , h1) = λh(h1 − hτ ) in (13) prescribes motion along this same direction, we use its convergence criterion to define bu. In particular, the magnitude of uh is proportional to the distance to the target. Here, the relevant target point is the closest point on the boundary of the admissible half-space obtained by projecting hτ onto ˙XA,which is at distance ∥δh∥ from hτ . Therefore, convergence to ˙XA is achieved by τ = 1 if 
+
+bu ≥ λh∥δh∥. (32) Choosing the minimal admissible offset, we obtain the margin 
+
+mu = bu∥nu∥ = bu∥δh∥ = λh∥δh∥2. (33) 
+
+B. Constraining uθ to the admissible u–space UA
+
+We now have all the necessary elements for constraining uθ
+
+to the half-space ˙XA(xt; θ). As any uθ fulfilling the half-space conditions (31) guarantees convergence, we allow the flow matching vector field to select any such uθ while minimizing the imitation learning loss (24). We note that the second condition in (31) is readily fulfilled by construction via the ReLU function σr in (29) and proceed to enforce the first condition via two variants: a soft constraint via a penalty term, and a hard structural constraint imposed into the model. 
+
+1) Soft-constrained uθ : Positive quantities for the left-hand side of (31) can be directly penalized via the hinge-type loss 
+
+ℓPI = max(0 , −δT
+
+> h
+
+uθ + mu) = σr (−δT
+
+> h
+
+uθ + mu). (34) The loss (34) must be minimized ∀hτ ∈ ˙X and ∀xt ∈ X . In practice, we sample uniformly from ˙X and X during training. 
+
+2) Hard-constrained uθ : Alternatively, we strictly constrain 
+
+uθ to satisfy (31), by projecting uθ onto UA(hτ ), analogously to (29). We obtain the projected vector field 
+
+uΠ 
+
+> θ
+
+= Π UA (uθ ) = uθ + δu,
+
+with δu = −σr
+
+ nT 
+
+> u
+
+uθ + mu
+
+ nu/∥nu∥2, (35) see Fig. 2(c). Hard constraints are architecturally more restric-tive than soft constraints, in exchange for provable guarantees. V. E NFORCING STABILITY 
+
+In the previous section, we introduced constrained flow matching dynamical systems, whose learned vector field uθ
+
+generates velocities in a given admissible set ˙XA(xt; θ). Next, we identify admissible sets for two stability properties. 
+
+A. Positively-invariant Flow Matching Dynamical Systems 
+
+Positive invariance is crucial when the state of a dynamical system fθ must remain within a specified region S, e.g., a robot’s workspace. It is also relevant when minimizing penalty losses, e.g., (34), over a state space, as the problem must be constrained to a closed region to be tractable. Similarly to [22, 31], we enforce positive invariance by defining the set of admissible velocities as 
+
+˙XA(xt) = 
+
+n
+
+˙xt ∈ ˙X | nT 
+
+> ∂
+
+˙xt ≤ 0
+
+o
+
+, ∀xt ∈ ∂S, (36) where n∂ is the outward-pointing normal vector at the bound-ary ∂S of S. We introduce positively-invariant flow matching dynamical systems as flows constrained to the set (36) at every state xt ∈ ∂S. This is achieved by constraining the vector field 
+
+uθ as discussed in Sec. IV. In this case, we use the normal vector nh = n∂ and set mh = 0 to compute the projection 
+
+δh (29), imposing then the desired constraints either as a soft penalty (34) or as strict constraint (35). 
+
+B. Asymptotically-stable Flow Matching Dynamical Systems 
+
+For goal-driven tasks, we define the admissible velocity set ˙XA using Lyapunov conditions, so that the target pose 
+
+xe ∈ X becomes an asymptotically stable equilibrium of fθ .While Lyapunov stability theory typically requires fθ to be time-differentiable, flow matching dynamical systems (19) de-fine a distribution over ˙xt, rendering them non-differentiable, similarly to stochastic differential equations [27]. Instead, we perform our stability analysis on sampled trajectories , ensur-ing time-differentiability. These trajectories are obtained by sampling an initial ω0 ∼ N (0, I) and subsequently evolving 
+
+ω deterministically. This can be achieved, e.g., by making ωt
+
+track ˙xt through the first-order dynamics α ˙ωt = ˙ xt −ωt, with 
+
+α > 0. As α → ∞ , ωt remains constant at ω0; as α → 0, it converges instantaneously to ˙xt. Intuitively, by sampling only 
+
+ω0, we select one of the infinitely-many dynamical systems encoded by the flow matching model. 
+
+1) Stability conditions: Inspired by [33, 37, 31], we enforce stability w.r.t. a Lyapunov function in a latent space L ⊆ Rm
+
+defined via a neural network ψθ : X → L . This approach features high expressivity, as a simple latent Lyapunov func-tion can be identified with an arbitrary complex Lyapunov function in the original space X . We define latent states as 
+
+yt = ψθ (xt), yielding the latent equilibrium ye = ψθ (xe) and latent dynamics 
+
+˙yt = ∂ψ θ
+
+∂t (xt) = Jψθ (xt)fθ (xt, ωt), (37) where Jψθ denotes the Jacobian of ψθ with respect to xt. To enforce asymptotic stability, two challenges must be addressed, which we achieve through two stability conditions. First, if we construct a valid Lyapunov candidate (2) in L, we must ensure that this candidate remains valid once expressed in X . Second, we must ensure that the value of this function decreases as time evolves, making this candidate a valid Lyapunov function (3) and thus ensuring asymptotic stability. We first construct a simple Lyapunov candidate using the Euclidean distance 
+
+V L(yt) = d(ye, yt)2 (38) in L leading to 
+
+V X (xt) = d(ψθ (xe), ψ θ (xt)) 2 (39) in X . A valid candidate must be positive definite (2), which 
+
+V L is by construction. While V X is non-negative, it can, for arbitrary ψθ , equal 0 for xt̸ = xe, thus breaking (2). Thus, we require the following injectivity condition at xe [31]: 
+
+Condition 1. V X is a valid Lyapunov candidate if 
+
+ψθ (xt) = ye ⇐⇒ xt = xe, ∀xt ∈ X .7
+
+To then obtain a valid Lyapunov function, previous ap-proaches [33, 37, 30] enforce (3) by constraining ˙yt to align with the steepest descent direction of V L. This guarantees 
+
+˙V L < 0 and, consequently, ˙V X < 0. However, constraining the network to align with one of the infinitely many admissible solutions can be too restrictive when learning multimodal behaviors. Instead, we propose to constrain ˙yt to lie in the admissible latent set ˙LA(yt; θ) satisfying ˙V L < 0,
+
+˙LA(yt; θ) = { ˙yt ∈ ˙L | ∇ y V L(yt)T ˙yt < 0}. (40) Using (37), we can construct the corresponding set in ˙X as 
+
+˙XA(xt; θ) = { ˙xt ∈ ˙X | ∇ xV X (xt)TJψθ ˙xt < 0}. (41) As computing ˙XA requires evaluating ∇y d(ye, yt) in L, we work directly with ˙LA, leading to the following asymptotic stability condition: 
+
+Condition 2. Given a valid Lyapunov candidate V X ,
+
+xe is an asymptotically stable equilibrium of fθ in X if 
+
+˙yt ∈ ˙LA, ∀xt ∈ X \ { xe}.
+
+Note that this aligns with the conditions in [31, Thm 3]. 
+
+2) Enforcing latent constraints: We introduce Stable Flow Matching Dynamical Systems (SFMDS) as constrained flow matching dynamical systems over the set (41), or equivalently, the latent set (40). SFMDS constrains a latent vector field ˜uθ
+
+to generate velocities ˙yt ∈ ˙LA(yt; θ) as follows. We define the latent flow dynamics 
+
+∂ ˜hτ
+
+∂τ = ˜ uθ (˜hτ , s τ ; xt) (42) with ˜hτ ∈ ˙L, so that ˙yt = ˜h1. From (37), we can relate flow states in X and L as ˜hτ = Jψθ hτ , and thus 
+
+˜uθ = ∂ ˜hτ
+
+∂τ = ∂(Jψθ hτ )
+
+∂τ = Jψθ
+
+∂hτ
+
+∂τ = Jψθ uθ , (43) where we used that Jψθ is constant w.r.t. τ . Finally, we enforce 
+
+˙yt = ˜h1 ∈ ˙LA(yt; θ) via soft or hard constraints, as described in Sec. IV and elaborated next. 
+
+a) Soft SFMDS: Using (43), we reformulate the hinge-type loss (34) in the latent space as 
+
+ℓAS = σr
+
+  − δT 
+
+> ˜h
+
+˜uθ + ˜ mu
+
+ = σr
+
+  − δT
+
+> ˜h
+
+Jψθ uθ + ˜ mu
+
+, (44) where δ˜h is the vector that projects ˜hτ onto ˙LA(yt; θ), and ˜mu
+
+is the latent margin. From (40), the outward-pointing normal vector of ˙LA(yt; θ) is ∇yt d(ye, yt)2, from which we compute 
+
+δ˜h following (29). Note that there is no restriction on the dimensionality of yt, enabling dim( L)̸ = dim( X ) for ψθ .Minimizing (44) enforces that the latent dynamics ˙yt (37) belong to ˙LA(yt; θ) (Cond. 2). Importantly, it also implicitly enforces ψθ to be injective at the equilibrium (Cond. 1): The latent margin ˜mh in (29) enforces ˙yt̸ = 0 with yt = ψθ (xt),
+
+∀xt ∈ X \{ xe}, implying yt̸ = ye as ˙ye = 0 at the equilibrium point, as similarly described in [31]. In practice, the loss (44) can only be tractably enforced in a closed region, i.e., fθ must always stays within this region [22]. This is achieved by integrating the loss (34) for 
+
+Algorithm 1: Soft SFMDS 
+
+Input: Initial vector field uθ , encoder ψθ , dataset 
+
+D = {(x(i) 
+
+> t
+
+, ˙x(i) 
+
+> t
+
+)}Ni=1 , boundary ∂X , latent margin 
+
+˜mh, equilibrium xe, scalar weights λIL , λPI , λAS .
+
+Output: Trained stable vector field uθ
+
+repeat 
+
+ℓIL ← il_loss( uθ , D)
+
+ℓPI ← pi_loss( uθ , ∂X )
+
+ℓAS ← as_loss( uθ , ψθ , ˜mh, xe)
+
+Compute ℓSFMDS = λIL ℓIL + λPI ℓPI + λAS ℓAS .Update uθ and ψθ by minimizing ℓSFMDS w.r.t. θ.
+
+until convergence ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// Multi-step Imitation Learning Loss 
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Input: Vector field uθ , dataset D = {(x(i) 
+
+> t
+
+, ˙x(i) 
+
+> t
+
+)}Ni=1 
+
+Output: Imitation learning loss ℓIL 
+
+Function il_loss( uθ , D):
+
+Sample batch (xt, ˙xt) ∼ D 
+
+Sample h0 ∼ N (0, I)
+
+Sample sτ ∼ Unif([0 , 1]) 
+
+Set h1 ← ˙xt
+
+Compute hτ ← GaussianPath( h0, h1, s τ ) Eq. (14) Compute target velocity u ← λh(h1 − hτ )
+
+return ℓIL (uθ (hτ , s τ ; xt), u) Eq. (24) - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// Positive Invariance Loss 
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Input: Vector field uθ , boundary ∂X
+
+Output: Positive invariance loss ℓPI 
+
+Function pi_loss( uθ , ∂X ):
+
+Sample hτ ∼ Unif( ˙X )
+
+Sample sτ ∼ Unif([0 , 1]) 
+
+Sample boundary states xt ∼ Unif( ∂X )
+
+// Projection hτ onto ˙XA
+
+Compute normal nh ← OutwardNormal( xt, ∂ X )
+
+Set mh ← 0 // non-strict inequality 
+
+Compute δh ← Proj( hτ , nh, mh) Eq. (29) 
+
+// Penalize uθ according to UA
+
+Compute margin mu ← λh∥δh∥2
+
+Compute normal vector nu ← − δh
+
+return ℓPI (uθ (hτ , s τ ; xt), nu, mu) Eq. (34) - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// Asymptotic Stability Loss 
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Input: Vector field uθ , encoder ψθ , latent margin ˜mh,equilibrium xe
+
+Output: Asymptotic stability loss ℓAS 
+
+Function as_loss( uθ , ψθ , ˜mh, xe):
+
+Sample hτ ∼ Unif( ˙X )
+
+Sample sτ ∼ Unif([0 , 1]) 
+
+Sample states xt ∼ Unif( X )
+
+// Mappings to latent space 
+
+Compute latent FM states ˜hτ ← Jψθ (xt) hτ
+
+Compute latent FM velocity 
+
+˜uθ ← Jψθ (xt) uθ (hτ , s τ ; xt)
+
+Compute latent states yt, ye ← ψθ (xt), ψ θ (xe)
+
+// Compute projection onto latent ˙LA
+
+Compute normal ˜nh ← ∇ y V L From Eq. (40) Compute ˜δh ← Proj (˜hτ , ˜nh, ˜mh) Eq. (29) 
+
+// Penalize ˜uθ according to latent ˜UA
+
+Compute margin ˜mu ← λh ∥˜δh∥2
+
+Compute normal vector ˜nu ← − ˜δh
+
+return ℓAS ( ˜ uθ , ˜nu, ˜mu) Eq. (44) 
+
+positive invariant sets derived from (36). As a result, soft 8
+
+SFMDS imposes local asymptotic stability. Soft SFMDS is summarized by Algorithm 1. 
+
+Algorithm 2: Hard SFMDS 
+
+Input: Initial vector field uθ , encoder ψθ , dataset 
+
+D = {(x(i) 
+
+> t
+
+, ˙x(i) 
+
+> t
+
+)}Ni=1 , latent margin ˜mh,equilibrium xe
+
+Output: Trained stable vector field uθ
+
+repeat 
+
+ℓIL ← hard_il_loss( uθ , D, ψ θ , ˜mh)
+
+Update uθ and ψθ by minimizing ℓIL w.r.t. θ.
+
+until convergence ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// Hard Imitation Learning Loss 
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Input: Vector field uθ , dataset D = {(x(i) 
+
+> t
+
+, ˙x(i) 
+
+> t
+
+)}Ni=1 ,encoder ψθ , latent margin ˜mh
+
+Output: Imitation learning loss ℓIL 
+
+Function hard_il_loss( uθ , D, ψ θ , ˜mh):
+
+Sample batch (xt, ˙xt) ∼ D 
+
+Sample h0 ∼ N (0, I)
+
+Sample sτ ∼ Unif([0 , 1]) 
+
+Set h1 ← ˙xt
+
+Compute hτ ← GaussianPath( h0, h1, s τ ) Eq. (14) Compute target velocity u ← λh(h1 − hτ )
+
+Compute 
+
+uΠ 
+
+> θ
+
+←hard_forward( uθ , ψ θ , hτ , s τ , xt, ˜mh)
+
+return ℓIL (uΠ 
+
+> θ
+
+, u) Eq. (24) - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// Constrained Vector Field 
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Output: Constrained inference uΠ
+
+> θ
+
+Function hard_forward( uθ , ψ θ , hτ , s τ , xt, ˜mh):
+
+Compute latent FM states ˜hτ ← Jψθ (xt) hτ
+
+Compute ˜uθ ← Jψθ (xt)uθ (hτ , s τ ; xt)
+
+Compute latent states yt, ye ← ψθ (xt), ψ θ (xe)
+
+// Compute projection onto latent ˙LA
+
+Compute normal ˜nh ← ∇ y V L From Eq. (40) Compute ˜δh ← Proj h(˜hτ , ˜nh, ˜mh) Eq. (29) Compute margin ˜mu ← λh ∥˜δh∥2
+
+Compute normal vector ˜nu ← − ˜δh
+
+Compute δ˜u ← Proj u(˜ uθ , ˜nu, ˜mu) Eq. (45) Get projection ˜uΠ 
+
+> θ
+
+← ˜uθ + δ˜u
+
+uΠ 
+
+> θ
+
+← J−1 
+
+> ψθ
+
+˜uΠ
+
+> θ
+
+return uΠ
+
+> θ
+
+b) Hard SFMDS: In contrast to penalty losses, strict constraints can guarantee asymptotic stability globally by construction. In this case, we require Jψθ to be invertible, im-plying that ψθ must be a diffeomorphism [33]. The bijectivity of such a mapping fulfills Cond. 1 by construction, while also enforcing dim( L) = dim( X ). Akin to (35), we project the latent vector field ˜uθ onto the half-space ˙LA(yt; θ) (Cond. 2) and obtain the latent projected vector field 
+
+˜uΠ 
+
+> θ
+
+= ˜ uθ + δ˜u, with δ˜u = σr
+
+ −δT 
+
+> ˜h
+
+˜uθ + ˜ mu
+
+ δ˜h/|| δ˜h|| 2.
+
+(45) As for soft SFMDS, we compute δ˜h using (29) with the outward-pointing normal n˜h = ∇yt d(ye, yt)2 of ˙LA(yt; θ).Since Jψθ is invertible, ˜uΠ 
+
+> θ
+
+is mapped to the original space using (43), yielding the hard-constrained flow matching dy-namics 
+
+uΠ 
+
+> θ
+
+= J−1 
+
+> ψθ
+
+˜uΠ 
+
+> θ
+
+. (46) As a result, the system fθ is globally asymptotically stable. Task Space Latent Space           
+
+> Soft Hard
+> Fig. 3. 2D illustration of trajectory inference for soft/hard SFMDS. Each forward Euler step moves ytcloser to ye=ψθ(xe), thereby xtcloser to xe.
+
+We can further exploit the invertibility of Jψθ to control the convergence rate towards the equilibrium xe by imposing a chosen task-space margin mh. This is achieved by relating 
+
+mh with its latent counterpart ˜mh used to compute δ˜h.Specifically, the margins relate as ˜mh = mh∥ ˜nh∥/∥nh∥ with 
+
+˜nh = ∇yt d(ye, yt)2 and nh = J−1 
+
+> ψθ
+
+˜nh. Hard SFMDS is summarized by Algorithm 2. 
+
+Remark 2. For soft SFMDS, a neural network parametrizes 
+
+uθ directly in task (velocity) space ˙X . For hard SFMDS, in contrast, a potentially identical, unconstrained, neural network outputs ˜uθ in ˙L, from which the constrained task-space dynamics are obtained via (46), see Fig. 3. 
+
+C. Discrete-Time Systems: the Forward-Euler Case 
+
+In the previous sections, we enforced asymptotic stability in a continuous-time flow matching dynamical system. In prac-tice, however, such systems are implemented via numerical integration, yielding discrete-time dynamics whose properties depend on the chosen integration scheme. In general, asymp-totic stability in continuous time does not carry over to the discretized system, so that the discrete-time behavior must be explicitly considered. Here, we address this issue for the system fθ under forward Euler integration , as in Fig. 3, though the approach naturally extends to other integrators. 
+
+a) Discretizing fθ : First, we analyze the discrete dynam-ics in the latent space L where the constraints are imposed. For the discrete-time dynamics yt+1 = yt + ˙ yt ∆t, with ∆t > 0,the Lyapunov condition ˙V L(yt) < 0 becomes 
+
+V L(yt+1 ) = d(yt+1 , ye)2 < d (yt, ye)2 = V L(yt), (47) thus altering the set of admissible velocities ˙LA(yt; θ). Sub-stituting yt+1 and writing the distance as a norm yields 
+
+∥yt + ˙ yt ∆t − ye∥ < ∥yt − ye∥. Dividing both sides by ∆t
+
+and rearranging terms leads to 
+
+∥ ˙yt − (ye − yt)/∆t
+
+| {z }
+
+> ch
+
+∥ < ∥ye − yt∥/∆t
+
+| {z }
+
+> rh
+
+, (48) defining the ball ˙LB 
+
+> A
+
+(yt; θ) = { ˙yt ∈ ˙L : ∥ ˙yt − ch∥ < r h} of admissible velocities, with center ch and radius rh.9         
+
+> Fig. 4. Overlap between X,˙X, and U. Dotted lines denote the admissible half-spaces, while solid lines denote the admissible balls, whose depiction illustrates their effect in X. The admissible sets in velocity space are shown in blue, and those in U-space are shown in purple.
+
+b) Discretizing uθ : Similarly, for the discrete latent flow matching dynamics 
+
+˜hτ +1 = ˜hτ + ˜ uθ (˜hτ ) ∆ τ, with ∆τ > 0, LaSalle’s decrease condition (10) becomes 
+
+Hh(˜hτ +1 ) < H h(˜hτ ). (49) Following (26), we define Hh as the squared distance between 
+
+˜hτ and ˙LB 
+
+> A
+
+(yt; θ). We compute this distance as the norm of the vector δball  
+
+> ˜h
+
+that projects ˜hτ onto ˙LB 
+
+> A
+
+(yt; θ) (see Fig. 4). Then, from this ball projection vector, LaSalle’s condition can be expressed as 
+
+∥δball  
+
+> ˜h
+
+(˜hτ +1 )∥ < ∥δball  
+
+> ˜h
+
+(˜hτ )∥, (50) which is the discrete-time equivalent of (31). The norm of δball 
+
+> ˜h
+
+admits the closed form 
+
+∥δball  
+
+> ˜h
+
+(˜hτ )∥ = σr (∥˜hτ − ch∥ − (rh − bh)) . (51) Note that the scalar bh defining the margin mh in (29) was integrated and subtracted from rh to enforce the strict inequality (48). When ˜hτ /∈ ˙LA(yt; θ), replacing (51) and 
+
+˜hτ +1 in (50) leads to 
+
+∥˜uθ − (ch − ˜hτ )/∆τ
+
+| {z }
+
+> cu
+
+∥ < ∥ch − ˜hτ ∥/∆τ
+
+| {z }
+
+> ru
+
+, (52) resulting in the ball ˜UB 
+
+> A
+
+(˜hτ ) = {˜uθ ∈ ˜U : ∥˜uθ − cu∥ < r u} of admissible velocities for ˜uθ (see Fig. 4). 
+
+c) Soft-constrained discrete-time uθ : The admissible ball 
+
+˜UB 
+
+> A
+
+(˜hτ ) is contained within the continuous-time admissible half-space enforced in (44). We therefore augment (44), here-after denoted by ℓhalf , to also enforce the ball constraint as 
+
+ℓSFMDS = ℓhalf + γℓ ball , (53) with γ ∈ R>0. To remain consistent with the half-space formulation, ℓball penalizes violations of the half-space induced by the hyperplane tangent to the ball ˜UB 
+
+> A
+
+(˜hτ ) at the projection of uθ onto this set. This projection is given by 
+
+˜uΠball  
+
+> θ
+
+= ˜ uθ + δball  
+
+> ˜u
+
+,
+
+with δball  
+
+> ˜u
+
+= σr (∥cu − ˜uθ ∥ − (ru − bu)) cu − ˜uθ
+
+∥cu − ˜uθ ∥ , (54) with ˜uθ = Jψθ uθ as in (44). Moreover, we have incorporated the offset bu to enforce convergence of ˜hτ towards ˙LB 
+
+> A
+
+(yt; θ)
+
+by τ = 1 . The boundary of the this half-space has normal vector nu = −δball  
+
+> ˜u
+
+. As this boundary does not pass through the origin, the hyperplane definition includes an additional mar-gin m+˜u = ( δball  
+
+> ˜u
+
+)T ˜uΠball  
+
+> θ
+
+. This yields the half-space condition 
+
+(−δball  
+
+> ˜u
+
+)T ˜uθ + m+˜u ≤ 0, and therefore the penalty 
+
+ℓball = σr
+
+ (−δball  
+
+> ˜u
+
+)T ˜uθ + m+˜u
+
+ . (55) While ℓball = 0 does not strictly guarantee feasibility, itera-tive minimization drives ˜uθ arbitrarily close to the admissible ball. 
+
+d) Hard-constrained discrete-time uθ : The projected vector ˜uΠball  
+
+> θ
+
+(54) can be used directly in hard SFMDS, yielding 
+
+uΠball  
+
+> θ
+
+= J−1 
+
+> ψθ
+
+˜uΠball  
+
+> θ
+
+. (56) We note that a few number of edge cases may still arise from the discretization of uθ . They are discussed, together with proposed solutions, in App. A. VI. S TABLE FLOW MATCHING DYNAMICAL SYSTEMS ON 
+
+LIE GROUPS 
+
+We extend SFMDS to Lie groups, allowing us to encode, e.g., the orientation part or the pose of end-effector motions. We define a flow matching dynamical system on a Lie group 
+
+X as the output of a flow ϕθ : g × [0 , 1] × X → g on the Lie algebra of X , represented in a global frame at the identity via the inverse adjoint operator Ad −1 
+
+> x
+
+as 
+
+˙xt = Ad −1 
+
+> x
+
+fθ (xt, ωt) = Ad −1 
+
+> x
+
+ϕθ (ωt, s 0 = 0 , τ = 1; xt)= Ad −1 
+
+> x
+
+ωt +
+
+Z 10
+
+Ad −1 
+
+> x
+
+uθ (hτ , s τ ; xt)dτ, (57) where the last equality follows from (19) and the linearity of Ad −1 
+
+> x
+
+. Similarly as in the Euclidean case, we learn a vector field uθ that optimizes (18) subject to Ad −1 
+
+> x
+
+fθ (xt, ωt) ∈ F A.
+
+A. Soft SFMDS on Lie Groups 
+
+For soft SFMDS, asymptotic stability is enforced anal-ogously to the Euclidean case via the loss (44). The key distinction is that the vector field uθ ∈ g is, following (57), constrained by evaluating the stability losses on Ad −1 
+
+> x
+
+uθ . Note that the positive invariance loss from (36) is not necessary for closed Lie groups such as S1, S3, and SO(3) .
+
+B. Hard SFMDS on Lie Groups 
+
+Regarding hard SFMDS, we recall that enforcing global asymptotic stability through hard constraints requires a dif-feomorphic mapping ψθ between X and L, where both spaces are now Lie groups. As in prior works [38, 25], we use the logarithmic map (see App. B for details) to map elements from the Lie group X to elements ξt = log (xt) on its Lie algebra gX . We then define the Euclidean diffeomorphic network ψθ : gX → gL between the Lie algebras. Note that special care must must be taken to handle wrapping effects, e.g., in SO (3) , as a 360 ◦ rotation corresponds to the same element in X as a 0◦ rotation. In such case, the logarithmic map is multivalued, violating the required bijectivity of ψθ .Inspired by [25, 38], we enforce that the logarithmic map to remain diffeomorphic by restricting ψθ to the region of the 10 
+
+Lie algebra where wrapping does not occur, known as the 
+
+first cover . Effectively, this leads to the first cover of g being a positively invariant set w.r.t. fθ . Next, we describe how this constraint is addressed for the Lie groups considered in this work. 
+
+1) Torus T2: For the 2-torus, the first cover corresponds to the region in which each angular coordinate is restricted to the interval θi,t ∈ (−π, π ). Hence, we can construct the mapping 
+
+ξt = π tanh  ψ−1 
+
+> θ
+
+(yt), (58) which guarantees that each angular component remains within its principal interval. Since this mapping is invertible, we obtain the following inverse 
+
+yt = ψθ
+
+
+
+arctanh 
+
+ ξt
+
+π
+
+ 
+
+(59) from which we obtain a map from the first cover of g to the latent space that prevents wrapping. 
+
+2) Special Euclidean group SE(3) : For the special Eu-clidean group, the Lie algebra representation of the rotation component ξrt ∈ so (3) must satisfy ∥ξr 
+
+> t
+
+∥ < π for ξt to remain within the first cover. We refer to this region as the 
+
+π-ball Bπ . Let ψ′ 
+
+> θ
+
+: so (3) X → so (3) L denote the mapping of the rotation component. Following [25], we ensure that the mapping remains within Bπ by first applying a unit-box constraint on the output, analogous to the approach used for the torus, 
+
+eξrt = π tanh  ψ′
+
+> θ
+> −1
+
+( yrt ). (60) We then smoothly map this unit cube to Bπ by scaling eξrt
+
+according to the distance d from the origin of the latent space to the cube boundary along the direction n = fξrt  
+
+> ∥fξrt∥
+
+, i.e., 
+
+d = 1
+
+∥n∥∞
+
+, ξrt = eξrt
+
+d , (61) thus ensuring that ξrt ∈ Bπ , and therefore that ξt belong to the first cover of g. The inverse mapping is then expressed as 
+
+yrt = ψ′
+
+> θ
+
+
+
+arctanh 
+
+ dπ ξrt
+
+ 
+
+. (62) VII. E XPERIMENTS 
+
+We evaluate SFMDS across six experiments spanning benchmark learning-from-demonstration problems, complex action distributions, systems on Lie groups, real robotic ma-nipulation tasks, and high-dimensional dynamical systems. We consider: (1) LASA dataset [13], (2) LASA on T2 as a new benchmark dataset, (3) a novel multimodal dataset in R2, (4) the multimodal simulated pouring task on SE(3) from [21], (5) a real robotic insertion task on SE(3) , and (6) a 1682 -dimensional reaction–diffusion system. We assess trajectory accuracy using multiple distance-based metrics and asymp-totic stability by testing convergence from out-of-distribution initial conditions. As baseline, we consider behavior cloning (BC), which uses the same network architecture and training procedure as the soft SFMDS variant but without the stability losses. Due to its unconstrained nature, it serves as a reference 
+
+TABLE I ACCURACY AND STABILITY ON THE LASA AND LASA T2 DATASETS .                                                                           
+
+> Method Accuracy Stability RMSE ↓DTDW ↓FD ↓%Unsuc. Trajs. ↓
+> R2–SFMDS  Hard RealNVP 2.636 ±1.745 1.151 ±0.933 2.654 ±1.975 0.000 Hard 1S RealNVP 2.811 ±1.794 1.139 ±0.864 2.564 ±1.685 0.044 Hard NODE 2.661 ±1.867 1.111 ±0.813 2.622 ±1.837 0.000 Hard 1S NODE 2.896 ±1.948 1.106 ±0.816 2.569 ±1.844 0.000 Soft 2.400 ±1.585 1.061 ±0.763 2.547 ±1.695 0.000 Soft 1S 2.471 ±1.589 1.053 ±0.698 2.520 ±1.611 0.000 BC 2.137 ±1.606 0.961 ±0.862 2.382 ±1.886 40.163
+> R2–SoTA  CLF-DM [14] 3.567 ±2.725 1.455 ±1.108 3.734 ±2.992 0.000 ∗
+> Euc. Flows[33] 2.926 ±2.415 1.519 ±1.980 3.278 ±3.401 2.144 Euc. Flows NODE 2.731 ±2.220 1.351 ±1.535 3.184 ±3.214 0.755 PUMA [31] 2.202 ±1.448 0.963 ±0.597 2.286 ±1.384 0.000
+> T2–SFMDS  Hard RealNVP 0.124 ±0.080 0.073 ±0.045 0.168 ±0.118 0.000 Hard NODE 0.119 ±0.081 0.077 ±0.075 0.180 ±0.147 0.000 Soft 0.118 ±0.091 0.080 ±0.108 0.193 ±0.235 0.000 BC 0.087 ±0.058 0.056 ±0.036 0.140 ±0.082 32.248
+> T2–SoTA  LieImFlow [38] 0.134 ±0.116 0.089 ±0.111 0.205 ±0.241 0.026 PUMA 0.097 ±0.061 0.061 ±0.035 0.148 ±0.084 0.000
+> ∗
+
+Denotes results reported according to the original works. 
+
+for achievable accuracy and, crucially, highlights the lack of asymptotic stability in unconstrained networks. 
+
+Accuracy metrics. We employ multiple distance metrics to quantify the accuracy of the SFMDS variants and considered baselines. For unimodal datasets, we report the Root Mean Squared Error (RMSE), Dynamic Time Warping Distance (DTWD) [26], and Fr´ echet Distance (FD) [11] between the demonstrations and the trajectories generated by the learned dynamics fθ . These metrics are computed by initializing fθ
+
+from the same initial conditions as in the dataset, rolling out the dynamics for the same number of time steps, and compar-ing the resulting trajectories to the corresponding demonstra-tions, following standard practice [33, 37, 31]. For multimodal datasets, the aforementioned metrics are ill-defined due to the demonstrations’ multimodal nature. Instead, we compare the set of rollouts produced by fθ to the set of demonstrations using the Chamfer distance [1]. Given the set G, consisting of all the points in the trajectories generated from fθ , and the corresponding demonstration set D, the Chamfer distance is defined as CH( G, D ) := 1
+
+> |G|
+
+P 
+
+> g∈G
+
+min d∈D d(xg , xd). We report both CH( G, D ) and CH( D, G ), as the former measures motion fidelity and the latter reflects the coverage of the demonstrations by the generated trajectories, i.e., the ability to capture multimodality. Multiple rollouts are sampled per initial condition to compute these metrics. 
+
+A. Benchmark Datasets in R2 and T2
+
+We evaluate the performance of SFMDS and compare it with multiple state-of-the-art methods on three benchmark datasets: (1) LASA dataset [13], (2) LASA on T2 as a new benchmark dataset, (3) a novel multimodal dataset in R2. We sample ωt at every time step, except on the LASA dataset where we additionally consider the 1S variant which samples 
+
+ωt only at t = 0 , as described in Sec. V-B. For the stability analysis, we simulated 900 trajectories per model to compute the percentage of unsuccessful trajectories. 11  
+
+> Fig. 5. Vector fields of learned soft (left) and hard (right) SFMDS on LASA. White trajectories denote demonstrations, red trajectories show rollouts from the same initial conditions, and background color indicates normalized speed (lighter colors indicate higher values).
+
+1) LASA: The LASA dataset [13] is composed of 30 two-dimensional human handwriting motions. Each motion, cap-tured using a tablet PC, includes 7 demonstrations of a desired trajectory from different initial positions. The demonstrated trajectories exhibit convergent behavior toward an attractor, so the dataset is well-suited for assessing the stability of learned dynamical systems. We compare SFMDS with five benchmark methods: (1) CLF-DM [14], (2) Euclideanzing flows (Euc. Flows) [33], (3) a variant of Euclideanzing flows hereinafter referred to as Euc. Flows (NODE), where RealNVP is replaced by a Neural ODE (NODE) [5], (4) PUMA [31], and (5) Behavior Cloning (BC). CLF-DM is a relatively early method constrained to stricter Lyapunov functions and is therefore expected to exhibit the lowest accuracy among the compared approaches. Euclideanzing flows employs latent Lyapunov functions together with RealNVP [9] as an invertible mapping. Euc. Flows (NODE) follows the same approach as Euc. Flows, but uses Neural ODE (NODE) [5], known to be more expressive, as invertible mapping. PUMA also enforces stability using latent Lyapunov functions, but softly through a loss function. Finally, BC denotes an unconstrained flow matching dynamical system, trained without stability losses or constraints. All baselines, except BC, feature unimodal behaviors. Fig. 5 displays examples of learned soft and hard SFMDS, showing that both variants learn accurate and smooth behav-iors. The effect of the positive invariance loss in soft SFMDS is evident, as the vector field at the boundary points inward. This contrasts with hard SFMDS, where global asymptotic stability does not require this behavior. As shown in Table I, all methods achieve similar accuracy for the moderately complex motions of LASA. Moreover, SFMDS achieves competitive accuracy performance with the best-performing baselines. As expected, BC does not enforce stability, and 40% of its trajectories fail to converge to the equilibrium. In contrast, all SFMDS variants consistently converge, with the sole exception of hard SFMDS 1S using RealNVP, where a negligible fraction of trajectories (0.044% ) does not exactly reach the goal. Moreover, the Euc. Flows baselines also showcase a few cases of unsuccessful trajectories. As described in App. A, this behavior can arise in edge cases where the Jacobian 
+
+Jψθ varies too sharply due to overfitting, making accurate simulation of the dynamics challenging, potentially leading to spurious behavior. RealNVP has been shown to be particularly prone to such effects [30, Sec. V.A]. We observe that the 1S 
+
+and non-1S SFMDS variants show comparable performance, motivating the use of the latter, more common in practice, for the remainder of the experiments. 
+
+2) LASA T2: We introduce the LASA T2 dataset, which follow the same structure as the original LASA dataset and is constructed by projecting the demonstrations onto a two-dimensional unit torus T2 = S1 × S 1. Fig. 6 displays exam-ples of SFMDS on T2, showing that both SFMDS variants accurately capture trajectories that span a large portion of the manifold. We compare SFMDS with baseline dynamical systems imposing asymptotic stability on Lie groups, namely LieImFlow [38] and PUMA [31]. LieImFlow extends the paradigm of latent Lyapunov–based methods with invertible networks, specifically employing NODE [5], to Lie groups, similarly to SFMDS in Sec. VI. From Table I, we observe that all benchmarks lead to a similar accuracy, while BC fails to learn stable dynamics, leading to 32% of failure cases. 
+
+3) Multimodal: We introduce the novel Multimodal R2
+
+dataset, created to provide a multimodal benchmark for dy-namical systems serving a role similar to that of LASA. Multimodal R2 is composed of 10 different motions, each exhibiting between 3 and 6 intersecting trajectories. The com-plete dataset, together with the learned soft and hard SFMDS, is depicted in Fig. 7. We observe that both SFMDS variants successfully capture the trajectory distributions present in the dataset, while generating asymptotically stable trajectories. 12  
+
+> Fig. 6. Vector fields of learned soft (left) and hard (right) SFMDS on LASA
+> T2. White trajectories are demonstrations, red trajectories show rollouts from the same initial conditions, and background color indicates normalized speed.
+
+Note that, in some examples, not all modalities are perfectly captured, while in few cases certain sampled trajectories deviate from the data distribution. In particular, the second-to-last motion learned by hard SFMDS is noteworthy: at an intermediate stage of the trajectory, some samples diverge from the data support. However, they eventually reach the equilibrium due to the stability guarantees of the method. We evaluate the accuracy performance of SFMDS by sam-pling 30 trajectories for every initial condition, and compare them to the ground-truth trajectories using the Chamfer dis-tance. Table II reports the accuracy and stability measure for both SFMDS variants, as well as for the Eucl. flow and PUMA baselines. In contrast to the previous unimodal datasets in R2
+
+and T2 where RealNVP and NODE led to similar perfor-mances for hard SFMDS, RealNVP failed to robustly learn the multimodal behaviors in this setting. In Consequently, we use only NODE for the mapping ψθ . All subsequent experiments involving hard SFMDS are also conducted exclusively with NODEs, as the tasks become increasingly challenging. Table II shows that both SFMDS variants significantly outperform the state-of-the-art baselines in terms of accuracy on the multimodal dataset, which is expected given their unimodal                                      
+
+> TABLE II ACCURACY AND STABILITY ON MULTIMODAL DATASETS IN R2AND SE(3)
+> Method Accuracy Stability Chamfer dist.
+> %Unsuc. Trajs. ↓CH (G, D )↓CH (D, G )↓
+> ×10 −3×10 −3
+> R2–SFMDS  Hard NODE 3.828 ±5.178 3.724 ±3.613 0.000 Soft 1.402 ±0.783 2.512 ±0.991 0.000 BC 3.271 ±5.707 2.501 ±1.138 27.978
+> R2–SoTA  Euc. Flows 2.530 ±0.831 94.13 ±60.88 23.056 Euc. Flows NODE 3.392 ±1.517 36.10 ±21.38 0.089 PUMA 4.018 ±2.604 51.69 ±38.88 0.000
+> SE(3) –SFMDS  Hard NODE 13.152 ±2.079 14.783 ±2.215 0.000 Soft 7.896 ±1.418 10.447 ±1.505 0.038 BC 8.191 ±1.940 10.548 ±1.845 21.355
+
+nature. Lastly, SFMDS consistently exhibit asymptotically stable behavior. 
+
+B. Simulated Water Pouring on SE(3) 
+
+The SE(3) pouring dataset [21] contains 5 demonstrations for each of 2 pouring tasks, labeled water and wine . We modified the dataset so that all demonstrations share the same equilibrium by selecting a single goal pose and interpolating the last 120 steps of each trajectory in SE(3) .Fig. 8(a)-(b) depicts the learned SFMDS vector fields in a slice of SE(3) , showing that both variants learn smooth and converging dynamics. Fig. 8(c) displays a demonstrated and a generated trajectory, showcasing that SFMDS stably encodes the demonstrated behaviors. Similarly to Sec. VII-A3, we compute the accuracy metrics for each trained model by generating 30 rollouts and comparing them to the ground-truth trajectories using the Chamfer distance. Table II shows that soft SFMDS outperforms hard SFMDS in terms of accuracy, which can be attributed to its softer constraints. Nevertheless, as can be observed in the attached video, qualitatively, both methods closely resemble the demonstrations. Regarding sta-bility, results are reported using a total of 4064 trajectories rolled out from a grid of initial conditions in SE(3) . We note that a negligible portion of non-convergent trajectories arises due to the weak stability guarantees of the soft SFMDS (< 0.13% ) and to edge cases of hard SFMDS ( < 0.03% ). 
+
+C. Insertion Task on SE(3) with a Real Humanoid Robot 
+
+We validate SFMDS on a real robotic manipulation task, where a RB-Y1 humanoid robot inserts a cylindrical object into a container, see Fig. 9. The pose trajectory of the left end-effector is learned using SFMDS on SE(3) from 15 
+
+demonstrations with different initial poses, collected using a master arm with the same kinematic structure as the robot. The robot’s end-effector is controlled via a Cartesian impedance controller provided by the manufacturer, running at 500 Hz. At each control cycle, the desired velocity ˙xdt , generated by the learned dynamics fθ , is integrated using a single Euler step to produce the pose reference for the controller. The frequency of the control loop is limited by the inference time of the learned model. Since evaluating flow-matching models requires an integration procedure, they are inherently 13    
+
+> Fig. 7. Vector fields of learned soft (top) and hard (bottom) SFMDS in the Multimodal R2dataset. White trajectories denote demonstrations, red trajectories show rollouts from the same initial conditions, and background color indicates normalized speed.
+
+slower than explicit models, making inference-time evaluation relevant. This situation is further exacerbated for hard SFMDS implemented via NODE, which require an additional inner integration loop at each inference step and the computation of the Jacobian. To alleviate this issue, we implemented a custom Taylor-series approximations of the Jacobian and its inverse, rather than relying on PyTorch’s implementations. Although these approximations are less precise, they are significantly faster and were empirically found to be sufficiently accurate to achieve strong performance. We tested a learned hard SFMDS from both seen and unseen initial poses and introduced perturbations during execution. Three examples are provided in Fig. 9 and detailed qualitative results are shown in the accompanying video. We observe that the learned model converges for most initial conditions, is robust to disturbances, and integrates seamlessly with standard robotic controllers in real time. A handful of failures occured due to workspace limits and self-collisions, which are not accounted for by SFMDS. 
+
+D. High-dimensional Reaction-diffusion System 
+
+Finally, we evaluate the scalability of SFMDS on data gen-erated from the evolution of a Gray-Scott reaction-diffusion (GSRD) system (see App. C for details). This system produces two concentration fields u and v that can be visualized on a 2D grid. We represent both fields using 29 × 29 values,       
+
+> SFMDS (Soft) SFMDS (Hard)
+> (a) Init. Orientation (b) Final Orientation (c) Traj. SE(3)
+> Fig. 8. Learned SFMDS on the water-pouring task in SE(3) . (a)-(b) Flow lines computed at constant orientation and height (white) and demonstrations (cyan) projected onto the xy -plane. Flow lines are initially multimodal (a) and converge at the end (b). Background color indicates the desired cup rotation (low/dark initially, higher/brighter near pouring). (c) Example demonstration (light bottles) and reproduced SFMDS trajectory (dark bottles).
+
+leading to a state of dimension dim( X ) = 2 × 29 × 29 = 1682 
+
+(one field per channel). We consider an instance of the GSRD system that showcases asymptotic stability (see in App. C). We obtained a dataset of 10 trajectories generated from different initial conditions, each consisting of 278 frames. We learn a SFMDS with vector field uθ parameterized via a UNet-like architecture to exploit the spatial correlations present in the 14                            
+
+> Fig. 9. Sequences of robot poses along the hard SFMDS trajectories on the SE(3) insertion task for three different initial conditions. TABLE III ACCURACY AND STABILITY ON THE GSRD SYSTEM .
+> Method Accuracy Stability RMSE ↓Chamfer dist. %Unsuc. Trajs. ↓
+> CH (G, D )↓CH (D, G )↓
+> SFMDS Hard 0.091 ±0.033 1.061 ±1.744 1.330 ±1.756 0.000 SFMDS Soft 0.094 ±0.024 2.607 ±0.504 3.238 ±0.905 2.344 BC clipped 0.600 ±0.006 7.404 ±1.896 21.036 ±12.291 100.0 BC 4.905 ±0.197 8.691 ±2.077 136.173 ±147.995 100.0
+
+GSRD system’s concentration fields. For hard SFMDS, ψθ is parameterized by Glow blocks [15], which are invertible. We also consider behavioral cloning (BC) as a baseline. Fig. 10 shows two ground-truth trajectories for the concen-tration field u, and the corresponding trajectories generated via soft and hard SFMDS. In Fig 10(a), soft SFMDS converges to a spurious attractor. In contrast, hard SFMDS always converges to the equilibrium, even if the dynamical system temporarily diverges from the ground-truth, as in Fig 10(b). As in previous sections, we assess accuracy by generating rollouts of fθ from the dataset’s initial conditions. Table III reports the achieved performance assessed quantitatively via pixel-wise RMSE and Chamfer distances, showing that both SFMDS variants can accurately reproduce the demonstrated trajectories, outperforming BC. To assess the stability of the learned dynamical systems, we generate rollouts starting from 1024 out-of-distribution states (sampled from a uniform distribution Unif ([ −1, 1]) ). Table III show that both SFMDS variants consistently reach the equilibrium, except for a few spurious attractors in soft SFMDS. Additional experiments and implementation details are reported in App. C. 
+
+E. Inference Times 
+
+Table IV reports the inference frequency of the different models. Although the frequency decreases with the dimension, even hard SFMDS achieves control frequencies of approx-imately 13 Hz, which is sufficient for a wide range of manipulation tasks. VIII. C ONCLUSIONS 
+
+This paper introduced Stable Flow Matching Dynamical Systems (SFMDS), a dynamical-system-based imitation learn-ing framework that combines the generative power of flow matching with the stability guarantees of dynamical-system-based policies. SFMDS models the velocity at each state through a flow-matching process while restricting the set of admissible solutions using control-theoretic constraints, thus       
+
+> TABLE IV AVG .INFERENCE FREQUENCY (H Z)↑USING AN NVIDIA GeForce RTX 4090 GPU.
+
+Method R2 SE(3) R1682 
+
+BC / Soft SFMDS 341 .78 148 .01 48 .79 
+
+Hard SFMDS 17 .14 † 12 .66 † 14 .03 ‡    
+
+> †ψθparameterized using NODE.
+> ‡ψθparameterized via Glow blocks (see App C).
+
+extending concepts from latent Lyapunov stability analysis to flow matching dynamical system. We proposed two SFMDS variants encoding stability either via soft penalty terms or via hard constraints. We validated their performance through extensive experiments on benchmark datasets, simulations and real robotic tasks. Finally, we demonstrated scalability to a 
+
+1682 -dimensional dynamical system. Several research directions could further extend the capabili-ties of the SFMDS framework. First, many robotic tasks cannot be adequately described by a single goal pose: Extending the framework to handle convergence to sets of goal states would therefore increase its applicability. Second, incorporating the robot’s physical constraints directly into the dynamical system driving the end-effector motion would improve robustness, as most failures in the real-robot experiments were caused by constraint violations such as imminent self-collisions. Finally, richer policy conditioning, for example, through images or point clouds, could broaden the applicability of SFMDS and motivate the study of stability in these settings. REFERENCES 
+
+[1] Harry G Barrow, Jay M Tenenbaum, Robert C Bolles, and Helen C Wolf. Parametric correspondence and cham-fer matching: Two new techniques for image matching. Technical report, 1977. [2] Aude Billard, Sina Mirrazavi, and Nadia Figueroa. 
+
+Learning for adaptive and reactive robot control: adynamical systems approach . Mit Press, 2022. [3] Stephen Boyd and Lieven Vandenberghe. Convex opti-mization . Cambridge university press, 2004. [4] Max Braun, No´ emie Jaquier, Leonel Rozo, and Tamim Asfour. Riemannian flow matching policy for robot motion learning. In IEEE/RSJ Intl. Conf. on Intelligent Robots and Systems (IROS) , pages 5144–5151, 2024. [5] Ricky TQ Chen, Yulia Rubanova, Jesse Bettencourt, and David K Duvenaud. Neural ordinary differential equations. Advances in neural information processing systems , 31, 2018. 15  
+
+> (a)
+> (b) Fig. 10. Ground-truth (GT) and generated trajectories via Soft and Hard SFMDS associated with two different demonstrations ((a) and (b), respectively).
+
+[6] Xiaoyuan Cheng, Xiaohang Tang, and Yiming Yang. Safe and stable control via Lyapunov-guided diffusion models. In Neural Information Processing Systems (NeurIPS) , 2025. [7] Eugenio Chisari, Nick Heppert, Max Argus, Tim Welschehold, Thomas Brox, and Abhinav Valada. Learn-ing robotic manipulation policies from point clouds with conditional flow matching. In Conference on Robot Learning (CoRL) , 2024. [8] Haoran Ding, No´ emie Jaquier, Jan Peters, and Leonel Rozo. Fast and robust visuomotor riemannian flow matching policy. IEEE Transactions on Robotics , 41: 5327–5343, 2025. [9] Laurent Dinh, Jascha Sohl-Dickstein, and Samy Bengio. Density estimation using real nvp. In International Conference on Learning Representations , 2017. [10] Jianghua Duan, Yongsheng Ou, Jianbing Hu, Zhiyang Wang, Shaokun Jin, and Chao Xu. Fast and stable learning of dynamical systems based on extreme learning machine. IEEE Transactions on Systems, Man, and Cybernetics: Systems , 49(6):1175–1185, 2017. [11] Thomas Eiter and Heikki Mannila. Computing discrete Fr´ echet distance. Technical Report CD-TR 94/64, Tech-nische Universitat Wien, 1994. [12] Niklas Funk, Julen Urain, Joao Carvalho, Vignesh Prasad, Georgia Chalvatzaki, and Jan Peters. Action-Flow: Equivariant, accurate, and efficient policies with spatially symmetric flow matching. 2024. [13] S. Mohammad Khansari-Zadeh and Aude Billard. Learn-ing stable nonlinear dynamical systems with gaussian mixture models. IEEE Transactions on Robotics , 27(5): 943–957, 2011. [14] S. Mohammad Khansari-Zadeh and Aude Billard. Learn-ing control lyapunov function to ensure stability of dy-namical system-based robot reaching motions. Robotics and Autonomous Systems , 62(6):752–765, 2014. [15] Durk P Kingma and Prafulla Dhariwal. Glow: Generative flow with invertible 1x1 convolutions. Advances in neural information processing systems , 31, 2018. [16] Ivan Kobyzev, Simon JD Prince, and Marcus A Brubaker. Normalizing flows: An introduction and review of current methods. IEEE Transactions on Pattern Analysis and Machine Intelligence , 43(11):3964–3979, 2020. [17] J Zico Kolter and Gaurav Manek. Learning stable deep dynamics models. Advances in neural information processing systems , 32, 2019. [18] Joseph P La Salle. An invariance principle in the theory of stability. Technical report, 1966. [19] J. M. Lee. Introduction to smooth manifolds . Springer, 2013. [20] John M Lee. Smooth manifolds. In Introduction to smooth manifolds , pages 1–29. Springer, 2003. [21] Yonghyeon Lee. Mmp++: Motion manifold primitives with parametric curve models. IEEE Transactions on Robotics , 2024. [22] Andre Lemme, Klaus Neumann, Ren´ e Felix Reinhart, and Jochen J Steil. Neural learning of vector fields for encoding stable dynamical systems. Neurocomputing ,141:3–14, 2014. [23] Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maximilian Nickel, and Matthew Le. Flow matching for generative modeling. In Intl. Conf. on Learning Representations (ICLR) , 2023. [24] Xingchao Liu, Chengyue Gong, et al. Flow straight and fast: Learning to generate and transfer data with rectified flow. In Intl. Conf. on Learning Representations (ICLR) ,16 
+
+2023. [25] Hadi Beik Mohammadi, Søren Hauberg, Georgios Ar-vanitidis, Nadia Figueroa, Gerhard Neumann, and Leonel Rozo. Neural contractive dynamical systems. In The Twelfth International Conference on Learning Represen-tations , 2023. [26] Meinard M¨ uller. Dynamic time warping. Information retrieval for music and motion , pages 69–84, 2007. [27] Bernt Oksendal. Stochastic differential equations: an introduction with applications . Springer Science &Business Media, 2013. [28] George Papamakarios, Eric Nalisnick, Danilo Jimenez Rezende, Shakir Mohamed, and Balaji Lakshmi-narayanan. Normalizing flows for probabilistic modeling and inference. Journal of Machine Learning Research ,22(57):1–64, 2021. [29] John E Pearson. Complex patterns in a simple system. 
+
+Science , 261(5118):189–192, 1993. [30] Rodrigo P´ erez-Dattari and Jens Kober. Stable motion primitives via imitation and contrastive learning. IEEE Transactions on Robotics , 39(5):3909–3928, 2023. [31] Rodrigo P´ erez-Dattari, Cosimo Della Santina, and Jens Kober. Puma: Deep metric imitation learning for stable motion primitives. Advanced Intelligent Systems , 6(11): 2400144, 2024. [32] Nicolas Perrin and Philipp Schlehuber-Caissier. Fast diffeomorphic matching to learn globally asymptotically stable nonlinear dynamical systems. Systems & Control Letters , 96:51–59, 2016. [33] Muhammad Asif Rana, Anqi Li, Dieter Fox, Byron Boots, Fabio Ramos, and Nathan Ratliff. Euclideaniz-ing flows: Diffeomorphic reduction for learning stable dynamical systems. In Conference on Learning for Dynamics and Control (L4DC) , pages 630–639, 2020. [34] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-net: Convolutional networks for biomedical image segmentation. In International Conference on Medical image computing and computer-assisted intervention ,pages 234–241. Springer, 2015. [35] Joan Sola, Jeremie Deray, and Dinesh Atchuthan. Amicro lie theory for state estimation in robotics. arXiv preprint arXiv:1812.01537 , 2018. [36] Christopher Iliffe Sprague, Arne Elofsson, and Hossein Azizpour. Stable autonomous flow matching. arXiv preprint arXiv:2402.05774 , 2024. [37] Julen Urain, Michele Ginesi, Davide Tateo, and Jan Peters. Imitationflow: Learning deep stable stochastic dynamic systems by normalizing flows. In IEEE/RSJ Intl. Conf. on Intelligent Robots and Systems (IROS) , pages 5231–5237, 2020. [38] Julen Urain, Davide Tateo, and Jan Peters. Learning stable vector fields on lie groups. IEEE Robotics and Automation Letters , 7(4):12569–12576, 2022. [39] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. Advances in neural information processing systems , 30, 2017. [40] Mandy Xie, Ankur Handa, Stephen Tyree, Dieter Fox, Harish Ravichandar, Nathan D Ratliff, and Karl Van Wyk. Neural geometric fabrics: Efficiently learning high-dimensional policies from demonstration. In Con-ference on Robot Learning , pages 1355–1367. PMLR, 2023. [41] Ge Yan, Jiyue Zhu, Yuquan Deng, Shiqi Yang, Ri-Zhao Qiu, Xuxin Cheng, Marius Memmel, Ranjay Krishna, Ankit Goyal, Xiaolong Wang, and Dieter Fox. Mani-Flow: A general robot manipulation policy via consis-tency flow training. arXiv preprint arXiv:2509.01819 ,2025. [42] Jiechao Zhang, Hadi Beik-Mohammadi, and Leonel Rozo. Learning riemannian stable dynamical systems via diffeomorphisms. In Conference on Robot Learning (CoRL) , 2022. [43] Weiming Zhi, Tin Lai, Lionel Ott, and Fabio Ramos. Dif-feomorphic transforms for generalised imitation learning. In L4DC , Proceedings of Machine Learning Research, pages 508–519. PMLR, 2022. APPENDIX AEDGE CASES FOR HARD -C ONSTRAINED METHODS 
+
+As discussed in Secs. V-C and VII-A, a few rare edge cases compromising the stability of hard SFMDS might arise from the discretization of the dynamics uθ . In this appendix, we describe how these cases can be addressed to increase the robustness of hard SFMDS. 
+
+1) Escaping ˙XA: Next, we consider the case when 
+
+˙XA(xt; θ) is a half-space. However, the same approach can be employed in the case when ˙XA(xt; θ) is a ball. When 
+
+hτ ∈ ˙XA(xt; θ), the ReLU-based projection in (29) leaves the vector field uθ unconstrained. In such cases, if uθ induces motion toward the boundary of the admissible half-space, discretization effects may cause the state hτ to step outside 
+
+˙XA(xt; θ) in a single integration step, as shown in Fig. 11(a). Although the constrained uθ will subsequently enforce con-vergence back toward ˙XA(xt; θ), this may be insufficient when only a limited number of integration steps remain. As a result, the trajectory may fail to converge to ˙XA(xt; θ) by 
+
+τ = 1 . Alternatively, it can enter oscillatory regimes near the boundary, effectively making set membership dependent on the particular phase of the oscillation at which the integration terminates. To address this issue, whenever uθ induces motion that drives hτ toward the boundary of ˙XA(xt; θ), we constrain the vector field such that a single Euler integration step cannot cause the state to escape ˙XA(xt; θ). To this end, in these situations, we remove the activation σr from (29), yielding 
+
+δh = − nT
+
+> h
+
+hτ + mh
+
+∥nh∥2 nh. (63) We then use δh to compute the offset bu, which in this case is treated as a maximum allowable offset toward the boundary, satisfying 
+
+bu = λh ∥δh∥. (64) 17                
+
+> (a) (b) (c) Fig. 11. Failure edge case caused by discretizing uθ. (a) With one integration step remaining, the state hτjumps outside ˙XA(xt;θ)and fails to converge back after the final step. (b) Constraining the vector prevents hτfrom leaving
+> ˙XA(xt;θ). (c) Detailed view of the admissible set UA(hτ)for this case.
+
+This bound is subsequently used to define the margin mu,which enforces the condition 
+
+−δT
+
+> h
+
+uθ − mu < 0, ∀hτ ∈ ˙XA(xt; θ). (65) Since the margin mu is now subtracted, the half-space offset is applied in the opposite direction compared to (31), effec-tively preventing outward motion across the boundary (see Fig. 11(b)-(c). 
+
+2) Overfitting of ψθ : In cases where the transformation 
+
+ψθ varies too sharply, for instance, due to overfitting, the discretized dynamics may violate the stability conditions even when the admissible set is defined as a ball in the latent space. In this case, the latent dynamics may remain stable, while the corresponding deformation induced by J−1 
+
+> ψθ
+
+changes too abruptly in task space. As a result, a single integration step may move the task-space trajectory in a manner inconsistent with the intended stability guarantees. This issue can be mitigated in several ways. A first possibility is to regular-ize ψθ to promote smoothness, for example, by penalizing large Jacobian norms. Another option is to use invertible architectures that are empirically less prone to such sharp local deformations; for instance, NODE-based transformations are preferable to RealNVP-type mappings in this regard. The effect of discretization can also be reduced by using higher-order integration schemes or by decreasing the integration step size. Finally, a promising alternative is to perform numerical integration directly in the latent space, where stability condi-tions are enforced by construction, and then map the integrated state back to task space through ψ−1 
+
+> θ
+
+. We leave a systematic investigation of this direction for future work. APPENDIX BLIE GROUPS : E XPONENTIAL , LOGARITHMIC , AND ADJOINT MAPS 
+
+To construct and simulate dynamics on Lie groups, we use three operations: (1) in hard SFMDS, we employ the logarithmic map to represent states in the group’s Lie algebra; (2) to simulate the dynamics, we use a forward Euler scheme adapted to Lie groups, where one integration step is given by 
+
+xt+∆ t = xt exp  ∆t Ad −1 
+
+> x
+
+fθ (xt, ωt), (66) where ∆t is the integration step size, and (3) we use the adjoint operator to map vectors from local frames to global frames at the identity, as shown in (57). Note that, in hard SFMDS, the input to fθ is the Lie algebra representation ξt = log( xt).Thus, strictly speaking, the vector field should be written as 
+
+fθ (ξt, ωt) in (66). To use a unified notation for both soft and hard SFMDS, we assume that, in the hard case, the logarithmic map is implemented as the first frozen layer of fθ . This allows us to write the vector field consistently as fθ (xt, ωt). Next, we detail these operations for the specific Lie groups considered in this work. 
+
+1) Torus T2: The 2-torus is identified as the Lie group 
+
+T2 = S1 × S 1. Since S1 is isomorphic to the set of unit complex numbers {eiθ | θ ∈ R} ⊂ C, elements on the torus can be written as xt = ( eiθ 1,t , e iθ 2,t ) ∈ T2 ⊂ C2 [20, Ch. 7]. Its Lie algebra is t2 ∼= R2, whose elements can be written as 
+
+ξt = ( θ1,t , θ 2,t ). The exponential and logarithmic maps are then constructed as, 
+
+exp T2 (ξt) = ( eiθ 1,t , e iθ 2,t ) ∈ C2, (67) 
+
+log T2 (xt) =  wrap( θ1,t ), wrap( θ2,t ) ∈ R2, (68) where the wrap operator maps an angle to its principal value in the interval [−π, π ]. Since the 2-torus group is Abelian, the adjoint matrix is trivial, leading to 
+
+Ad x = I2, ∀xt ∈ T2. (69) 
+
+2) Special Euclidean group SE(3) : Each element of SE(3) 
+
+is a pose 
+
+xt =
+
+Rt pt
+
+0 1
+
+
+
+∈ SE(3) ,
+
+where Rt ∈ SO(3) and pt ∈ R3 denote the rotation and translation components, respectively. A Lie algebra element is written as 
+
+ξt =
+
+[ωt]× vt
+
+0⊤ 0
+
+
+
+∈ se (3) . (70) The exponential map is defined as [35], 
+
+exp SE(3) (ξt) = 
+
+exp SO(3) ([ ωt]×) J(ωt) vt
+
+0⊤ 1
+
+
+
+, (71) where the rotational exponential is given by Rodrigues’ for-mula [35], 
+
+exp SO(3) ([ ωt]×) = I + sin θt
+
+θt
+
+[ωt]× + 1 − cos θt
+
+θ2
+
+> t
+
+[ωt]2
+
+> ×
+
+,θt = ∥ωt∥,
+
+(72) and the left Jacobian J(ωt) is 
+
+J(ωt) = I + 1 − cos θt
+
+θ2
+
+> t
+
+[ωt]× + θt − sin θt
+
+θ3
+
+> t
+
+[ωt]2
+
+> ×
+
+. (73) The logarithm is obtained by first computing 
+
+[ω]× = log SO(3) (Rt) = θt
+
+2 sin θt
+
+(Rt − R⊤ 
+
+> t
+
+), (74) 
+
+θt = cos −1
+
+ tr( Rt) − 12
+
+
+
+. (75) Then, the translational component is recovered using the inverse left Jacobian, 
+
+vt = J(ωt)−1pt. (76) 18 
+
+Thus, 
+
+log SE(3) (xt) = 
+
+[ωt]× vt
+
+0⊤ 0
+
+
+
+. (77) The adjoint matrix Ad x : se (3) → se (3) has the form [35], 
+
+Ad x =
+
+ Rt 0[pt]×Rt Rt
+
+
+
+, (78) where [pt]× denotes the skew-symmetric matrix associated with the cross product. APPENDIX CHIGH -DIMENSIONAL REACTION DIFFUSION SYSTEM 
+
+We consider the Gray-Scott reaction-diffusion system, which models the chemical reaction given by 
+
+U + 2 V → 3VV → P
+
+where U is consumed, V produced, and P is an inert product. This system is governed by the system of ODE 
+
+∂u ∂t = Du∇2u − uv 2 + F (1 − u), (79) 
+
+∂v ∂t = Dv ∇2v + uv 2 − (F + k)v, (80) where u and v are the concentrations of U and V , Du and 
+
+Dv are their diffusion coefficients, and the parameters F and 
+
+k control the rates at which U is fed to the system, and 
+
+V is removed from it, respectively. This reaction-diffusion system has been studied extensively due to the complex spa-tiotemporal patterns it can exhibit [29]. In this experiment, we focus on a particular instance of this system, whose solution is characterized by spots that emerge after a perturbation and multiply until filling the available space 1. This is accomplished by setting Du = 0 .16 , D v = 0 .06 , F = 0 .034 , and k = 0 .065 .Moreover, enforcing Neumann boundary conditions and lim-iting the physical space in which the system evolves makes it reach the same steady state for different initial perturbations, which renders it a suitable testbed for assessing the stability of learned dynamical systems. As in [29], we simulate the system via forward Euler integration. The spatial 2D grid is set to 29 × 29 points, and the initial state is set to (u, v ) = (1 .0, 0.0) with a perturbation set to u = 0 .5, v = 0 .25 in a square region of size r = 7 
+
+in the center of the grid. Each point in the grid is then further perturbed by adding to it a uniform noise sample, 
+
+ϵ ∼ Unif ([ −s, s ]) , where s = 0 .25 . Fig. 12 show examples of trajectories obtained when simulating the reaction-diffusion system with the conditions described above, recording frames every 10 Euler integration steps. Note that the frames are unevenly spaced to highlight the fields’ evolution, which tends to be more noticeable at the beginning of the trajectories. To learn a model of this dynamical system, we construct a dataset by simulating the reaction-diffusion system and using the resulting trajectories, discarding the initial state frame. Although different trajectories may reach the steady state at a different frame number, we empirically found that simulating  
+
+> 1Referred to as “pattern λ” by [29].
+
+the reaction-diffusion system for 500 frames suffices to reach the fixed point consistently. We then stablish a new maximum frame number for all trajectories by retrieving the frame index at which we observe no noticeable changes in the states’ evolution. This results in a dataset of 10 trajectories, each consisting of 278 frames. We normalize the collected data via an independent min-max normalization of the concentration fields u and v to the interval [−1, 1] , using the numerical ranges that these fields take for all the simulated trajectories. The normalized fields are then stacked, making every data point in the dataset a 2 × 29 × 29 image, i.e., dim( ˙X ) = 1682 .We exploit the spatial correlation of the concentration fields by parameterizing the vector field uθ of soft and hard SFMDS with the UNet-like neural architecture [34] displayed in Fig. 13. The positional encoding module is implemented as described in [39], and its outputs are repeated and reshaped to match the expected dimension that allows its concatenation with the corresponding hτ and xt embeddings at each skip connection. The hard SFMDS sub-neural network ψθ is pa-rameterized by two Glow blocks [15] without actnorm layers. For all experiments, the parameter c is set to 32 . To compute the auxiliary loss functions of soft SFMDS, we draw (ambient space) samples from a clipped standard normal distribution, where clipping constrains the numerical values of the samples to lie within [−1, 1] . These samples contain values at the ambient space boundary since, as previously stated, a min-max normalization is performed over the reaction-diffusion trajectories used to construct the database. In addition, for the soft SFMDS variant, both the positively invariant set and asymptotic stability loss functions are computed performing pixel-wise projections, which we found to work better empir-ically. The model rollouts are constructed by conditioning the learned vector field uθ on ground-truth initial states for the first velocity prediction only. This velocity prediction is then used to predict the next state, which is then used as the new conditioning state for the following prediction. Additional examples of trajectories generated by the two SFMDS variants, starting from OOD initial states are dis-played in Fig. 14, where out of bounds pixels are represented in different colors to improve visualization. We observe that the behavior of the soft SFMDS variant is consistent with the positively invariant set constraint, as pixels remain bounded for the trajectory. In contrast, the hard SFMDS variant can generate states with pixels going out of bounds, since apositively invariant set is not enforced nor required in this case. Note that this is consistent with observations made for hard SFMDS in the benchmark datasets of Sec. VII-A1. Finally, we note that, although the evolution of pixels during the generation of trajectories is not numerically bounded for the SFMDS, the steady state is consistently reached by both SFMDS variants given a sufficient prediction horizon. 19 
+
+Fig. 12. Example of ground-truth trajectory for the u and v fields. Note that, at each frame, both fields are correlated although their numerical values differ. 
+
+Fig. 13. Diagram of the UNet-like architecture used to parameterize uθ , for both soft and hard SFMDS. 
+
+Fig. 14. Examples of trajectories generated by Soft and Hard SFMDS when starting from OOD initial states. Out-of-bound pixels are white if below the lower bound, and black if above the upper bound.

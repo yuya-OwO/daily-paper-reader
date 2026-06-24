@@ -1,0 +1,963 @@
+Title: Patching Control Lyapunov Barrier Functions for Temporal Logic Specifications with Bounded Controls
+
+URL Source: https://arxiv.org/pdf/2606.12768v1
+
+Published Time: Fri, 12 Jun 2026 00:20:11 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Patching Control Lyapunov Barrier Functions for Temporal Logic Specifications with Bounded Controls 
+
+Ruikun Zhou*, Yating Yuan*, Haocheng Chang, Yinan Li, and Yiming Meng 
+
+Abstract — We propose an abstraction-free framework for controller synthesis for continuous-time dynamical systems sub-ject to Linear Temporal Logic (LTL) specifications and bounded control inputs. The proposed method combines the sequential decomposition of LTL tasks with the use of formally certified Control Lyapunov-Barrier Functions (CLBFs). By formulating local specifications as a sequence of safe-stabilization problems, we systematically approximate and patch the winning sets of the decomposed subtasks. The satisfaction of these local constraints is guaranteed by the offline-computed level sets of the CLBFs. As a result, our framework yields formally verified switching feedback controllers that enable efficient online planning and dynamic re-planning. This ensures robust continuous specification satisfaction in the presence of state perturbations, avoiding the explicit state-space abstractions commonly required in the literature. The approach is validated through numerical simulations and a hardware demonstration on a Crazyflie quadrotor. 
+
+Index Terms — Linear temporal logic; Control Lyapunov function; Control barrier function; Reach-avoid; Mobile robots. 
+
+I. I NTRODUCTION 
+
+Linear Temporal Logic (LTL) serves as a rigorous formal language for specifying temporally structured mission re-quirements in robotics and autonomous systems, such as se-quencing, repeated visitation, conditional task execution, and safety constraints over long horizons [1]. It is therefore well-suited to motion planning and control problems that require the satisfaction of complex task specifications over time, and has been widely used in a range of robotic applications, such as autonomous driving, surveillance robots, and firefighting robots [2]. One of the central challenges in realizing LTL specifications in robotic systems is to design controllers for long-horizon tasks while accounting for dynamics and safety constraints [3]. Abstraction-based methods constitute a classical line of work for LTL control, where continuous systems are rep-resented by finite symbolic models and controllers are syn-thesized to satisfy LTL specifications [4]. Building on this abstraction-based paradigm, reactive mission and motion planning frameworks have been developed to provide formal                    
+
+> Ruikun Zhou is with the Department of Aeronautics and Astronautics, Massachusetts Institute of Technology, Cambridge, MA 02139, USA. Email:
+> ruikun@mit.edu .Yating Yuan, and Haocheng Chang are with the Department of Applied Mathematics, University of Waterloo, Waterloo, Ontario N2L 3G1, Canada. Emails: {yating.yuan, haocheng.chang }@uwaterloo.ca
+> Yinan Li is with MacLean Engineering &Marketing Co. Limited, Collingwood, ON, Canada. Email: yli@macleanengineering.com .Yiming Meng is with the AI Thrust, Information Hub, Hong Kong University of Science and Technology (Guangzhou), China. Email:
+> yimingmeng@hkust-gz.edu.cn .
+
+guarantees for high-level robotic tasks under admissible environment assumptions [5]. A key step in such abstraction-based synthesis frameworks is the construction of finite abstractions of the continuous dynamics, with robustness margins used to account for mismatches between the control system and its finite abstractions [6]. This line of work was further extended to robustly complete control synthe-sis for nonlinear systems through an interval branch-and-bound scheme with adaptive refinement [7]. However, finite-abstraction-based synthesis can be computationally demand-ing due to the burden of abstraction construction and state-space explosion. To address these limitations, another line of work pursues abstraction-free control synthesis under LTL specifications using control barrier functions (CBFs). A typical methodol-ogy is to decompose the LTL specification into sequential subtasks and then use CBF-based quadratic programs (CBF-QPs) to synthesize controllers [8], but such methods still have technical restrictions. Notably, CBF-QP-based methods typically require online optimization to compute control inputs, and conflicts among barrier-function constraints may lead to infeasible QPs. To address this issue, methods for the composition of barrier functions and a prioritization-based control method were proposed to guarantee the feasibility of the controller [9]. Nevertheless, these approaches still typically rely on online optimization to compute the control input. Alternatively, hybrid barrier certificates establish sat-isfaction of syntactically co-safe LTL specifications through a hybrid-system eventuality argument [10]. This approach avoids the standard CBF-QP formulation, but it does not explicitly incorporate bounded-control constraints. On the other hand, recent progress on the compatibility of CBFs and CLFs shows that one can directly synthesize a single control Lyapunov barrier function (CLBF) for safe stabilization tasks [11]–[13]. More importantly, the level sets of CLBFs depict the invariant set where both safety and convergence are guaranteed. Therefore, in the scenarios where CLBFs are accessible and the LTL specification can be decomposed into a set of reach-avoid tasks, those level sets can be leveraged to capture a set of several feasible trajectories for the specifications, potentially without solving QP problems. In this work, by leveraging the formally certified CLBFs proposed in [13], we propose an abstraction-free framework that synthesizes controllers and approximates the winning set for the given LTL specifications by approximating and patching the winning sets of decomposed subtasks. The main contributions are threefold, as follows.  
+
+> arXiv:2606.12768v1 [eess.SY] 11 Jun 2026 •
+
+To the authors’ best knowledge, this is the first work connecting the approximation of the winning set of LTL specifications and the level sets of CLBFs under bounded control.  
+
+> •
+
+By formulating the local specification tasks as a se-quence of safe stabilization problems, the proposed method yields formally verified switching feedback controllers under bounded control constraints. With the offline-computed CLBFs, this formulation enables effi-cient online planning under bounded control constraints and allows for dynamic, on-the-fly re-planning that guarantees specification satisfaction in the presence of state perturbations while tracking reference trajectories in noisy environments or with perturbed dynamics.  
+
+> •
+
+A set of case studies, including numerical simula-tions and a real-world experiment in which a Crazyflie quadrotor tracks a trajectory generated by the proposed algorithm, is provided to demonstrate the effectiveness of the proposed method. II. P RELIMINARIES AND PROBLEM FORMULATION 
+
+Throughout this paper, we consider a control-affine system of the form: 
+
+˙x = f (x) + g(x)u, (1) where f : X ⊆ Rn → Rn and g : X ⊆ Rn → Rn×p are locally Lipschitz. The control input u is constrained by the hyperbox 
+
+u ∈ U box := u ∈ Rp | uj ≤ uj ≤ uj , j = 1 , . . . , p , (2) where uj , u j ∈ R denote the lower and upper bounds on each control component, respectively, which is consistent with the physical constraints of many systems in practice, such as motor torque limits. We denote the solution of system (1) with initial condition x(0) = x0 and control input u
+
+as ϕ(t, x 0, u ), which is defined on the maximal interval of existence I ⊆ [0 , ∞). In this work, we assume that the maximal interval of existence is [0 , ∞) for all x0 ∈ X and 
+
+u ∈ U box .
+
+A. State constraints and smooth approximation 
+
+Consider multiple state constraints defined by a finite set of continuously differentiable functions {hi}Ni=1 , where hi :
+
+X → R, i = 1 , . . . , N . The safe set Ci associated with hi is defined as Ci := {x ∈ X | hi(x) ≤ 1}, and the unsafe set 
+
+Di is defined as Di := {x ∈ X | hi(x) > 1}. Apparently, the overall safe region Csafe is the intersection of all Ci, i.e., 
+
+Csafe = TNi=1 Ci, which can also be written as the point-wise maximum of all hi as follows: 
+
+Csafe = {x ∈ X | hmax ≤ 1}, (3) where hmax := max i=1 ,...,N hi(x) is not a continuously differentiable function in general. The system is said to be safe with respect to the constraints hi if for any initial state 
+
+x0 ∈ C safe , there exists a control input u ∈ U box such that the solution ϕ(t, x 0, u ) remains in Csafe for all t ≥ 0. Let the interior of Csafe be denoted as Int( Csafe ), which is assumed to be nonempty. Let xeq be the unique equilibrium point of (1) in Csafe , and suppose that xeq ∈ Int( C). We then define the safe region of attraction (ROA) under a given state-feedback control policy u = κ(x) ∈ U box as 
+
+Dsafe := 
+
+n
+
+x0 ∈ C safe | ϕ(t, x 0, κ ) ∈ C safe , ∀t ≥ 0,
+
+and lim  
+
+> t→∞
+
+ϕ(t, x 0, κ ) = xeq 
+
+o
+
+. (4) In this work, we adopt the softmax relaxation idea of the safe set Csafe from [12], which approximates the pointwise maximum function hmax with a smooth function as follows: 
+
+hsoft (x; τ ) := 1
+
+τ log 
+
+> N
+
+X
+
+> i=1
+
+eτ h i(x)
+
+!
+
+, (5) where τ > 0 is a tunable parameter. It can be shown that 
+
+C := {hsoft ≤ 1} ⊆ { hmax ≤ 1} = Csafe .
+
+Denote the boundary of C by ∂C := {x ∈ X | hsoft (x) = 1 }.
+
+B. Linear temporal logic 
+
+Let AP be a finite set of atomic propositions. We consider the stutter-invariant fragment of LTL, denoted by LTL \⃝ ,which excludes the next operator ⃝ [1]. We further assume that all formulas are in positive normal form [1], meaning that negation is only allowed directly in front of atomic propositions. The syntax of LTL \⃝ over AP is defined inductively as 
+
+φ ::= ⊤ | ⊥ | π | ¬ π | φ1∧φ2 | φ1∨φ2 | φ1 U φ2 | φ1 R φ2,
+
+where π ∈ AP . Here, ⊤ and ⊥ denote true and false ,respectively; ¬, ∧, and ∨ denote negation , conjunction , and 
+
+disjunction ; and U and R denote the temporal operators until 
+
+and release , respectively. The derived temporal operators F
+
+(eventually ) and G (always ) are defined by Fφ := ⊤ U φ
+
+and Gφ := ⊥ R φ.Let σ = σ0σ1σ2 · · · be an infinite word over the alpha-bet 2AP , where each σi ⊆ AP . The satisfaction relation 
+
+σ, i |= φ, meaning that σ satisfies φ at position i, is defined inductively as follows [14]:  
+
+> •
+
+σ, i |= ⊤ ⇔ True;  
+
+> •
+
+σ, i |= ⊥ ⇔ False;  
+
+> •
+
+σ, i |= π ⇔ π ∈ σi; 
+
+> •
+
+σ, i |= ¬π ⇔ π / ∈ σi; 
+
+> •
+
+σ, i |= φ1 ∧ φ2 ⇔ σ, i |= φ1 ∧ σ, i |= φ2; 
+
+> •
+
+σ, i |= φ1 ∨ φ2 ⇔ σ, i |= φ1 ∨ σ, i |= φ2; 
+
+> •
+
+σ, i |= φ1Uφ2 ⇔∃j ≥ i, (σ, j |= φ2 ∧ ∀ k ∈ [i, j ), σ, k |= φ1) ;  
+
+> •
+
+σ, i |= φ1Rφ2 ⇔∀j ≥ i, (σ, j |= φ2 ∨ ∃ k ∈ [i, j ), σ, k |= φ1) .
+
+We write σ |= φ if and only if σ, 0 |= φ.A word σ is said to be in lasso form if it can be written as σ = σpre (σsuf )ω , where σpre and σsuf are finite words over 2AP . Here, σpre is called the prefix , σsuf is called the suffix , and (σsuf )ω denotes the infinite repetition of σsuf . We use len( ·) to denote the length of a finite word. Let L : X → 2AP be a labeling function, where L(x) ⊆
+
+AP denotes the set of atomic propositions satisfied at state 
+
+x ∈ X . Following [15], for each atomic proposition π ∈ AP ,define JπK := {x ∈ X | π ∈ L(x)}. For any subset of atomic propositions P ∈ 2AP , define JP K := {x ∈ X | L(x) = 
+
+P }. Hence, JP K is the set of states that satisfy all and only the propositions in P . Note that for any two distinct labels 
+
+P, Q ∈ 2AP , JP K ∩ JQK = ∅.
+
+Definition 1 (Trace of a continuous-time trajectory [15]): 
+
+Given an initial condition x0 ∈ X and a control input 
+
+u ∈ U box , let ϕ(·, x 0, u ) : R≥0 → X be the corresponding trajectory of the continuous-time system (1). An infinite word σ = σ0σ1σ2 · · · over 2AP is called a trace of 
+
+ϕ(·, x 0, u ) with respect to LTL \⃝ if there exists a sequence of time instants t0t1t2 · · · such that 1) t0 = 0 , tm < t m+1 for all m ∈ N0, and tm → ∞ as 
+
+m → ∞ ;2) ϕ(tm, x 0, u ) ∈ JσmK for all m ∈ N0;3) if σm̸ = σm+1 for each m ∈ N0, then there exists 
+
+t′ ∈ [tm, t m+1 ] such that ϕ(t, x 0, u ) ∈ JσmK for all 
+
+t ∈ [tm, t ′), ϕ(t, x 0, u ) ∈ Jσm+1 K for all t ∈ (t′, t m+1 ],and ϕ (t′, x 0, u ) ∈ JσmK ∪ Jσm+1 K.
+
+Definition 2 ( [15]): Given an initial condition x0 ∈ X 
+
+and an input u ∈ U box , the trajectory ϕ(·, x 0, u ) satisfies an 
+
+LTL \⃝ formula φ, denoted by ϕ(·, x 0, u ) |= φ, if the trace 
+
+σ of ϕ(·, x 0, u ) satisfies φ, namely, σ |= φ.
+
+Definition 3 (Winning set for an LTL specification): 
+
+Given the control-affine system (1) and an LTL \⃝ formula 
+
+φ, let M be a finite memory set. A finite-memory control strategy is denoted by κ : X × M → U box . Then, the winning set of system (1) with respect to φ is defined as 
+
+Win( φ) := 
+
+n
+
+x0 ∈ X ∃M , ∃ κ : X × M → U box 
+
+such that ϕ(·, x 0, κ ) |= φ
+
+o
+
+.
+
+(6) That is, Win( φ) is the set of all initial states for which there exists a finite-memory control strategy such that the corresponding closed-loop trajectory satisfies φ.The finite memory set M will be specified in Section II-C to encode the progress of the LTL specification during the closed-loop execution. 
+
+C. Problem formulation 
+
+Consider the continuous-time system (1) and an LTL \⃝ 
+
+specification φ defined over a set of atomic propositions AP .Since computing the exact winning set Win( φ) is generally intractable, the objective of this work is to compute a certified inner approximation dWin( φ) ⊆ Win( φ), and to synthesize a switching state-feedback control policy such that, for every initial condition x(0) ∈ dWin( φ), the resulting closed-loop trajectory satisfies φ.In this work, given a lasso-form word σ |= φ and the label-ing function L associated with AP , the task of satisfying φ
+
+can be decomposed into a finite sequence of safe-stabilization subtasks induced by σ. The overall synthesis problem is then reduced to computing CLBF-based inner approximations of the local winning sets for these subtasks and patching the corresponding local controllers. The computed set dWin( φ) and the associated switching policy together provide a correct-by-construction motion planner: for any initial condition in this certified set, the planner generates a closed-loop trajectory satisfying the prescribed LTL \⃝ specification. III. LTL SPECIFICATION DECOMPOSITION 
+
+Consider an LTL \⃝ formula φ over AP . Let σ =
+
+σpre (σsuf )ω be a word over 2AP such that σ |= φ. In this work, we interpret σ as a reference trace for system (1). Since 
+
+σ |= φ, synthesizing a feedback control policy whose closed-loop trajectory induces the trace σ ensures the satisfaction of the specification φ. Following the sequential structure of σ,we decompose the synthesis problem into safe-stabilization subtasks, each associated with a pair of consecutive letters of σ.Specifically, for each consecutive pair (σm, σ m+1 ) in the lasso-form word σ, with m ∈ N0, let Xm ⊆ X denote the local state-space region associated with the transition from 
+
+σm to σm+1 . We formulate such a transition as a local reach-avoid control problem and define its transition tuple as 
+
+Tm := ( Sm, Gm, Am), (7) where Sm, Gm, Am ⊆ X m denote the source set, the goal set, and the forbidden set, respectively. Since σ is in lasso form, the induced infinite transition sequence {T m}m∈N0 admits a finite prefix-suffix represen-tation. Accordingly, we let Mpre = len( σpre ) denote the number of prefix transitions, including the transition from the last prefix symbol to the first suffix symbol when the suffix is nonempty, and let Msuf = len( σsuf ) denote the number of transitions in one suffix cycle, including the wrap-around transition from the last suffix symbol to the first one. We then write the corresponding finite pattern as {T m}M −1 
+
+> m=0
+
+,where M = Mpre + Msuf .Therefore, realizing the reference word σ is reduced to a sequence of transitions {T m}M −1 
+
+> m=0
+
+, each requiring the system to move from Sm to Gm while avoiding Am. The following assumptions are imposed. 
+
+Assumption 1: For each transition Tm = ( Sm, Gm, Am),we assume that  
+
+> •
+
+Sm ⊆ JσmK is nonempty and satisfies Sm ∩ A m = ∅; 
+
+> •
+
+Gm ⊆ Jσm+1 K is nonempty, connected and closed, and satisfies Gm ∩ A m = ∅; 
+
+> •
+
+Am is closed. 
+
+Assumption 2: For each transition Tm = ( Sm, Gm, Am),there exist a designated center point x⋆m ∈ int( Gm) and a continuous metric dm : Xm × X m → R≥0 such that 
+
+Gm = {x ∈ X m | dm(x, x ⋆m) ≤ δm}, (8) where δm > 0 is a scalar constant defining the boundary of the goal set. 
+
+Definition 4 (Winning set for a word-induced transition): 
+
+Consider a transition Tm = ( Sm, Gm, Am) induced by the pair of consecutive symbols (σm, σ m+1 ) in the reference word σ, as defined in (7). The winning set of Tm is defined as 
+
+Win σ (Tm) := 
+
+n
+
+x0 ∈ S m ∃ κm : Xm → U box , ∃ τm ≥ 0
+
+such that ϕ(t, x 0, κ m) /∈ A m, ∀t ∈ [0 , τ m],
+
+and ϕ(τm, x 0, κ m) ∈ G m
+
+o
+
+.
+
+(9) Here, τm denotes the duration of the transition from σm
+
+to σm+1 , κm : Xm → U box is a local feedback control strategy, and ϕ(·, x 0, κ m) is the corresponding trajectory of system (1). For the finite transition pattern {T m}M −1 
+
+> m=0
+
+induced by the reference word σ, we instantiate the finite memory set in Definition 3 as M := {0, . . . , M − 1} where each element m ∈ M indicates the currently active local transition task Tm. Given local feedback control strategies {κm}M −1 
+
+> m=0
+
+,the corresponding global finite-memory control strategy is defined by κ(x, m ) = κm(x), m ∈ M . Let ζ : N0 → M 
+
+denote the lasso index map, with ζ(0) = 0 , which follows the prefix transitions and then loops over the suffix transitions. For each n ∈ N0, when the current memory element is 
+
+m = ζ(n) and the trajectory reaches Gζ(n), then the memory element is updated to ζ(n + 1) .
+
+Proposition 1: Consider an LTL \⃝ formula φ, let σ =
+
+σpre (σsuf )ω be a reference word such that σ |= φ. Let 
+
+{T m}M −1 
+
+> m=0
+
+, where M = Mpre + Msuf , be the corresponding sequence of transitions induced by σ, with winning sets 
+
+Win σ (Tm). Let ζ : N0 → M be the lasso index map defined above. Suppose that x0 ∈ Win σ (T0) and 
+
+Gζ(n) ⊆ Win σ (Tζ(n+1) ), n ∈ N0. (10) Then there exists a finite-memory control strategy κ : X × M → U box for the system (1), obtained by sequentially patching the local strategies {κm}M −1 
+
+> m=0
+
+, such that the corre-sponding trajectory satisfies ϕ(·, x 0, κ ) |= φ. 
+
+Proof: We construct the closed-loop trajectory recur-sively.Since ζ(0) = 0 and x0 ∈ Win σ (T0) ⊆ S 0 ⊆ Jσ0K, the initial symbol σ0 is satisfied. By the definition of Win σ (T0)
+
+and (10), there exists a local strategy κ0 and a finite time 
+
+τ0 ≥ 0 such that ϕ(t, x 0, κ 0) /∈ A0, ∀t ∈ [0 , τ 0], and 
+
+x1 := ϕ(τ0, x 0, κ 0) ∈ G 0 ⊆ Win σ (T1) ⊆ Jσ1K.
+
+Proceeding inductively, suppose that for some n ≥ 1, xn ∈
+
+Win σ (Tζ(n)) ⊆ S ζ(n) ⊆ Jσζ(n)K. Then, by the definition of 
+
+Win σ (Tζ(n)) and (10), there exists a local strategy κζ(n) and a finite time τn ≥ 0 such that ϕ(t, x n, κ ζ(n)) /∈ A ζ(n) for all t ∈ [0 , τ n], and xn+1 := ϕ(τn, x n, κ ζ(n)) ∈ G ζ(n) ⊆
+
+Win σ (Tζ(n+1) ) ⊆ Jσζ(n+1) K.
+
+Hence, the local strategies {κm}M −1 
+
+> m=0
+
+can be patched sequentially to generate a trajectory whose induced trace is 
+
+σ. Since σ |= φ, the induced trace of ϕ(·, x 0, κ ) satisfies φ.By Definition 2, we conclude that ϕ(·, x 0, κ ) |= φ.Consequently, each transition Tm can be formulated as a bounded-input safe stabilization subproblem: steer the state toward the designated center x⋆m while avoiding Am. The transition is declared finished when the state enters the goal set Gm, whose reaching criterion is given by (8). In the following section, we present the patching CLBF method to address this issue, adopted from [13]. IV. S AFE STABILIZATION WITH PATCHING CLBF For a given reach-avoid transition Tm, we first present the definitions of CLFs and CBFs with bounded control inputs, which are the building blocks for the patching CLBFs. We assume that x⋆m is the unique equilibrium point in Xm, i.e., 
+
+f (x⋆m) = 0 , in the absence of control input ( u = 0 ). Am =
+
+Xm/Cm
+
+> safe
+
+, where Cm 
+
+> safe
+
+is the safe set defined in Section II-A with x⋆m ∈ Int( Cm
+
+> safe
+
+) for Tm with a finite set of hmi , and we denote its smooth approximation by Cm.
+
+Definition 5: A continuously differentiable function V :
+
+Xm → R is a CLF for system (1) such that V (x⋆m) = 0 , and there exists a control input u ∈ U box , ∀x ∈ X m \ { x⋆m},
+
+V (x) > 0, and (11) 
+
+Lf V (x) + Lg V (x)u < 0, (12) where Lf V (x) := ∇V (x) · f (x) and Lg V (x) := ∇V (x) ·
+
+g(x) are the Lie derivatives of V along f and g, respectively. 
+
+Definition 6: A continuously differentiable function h :
+
+Xm → R is a CBF for system (1) with respect to Cm if there exists a control input u ∈ U box , ∀x ∈ C m,
+
+h(x) ≤ 1, and (13) 
+
+Lf h(x) + Lg h(x)u < 0. (14) Following [12], [13], we have the following proposition about the strict compatible condition between the CLF V
+
+and the CBF h.
+
+Proposition 2 ( [13]): Let V : Xm → R be a candidate CLF and h : Xm → R be a candidate CBF for system (1) with respect to Cm. If the following conditions hold: 1) For every x ∈ C m \ { x⋆m}, there exists u ∈ U box such that 
+
+Lf V (x) + Lg V (x)u < 0. (15) Note that this condition is equivalent to 
+
+(h(x) ≤ 1 ∧ x̸ = xeq ) = ⇒
+
+Lf V (x) + 
+
+> p
+
+X
+
+> j=1
+
+ mj (Lg V (x)) j − rj (Lg V (x)) j
+
+ < 0,
+
+(16) where mj = uj +uj 
+
+> 2
+
+and rj = uj −uj 
+
+> 2
+
+.2) For every x ∈ ∂Cm, there exists u ∈ U box such that 
+
+Lf V (x) + Lg V (x)u < 0, (17) and 
+
+Lf h(x) + Lg h(x)u < 0. (18) Given the hyperbox constraint on the control input, the above two conditions (17) and (18) are equivalent to 
+
+
+
+h(x) = 1 
+
+∧
+
+
+
+λ1, λ 2, λ ± 
+
+> j
+
+≥ 0 (j = 1 , . . . , p ),λ1 + λ2 +
+
+> p
+
+X
+
+> j=1
+
+(λ+ 
+
+> j
+
++ λ− 
+
+> j
+
+) = 1 
+
+∧ λ1Lg V (x) + λ2Lg h(x) + 
+
+> p
+
+X
+
+> j=1
+
+(λ+ 
+
+> j
+
+− λ− 
+
+> j
+
+) ej = 0 
+
+
+
+=⇒ λ1Lf V (x) + λ2Lf h(x) <
+
+> p
+
+X
+
+> j=1
+
+(λ+ 
+
+> j
+
+uj − λ− 
+
+> j
+
+uj ).
+
+(19) Here ej ∈ R1×p denotes the j-th standard basis row vector. Then, V and h are said to be strictly compatible. We direct the readers to [13] for the detailed proof of Proposition 2. It is worth noting that conditions (16) for the CLF and (19) for the compatibility are first-order formulas, which can be verified by off-the-shelf SMT solvers, such as dReal [16], which provides the formal guarantees. Suppose that Cm is compact, we have the following theorem. 
+
+Theorem 1 ( [12], [13]): Let V be a CLF and h be a CBF for system (1) with respect to Cm. If V and h are strictly compatible as defined in Proposition 2, then there exists a continuously differentiable function W : Xm → R, which is a CLBF for system (1), satisfying: 1) W is positive definite, and W (x⋆m) = 0 .2) Cm = {x ∈ X m | W (x) ≤ 1}.3) For every x ∈ C m \ { x⋆m}, there exists u ∈ U box such that 
+
+Lf W (x) + Lg W (x)u < 0. (20) We refer the reader to [13] for the detailed proof of this theorem. To construct such a CLBF W , for some ε > 0, we define the smooth bump function 
+
+b =
+
+
+
+exp 
+
+
+
+− 1
+
+ε2 − (h(x) − 1) 2 + 1
+
+ε2
+
+
+
+, 1 − ε < h (x) < 1,
+
+1, h(x) ≥ 1,
+
+0, h(x) ≤ 1 − ε. 
+
+As discussed in [13], the compatibility also holds on the inner boundary of Cm, i.e., ∂C− 
+
+> ε
+
+:= {x ∈ X m | 1−ε ≤ h(x) ≤ 1}.
+
+By rescaling V if necessary, we can assume that V (x) ≤ 1,
+
+∀x ∈ C m, and V (x) ≤ h(x) ∀x ∈ ∂C− 
+
+> ε
+
+. Then, W can be constructed as follows [12]: 
+
+W (x) := (1 − b(x)) V (x) + b(x)h(x), (21) and the 1-sublevel set of W , denoted as W1
+
+> m
+
+, captures an estimate of the safe ROA of x⋆m. Thus, we have the approximated winning set \Win σ (Tm) = W1 
+
+> m
+
+\ G m, and 
+
+\Win σ (Tm) ⊆ Win σ (Tm) . By guaranteeing 
+
+Gm−1 ⊆ \Win σ (Tm) ⊆ Win σ (Tm), (22) we have that (10) still holds with the approximations of local winning sets. 
+
+Remark 1: It is worth noting that one can also use Lya-punov stability theory for set stability with respect to Gm
+
+to construct the CLBF W for the transition Tm given some other assumptions, which turns the local specification into a reachability problem while keeping safe. In this case, we do not need the assumption for Gm in Assumption 2. However, due to the asymptotic stability nature of the CLF-based method, which might result in an extremely slow convergence close to Gm.V. LTL C ONTROL SYNTHESIS WITH PATCHING CLBF S
+
+In this section, we consider an LTL \⃝ specification φ
+
+satisfying the conditions in Proposition 1 with a lasso-form trace σ = σpre (σsuf )ω . We then present the process of synthesizing the patching CLBF-based controller for the LTL specification φ by sequentially switching the local CLBF-based controllers for the reach-avoid transitions {T m}M −1 
+
+> m=0
+
+.For each transition Tm, let W be the patching CLBF in (21). We synthesize the bounded controller proposed in [17] for hyperrectangle input constraints, in the form uη (x) = 
+
+ρη (x) ⊙ ω(x), where ω is the vertex control and ρη is a component-wise rescaling, and ⊙ denotes component-wise multiplication. For system (1) with u ∈ Rp, let 
+
+aW (x) = Lf W (x) = ∇W (x) · f (x), (23) and for each j ∈ { 1, . . . , p },
+
+bW,j (x) = −Lgj W (x) = −∇ W (x) · gj (x), (24) where ∇W (x) = b∇h + (1 − b)∇V + ( h − V )∇b. 
+
+Under box constraints uj ∈ [uj , u j ], we set 
+
+rj (x) = 
+
+(
+
+uj , bW,j (x) ≥ 0,
+
+−uj , bW,j (x) < 0, (25) 
+
+ωj (x) = rj (x) sign( bW,j (x)) , (26) 
+
+β(x) = 
+
+> p
+
+X
+
+> j=1
+
+rj (x)|bW,j (x)|. (27) Next, we define 
+
+λ(x) = 1 − |aW (x)| + aW (x)2β(x) , (28) 
+
+ϕj (x) = rj (x)|bW,j (x)|
+
+β(x) , (29) 
+
+τ ηj (x) = 
+
+
+
+p ln( λ(x)) 
+
+λ(x) − ηr j (x)|bW,j (x)|, β(x) > 0,
+
+0, β(x) = 0 ,
+
+(30) where η > 0 is a positive constant. Then the continuous rescaling function ρηj (x) is synthesized as: 
+
+ρηj (x) = 
+
+(
+
+1 − (1 − Γ( x)ϕj (x)) eτ ηj (x)ϕj (x), if Πj (x) > 0; 0, if Πj (x) = 0 .
+
+(31) where Γ( x) = |aW (x)|+aW (x)2β(x) and Πj (x) = rj (x)|bW,j (x)|.Consequently, the CLBF-based controller for the transition 
+
+Tm is given by 
+
+uη (x) = uη 
+
+> 1
+
+(x), . . . , u ηp (x)⊤ (32) with uηj (x) = ρηj (x)ωj (x) for each j ∈ { 1, . . . , p }.With the CLBF-based controllers for transitions 
+
+{T m}M −1 
+
+> m=0
+
+, we can sequentially patch them together to generate a switching control strategy for the LTL specification φ. For each transition Tm, let 
+
+κm(x) := uη,m (x) where x ∈ Xm and uη,m is the CLBF-based controller synthesized by (32). The global finite-memory control strategy is then defined as 
+
+κ(x, m ) = uη,m (x), m ∈ M . The synthesis process is:  
+
+> •
+
+Step 1: Decompose the LTL specification φ with a lasso-form word σ = σpre (σsuf )ω into a sequence of transitions {T m}M −1 
+
+> m=0
+
+as in Section III.  
+
+> •
+
+Step 2: For the first transition, compute the safe ROA estimate with a patching CLBF in Section IV and its controller uη, 0 with (32). The corresponding 1-level set 
+
+W11 provides an inner approximation of the winning set of φ, dWin( φ). 
+
+> •
+
+Step 3: Repeat Step 2 for each transition Tm to con-struct a patching CLBF and obtain the corresponding approximated winning set W1 
+
+> m
+
+and the associated local controller κm(x) = uη,m (x), using (32).  
+
+> •
+
+Step 4: By Proposition 1 and (22), the global control synthesis is achieved by aggregating the local winning-set approximations W1 
+
+> m
+
+via set union. By establishing a switching strategy that applies the appropriate local controller within each respective region, we can syn-thesize correct-by-construction motion planning for all the points in dWin( φ).We summarize the proposed framework in Algorithm 1. 
+
+Remark 2: We would like to emphasize that the proposed motion planning framework can accommodate trajectory-tracking deviations, including those caused by moderate exogenous noise or disturbances, through rapid online re-planning. When the current state deviates from the planned trajectory during tracking, the current state can be used as a new initial condition, and the control synthesis can be re-executed to generate a new valid path. The formal satisfaction guarantee is restricted to the nominal model and holds provided that the new initial state remains inside the certified local winning set \Win σ (Tm) associated with the current local specification Tm. Under this condition, the replanned trajectory is guaranteed to satisfy φ.VI. C ASE STUDIES 
+
+In this section, we evaluate the efficacy of the proposed approach on two simulations and one real experiment with the Crazyflie quadrotor. The patching CLBF step is done with the LyZNet [18] toolbox on a server node equipped with an Intel(R) Xeon(R) Gold 6326 CPU @ 2.90 GHz (32 cores). Comparisons were conducted on a server with 2×
+
+Intel Xeon Silver 4114 CPUs and 128 GB RAM, with each run allocated 2 CPU threads. 
+
+Algorithm 1: Patching CLBF-Based Control under 
+
+LTL \⃝ Specification φ
+
+Input: System (1) and word σ = σpre (σsuf )ω |= φ
+
+Output: Closed-loop trajectory ϕ(·; x0, u ) and control law u 
+
+> 1
+
+Mpre ← 0 if σpre is empty, else len( σpre ); 
+
+> 2
+
+Msuf ← 0 if σsuf is empty, else len( σsuf ) ; 
+
+> 3
+
+M ← Mpre + Msuf ;
+
+// Define the memory-index map ζ; 
+
+> 4
+
+Function MemoryIndex( n): 
+
+> 5
+
+if 0 ≤ n < M pre then  
+
+> 6
+
+return n; 
+
+> 7
+
+else  
+
+> 8
+
+return Mpre + (( n − Mpre ) mod Msuf );
+
+// Offline synthesis phase:  
+
+> 9
+
+Construct transitions {T m}M −1 
+
+> m=0
+
+that satisfy Assumption 1 ;  
+
+> 10
+
+for m = 0 to M − 1 do  
+
+> 11
+
+Construct the safe ROA estimate W1 
+
+> m
+
+for Tm
+
+using (21) ;  
+
+> 12
+
+if m ≥ 1 then  
+
+> 13
+
+Verify that Gm−1 satisfies (22);  
+
+> 14
+
+Store W1 
+
+> m
+
+and controller uη,m (·);
+
+// Online control phase:  
+
+> 15
+
+n ← 0; // stage counter;  
+
+> 16
+
+x(0) ← x0; 
+
+> 17
+
+while execution continues do  
+
+> 18
+
+m ← MemoryIndex (n) ; // m = ζ(n); 
+
+> 19
+
+Apply u(t) = uη,m (x(t)) ; 
+
+> 20
+
+Evolve ˙x(t) = f (x(t)) + g(x(t)) u(t); 
+
+> 21
+
+if x(t) ∈ G m then  
+
+> 22
+
+n ← n + 1 ;Firstly, we consider the attitude tracking problem for a rigid spacecraft. The system dynamics are governed by Euler’s rotational equations [19]: 
+
+J ˙x = −x × Jx + u
+
+where J ∈ R3×3 is the positive-definite, symmetric inertia matrix. For an asymmetric rigid body, we assume J =
+
+diag (10 , 15 , 20) . x = [x1, x 2, x 3]⊤ denotes the angular velocities of the spacecraft in the body-fixed frame, and 
+
+u = [u1, u 2, u 3]⊤ denotes the input control torques. We consider the reach-avoid LTL specification as follows: 
+
+φ = F(Green) ∧ G(¬Red 1) ∧ G(¬Red 2), (33) which requires the system to eventually reach the green region and always avoid the two red regions. As a matter of fact, we can have a quadratic CLF lo-cally for this system in the form of V (x) = x⊤P x by linearizing the system at the equilibrium point and solving the continuous-time algebraic Riccati equation with Q and Ras identity matrices of appropriate dimensions. This identical CLF configuration is maintained throughout the subsequent numerical examples. For such systems with known CLFs, we only need to define clearly the barrier functions with respect to the obstacles, and then the patching CLBF can be constructed easily by the method in Section IV. As shown in Fig. 1, we have h1 = 1 −(( x1 −1) 2 +( x2 −0.6) 2 +x23 −0.52)
+
+for Red 1 (upper right) and h2 = 1 − (( x1 + 1) 2 + ( x2 +1) 2 + x23 − 0.52) for Red 2 (lower left), respectively. The goal set Green is defined as a ball region centered at the origin with a radius of 0.1. Then, we construct a smooth barrier function with τ = 5 .2, and consequently patch it with the CLF with ε = 0 .5. Sampling within the winning set, all 20 trajectories initialized from different initial conditions successfully realize the LTL specification with the computed controller. −1.00          
+
+> −0.75
+> −0.50
+> −0.25
+> 0.00 0.25 0.50 0.75 1.00
+> x2−1.00
+> −0.75
+> −0.50
+> −0.25
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> x1
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> Patched CLBF
+> −1.00 −0.75 −0.50 −0.25 0.00 0.25 0.50 0.75 1.00
+> x2
+> −1.00
+> −0.75
+> −0.50
+> −0.25
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> x1
+> Winning Set Approximation with Patched CLBF
+
+Fig. 1: The certified CLBF for the LTL specification (33). The dashed green curve approximates the winning set under bounded inputs u ∈ [−3, 3] 3, within which all the trajectories satisfying φ.Secondly, we consider an omnidirectional robot [20] with state x = [ x1, x 2, x 3]⊤ and control input u = [ v1, v 2, ω ]⊤ ∈
+
+[−3, 3] 3. The dynamics are given by 
+
+
+
+˙x1
+
+˙x2
+
+˙x3
+
+ =
+
+
+
+cos x3 − sin x3 0sin x3 cos x3 00 0 1
+
+
+
+v1
+
+v2
+
+ω
+
+ .
+
+As shown in Fig. 2, the robot needs to complete a cyclic transfer task in a gated workspace, where gate 3 and gate 4
+
+open automatically upon robot proximity and are thus omit-ted from the LTL specification. Starting from the processing station r4, the robot alternates between two routes: one through r5, r2, and gate 1 to reach r1, and the other through 
+
+r3, r7, and gate 2 to reach r6. In each route, the robot picks up a key before passing through the corresponding gate and then returns to r4. The outbound and return routes are denoted by 
+
+y1, y2 and y′
+
+> 1
+
+, y′
+
+> 2
+
+, respectively. 
+
+y1 = r4 ∧ F r5 ∧ F(r2 ∧ F(gate 1 ∧ Fr1)) ,
+
+y′ 
+
+> 1
+
+= r1 ∧ F gate 1 ∧ F(r2 ∧ F(r5 ∧ Fr4)) ,
+
+y2 = r4 ∧ F r3 ∧ F(r7 ∧ F(gate 2 ∧ Fr6)) ,
+
+y′ 
+
+> 2
+
+= r6 ∧ F gate 2 ∧ F(r7 ∧ F(r3 ∧ Fr4)) .
+
+The overall LTL specification requires the two transfer cycles to be repeatedly executed in an alternating manner: 
+
+φ = G (¬obs) ∧ GF (y1 ∧ F (y′ 
+
+> 1
+
+∧ F (y2 ∧ F y′
+
+> 2
+
+))) ,
+
+where obs = W9 
+
+> i=1
+
+obs i. In this task, we need to decompose the overall LTL specification into 16 transitions as described in Sec. III. Regarding the barrier functions, we use again a log-sum-exp smooth approximation, and then construct the barrier functions for each Tm with τ = 4 as well as 0.5 safety margin for the obstacles to further ensure the robot’s safety. As illustrated in Fig. 2, for the first subtask φ1 = r4 ∧ F( r5),we can compute the approximated winning set dWin( φ) as the curve in the purple dashed line. As an example, the orange dashed line is the approximated winning set \Win σ (T10 ) for the subtask φ10 = r3 ∧ F( r7), which captures almost the whole winning set of this local specification. Consequently, for each subtask, we can immediately synthesize controllers for any states within the approximated winning set, which provides robustness and flexibility without solving QPs on the fly. −20 −10 0 10 20     
+
+> −20
+> −10
+> 0
+> 10
+> 20 r1r2
+> r3
+> r4r5
+> r6r7
+> gate 1
+> gate 2
+> gate 3gate 4
+> obs 1
+> obs 2
+> obs 3
+> obs 4
+> obs 5
+> obs 6
+> obs 7
+> obs 8
+> obs 9
+
+Fig. 2: Twenty trajectories of the omnidirectional robot ini-tialized from different states in a complex planar environment under the LTL specification using the proposed method, with 
+
+dWin( φ) in purple dashed line. The controller is executed at 
+
+50 Hz .TABLE I: Comparison of trajectory performance and compu-tational cost. Values are reported as mean ± sample standard deviation over 20 trajectories. 
+
+Method CPU runtime ¯T (s) 
+
+CPU runtime per step ¯Tstep (ms) 
+
+Control-energy cost per step ¯Estep 
+
+Patched CLBF 23 .984 ± 0.129 0.632 ± 0.002 0.366 ± 0.007 
+
+QP-CLF-CBF 29 .795 ± 0.360 2.60 ± 0.01 2.196 ± 0.013 
+
+With 20 different initial conditions sampled in the ap-proximated winning set, we further compare the proposed controller against the standard CBF-QP baseline with the CLF-based controller via Sontag’s formula. For each trajec-tory i ∈ { 1, . . . , 20 }, let Ti, Mi, and ui(k) denote the CPU runtime, the number of control steps, and the control input at the k-th step, respectively. Since Mi varies with the initial condition, we average the per-trajectory metrics so that each trajectory contributes equally. Specifically, we compute the CPU runtime as ¯T = 120 
+
+P20  
+
+> i=1
+
+Ti, the CPU runtime per con-trol step as ¯Tstep = 120 
+
+P20  
+
+> i=1
+> Ti
+> Mi
+
+, and the control-energy cost per control step as ¯Estep = 120 
+
+P20  
+
+> i=1 1
+> Mi
+
+PMi 
+
+> k=1
+
+∥ui(k)∥22. As shown in Table I, the proposed controller achieves higher computational efficiency by avoiding QP solving at every control step, thereby reducing the overall computation time. The proposed controller also yields a lower control-energy cost. Lastly, we test our method on a Crazyflie quadrotor for a planar task with the following LTL specification: φ = a0 ∧
+
+Fa1 ∧GF a2 ∧GF a3 ∧G(¬obs) where obs = ∨3
+
+> i=1
+
+obs i. We use the single integrator with u ∈ [−0.3, 0.3] 2 for planning with the proposed method, while the tracking is done with its default controller. This specification requires the trajectory to start from region a0, avoid the three obstacle regions, eventually visit region a1, and repeatedly visit regions a2
+
+and a3. The simulation scenario in Webots 1 and resulting trajectory are shown in Fig. 3, and the corresponding real experiment scenario and trajectory are shown in Fig. 4. The results demonstrate the effectiveness of the proposed method in generating trajectories that satisfy complex temporal logic specifications while respecting control constraints. Although the simplified planning model used in the real experiment may introduce deviations, the recorded real-world trajectory follows the planned trajectory and completes the specified task sequence, demonstrating the practical trackability of the generated trajectory. 
+
+Fig. 3: Webots simulation scenario and executed trajectory for the Crazyflie quadrotor. The black, green, orange, blue, and pink regions correspond to obstacles, a0, a1, a2, and a3,respectively. The red curve denotes the executed trajectory. 
+
+> 1https://www.cyberbotics.com/
+
+Fig. 4: The real experiment and executed trajectory for the Crazyflie quadrotor, where the boxes are obstacles. VII. C ONCLUSION AND DISCUSSIONS 
+
+This work presents a patched-CLBF framework for syn-thesizing switching feedback controllers for continuous-state systems subject to LTL \⃝ specifications and bounded inputs. By linking feasible temporal-logic trajectories to CLBF level sets, the method decomposes the synthesis problem into a sequence of safe stabilization tasks and enables efficient online execution. Simulations and a Crazyflie quadrotor experiment demonstrate the effectiveness of the approach. Future work will focus on reducing the conservativeness of the certificate construction and improving scalability to higher-dimensional systems, where certificate search and patch verification become more challenging. Moreover, the proposed framework is sound but not complete: successful synthesis guarantees specification sat-isfaction, while failure does not preclude the existence of satisfying controllers. This incompleteness stems from the conservative, sufficient-condition-based structure of certifi-cate verification. While recent work derives necessary-and-sufficient conditions for specific finite-trace formulations, these do not extend to general continuous-state LTL \⃝ 
+
+synthesis [21]. By contrast, the proposed framework provides the formal guarantee that whenever the procedure succeeds, the synthesized closed-loop behavior satisfies the given spec-ification [15]. REFERENCES [1] Edmund M. Clarke, Orna Grumberg, and Doron A. Peled. Model Checking . MIT Press, 1999. [2] Matt Luckcuck, Marie Farrell, Louise A Dennis, Clare Dixon, and Michael Fisher. Formal specification and verification of autonomous robotic systems: A survey. ACM Computing Surveys (CSUR) , 52(5):1– 41, 2019. [3] Hadas Kress-Gazit, Morteza Lahijanian, and Vasumathi Raman. Syn-thesis for robots: Guarantees and feedback for robot behavior. Annual Review of Control, Robotics, and Autonomous Systems , 1:211–236, may 2018. [4] Marius Kloetzer and Calin Belta. A fully automated framework for control of linear systems from temporal logic specifications. IEEE Transactions on Automatic Control , 53(1):287–297, 2008. [5] Hadas Kress-Gazit, Georgios E. Fainekos, and George J. Pappas. Temporal-logic-based reactive mission and motion planning. IEEE Transactions on Robotics , 25(6):1370–1381, 2009. [6] Jun Liu and Necmiye Ozay. Finite abstractions with robustness mar-gins for temporal logic-based control synthesis. Nonlinear Analysis: Hybrid Systems , 22:1–15, 2016. [7] Yinan Li and Jun Liu. ROCS: A robustly complete control synthesis tool for nonlinear dynamical system s. In Proceedings of the 21st In-ternational Conference on Hybrid Systems: Computation and Control ,HSCC ’18, pages 130–135, New York, NY, USA, 2018. ACM. [8] Luyao Niu and Andrew Clark. Control barrier functions for abstraction-free control synthesis under temporal logic constraints. In 
+
+59th IEEE Conference on Decision and Control (CDC) , pages 816– 823. IEEE, 2020. [9] Mohit Srinivasan and Samuel Coogan. Control of mobile robots using barrier functions under temporal logic specifications. IEEE Transactions on Robotics , 37(2):363–374, 2021. [10] Andrea Bisoffi and Dimos V. Dimarogonas. A hybrid barrier certificate approach to satisfy linear temporal logic specifications. In 2018 Annual American Control Conference (ACC) , pages 634–639. IEEE, 2018. [11] Hongkai Dai, Chuanrui Jiang, Hongchao Zhang, and Andrew Clark. Verification and synthesis of compatible control lyapunov and control barrier functions. In 2024 IEEE 63rd Conference on Decision and Control (CDC) , pages 8178–8185. IEEE, 2024. [12] Jun Liu and Maxwell Fitzsimmons. Computing control lyapunov-barrier functions: Softmax relaxation and smooth patching with formal guarantees. arXiv preprint arXiv:2510.02223 , 2025. [13] Jun Liu. Formal verification of control lyapunov-barrier func-tions for safe stabilization with bounded controls. arXiv preprint arXiv:2511.10510 , 2025. [14] Yinan Li. Robustly complete temporal logic control synthesis for nonlinear systems . PhD thesis, University of Waterloo, 2019. [15] Tichakorn Wongpiromsarn, Ufuk Topcu, and Andrew Lamperski. Automata theory meets barrier certificates: Temporal logic verification of nonlinear systems. IEEE Transactions on Automatic Control ,61(11):3344–3355, 2015. [16] Sicun Gao, Soonho Kong, and Edmund M Clarke. dReal: an SMT solver for nonlinear theories over the reals. In Proc. of CADE , pages 208–214, 2013. [17] Horacio Leyva, Julio Solis-Daun, and Rodolfo Su´ arez. Global clf stabilization of systems with control inputs constrained to a hyperbox. 
+
+SIAM Journal on Control and Optimization , 51(1):745–766, 2013. [18] Jun Liu, Yiming Meng, Maxwell Fitzsimmons, and Ruikun Zhou. LyZNet: A lightweight Python tool for learning and verifying neural Lyapunov functions and regions of attraction. In Proceedings of the 27th ACM International Conference on Hybrid Systems: Computation and Control , 2024. [19] M. Krstic and P. Tsiotras. Inverse optimal stabilization of a rigid spacecraft. IEEE Transactions on Automatic Control , 44(5):1042– 1049, 1999. [20] Ratnangshu Das and Pushpak Jagtap. Prescribed-time reach-avoid-stay specifications for unknown systems: A spatiotemporal tubes approach. 
+
+IEEE Control Systems Letters , 8:946–951, 2024. [21] Luyao Niu, Andrew Clark, and Radha Poovendran. Necessary and sufficient conditions for satisfying linear temporal logic constraints using control barrier certificates. In 2023 62nd IEEE Conference on Decision and Control (CDC) , pages 8589–8595. IEEE, 2023.

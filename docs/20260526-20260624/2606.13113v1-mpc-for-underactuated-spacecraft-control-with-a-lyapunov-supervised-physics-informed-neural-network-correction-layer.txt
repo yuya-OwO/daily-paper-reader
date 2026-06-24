@@ -1,0 +1,141 @@
+Title: MPC for underactuated spacecraft control with a Lyapunov supervised physics-informed neural network correction layer
+
+URL Source: https://arxiv.org/pdf/2606.13113v1
+
+Published Time: Fri, 12 Jun 2026 00:51:16 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+# MPC for underactuated spacecraft control with a Lyapunov supervised physics-informed neural network correction layer 
+
+## Amirhossein Ayanmanesh Motlaghmofrad 1, Carlo Cena ∗† 1,2 , Mauro Martini 1, Marcello Chiaberge 1
+
+> 1
+
+Politecnico di Torino, Torino (TO), ITA 
+
+> 2
+
+Argotec S.R.L., San Mauro (TO), ITA 
+
+Underactuated spacecraft faces controllability limitations and heightened sensitivity to environmental disturbances, complicating attitude maneuvering and stabilization. Due to the lack of control authority along the underactuated axis, conventional controllers cannot directly stabilize all attitude components and therefore require reference plan-ning strategies. Furthermore, MPC approaches remain sen-sitive to inertia uncertainty and unmodeled dynamic cou-plings, resulting in degraded tracking performance under mismatch. To address these issues, we consider a hierar-chical architecture integrating three layers: (i) a nonlin-ear model predictive controller (NMPC) for constraint and underactuation-aware maneuver planning and nominal closed-loop stability under actuator limits; (ii) a physics-informed neural network (PINN) trained offline on simu-lation data to estimate residual disturbance torques, with loss terms that enforce consistency with rigid-body rota-tional dynamics; (iii) a Lyapunov-based supervisory safety mechanism that evaluates the learned correction online and bounds or suppresses its influence to preserve the sta-bility properties of the baseline controller. The architecture is evaluated in a high-fidelity simulation environment mod-elling reaction wheel dynamics, actuator saturation, and environmental disturbances. Monte Carlo studies show statistically significant reductions in steady-state attitude error relative to standalone NMPC while maintaining ro-bust behavior under uncertainty. The supervisory layer ensures graceful degradation to purely model-based con-trol when the learning-based augmentation is unreliable. 
+
+# 1 Introduction 
+
+Attitude control is fundamental to spacecraft operations, enabling precise maneuvers, Earth and deep-space obser-vation, and reliable communication between space and ground. However, design decisions or actuator failures can result in underactuated spacecraft, reducing control over rotational dynamics and necessitating careful characteriza-tion of the actuation system. Common actuators include control moment gyros (CMGs), reaction wheels (RWs), and thrusters. When only internal torques are available, control is constrained by the conservation of angular momentum, 
+
+> ∗Corresponding author. E-Mail: carlo.cena@polito.it
+> †This work was supported by the the project PNRR-NGEU which has received funding from the MUR – DM 117/2023.
+
+leading to fundamental accessibility limitations [1]. For the study of underactuated spacecraft, two principal ap-proaches have been proposed. The first assumes zero total angular momentum, which simplifies the dynamics and en-ables short-time local controllability of the reduced attitude system, allowing rest-to-rest maneuvers between admis-sible configurations [2]. The second exploits predictable external torques, such as solar radiation pressure, to re-cover full three-axis attitude control without relying on conservation assumptions [3, 4]. With a practical approach in mind, the present study adopts the zero-total-angular-momentum assumption. Although environmental distur-bances may induce drift in the otherwise uncontrollable component of angular momentum over time, it is assumed that occasional external momentum management counter-acts this drift. Recent advancements in space technology have explored neural networks for trajectory optimization and adaptive feedback control, suitable for onboard im-plementation [5, 6]. Applications include adaptive neural-network controllers [7], neural networks assisting primary controllers [8], and neural-network-based optimal attitude control with impulsive thrusters [9]. Physics-informed approaches, such as physics-informed normalizing flows, have also been used in several applications [10–13]. Ad-ditionally, in the broader control field data-driven MPC approaches are increasingly explored [6, 14]. This work proposes a hybrid model-based and learning-based control architecture that systematically combines the strengths of both paradigms while mitigating their standalone limita-tions. A model-based baseline controller ensures nominal stability, for the controllable axes, and safety properties, forming a certifiable backbone suitable for safety-critical operations. This baseline is augmented with a physics-informed neural network (PINN) operating as a residual torque compensator, enabling improved tracking perfor-mance in the presence of underactuation and structured modeling uncertainties. To preserve closed-loop guaran-tees, a deterministic Lyapunov-based supervisory mech-anism constrains the neural network contribution in real time, ensuring that stability and safety properties remain intact in accordance with formal guidance [15]. The main contributions of this paper can be summarized as follows:      
+
+> 3rd Conference on AI in and for Space (SPAICE 2026)
+> ©2026 A. Ayanmanesh Motlaghmofrad et al., licenced via CC BY 4.0.
+> arXiv:2606.13113v1 [eess.SY] 11 Jun 2026 NMPC
+> Main Controller
+> PINN
+> Residual Torque
+> Estimator
+> Lyapunov-Based
+> Supervisor Simulator
+> reference reference Figure 1: High-level block diagram representation of the proposed control system architecture for the underactuated spacecraft under study.
+
+• We propose a novel hybrid control framework that combines a baseline model-based controller with a physics-informed neural network (PINN) to address underactuation and modeling uncertainties, while pre-serving theoretical guarantees for safety-critical oper-ations. 
+
+• We develop a deterministic Lyapunov-based supervi-sory mechanism that constrains the neural network contribution in real time, in accordance with formal verification principles [15]. 
+
+• We show improved steady-state tracking performance, achieving a 3.8% reduction in average steady-state er-ror and a 24.16% reduction for the worst case com-pared to the baseline controller, and demonstrate sig-nificant improvements in the final error, yielding a 12.7% reduction in average final error, 52.9% reduction in the maximum final error, and 29.42% reduction in final error variance. 
+
+# 2 Methodology 
+
+The control architecture is hierarchical and comprises three main components: a nonlinear model predictive controller (NMPC) as the baseline policy, a physics-informed neu-ral network (PINN) that estimates residual disturbance torques to reduce model-plant mismatch, and a Lyapunov-based supervisory safety layer that ensures stability and constraint satisfaction. The attitude is represented by a unit quaternion q and body rates ω. The reaction-wheel speeds are denoted by ωRW , and the input is the wheel motor torque uRW . Practical limits are treated as hard constraints, including wheel speed |ωRW | ≤ 6000 rpm ,motor torque ∥uRW ∥∞ ≤ 0.05 Nm , stored momentum 
+
+≈ 0.9 Nms , and torque slew-rate ∥∆uRW ∥∞ ≤ ∆umax 
+
+with ˙umax = 0 .4 Nm /s and Ts = 0 .5 s . The nominal pre-dictive model assumes a diagonal inertia J with underactu-ated actuator distribution and discretization by fixed-step RK4. Gravity-gradient and aerodynamic drag are included, while solar radiation pressure and magnetic torques are neglected as secondary in the considered regime. The con-trol objective is to achieve a steady-state pointing error bounded by a 0.5◦ settling-angle requirement, satisfy all ac-tuator and operational constraints at all times, and preserve robust closed-loop behavior under bounded model mis-match. The NMPC formulation employs a discrete predic-tion model from RK4 with an update period TNMPC = 0 .5 s 
+
+and horizon length Nh = 24 (12s window). The optimal control problem minimizes a finite-horizon cost with stage terms penalizing attitude error, angular-rate error, control effort, and input increments, plus a quadratic terminal cost. Whereas, the PINN learns a bounded residual torque τd as a corrective term in the augmented discrete-time dynamics of Equation (1). 
+
+xk+1 = Φ RK4 (xk, u RW ,k , τ d(k)) , (1) where ΦRK4 (·) denotes the fourth-order Runge–Kutta dis-cretization of the continuous dynamics. The residual torque is assumed constant over each NMPC sampling interval, 
+
+τd(t) ≈ τd(k) for t ∈ [kT s, (k + 1) Ts), reflecting the fact that dominant model mismatch sources, such as inertial parameter errors and slowly varying disturbances, evolve on time scales significantly slower than the NMPC update rate. The network follows a NARX structure with three hidden layers of 128 neurons each with tanh activations. It receives as input 16 features: the previous 2 estimated disturbance torque, and a set of 14 engineered features created starting from the current and previous spacecraft angular velocity, and the current RWs torques. Inputs are normalized using training set statistics, and outputs are scaled by conservative bounds to enforce magnitude limits. The training objective is formulated as a multi-step roll-out loss through the dynamics. Starting from state xk, the augmented dynamics are propagated over H = 10 integra-tion steps (sampled ten times faster than the NMPC update frequency), yielding a predicted angular velocity ˆωk+H (θ).The physics-informed loss is defined in Equation (2). 
+
+L(θ) = X
+
+> k∈K
+
+∥ˆωk+H (θ) − ωk+H ∥22, (2) where ωk+H denotes the measured angular velocity from simulation data, K is the set of training time indices, and θ  
+
+> 3rd Conference on AI in and for Space (SPAICE 2026)
+> ©2026 A. Ayanmanesh Motlaghmofrad et al., licenced via CC BY 4.0.
+
+represents the network parameters. By construction, the loss depends on θ only through the effect of τd(k) on state evolution over the prediction horizon. This formulation aligns the learning objective with the intended role of the PINN: improving short-horizon prediction accuracy in a manner consistent with its deployment in the closed-loop system. Finally, the Lyapunov-based supervisory layer serves as a deterministic safety filter between the torque commanded by the NMPC and the PINN correction. It tests the admissibility of the corrected torque under a conserva-tive, near worst-case assumption and scales the learned cor-rection to ensure non-increase of an energy-like Lyapunov measure, thereby guaranteeing that beneficial corrections are admitted while harmful ones are suppressed. Overall, the closed loop consists of the NMPC baseline performing both implicit trajectory planning and feedback control, to generate constraint-aware command references that ac-tively reduce the attitude error along the underactuated axis, while ensuring nominal stability and recursive feasi-bility; the PINN providing a bounded, physics-regularized residual torque estimate that drives the spacecraft’s be-havior closer to the NMPC’s predictive model; and the Lyapunov supervisor enforcing a safety cage that guaran-tees graceful degradation to pure NMPC when learning is unreliable. 
+
+# 3 Experimental Setup 
+
+The validation campaign quantitatively evaluates whether PINN-based residual torque compensation improves atti-tude regulation performance relative to a baseline NMPC controller. All experiments are conducted under controlled and repeatable simulation conditions with fixed controller parameters established prior to testing. We performed a Monte Carlo campaign spanning diverse initial attitudes, by generating 50 unit direction vectors uniformly distributed on the unit sphere S2 using a Fibonacci lattice sampling scheme. For each direction, two initial attitudes are defined by applying rotations of 75 ◦ and 125 ◦ about the corre-sponding axis, yielding 100 distinct initial attitude quater-nions, to ensure comprehensive coverage of both moderate and large-angle slew maneuvers. The spacecraft and all reaction wheels are initialized with zero angular velocity, establishing rest-to-rest conditions with zero total angular momentum. All simulations incorporate representative environmental disturbances for low Earth orbit operations, including gravity-gradient torques and aerodynamic drag effects. Model mismatch is deliberately introduced through uncertainty in the spacecraft inertia tensor: the principal moments of inertia in the prediction model are perturbed with respect to the true values used in simulation, intro-ducing structured parametric uncertainty in both diagonal and off-diagonal components. This structured model er-ror creates prediction discrepancies that motivate residual learning compensation. Disturbance and uncertainty real-izations remain fixed across paired simulations to isolate the effects of control architecture differences. Each simu-lation lasts 100 seconds, providing sufficient duration to observe both transient response and steady-state behavior. Convergence is declared when the attitude error magnitude remains below 0.5◦ for the remainder of the trajectory. 
+
+Controller Configurations: Three controllers are com-pared under identical conditions, including reference pro-files, actuator constraints, and numerical integration set-tings, without controller retuning. The tested controllers are: 1. Baseline NMPC : Standard nonlinear model predictive control using the nominal prediction model without learning augmentation. 2. NMPC + PINN : NMPC augmented with PINN-based residual torque correction applied directly to the con-trol input. 3. NMPC + PINN + Supervisor : PINN-augmented NMPC with residual corrections filtered through a Lyapunov-based supervisory layer prior to actuation. 
+
+Metrics: Performance is quantified using two attitude-error-based metrics computed for each Monte Carlo real-ization: 
+
+• Steady-state RMSE: Root mean square attitude error computed over all time samples satisfying the 0.5◦
+
+convergence criterion, characterizing steady-state pre-cision. 
+
+• Final attitude error: Attitude error magnitude at the terminal simulation time, quantifying the final point-ing accuracy. For each controller, we aggregate metrics across all Monte Carlo runs, reporting mean values and standard deviations to characterize dispersion across initial conditions. Statisti-cal significance is assessed through paired comparisons be-tween each learning-augmented configuration and its cor-responding baseline realization using the Wilcoxon signed-rank test. This nonparametric approach avoids normal-ity assumptions and evaluates whether paired differences are systematically shifted from zero, thereby distinguish-ing consistent performance improvements from incidental gains on isolated trajectories. Additionally, we show the closed-loop time history of the NMPC + PINN + Supervisor 
+
+controller to provide complementary qualitative insights into transient behavior and convergence characteristics. 
+
+# 4 Results 
+
+Aggregate statistical metrics computed over the full Monte Carlo campaign are shown in Table 1. Mean steady-state RMSE values remain well below the prescribed 0.5◦ accu-racy bound for all cases, indicating that observed variations   
+
+> 3rd Conference on AI in and for Space (SPAICE 2026)
+> ©2026 A. Ayanmanesh Motlaghmofrad et al., licenced via CC BY 4.0.
+
+Metric [deg] NMPC NMPC PINN NMPC PINN+Sup 
+
+SS RMSE avg 0.1476 ± 0.0672 0.1385 ± 0.0437 0.1419 ± 0.0495 
+
+SS RMSE max 0.4940 0.3392 0.3747 
+
+Final error avg 0.0870 ± 0.0704 0.0722 ± 0.0452 0.0759 ± 0.0497 
+
+Final error max 0.4915 0.1607 0.2315    
+
+> Table 1: Results obtained with 100 Monte Carlo simulations using the three controller introduced in Section 3.
+
+occur within the high-precision regulation regime required by the task. Additionally, paired comparisons with respect to the baseline NMPC controller were performed using the Wilcoxon signed-rank test. Both learning-augmented con-figurations demonstrate statistically significant improve-ments relative to the baseline. The results support the hypothesis that PINN-based residual torque estimation en-hances NMPC performance. The learned compensation systematically reduces both steady state RMSE and final attitude error across the Monte Carlo set; a behavior that is consistent with the role of the PINN in correcting struc-tured model mismatch, such as inertia uncertainty and unmodeled dynamic coupling, thereby causing the plant to more closely match the NMPC’s internal predictive model. Moreover, improvements are not limited to typical trajec-tories: both the steady-state and final error dispersions decrease under learning-augmented control. This reduc-tion in variance and improvement in terms of worst case (maximum error in Table 1), together with statistically significant paired improvements, demonstrates that the PINN enhances not only the nominal accuracy but also the uniformity and reliability of performance across diverse initial attitudes. While the supervised PINN configuration outperforms the baseline controller, its improvements are smaller than those of the unsupervised variant NMPC + PINN . Though, this outcome is expected, as the supervi-sory layer enforces a conservative Lyapunov-based non-increase condition using the nominal inertia model. As a result, beneficial corrections may be partially rejected when they appear unsafe under the nominal assumptions. The su-pervisor thus prioritizes stability over performance, yield-ing a controlled trade off: constrained use of the learned correction in exchange for preserving the guarantees of the baseline NMPC controller. Finally, Figure 2 shows the closed-loop attitude trajectories obtained under the hierar-chical controller, which exhibit consistent convergence to the reference equilibrium. 
+
+# 5 Discussion 
+
+This work presented a hierarchical control framework for attitude regulation of underactuated spacecraft that in-tegrates NMPC, PINN-based residual compensation, and deterministic safety supervision. The nominal NMPC con- 
+
+> Figure 2: Monte Carlo quaternion trajectories under NMPC with PINN-based residual compensation and Lyapunov-based supervi-sory filtering.
+
+troller provides the primary control authority, handling nonlinear dynamics, actuator limits, and underactuation-aware maneuver planning. A physics -informed neural net-work is added as a residual torque estimator to compensate for model mismatch arising primarily from inertia uncer-tainty and neglected coupling effects. Finally, a Lyapunov-based supervisory layer ensures safety by filtering the learned correction through an energy - based admissibility condition. If the residual estimate is unreliable or rejected by the supervisor, the closed-loop system automatically reverts to the nominal NMPC policy without mode switch-ing. This design aligns with safety -critical requirements typical of aerospace applications. The architecture was implemented in a high -fidelity simulation environment, accounting for real -time execution constraints, scheduling at multiple frequencies, numerical robustness, and con-sistency between training assumptions and closed -loop operating conditions. A Monte Carlo validation campaign showed that PINN - based residual compensation improves steady -state attitude accuracy and reduces performance dispersion. When used without supervision, the largest performance gains were observed; with the supervisory layer active, improvements remained statistically signifi-cant while preserving strict stability guarantees, highlight-ing a clear performance-safety trade-off.   
+
+> 3rd Conference on AI in and for Space (SPAICE 2026)
+> ©2026 A. Ayanmanesh Motlaghmofrad et al., licenced via CC BY 4.0.
+
+# 6 Acknowledgments 
+
+This work has been developed with the contribution of the Politecnico di Torino Interdepartmental Centre for Service Robotics (PIC4SeR https://pic4ser.polito.it). 
+
+# References 
+
+1. Crouch, P. Spacecraft attitude control and stabilization: Applications of geometric control theory to rigid body models. IEEE Transactions on Automatic Control 29, 321–331 (1984). 2. Krishnan, H., McClamroch, N. H. & Reyhanoglu, M. Attitude stabi-lization of a rigid spacecraft using two momentum wheel actuators. 
+
+Journal of Guidance, Control, and Dynamics 18, 256–263 (1995). 3. Jin, L. & Li, Y. Model Predictive Control-Based Attitude Con-trol of Under-Actuated Spacecraft Using Solar Radiation Pressure. 
+
+Aerospace 9. issn : 2226-4310 (2022). 4. Cena, C., Bucci, S. & Balossino, A. Deep reinforcement learning for under-actuated satellite attitude control and reaction wheel desatura-tion using solar radiation pressure in Proceedings of the International Astronautical Congress (IAC) (Oct. 2023). 5. Shirobokov, M., Trofimov, S. & Ovchinnikov, M. Survey of machine learning techniques in spacecraft control design. Acta Astronautica 
+
+186, 87–97. issn : 0094-5765 (2021). 6. Celestini, D. et al. Transformer-Based Model Predictive Control: Trajectory Optimization via Sequence Modeling. IEEE Robotics and Automation Letters 9, 9820–9827 (2024). 7. KrishnaKumar, K., Rickard, S. & Bartholomew, S. Adaptive neuro-control for spacecraft attitude control. Neurocomputing 9, 131–148. 
+
+issn : 0925-2312 (1995). 8. Apolloni, B., Battini, F. & Lucisano, C. A co-operating neural ap-proach for spacecrafts attitude control. Neurocomputing 16, 279– 307. issn : 0925-2312 (1997). 9. Biggs, J. D. & Fournier, H. Neural-Network-Based Optimal Atti-tude Control Using Four Impulsive Thrusters. Journal of Guidance, Control, and Dynamics 43, 299–309 (2020). 10. Gu, W., Primatesta, S. & Rizzo, A. Physics-informed Neural Net-work for Quadrotor Dynamical Modeling. Robotics and Autonomous Systems 171, 104569. issn : 0921-8890 (2024). 11. Falas, S., Asprou, M., Konstntinou, C. & Michael, M. K. Robust Power System State Estimation Using Physics-Informed Neural Networks. 
+
+IEEE Transactions on Industrial Informatics pre-print (2025). 12. Cena, C., Martini, M. & Chiaberge, M. Learning Robust Satellite Attitude Dynamics with Physics-Informed Normalising Flow. Pre-print arXiv (2025). 13. Varey, J., Ruprecht, J. D., Tierney, M. & Sullenberger, R. Physics-Informed Neural Networks for Satellite State Estimation in 2024 IEEE Aerospace Conference (2024), 1–8. 14. Berberich, J. & Allgöwer, F. An Overview of Systems-Theoretic Guarantees in Data-Driven Model Predictive Control. Annual Re-view of Control, Robotics, and Autonomous Systems 8, 77–100. issn :2573-5144 (2025). 15. European Cooperation for Space Standardization (ECSS). ECSS-E-HB-40-02A: Space engineering - Machine learning handbook. Hand-book 2024. 3rd Conference on AI in and for Space (SPAICE 2026) 
+
+© 2026 A. Ayanmanesh Motlaghmofrad et al., licenced via CC BY 4.0.

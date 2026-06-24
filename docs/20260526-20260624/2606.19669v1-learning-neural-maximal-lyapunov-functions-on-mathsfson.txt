@@ -1,0 +1,647 @@
+Title: Learning Neural Maximal Lyapunov Functions on 𝖲𝖮(n)
+
+URL Source: https://arxiv.org/pdf/2606.19669v1
+
+Published Time: Fri, 19 Jun 2026 00:23:06 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Learning Neural Maximal Lyapunov Functions on SO (n)
+
+Adeel Akhtar a, Matthieu Barreau b
+
+Abstract — Establishing stability guarantees for dynam-ical systems on Lie groups is a fundamental challenge, as classical Lyapunov methods developed for Euclidean spaces do not directly transfer to curved geometries. In this paper, we propose a framework for learning maximal Lyapunov functions for systems evolving on the special or-thogonal group SO (n). Theoretically, we introduce a neural Lyapunov architecture based on the logarithmic map with proven approximation capabilities, and we formulate the learning problem via a Zubov-type characterization of the maximal region of attraction. A key technical contribution is the derivation of explicit, numerically tractable formulas for the derivative of the logarithmic map, enabling training through a two-phase algorithm that balances computa-tional efficiency and accuracy. Empirically, we validate the approach on a low-dimensional nonlinear system. 
+
+Index Terms — Lie groups, PINNs, Neural Lyapunov Func-tions, Learning. 
+
+I. I NTRODUCTION 
+
+# MANY engineering, biological, and physical systems evolve under structural geometric constraints that re-strict their state to nonlinear manifolds rather than Euclidean spaces. Examples arise in rigid-body mechanics [1], in syn-chronization problems [2], and in grand unified theories [3], to cite a few, where the system configuration is represented by a rotation matrix evolving on the special orthogonal group 
+
+SO (n). Such systems are naturally modeled as dynamical systems on Lie groups, where the state in SO (n) evolves according to differential equations that preserve the orthogo-nality constraint. For these applications, establishing stability guarantees is crucial and is usually assessed using Lyapunov functions [4]. Despite their central role in control theory, constructing Lyapunov functions for a generic nonlinear dynamical system remains a challenge. For linear time-invariant systems, global stability is equivalent to the existence of a quadratic Lyapunov function, computable via linear matrix inequalities [5]. For nonlinear systems, an accurate Lyapunov function is gener-ally not quadratic [4], and it becomes even more important when estimating the largest region of attraction (ROA) around   
+
+> This work is partially supported by the Wallenberg AI, Autonomous Systems and Software Program (WASP) funded by the Knut and Alice Wallenberg Foundation and Digital Futures, and NJIT’s startup funds.
+> aDepartment of Mechanical and Industrial Engineering, New Jersey Institute of Technology, NJ, USA
+
+adeel.akhtar@njit.edu .               
+
+> bDepartment of Decision and Control Systems, Digital Fu-tures, KTH Royal Institute of Technology, Stockholm, Sweden
+
+barreau@kth.se . Both authors contributed equally. 
+
+an equilibrium point. Zubov [6], along with Vannelli and Vidyasagar [7] characterized the maximal ROA as the sublevel set of a maximal Lyapunov function satisfying a certain partial differential equation (PDE), but lacked the computational means to approximate it. More recently, polynomial parameterizations combined with sum-of-squares techniques [8], [9] and rational Lyapunov constructions [10] have been proposed to solve this PDE, but their applicability is limited to low-dimensional systems with a specific structure. Residual-based neural methods, inspired by physics-informed learning [11], have recently been used to approximate Lyapunov functions by enforcing Lyapunov or Zubov-type conditions at sampled collocation points [12]– [14]. These approaches avoid fixed-grid discretizations of the state space, which makes them attractive for systems whose intrinsic dimension is too large for classical gridding-based methods. The unsupervised setting was treated in [14] with local guarantees. Despite this progress, no existing work addresses the learn-ing of a maximal Lyapunov function on SO (n). The difficulties in Euclidean settings are amplified on manifolds: classical constructions are not directly applicable, the geometry of the state space must be respected, and although SO (n) is embedded in Rn×n, it is a nonlinear manifold of intrinsic dimension mn = n(n − 1) /2 that can be locally parametrized by mn coordinates. Leveraging this intrinsic low-dimensional structure while preserving the group geometry is the central challenge we address in this work. This paper makes two contributions. First, we introduce a neural Lyapunov architecture on SO (n), yielding positive-definite functions with universal approximation capabilities on the rotation group. Second, we derive explicit, numerically tractable expressions for the derivative of the logarithmic map and propose a two-phase training algorithm. 
+
+Notation: We write R≥0 for the non-negative real numbers, 
+
+In for the identity in Rn×n, spec( M ) for the complex eigen-values of a real square matrix M , ∥ · ∥ Rn for the standard Euclidean norm, and Cr (A, B ) for the r-times continuously differentiable functions from A to B. For smooth manifolds 
+
+M, N and a smooth map F : M → N , the differential 
+
+at x ∈ M is the linear map dFx : TxM → TF (x)N . If 
+
+V : M → R is smooth and M carries a Riemannian metric 
+
+⟨· , ·⟩ x, the Riemannian gradient ∇V (x) ∈ TxM is defined by 
+
+dVx[ξ] = ⟨∇ V (x), ξ ⟩x for all ξ ∈ TxM . For a differentiable map ψ : Rmn × Rmn → Rp, Dω ψ and Dxψ denote partial Jacobians with respect to ω and x.
+
+> arXiv:2606.19669v1 [math.OC] 18 Jun 2026
+
+II. B ACKGROUND AND PROBLEM FORMULATION 
+
+A. Neural Lyapunov Functions on Rn
+
+Consider a dynamical system 
+
+˙x(t) = f (x(t)) , x(0) = x0 ∈ Rn, (1) where f : Rn → Rn is Lipschitz continuous and f (0) = 0 . We assume that there exists a unique forward-complete solution. A possible neural network architecture for neural Lyapunov functions on Rn was introduced in [12] as 
+
+Vθ : Rn → R≥0
+
+x 7 → ∥ψθ (x) − ψθ (0) ∥Rp + α∥x∥Rn ,
+
+(2) where ψθ : Rn → Rp is a traditional feedforward neural network, and α > 0. This neural network architecture is inspired by Lyapunov theory [4], which requires a Lyapunov function to be positive definite. The first term in (2) x 7 →∥ψθ (x) − ψθ (0) ∥Rp is a positive semidefinite function. To ensure that Vθ is positive definite, a term α∥x∥Rn is added. As proven in [12], this architecture is a universal approximation of any candidate Lyapunov function on any compact set included in Rn excluding a neighborhood around the origin. 
+
+B. The special orthogonal group SO (n)
+
+In this paper, we work on the special orthogonal group, defined as follows. For further background on Lie groups, we refer the reader to [15]. 
+
+Definition 1. The special orthogonal group is defined as 
+
+SO (n) = R ∈ Rn×n R⊤R = In, det( R) = 1 .
+
+Under matrix multiplication, SO (n) forms a group with iden-tity element In. Moreover, SO (n) has the structure of a smooth manifold and is therefore a Lie group. •
+
+This manifold is commonly used for the rotation of 3D bodies ( n = 3 ), for instance, and the reader can refer to [15, Chap. 4] for some examples. A dynamical system defined on this manifold has the following structure: 
+
+˙R(t) = R(t)Γ( t), R(0) = R0 ∈ SO (n), (3) where t 7 → R(t) is the trajectory and Γ = R⊤ ˙R is the body velocity. This velocity belongs to the Lie algebra so (n), which is defined next. 
+
+Definition 2. The Lie algebra so (n) is defined as the tangent space at the identity element In of SO (n), i.e., so (n) =S ∈ Rn×n S⊤ = −S . This set forms the real vector space of skew-symmetric matrices and has dimension mn = 
+
+> n(n−1) 2
+
+. •
+
+The Lie algebra so (n) is isomorphic to Rmn [15, p. 252] and the isomorphism is realized by the hat and vee maps: 
+
+c(·) : Rmn → so (n), (·)∨ : so (n) → Rmn . (4) Since SO (n) is a Lie group, it admits a left-invariant Rie-mannian metric [15]. Under this metric, the inner product on each tangent space TRSO (n) at R, denoted ⟨· , ·⟩ R, is related to the inner product at identity ⟨· , ·⟩ In . In particular, for 
+
+ξR, η R ∈ TRSO (n) with ξR = RbΩ1 and ηR = RbΩ2, where 
+
+bΩ1, bΩ2 ∈ so (n), the following property holds: 
+
+⟨ξR, η R⟩R = ⟨RbΩ1, R bΩ2⟩R (5) 
+
+= ⟨R⊤RbΩ1, R ⊤RbΩ2⟩In = ⟨bΩ1, bΩ2⟩In (6) 
+
+= ⟨Ω1, Ω2⟩Rmn . (7) The inner products in (5), (6), and (7), are on TRSO (n),
+
+TIn SO (n) (isomorphic to so (n)), and Rmn , respectively. 
+
+C. Dynamically controlled systems on SO (n)
+
+We consider a dynamically controlled system with config-uration on SO (n) using the left-trivialized representation of its tangent bundle. Since so (n) = TIn SO (n) is identified with Rmn by the isomorphism in (4), each x ∈ Rmn defines 
+
+bx ∈ so (n) and hence the tangent vector Rbx ∈ TRSO (n). Thus 
+
+R ∈ SO (n) is the configuration, x is the body velocity, and, under left trivialization, the tangent-bundle state is identified with (R, x ) ∈ SO (n) × Rmn . We consider 
+
+ ˙R(t) = R(t)bx(t), R(0) = R0 ∈ SO (n),
+
+˙x(t) = f (x(t), R (t)) , x(0) = x0 ∈ X , (8) where X ⊂ Rmn is a compact connected domain containing the origin, and f : SO (n)×X → Rmn . Here, bx(t) denotes the pointwise application of the hat map to x(t). We assume that there exists a unique forward-complete solution π(·, R 0, x 0)
+
+for any initial condition (R0, x 0) ∈ K ≜ SO (n) × X [15]. Without loss of generality, we assume that the dynamical system (8) has e = (In, 0) as an equilibrium point. The problem addressed in this paper is to characterize the maximal region of attraction around e in K defined as: 
+
+R∗ =
+
+
+
+(R0, x 0) ∈ K lim t→∞ π(t, R 0, x 0) = e, 
+
+∀t ≥ 0, π (t, R 0, x 0) ∈ K 
+
+
+
+.
+
+III. N EURAL LYAPUNOV FUNCTIONS ON SO (n)
+
+In this section, we first derive the neural architecture to model a positive-definite function on K, then we discuss the conditions under which it is a local Lyapunov function for the dynamical system in (8) around e. Finally, we present our learning problem. 
+
+A. Neural Lyapunov function candidate 
+
+The Lyapunov direct method for assessing asymptotic sta-bility of the equilibrium point e in K requires the existence of a candidate Lyapunov function defined as a positive definite function on K with e as the origin. Inspired by (2), let a candidate Lyapunov function on the compact set K be written as 
+
+V : K → R≥0
+
+(R, x ) 7 → ∥Ψ( R, x ) − Ψ( e)∥2 
+
+> Rp
+
++ α∥(R, x )∥2
+
+> K
+
+,
+
+(9) where Ψ is continuously differentiable everywhere but at the origin and locally Lipschitz, α > 0, and ∥(R, x )∥2 
+
+> K
+
+=
+
+∥R − In∥2 
+
+> F
+
++ ∥x∥2 
+
+> Rmn
+
+. Compared with (2), this formulation considers a heterogeneous state on K and that the norms are now squared. This form has better approximation properties since V is continuously differentiable. SO (n)reg so (n)reg 
+
+Dn
+
+SO (n) so (n)
+
+Log 
+
+γ (·)∨
+
+γ−1 c(·)
+
+Exp 
+
+Fig. 1 : Mapping between the different spaces. The top trans-formations are used for inference of Vθ1,α , while the lower mappings are used for sampling in SO (n).On Rn, Ψ can be chosen as a feedforward neural network and can therefore approximate arbitrarily closely any locally Lipschitz function and its gradient on a compact set of Rn
+
+[16]. However, there is no such approximation result on SO (n)
+
+since it is not globally isomorphic to a Euclidean space. However, we have seen in the previous section that so (n)
+
+is isomorphic to Rmn . We therefore define the following set: 
+
+SO (n)reg ≜ {R ∈ SO (n) | ∃ ω ∈ D n, R = Exp( bω)} , (10) where Exp : so (n) → SO (n) is the matrix exponential and 
+
+Dn = {ω ∈ Rmn | ∥ bω∥2 < π } . (11) With this definition, we have SO (n)reg = {R ∈ SO (n) | − 1̸ ∈
+
+spec( R)} which excludes rotations by exactly π, for which the logarithm is not unique [17]. Similarly, we define so (n)reg ≜
+
+{bω ∈ so (n) | ω ∈ D n}. Therefore, we can define the matrix logarithm Log as the inverse of the exponential on SO (n)reg :
+
+∀R ∈ SO (n)reg , R = Exp (Log( R)) .
+
+Consequently, the proposed logarithmic-map construction is well-defined on SO (n)reg . We can now use the map vee , given in (4), to construct a bijection between SO (n)reg and Dn as: 
+
+∀R ∈ SO (n)reg , ∃ ω ∈ D n, ω = Log( R)∨ = γ(R). (12) The mappings Exp , γ , c(·), and their inverse maps are sum-marized in Figure 1. We also define Kreg ≜ SO (n)reg × X .
+
+This construction certifies R∗ ∩ K reg . These maps enable the formulation of the following proposition on the approximation of the candidate Lyapunov function on Kreg .
+
+Proposition 1. If V ∗ ∈ C2(Kreg , R) is a positive-definite function lower-bounded by β∥ · ∥ 2 
+
+> K
+
+on Kreg for β > 0 with 
+
+V ∗(e) = 0 , then there exist Ψ locally Lipschitz on Kreg and 
+
+α > 0 such that V ∗ can be written as (9) . △
+
+Proof. For any 0 < α < β , define ˜V (R, x ) = V ∗(R, x ) −
+
+α∥(R, x )∥2 
+
+> K
+
+≥ (β − α)∥(R, x )∥2 
+
+> K
+
+≥ 0. Set ψ1(R, x ) =q ˜V (R, x ) and ψi ≡ 0 for i ∈ { 2, . . . , p }. Then for Ψ = [ψ1 · · · ψp]⊤, we get V ∗ = V for V as in (9). It remains to show that ψ1 =
+
+p ˜V is locally Lipschitz on Kreg . Since Kreg 
+
+is a smooth manifold and every point admits a coordinate neighborhood, it suffices to show Lipschitz continuity in local coordinates around every point. Let q ∈ K reg and let 
+
+Φ( R, x ) = [γ(R)⊤ x⊤]⊤, which is a C1-diffeomorphism from a neighborhood N of q in Kreg to an open subset of 
+
+Rmn × Rmn . Let g = ˜V ◦ Φ−1, which is C1 on Φ( N ).
+
+Away from e: If q̸ = e, let N be a neighborhood of q
+
+not containing e. Then g > 0 on Φ( N ), so √g is C1 with Euclidean gradient ∇√g = ∇g 
+
+> 2√g
+
+, which is bounded on any compact subset of Φ( N ).
+
+Near e: If q = e, then g(0) = 0 and, since V ∗(e) = 0 is a minimum of V ∗ ∈ C2, we have ∇g(0) = 0 , so ∥∇ g(v)∥ =
+
+O(∥v∥) near zero. The lower bound on ˜V gives g(v) ≥ c∥v∥2
+
+for some c > 0, hence pg(v) ≥ √c∥v∥. Therefore, 
+
+∥∇ √g(v)∥ = ∥∇ g(v)∥
+
+2pg(v) ≤ O(∥v∥)2√c ∥v∥ = O(1) ,
+
+so √g is locally Lipschitz at 0 in Rmn × Rmn .
+
+Proposition 2. Let ψθ : Rmn × Rmn → Rp be a neural network, and for α > 0
+
+Pθ,α (R, x ) = ∥ψθ (γ(R), x )−ψθ (0 , 0) ∥2 +α∥(R, x )∥2
+
+> K
+
+. (13) 
+
+If (8) admits a local quadratic Lyapunov function, then any Lyapunov function V ∗ ∈ C 2(Kreg , R) (and its gradient) can be approximated arbitrarily closely in the L∞ norm by Pθ,α 
+
+(and its gradient) on any compact set K ⊂ K reg . △
+
+Proof. The positive-definiteness of Pθ,α follows directly from (13) since both terms are nonnegative and the second one is positive definite. We now clarify the approximation statement. Let K ⊂ K reg be compact. Since (R, x ) 7 → (γ(R), x ) is smooth on Kreg , the image of any compact set K ⊂ K reg is compact in R2mn . Let Vq be a local quadratic Lyapunov func-tion around e. Then V (R, x ) = V ∗(R, x ) + κV q approximates 
+
+V ∗ arbitrarily closely in the L∞ norm on any compact set K
+
+as κ > 0 is chosen sufficiently small, and is lower-bounded by a positive-definite quadratic function. By Proposition 1, there exists Ψ locally Lipschitz on Kreg and continuously differentiable on Kreg \ { e} such that (9) holds. This Ψ and its gradient can be approximated arbitrarily closely in the L∞
+
+norm on any compact set K ⊂ K reg by a feedforward neural network [16]. This leads to the universal approximation of 
+
+V ∗.Assuming f is continuously differentiable is sufficient for the existence of a C2 Lyapunov function [4], [18], and Propo-sition 2 gives us a candidate Lyapunov function Vθ1,α = Pθ1,α 
+
+on Kreg with universal approximation capabilities. We will investigate how to transform it into a Lyapunov function. 
+
+B. Zubov characterization 
+
+To establish the local asymptotic stability of the equilibrium point e, the Lyapunov direct method (such as [15, Theo-rem 6.45]) requires us to show that the Fr´ echet derivative of 
+
+t 7 → Vθ1,α (R(t), x (t)) is negative definite along the trajectories of (8). In a local neighborhood of e, this derivative must be strictly negative within the 1-level set of Vθ1,α , i.e., 
+
+∀v0 ∈ K reg \ { e},Vθ1,α (v0) < 1 ⇒ ∀ t > 0, ddt Vθ1,α (π(t, v 0)) < 0. (14) The Lyapunov direct method enables us to conclude that the 1-level set of Vθ1,α defined as 
+
+R(Vθ1,α ) = {(R, x ) ∈ K reg | Vθ1,α (R, x ) < 1} (15) is a region of attraction around the equilibrium point e.In this paper, we are interested in estimating the maximal region of attraction R∗. Zubov’s theorem [6, Theorem 22] provides a practical characterization of the maximal region of attraction as the 1-level set of a maximal Lyapunov function 
+
+V ∗ defined as a solution to 
+
+∀v0 ∈ K reg \ { e}, V ∗(v0) < 1 ⇒ ∀t > 0,ddt V ∗(π(t, v 0)) = −ϕ(π(t, v 0)) (1 − V ∗(π(t, v 0))) , (16) where ϕ is a positive definite function on K. This formulation is still dependent on time and not just on the state. We need a way to compute the Fr´ echet derivative t 7 → ddt V ∗(π(t, v )) ,defined at any point v = (R, x ) ∈ K. Let (Rt, x t) =
+
+π(t, R, x ), and by definition of the gradient and using the chain rule, we get: 
+
+ddt V ∗(Rt, x t) = ⟨∇ RV ∗(Rt, x t), ˙Rt⟩Rt
+
++⟨∇ xV ∗(Rt, x t), ˙xt⟩Rmn  
+
+> by (8)
+
+= ⟨∇ RV ∗(Rt, x t), R t bxt⟩Rt
+
++ ⟨∇ xV ∗(Rt, x t), f (xt, R t)⟩Rmn  
+
+> by (6)
+
+= ⟨R⊤ 
+
+> t
+
+∇RV ∗(Rt, x t), R ⊤ 
+
+> t
+
+Rt bxt⟩In
+
++ ⟨∇ xV ∗(Rt, x t), f (xt, R t)⟩Rmn  
+
+> by (7)
+
+= ⟨ R⊤ 
+
+> t
+
+∇RV ∗(Rt, x t)∨ , x t⟩Rmn 
+
++ ⟨∇ xV ∗(Rt, x t), f (xt, R t)⟩Rmn .
+
+(17) The above expression allows us to compute the Fr´ echet derivative using the gradient information, and to transform the previous problem (16) into a time-independent equivalent problem, as stated below. 
+
+Proposition 3. If there exists a positive definite function ϕ on 
+
+K such that V ∗ is a positive definite solution to 
+
+⟨ R⊤∇RV ∗(R, x )∨ , x ⟩Rmn 
+
++ ⟨∇ xV ∗(R, x ), f (x, R )⟩Rmn =
+
+− ϕ(R, x ) 1 − V ∗(R, x ), (18) 
+
+then R∗ = R(V ∗). △
+
+The complete proof of this proposition is an adaptation of [7, Corollary 3.1] on K ⊂ SO (n) × Rmn , using the time derivative of the Lyapunov function in (17). This formulation characterizes the maximal Lyapunov func-tion V ∗. In practice, we aim to approximate V ∗ by the candidate Lyapunov function Vθ1,α in (14) through a learning procedure as described below. 
+
+C. Learning formulation 
+
+To estimate the maximal region of attraction R∗, we will first approximate a maximal Lyapunov function V ∗ by Vθ1,α =
+
+Pθ1,α and ϕ by ϕθ2 = Pθ2,β , where θ1, θ 2, and α are training variables, while β is fixed to a small positive value. If Vθ1,α 
+
+is close to a V ∗ and is a Lyapunov function for (8), then 
+
+R(Vθ1,α ) in (15) is an inner approximation of the maximal region of attraction R∗.Learning a maximal Lyapunov function on a Euclidean space has been investigated in [13], [14]. We will follow the same procedure and define a learning problem that uses the neural architecture proposed previously while enforcing (18) on Kreg . We define a quantity, called the residual, which depends on the parameters θ1, θ 2, α , and β as follows: 
+
+r(R, x ) ≜
+
+D R⊤∇RVθ1,α (R, x )∨ , x 
+
+E
+
+> Rmn
+
++ ⟨∇ xVθ1,α (R, x ), f (x, R )⟩Rmn 
+
++ ϕθ2,β (R, x ) 1 − Vθ1,α (R, x ).
+
+To estimate a maximal Lyapunov function V ∗, the constraint (18) will be softly enforced through r = 0 on a discrete subset of Kreg . While the weaker condition r ≤ 0 would suffice to certify a Lyapunov function on a sublevel set, the equality 
+
+r = 0 is used here because Zubov’s characterization of the maximal Lyapunov function is an equality. To that extent, we define D(N ) ⊂ D n × X as N uniformly sampled points from 
+
+Dn × X in (11), and therefore 
+
+˜D(N ) = (γ−1(ω), x ) | (ω, x ) ∈ D (N ) . (19) Using this definition, the learning problem is written as 
+
+(θ∗ 
+
+> 1
+
+( ˜D(N )) , α ∗) ∈ argmin 
+
+> θ1,α
+
+min 
+
+> θ2
+
+1
+
+N
+
+X  
+
+> (R,x )∈˜D(N)
+
+∥r(R, x )∥2.
+
+(20) If the residual r converges to zero for sufficiently dense samples of Kreg , the learned function Vθ1,α approximates a maximal Lyapunov function and the associated level set 
+
+R(Vθ1,α ) provides an estimate of the maximal region of attraction. It is, however, difficult to compute the loss because the gradient of Vθ1,α has to be made explicit first. In classical physics-informed learning scenarios, this gra-dient is computed through automatic differentiation [19]. However, in our case, it requires evaluating the gradient of the logarithmic map. Since this operation is not directly implemented in classical automatic differentiation libraries, we derive explicit formulas for the derivative of the logarithmic map (12) in the next section. 
+
+IV. D ERIVATIVE OF THE LOGARITHMIC MAP 
+
+For (R, x ) ∈ Kreg , let (R(t), x (t)) = π(t, R, x ) and 
+
+X(t) = Log( R(t)) , which implies R(t) = Exp( X(t)) .The automatic differentiation framework requires the quantity (explained below in (22)) that gives the changes in X due to a small variation in R. Consider the curve Rδ ≜ R Exp( δdR ),where dR ∈ so (n). Then 
+
+˙Rδ δ=0 = R ddδ Exp( δdR ) δ=0 = R dR ∈ TRSO (n). (21) Let X(δ) ≜ Log( Rδ ). By definition of the directional deriva-tive, we can write the left-trivialized variation 
+
+Gℓ(R, dR ) ≜ lim 
+
+> δ→0
+
+Log( R Exp( δdR )) − Log( R)
+
+δ
+
+= ddδ δ=0 X(δ) = R⊤G(R, dR ),
+
+(22) where the superscript ℓ denotes left trivialization. The quantity 
+
+G is the one needed in TensorFlow to allow for the computa-tion of ∇Vθ1,α .
+
+A. Derivative of the logarithmic map 
+
+The derivative of the Log map along trajectories of (8) is given by the following result. 
+
+Proposition 4. Let t 7 → (R(t), x (t)) be a trajectory of the system defined in (8) and X(t) = Log( R(t)) . Then 
+
+˙X(t) = (d ℓ Exp X(t))−1[bx(t)] , (23) 
+
+where the left-trivialized differential of the exponential map 
+
+dℓ Exp X : so (n) → so (n) is 
+
+dℓ Exp X [∆] = 
+
+Z 10
+
+e−sX ∆esX ds, ∆ ∈ so (n). △
+
+Proof. Differentiating the identity R(t) = Exp( X(t)) yields 
+
+˙R(t) = d Exp X(t)[ ˙X(t)] .
+
+From [20, Prop. 20.1], we get that dℓ Exp X(t) is non-singular and we can use the identity d Exp X [∆] =Exp( X)d ℓ Exp X [∆] . Together with the system dynamics (8), it gives 
+
+Exp( X(t))d ℓ Exp X(t)[ ˙X(t)] = Exp( X(t)) bx(t).
+
+Premultiplying by Exp( −X(t)) yields the result. Since Rδ = Exp( X(δ)) , it follows from Proposition 4 that 
+
+˙X(δ) = (d ℓ Exp X(δ))−1[R−1 
+
+> δ
+
+˙Rδ ]. Evaluating at δ = 0 , and using (21)-(22) yields 
+
+G(R, dR ) = R(d ℓ Exp Log( R))−1[dR ] ∈ TRSO (n).
+
+Using (23), the left-trivialized R-gradient appearing in the residual can be written explicitly. Let ω = γ(R), X =Log( R), and zθ1 (ω, x ) = ψθ1 (ω, x ) − ψθ1 (0 , 0) . Define 
+
+Jℓγ (R)η =  (d ℓ Exp X )−1[bη]∨ , η ∈ Rmn .
+
+Then 
+
+ R⊤∇RVθ1,α (R, x )∨ =  Jℓγ (R)⊤ ∇ω
+
+
+
+∥zθ1 (ω, x )∥2
+
++ α∥ Exp( bω) − In∥2
+
+> F
+
+
+
+,
+
+where ∇ω ∥zθ1 (ω, x )∥2 = 2Dω ψθ1 (ω, x )⊤zθ1 (ω, x ). Simi-larly, ∇xVθ1,α (R, x ) = 2 Dxψθ1 (ω, x )⊤zθ1 (ω, x ) + 2 αx .
+
+B. Numerical evaluation 
+
+Computing (d ℓ Exp X(t))−1[dR ] naively requires discretiz-ing an integral and inverting it. This is inefficient and too inaccurate for a learning problem. However, there are other strategies that yield approximations of any order and exact computation, as described below [20]. 
+
+Series approximation. Using the adjoint representation 
+
+ad X [∆] = [ X, ∆] , where [·, ·] denotes the Lie bracket, the inverse operator admits the Bernoulli series expansion 
+
+(d ℓ Exp X )−1[dR ] = dR + 12 [X, dR ]+
+
+> ∞
+
+X
+
+> m=1
+
+B2m
+
+(2 m)! (ad X )2m[dR ],
+
+where B2m are the even Bernoulli numbers. Since R ∈
+
+SO (n)reg , the spectrum of ad X excludes ±i2kπ , ensuring absolute convergence of the series. In practice, truncating the series provides a fast approximation. Each ad X evaluation requires two n × n matrix multiplications, i.e., O(n3) oper-ations. Truncating the series after M terms, therefore, yields complexity O(M n 3), which is O(n3) in practice since only a few terms are typically required. 
+
+Remark 1. Note that, due to numerical roundoff, the truncated approximation of (d ℓ Exp X )−1[dR ] may fail to be exactly skew-symmetric. In the code, we enforce skew-symmetry in the approximation. ♦
+
+Exact computation. An exact evaluation can be obtained using the block matrix identity 
+
+Exp 
+
+ X ∆0 X
+
+ 
+
+=
+
+eX eX dℓ Exp X [∆] 0 eX
+
+
+
+.
+
+This relation allows the construction of the linear operator 
+
+dℓ Exp X in a chosen basis of so (n) and the exact solution of 
+
+dℓ Exp X [∆] = Y . Specifically, to compute (d ℓ Exp X )−1[Y ],let {Ei}mn 
+
+> i=1
+
+be a basis of so (n). For each j, compute 
+
+Pj = Exp 
+
+ X Ej
+
+0 X
+
+ 
+
+,
+
+extract the top-right block Bj , and set Vj = e−X Bj =dℓ Exp X [Ej ]. Express Vj = Pmn 
+
+> i=1
+
+Jij Ei to form the Jacobian 
+
+J ∈ Rmn×mn . Let y denote the coordinate vector of Y =P 
+
+> i
+
+yiEi. Solving Jδ = y yields 
+
+(d ℓ Exp X )−1[Y ] = 
+
+> mn
+
+X
+
+> i=1
+
+δiEi.
+
+The dominant cost is the computation of mn block matrix exponentials of size 2n × 2n. Using scaling–squaring [21], each exponential requires O(n3) operations, giving overall complexity O(mnn3) = O(n5). The system Jδ = y can be solved in O(m3
+
+> n
+
+) time, which is negligible for the small dimensions typical of so (n). The network input is intrinsic, 
+
+(γ(R), x ) ∈ R2mn , rather than an ambient representation of dimension n2 + mn.
+
+C. Final learning algorithm 
+
+Since the loss is now made numerically computable, a solu-tion to (20) can be approximated via a gradient-descent scheme with frequent resampling to avoid a sub-optimal θ∗ 
+
+> 1
+
+[22]. In the proposed learning algorithm, the series approximation is used during early training iterations to reduce computational cost, while the exact method is employed during the final phase. 
+
+V. S IMULATION RESULTS 
+
+We use the proposed methodology to learn an approxima-tion of the maximal region of attraction of the dynamical system introduced in (8) with n = 2 , mn = 1 , and f (x, R ) = 
+
+−x + x2 − 2( R − R⊤)∨. If x = −2( R − R⊤)∨, the dynamics on R have I2 as an almost-globally asymptotically stable equilibrium point on SO (2) reg [23], so the coupled system is chosen to have a locally asymptotically stable origin e. The −1.5 −1.0 −0.5 0.0 0.5 1.0 1.5 
+
+> α
+> −2.0
+> −1.5
+> −1.0
+> −0.5
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> ω
+> V(α, ω )
+> 0.00 0.12 0.24 0.36 0.48 0.60 0.72 0.84 0.96
+
+(a) Vθ∗       
+
+> 1,α ∗−1.5−1.0−0.50.00.51.01.5
+> ω
+> −2.0
+> −1.5
+> −1.0
+> −0.5
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> x
+> −2.7
+> −2.4
+> −2.1
+> −1.8
+> −1.5
+> −1.2
+> −0.9
+> −0.6
+> −0.30.0
+
+(b) ˙Vθ∗ 
+
+> 1,α ∗
+
+Fig. 2 : Learned Lyapunov function and its Fr´ echet derivative. code was implemented in Python with the TensorFlow library [24], and it is available on GitHub 1. With ϕ fixed as a quadratic function (to simplify the computations), we get the Lyapunov function in Figure 2a where ω = γ(R) ∈ [−π/ 2, π/ 2] and 
+
+x ∈ X = [ −2, 2] . Some trajectories are plotted in white. We observe that the sampled Fr´ echet derivative of the Lyapunov function is negative definite as expected, and the region of attraction is (inner-)estimated. The percentage of coverage of 
+
+R(Vθ∗  
+
+> 1,α ∗
+
+) compared to R∗ is 64 .3% , which showcases the feasibility of the approach. Considering only the quadratic term in (13) ( ψθ ≡ 0) leads to an infeasible learning problem for that example, underscoring the method’s interest. 
+
+VI. C ONCLUSION AND FUTURE WORK 
+
+We proposed a learning framework for designing neural Lyapunov functions on SO (n). We formulated a class of neural Lyapunov functions on SO (n) and theoretically derived its ap-proximation capabilities. A central technical contribution was the derivation of explicit, numerically tractable expressions for the derivative of the logarithmic map, enabling an efficient two-phase training procedure that balances computational cost and accuracy. The results demonstrate the approach on an interpretable low-dimensional tangent-bundle example. Future 
+
+> 1
+
+https://github.com/mBarreau/LyapunovSO 
+
+work will address computational speed-ups and systematic validation on larger Lie-group systems. 
+
+REFERENCES 
+
+[1] J. E. Marsden and T. S. Ratiu, Introduction to Mechanics and Symmetry ,ser. A Basic Exposition of Classical Mechanical Systems. Springer-Verlag, 1999. [2] R. S. Chandrasekaran, R. N. Banavar, and A. D. Mahindrakar, “A unified framework for consensus and synchronization on lie groups admitting a bi-invariant metric,” IEEE Transactions on Automatic Control , vol. 70, no. 11, pp. 7718–7724, 2025. [3] J. C. Baez and J. Huerta, “The algebra of grand unified theories,” 2010. [Online]. Available: https://arxiv.org/abs/0904.1556 [4] H. K. Khalil, Nonlinear Systems , ser. Pearson Education. Prentice Hall, 2002. [5] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan, Linear matrix inequalities in system and control theory . SIAM, 1994. [6] V. I. Zubov, Methods of AM Lyapunov and their application . US Atomic Energy Commission, 1961, vol. 4439. [7] A. Vannelli and M. Vidyasagar, “Maximal Lyapunov functions and domains of attraction for autonomous nonlinear systems,” Automatica ,vol. 21, no. 1, pp. 69–80, 1985. [8] M. Jones and M. M. Peet, “Converse Lyapunov functions and converging inner approximations to maximal regions of attraction of nonlinear systems,” in IEEE Conference on Decision and Control (CDC) , 2021. [9] D. Henrion and M. Korda, “Convex computation of the region of attrac-tion of polynomial control systems,” IEEE Transactions on Automatic Control , vol. 59, no. 2, pp. 297–312, 2013. [10] G. Valmorbida and J. Anderson, “Region of attraction estimation using invariant sets and rational Lyapunov functions,” Automatica , 2017. [11] G. E. Karniadakis, I. G. Kevrekidis, L. Lu, P. Perdikaris, S. Wang, and L. Yang, “Physics-informed machine learning,” Nature Reviews Physics ,2021. [12] N. Gaby, F. Zhang, and X. Ye, “Lyapunov-net: A deep neural network architecture for lyapunov function approximation,” in 2022 IEEE 61st Conference on Decision and Control (CDC) . IEEE, 2022. [13] J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou, “Physics-informed neural network Lyapunov functions: PDE characterization, learning, and verification,” Automatica , vol. 175, p. 112193, 2025. [14] M. Barreau and N. Bastianello, “(un)supervised learning of maximal lyapunov functions,” arXiv preprint arXiv:2408.17246 , 2024. [15] F. Bullo and A. D. Lewis, Geometric Control of Mechanical Systems , ser. Texts in Applied Mathematics. New York-Heidelberg-Berlin: Springer Verlag, 2004. [16] K. Hornik, “Approximation capabilities of multilayer feedforward net-works,” Neural networks , vol. 4, no. 2, pp. 251–257, 1991. [17] J. Gallier and D. Xu, “Computing exponentials of skew-symmetric matrices and logarithms of orthogonal matrices,” International Journal of Robotics and Automation , vol. 18, no. 1, pp. 10–20, 2003. [18] T. C. Sideris, “Dependence on initial conditions and parameters,” in 
+
+Ordinary Differential Equations and Dynamical Systems , ser. Atlantis Studies in Differential Equations. The Netherlands: Atlantis Press (Zeger Karssen), 2013, vol. 2, pp. 89–94. [19] A. G. Baydin, B. A. Pearlmutter, A. A. Radul, and J. M. Siskind, “Automatic differentiation in machine learning: a survey,” Journal of machine learning research , vol. 18, no. 153, pp. 1–43, 2018. [20] J. Gallier and J. Quaintance, Differential Geometry and Lie Groups .Springer International Publishing, 2020. [21] N. J. Higham, Functions of Matrices: Theory and Computation . SIAM, 2008. [22] M. Barreau and H. Shen, “A control perspective on training pinns,” arXiv preprint arXiv:2501.18582 , 2025. [23] A. Akhtar and R. G. Sanfelice, “Hybrid geometric controllers for fully-actuated left-invariant systems on matrix lie groups,” in 2022 IEEE 61st Conference on Decision and Control (CDC) , 2022. [24] M. Abadi et al. , “TensorFlow: a system for Large-Scale machine learning,” in 12th USENIX symposium on operating systems design and implementation (OSDI 16) , 2016, pp. 265–283.

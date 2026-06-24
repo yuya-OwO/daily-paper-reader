@@ -1,0 +1,415 @@
+Title: GP-GOMEA with GPU-Based Fitness Evaluations: Design and Performance Analysis
+
+URL Source: https://arxiv.org/pdf/2605.30954v1
+
+Published Time: Mon, 01 Jun 2026 00:47:44 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# GP-GOMEA with GPU-Based Fitness Evaluations: Design and Performance Analysis 
+
+Jasper Post 1,2, Johannes Koch 1,2[0009 −0008 −7570 −7621] , Anton Bouter 1[0000 −0003 −4599 −0733] , Tanja Alderliesten 3[0000 −0003 −4261 −7511] , and Peter A.N. Bosman 1,2[0000 −0002 −4186 −6666]  
+
+> 1
+
+Centrum Wiskunde & Informatica, Amsterdam, The Netherlands  
+
+> 2
+
+Delft University of Technology, Delft, The Netherlands  
+
+> 3
+
+Leiden University Medical Center, Leiden, The Netherlands 
+
+Abstract. GP-GOMEA is a state-of-the-art evolutionary algorithm for symbolic regression, known for discovering small and interpretable mod-els. However, its computational cost remains substantial, limiting its applicability to larger datasets and more complex target expressions. In contrast, the rise of modern subsymbolic approaches, particularly deep learning, has been driven largely by the massive parallelism of-fered by GPUs. In this work, we take the first major step toward a fully GPU-accelerated GP-GOMEA by introducing a GPU-based fit-ness evaluation scheme. We design a GPU-friendly representation of GP-GOMEA’s template-based individuals and a corresponding evalu-ation strategy that exploits the inherent parallelism of population-based search. This substantially increases evaluation throughput, enabling or-ders of magnitude more evaluations within the same time budget. Across four standard symbolic regression benchmarks, this increased evalua-tion capacity yields performance improvements, particularly for larger datasets and larger population sizes. Moreover, the ability to efficiently evaluate much larger datasets and more complex templates enables anal-yses that were previously infeasible, allowing us to systematically analyze what makes expressions increasingly difficult for GP-GOMEA, providing new insights into how expression structure affects search difficulty. Fi-nally, for the first time, this expanded capability allows a problem-agnostic evolutionary algorithm to reliably regress one of the largest Feynman equations within four hours. 
+
+Keywords: Symbolic regression · Genetic programming · GPU acceler-ation · GP-GOMEA 
+
+## 1 Introduction 
+
+Symbolic regression (SR) aims to discover mathematical expressions that de-scribe data. However, symbolic learning is known to be computationally demand-ing, especially for large datasets and complex expressions. Genetic programming (GP) is the dominant approach to SR, evolving candidate expressions through variation operators inspired by natural evolution.  
+
+> arXiv:2605.30954v1 [cs.NE] 29 May 2026 2J. Post et al.
+
+Among GP-based methods, GP-GOMEA is one of the most effective symbolic regression algorithms, but its evaluation cost remains a major bottleneck. Mean-while, modern machine learning routinely leverages GPU parallelism for large performance gains. This motivates bringing similar acceleration to GP-GOMEA. Since its introduction, several improvements to GP-GOMEA have been pro-posed. Despite these advancements, GP-GOMEA shares a bottleneck with most GP frameworks: fitness evaluation dominates runtime. This cost scales with both population size and dataset size, meaning that even moderately complex prob-lems can require hours to solve [4], severely limiting the algorithm’s ability to get good results on larger datasets. In this work, we investigate whether the computationally intensive fitness evaluations in GP-GOMEA can be offloaded to GPUs to reduce overall runtime. Parallelizing evaluation in GP-GOMEA is non-trivial because variation, evalu-ation, and selection are tightly interleaved. We therefore restructure the main evolutionary loop in GP-GOMEA to enable parallel fitness evaluations on the GPU. By exploiting modern GPU parallelism, we not only improve results for larger symbolic regression tasks but also gain the ability to perform analyses at expression sizes and complexities that were previously out of reach. The remainder of this paper is organized as follows. Related work is covered in Section 2. GP-GOMEA and the proposed changes are discussed in Section 3. Experiments and results are covered in Section 4. Finally, we discuss our results in Section 5 and conclude in Section 6. 
+
+## 2 Related Work 
+
+The performance of symbolic regression algorithms is usually measured by the quality of solutions found within a fixed compute budget. Two complementary directions can improve scalability: algorithmic advances that reduce the number of evaluations needed, and computational optimizations that make each evalua-tion faster. We briefly review both, before situating our contribution. GP-GOMEA provides a substantial algorithmic improvement over standard tree-based GP by replacing random variation with linkage-learning and gene-pool optimal mixing, enabling much more effective search under strict depth lim-its [22]. Since its introduction, several extensions have further improved its ca-pabilities. One line of work addresses the handling of real-valued constants, a known weakness of GP-based methods, by proposing simultaneous evolution of constants and expression structure [11]. Another extends the algorithm to de-composable problems through the use of modular subexpressions [9]. Further work improves efficiency for higher-arity operators by introducing a variation step that considers the semantic context of a subtree alongside greedy child selection, making better use of template nodes that would otherwise remain unused [18]. More recently, improved linkage learning strategies based on node proximity have been shown to be both simpler and more effective than mu-tual information-based approaches [12]. While each advancement improves the GP-GOMEA with GPU-Based Fitness Evaluations 3
+
+search quality of GP-GOMEA, none address the computational cost of evalua-tion, which remains the dominant bottleneck. In symbolic regression, fitness evaluation normally requires evaluating a can-didate expression on the full dataset. Consequently, the associated computational cost scales with both population size and dataset size. Reducing this cost is there-fore a natural target for efficiency enhancement. A widely adopted approach is vectorized computation: frameworks such as Operon [3], gplearn [20], and others exploit SIMD instructions through libraries like Eigen or NumPy to evaluate expressions efficiently on a dataset. A complementary technique is Just-In-Time (JIT) compilation, used by PySR [5] and Kozax [23], which specializes code at runtime, potentially yielding speedups at the cost of warm-up overhead. On multi-core CPUs, the embarrassingly parallel nature of population-wide fitness evaluation in most forms of GP can be exploited through multi-threading or island-based models [5, 8]. GPUs provide massively higher parallel through-put, but their effective use requires different design choices. Existing GPU-based approaches vary in scope: SRGPU [25] offloads only evaluation and selection to the GPU, while EvoGP [24] and Kozax [23] execute all GP operations on the GPU. To support efficient GPU execution, tree representations are typically abandoned in favor of linear representations such as prefix notation (Polish no-tation) [8, 25, 20, 24], postfix notation (Reverse Polish notation) [3], or reversed prefix [23], enabling stack-based evaluations without irregular control flow. Since GP-GOMEA is already state-of-the-art on a single core, bringing GPU acceleration to GP-GOMEA has potential for greater impact than when acceler-ating conventional GP approaches. So far, however, this has not been explored. 
+
+## 3 Method 
+
+We first introduce the serial version of GP-GOMEA that we use as a basis for this work, followed by the GPU-accelerated version. 
+
+3.1 GP-GOMEA 
+
+As mentioned, several improved versions of GP-GOMEA exist to date. Here, we start from the recentmost published version [12]. While it does not include all improvements published so far, it incorporates what is arguably the most fundamental improvement so far, substantially enhancing the modeling and ex-ploitation of linkage, which is key to any GOMEA variant. GP-GOMEA iteratively refines a population of individuals (or solutions) through repeated variation and selection, similar to other EAs. Each individ-ual in the population is represented as a fixed-length string of variables, mapped to nodes in a predefined tree template. This fixed structure ensures positional consistency across individuals, which is essential for identifying groups of statis-tically dependent nodes, referred to as linkage. Smaller expressions do not use all nodes in the template, leaving some variables inactive; these are called introns. 4 J. Post et al. 
+
+Linkage is captured in a Family of Subsets (FOS), which contains multiple groups of linked nodes. While the FOS can be learned from population statistics, node proximity in the template has been shown to be a better source of linkage information [12], and is used here. The Gene-pool Optimal Mixing (GOM) op-erator uses the FOS to guide variation: each individual is cloned to produce an offspring, and for each subset in the randomly shuffled FOS, the corresponding variables of the offspring are replaced with those from a randomly selected donor. The changed offspring is only evaluated if an actively used part of the template was affected. The change is accepted only if fitness does not worsen; otherwise it is reverted. If an individual fails to improve over 1 + ⌊log 10 (population size )⌋
+
+subsequent generations, Forced Improvements (FI) are applied: GOM is repeated using the current best solution as the donor, stopping at the first improvement found [6]. If no improvement is found, the individual is replaced by a copy of the best solution. After GOM, the set of offspring replace the population. Once the population converges, GP-GOMEA can be restarted: a new popu-lation is randomly generated, with the best solution found so far carried over to be used for FI. A restart is triggered after the No-Improvement Stretch (NIS), which is a number of subsequent generations in which the best solution did not improve. The default NIS is ⌊log 10 (population size )⌋ generations. 
+
+3.2 GPU-Accelerated Evaluations in GP-GOMEA 
+
+Fitness evaluations are the computational bottleneck in single-core GP-GOMEA, especially for large population sizes and/or datasets. To accelerate GP-GOMEA, we offload evaluations to the GPU. Below, we describe how we achieved this. 
+
+Restructuring GOM. In the original serial GP-GOMEA [22], offspring un-dergo variation sequentially. For each individual, every subset in the FOS is considered in a random order and GOM is applied. Because of this, and because each variation operation can lead to a change in the best solution, which in turn may be used in FI, parallelization is not straightforwardly possible. To enable parallel evaluation, we reversed the variation loop structure. In the parallel version, the outer loop iterates over the FOS, while the inner loop iterates over the population, with the FOS order shuffled per individual beforehand to preserve the stochasticity of the original implementation. Importantly, this only makes FI to be performed at a different point in time. In a recent version of GP-GOMEA that integrates real-valued evolutionary optimization, this was already found to not negatively impact the performance of GP-GOMEA [11]. For this reason, we used the same reversed-loop approach for both the CPU and the GPU version of GP-GOMEA in this paper. Within the inner loop, in iteration i, variation is applied to each offspring, sequentially using the CPU, by copying the gene values pertaining to the i-th subset in the randomly shuffled FOS for that offspring, from a randomly selected donor. Instead of immediately evaluating the modified offspring, all modified off-spring are collected into a batch. When all offspring have been changed using the GP-GOMEA with GPU-Based Fitness Evaluations 5
+
+CPU, the full batch of candidate offspring is evaluated in parallel on the GPU. Each candidate is then accepted if its fitness has not become worse; otherwise the modification is reverted. The resulting procedure is shown in Algorithm 1. The same loop reordering is also applied to FI, where the inner loop only considers the solutions to improve instead of the whole population. 
+
+Algorithm 1 GPU GP-GOMEA 
+
+Shown with FI condensed; parts executed in parallel on the GPU shown in blue.                                                                                 
+
+> 1: O ← Clone (P);B ← Clone (P)▷Offspring and Backup
+> 2: for i∈ { 0, . . . , |O| − 1}do ▷Shuffle FOS order for each offspring individual
+> 3: F OSOrder i←RandomPermutation (|F OS |)
+> 4: for i∈ { 0, . . . , |F OS | − 1}do ▷Loop over FOS indices
+> 5: changed ← {}
+> 6: for j∈ { 0, . . . , |O| − 1}do ▷Loop over offspring
+> 7: donor ←Random (P)
+> 8: Oj[F OS [F OSOrder ji ]] ←donor [F OS [F OSOrder ji ]]
+> 9: if Oj̸=Bjthen
+> 10: changed ←changed ∪j
+> 11: Evaluate (O[changed ]) ▷Evaluate changed solutions on GPU (and update best)
+> 12: for j∈changed do
+> 13: if f(Oj)not worse than f(Bj)then
+> 14: Bj← O j▷Accept: update backup
+> 15: else
+> 16: Oj← B j▷Reject: revert to backup
+> 17: PerformForcedImprovements()
+> 18: P ← O
+
+Data Structure of Individuals The representation of individuals in GP-GOMEA (see Section 3.1) is convenient for variation, but not for parallel eval-uations on a GPU. In particular, evaluation requires recursive tree traversal, an operation GPUs handle poorly because it involves irregular control flow rather than uniform parallel work. To address this, all individuals are transformed into a GPU-friendly linear representation, as detailed below. The transformation cost is negligible compared to the benefits of GPU-parallel evaluation. Individuals are transformed via post-order traversal to be represented in Re-verse Polish Notation (RPN) [3], where operators follow their operands (e.g., 
+
+3 + 1 → 3 1 + ) and introns are ignored. RPN encodes the evaluation order ex-plicitly, allowing each subexpression to be evaluated before its parent operation. Evaluation can then proceed in a single forward pass using a stack. Importantly, this represents a sequence of simple operations that can be parallelized well on a GPU. Figure 1 illustrates an example. While RPN provides a representation that is easy and efficient to evaluate, the sequence must be encoded to make efficient use of memory. Following the approach proposed in [24], a single individual with an RPN sequence of length 
+
+L is represented using two arrays, T ∈ NL and V ∈ RL, where T[i] encodes the discrete type of node i (e.g., input, operator, constant), and V[i] stores the associated numerical value. A visual example is given in Figure 1. 6 J. Post et al. 
+
+/
+
+−2
+
+x3
+
+× 3.5
+
+sin 
+
+x2 x5
+
++
+
+×
+
+4 x0
+
+x1
+
+−1 5.5  
+
+> (1)
+> (2) (3)
+> (4) (5)
+> (6)
+> (7)
+
+Expression Tree  
+
+> Active node Intron node
+
+Expression Semantics 
+
+−24 x0 + x1
+
+Reverse Polish Notation 
+
+−2 4 x0 × x1 + /
+
+Array Encoding 
+
+1 1 0 2 0 2 2 · · · 
+
+−2 4 0 2 1 0 3 · · · 
+
+> Type:
+> Value:
+
+Fig. 1: Left: the expression tree; colored nodes are active, while gray dashed nodes are introns. Numbers below active nodes indicate post-order traversal indices. Top right: the expression encoded by the tree. Middle right: the same expression in RPN, with each node color-matched to its position in the tree. Bottom right: the array encoding used internally for GPU evaluation, storing node type (0 = variable, 1 = constant, 2 = operator) and node value (variable index, constant value, or operator index). Dashed cells indicate zero-padding to arrive at a fixed array length. Since the RPN representation of individuals can vary in length, each vector is padded to a fixed length Lmax , defined by the maximum number of nodes in template. This yields the modified arrays ˆT ∈ NLmax and ˆV ∈ RLmax . Since all individuals now share the same length, they can be concatenated into two population-level arrays, P ˆT ∈ Nm×Lmax and P ˆV ∈ Rm×Lmax , enabling efficient indexing and evaluation while preserving the benefits of RPN linearization. 
+
+Evaluation on the GPU In symbolic regression, fitness computation exhibits two levels of parallelism: across individuals in the batch (task parallelism) and across datapoints within an individual (data parallelism). The latter is only possible when each datapoint contributes independently to the loss, such as in the most commonly employed loss function: the Sum of Squares Error (SSE). We define a sub-evaluation as the computation of the squared error for one individual on one datapoint. The sub-evaluations are divided across threads, which are the parallel units of work executed on the GPU. Threads are organized into thread blocks, and executed in groups of 32, called warps, using single-instruction multiple-thread (SIMT) execution model, meaning that each thread in a warp executes the same instruction. If threads follow different control-paths, the execution is serialized, which reduces performance (this phenomenon is called warp divergence). To prevent this, each thread block is assigned to evaluate one individual. Since all threads in the block interpret the same individual, control flow remains identical across threads, avoiding warp divergence. The sequence data of an individual is stored in memory accessible only to threads in the same block, called shared memory, which is much faster than GP-GOMEA with GPU-Based Fitness Evaluations 7
+
+Single Block per Individual Multiple Blocks per Individual 
+
+1a. Output and Squared Error Computation 
+
+1b. Aggregate Squared Errors across Threads in a Block 
+
+2. Aggregate Partial Sum of Squared Errors across Blocks    
+
+> 1...M
+> Individuals (= Blocks)
+> Blocks per Individual
+> 12· · · B
+> Threads
+> For a set of datapoints: 1. Compute output 2. Compute squared error 3. Aggregate squared errors 1...M
+> Individuals (= Blocks)
+> Blocks per Individual
+> For each individual (= in each block): 1. Aggregate squared errors across threads 2. Compute mean squared error 3. Store result in global memory
+
+Not required for single-block design                      
+
+> 1,1 · · · N,1 .... . ....1,M · · · N,M
+> Individuals
+> Blocks per Individual
+> 12· · · B
+> Threads
+> For a single datapoint: 1. Compute output 2. Compute squared error 1,1 · · · N,1 .... . ....1,M · · · N,M
+> Individuals
+> Blocks per Individual
+> In each block: 1. Aggregate squared errors across threads 2. Store partial sum of squared errors in global memory 1,1 · · · N,1 .... . ....1,M · · · N,M
+> Individuals
+> Blocks per Individual
+> For each individual: 1. Aggregate partial sum of squared errors 2. Compute mean squared error 3. Store result in global memory
+
+Fig. 2: Parallel decomposition and kernel design for two designs. Left: single block per individual. Only requires a single kernel launch. Right: multiple blocks per individual. Requires a second kernel to aggregate partial sums of squared errors. M is the number of individuals to be evaluated, N is the number of blocks per individuals and B is the number of threads in a block. global memory. Although the data must be loaded from global memory at the start of the block’s execution, this cost is offset by the faster access during subsequent accesses, increasing overall throughput. With up to 1024 threads per block, several parallelization strategies exist to cover all datapoints. (Figure 2): (1) let each thread process multiple datapoints sequentially, or (2) assign multiple blocks per individual and aggregate partial sums via global memory. The second option increases parallelism but adds global memory traffic and inter-block synchronization. We therefore adopt the first strategy: each thread iteratively processes multiple datapoints and accumulates a partial sum in registers. Since all threads evaluating an individual reside in a single block, aggregation is performed within the same block. Partial sums across threads are combined using parallel reduction, imple-mented via a CUDA provided primitive ( cub::BlockReduce ), which performs a tree-based reduction in shared memory. The resulting sum is normalized to compute the MSE and written to global memory for retrieval by the host. 
+
+## 4 Experiments and Results 
+
+In this section, we evaluate the proposed GPU GP-GOMEA using three exper-iments. First, we benchmark GPU GP-GOMEA against its CPU counterpart. 8 J. Post et al. 
+
+Table 1: Datasets used in the experiments 
+
+Dataset Ground Truth Expression #Instances #Features 
+
+Experiment I & II datasets 
+
+Daily Demand [7] x4 + x5 + x6 60 12 Auto MPG [16] Unknown 398 7California Housing [15] Unknown 20,640 8Feynman I.9.18 [17, 21] x0×x1×x2 
+
+> (x4−x3)2+( x6−x5)2+( x8−x7)2
+
+100,000 9
+
+Experiment III datasets 
+
+Addition x0 + x1 + · · · + x8 100,000 9Division x0+x1+x2 
+
+> x3+x4+x5+x6+x7+x8
+
+100,000 9Subtraction x0+x1+x2 
+
+> x4−x3+x6−x5+x8−x7
+
+100,000 9Multiplication x0×x1×x2 
+
+> x4−x3+x6−x5+x8−x7
+
+100,000 9Squaring x0×x1×x2 
+
+> (x4−x3)2+( x6−x5)2+( x8−x7)2
+
+100,000 9
+
+Secondly, we compare its evaluation throughput to several state-of-the-art sym-bolic regression approaches with both CPU and GPU implementations. Lastly, we demonstrate that GPU GP-GOMEA is capable of recovering an exact sym-bolic solution for a challenging benchmark problem that has proven difficult for prior GP-based methods, and investigate the sources of this difficulty. 
+
+4.1 Experimental Setup 
+
+The datasets used in the experiments are listed in Table 1. The real-world datasets were selected as they are also used in [24] and they cover a wide range of dataset sizes, allowing us to evaluate both solution quality and scalability. For Experiment I and II, each dataset was split into 30 cross-validation folds, where each fold uses 29 30 of the instances for training; the remaining 130 instances were used for validation. For Experiment III, each dataset was divided into 9 folds, where each fold uses 89 of the instances for training, and the other instances were used for validation. In both experiments, each fold was assigned a different random seed. The Mean-Squared Error (MSE) is used as the objective: MSE (ypred , y target ) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+(ypred ,i − ytarget ,i )2 (1) where ypred denotes the predicted output, ytarget the target output, and N the dataset size. However, to facilitate the comparison between datasets in Experi-ment III, the normalized mean-squared error (NMSE) is used: NMSE (ypred , y target ) = MSE (ypred , y target )
+
+Var (ytarget ) (2) where Var (ytarget ) is the variance of the target output. For comparison, we include CPU-based GP-GOMEA [12], and GPU-based EvoGP [24] and Kozax [23]. We exclude Operon [3] from the main comparison GP-GOMEA with GPU-Based Fitness Evaluations 9
+
+Table 2: Experiment Setup                            
+
+> Setting Experiment I & II (GPU & CPU) Experiment III (GPU only)
+> Operator set {+,−,×,÷,sin ,cos ,·2,√·,exp ,log ,pow }{+,−,×,÷,·2,√·}
+> Time budgets {10 min GPU, 60 min CPU} 240 min NISs log 10 {log 2,log 10 }Population sizes {128, 256, . . . , 65,536} {2,000, 65,536} Template depths {4 (31 nodes), 6 (127 nodes)} {6 (127 nodes), 8 (511 nodes)}
+
+Table 3: Hardware Specifications (note: CPU approaches use only a single core)         
+
+> Component CPU Approaches GPU Approaches
+> CPU Intel Xeon E5-2699V4 Intel Xeon Bronze 3206R GPU N/A NVIDIA RTX A5000 System RAM 630 GB 96 GB
+
+because it requires linear scaling to be enabled when using MSE as the objective; since no other framework applies this transformation, including Operon would constitute an unfair advantage. Results with Operon are provided for reference in Appendix A.2. Our experimental setup follows that of [24], in which EvoGP was shown to perform competitively with several other symbolic regression frame-works, including TensorGP [1], PySR [5], DEAP [8], SRGPU [25], and gplearn [20]. Strong performance relative to EvoGP therefore provides an indication of competitive performance with respect to these methods, though we note that those comparisons were conducted under different experimental conditions. To reflect typical usage of symbolic regression approaches, default parameter values are used whenever possible, except for the parameters explicitly listed in Table 2. Key hyperparameters, such as population size and template depth, are systematically varied, while the remaining parameters are kept at their default values (refer to Appendix B). The operator set was chosen to include commonly used mathematical operators for symbolic regression problems. The difference between time budgets for CPU and GPU approaches in Ex-periments I and II reflects practical constraints in hardware availability, while remaining fair as GPU-accelerated methods can exploit SIMT parallelism to achieve substantially higher evaluation throughput. CPU-based approaches were executed on a single CPU core, while GPU-based approaches were executed on a single CPU core and a single GPU. We note that the CPU and GPU machines differ in their host CPU and available RAM (see Table 3), which may mod-estly disadvantage GPU approaches beyond the time budget difference. For GP-GOMEA, populations are restarted when the population-wide NIS is reached, to ensure the full time budget is used. For the other approaches, default parameter settings are used, except that, following [24], the tournament size, crossover rate and mutation rate are set to 20, 0.9 and 0.1, respectively. In Experiment III, restarts were performed using two separate configurations. The first configuration uses a starting population of 65,536 with a NIS of log 2(P )
+
+generations, favoring deeper exploration with a single population by allowing up to 16 generations without improvements before a restart. The second configu-10 J. Post et al. 
+
+ration uses a starting population of 2,000 with a NIS of log 10 (P ) generations, performing restarts more frequently. Running both configurations lets us assess whether GP-GOMEA can exploit global landscape structure on harder prob-lems, or whether many restarts perform better, which would be indicative of a highly multi-modal landscape with little global structure. 
+
+4.2 Experiment I: CPU vs GPU GP-GOMEA 
+
+We compare the best validation MSE obtained during a run (Figure 3) and the number of evaluations per minute (Figure 4). The MSE is recomputed from the returned symbolic expressions using SymPy [14] with double-precision arith-metic, rather than relying on the values reported directly by GPU GP-GOMEA, ensuring fair and consistent comparisons. Training MSE results are provided in Appendix A.1. 
+
+Solution Quality (MSE). Across all datasets, GPU GP-GOMEA consistently matches or achieves a lower MSE than CPU GP-GOMEA, with the gap widening as dataset size increases. This trend is consistent with the evaluation throughput results discussed below. 
+
+Evaluation Throughput. The number of evaluations performed within the time budget provides insight into the effective search progress of each algorithm, since solution quality generally improves with more fitness evaluations. For implemen-tations, evaluation throughput remains approximately constant as population size increases: larger populations reduce the number of generations, leaving the total evaluation count roughly unchanged. GPU GP-GOMEA scales favorably with dataset size. On the smallest dataset (Daily Demand), its throughput is comparable to that of CPU GP-GOMEA. However, as dataset size increases, the benefits of GPU parallelism become in-creasingly pronounced. On the largest dataset (Feynman) GPU GP-GOMEA performs orders of magnitude more evaluations per minute than its CPU coun-terpart. 
+
+Fig. 3: Median validation MSE and interquartile ranges (shaded) over all runs for different population sizes across problems with template depths 4 and 6. GP-GOMEA with GPU-Based Fitness Evaluations 11 
+
+Fig. 4: Median number of evaluations per minute over population size across problems with template depths of 4 and 6. The shaded area corresponds to the interquartile range. 
+
+4.3 Experiment II: Comparing Evaluation Throughput 
+
+We compare the number of evaluations per minute across frameworks (Figure 5). Since the frameworks have fundamentally different ways in which expression size is restricted, a direct accuracy comparison is complicated. An analysis of these differences, as well as MSE results, are provided for reference in Appendix A.2. EvoGP achieves the highest evaluation throughput on the two smaller datasets (Daily Demand and AutoMPG), and its throughput increases markedly with population size on those problems, likely due to higher GPU utilization at larger population sizes. On small datasets, evaluation is extremely cheap and completes in microseconds, meaning the per-generation CPU overhead of GP-GOMEA’s linkage model building and GOM becomes the dominant cost. EvoGP avoids this overhead entirely, as its simpler variation operators are implemented as GPU kernels, keeping the full evolutionary loop on the device. On the two larger datasets, however, GPU GP-GOMEA overtakes EvoGP in evaluation through-put, as EvoGP switches to launching a separate kernel per individual for large datasets, incurring per-launch overhead. Kozax performs significantly worse than all other methods in terms of evalu-ation throughput, executing several orders of magnitude fewer evaluations across most configurations, and additionally suffers from out-of-memory errors at tem-plate depth 6 and larger population sizes, limiting the configurations for which results are available. 
+
+4.4 Experiment III: Finding a Large Feynman Equation 
+
+The Feynman I.9.18 equation used in Experiment I represents a particularly challenging symbolic regression problem that has not been reported to be reliably solved using generic evolutionary symbolic regression methods. To the best of our knowledge, prior approaches reporting successful recovery rely on domain knowledge or recitation of memorized solutions in the case of neural and language models instead of pure search-based discovery [21, 19, 2]. Such approaches may not generalize to similarly difficult real-world problems. We want to see if GPU GP-GOMEA now offers enough efficiency to be able to find this equation. Beyond this, this efficiency enables us for the first time to also 12 J. Post et al. 
+
+Fig. 5: Median number of evaluations per minute over population size across problems with template depths of 4 and 6. The shaded area corresponds to the interquartile range. study the difficulty of this equation for symbolic regression (with GP-GOMEA) in more detail. Specifically, we evaluate GPU GP-GOMEA on a sequence of synthetic datasets corresponding to expressions of increasing complexity that progressively approach Feynman I.9.18 (see Table 1). Performance is reported using the NMSE (Equation 2) to facilitate comparison across datasets. Figure 6 shows the NMSE over time and the success rate, defined as the percentage of folds reaching NMSE ≤ 10 −6. This corresponds to the effective decimal precision of 32-bit floating point arithmetic, and thus the tightest threshold at which NMSE loss remains a meaningful proxy for exact recovery rather than numerical noise. 
+
+Effect of Expression Complexity The Addition expression is recovered in all folds and configurations, though using a template depth of 8 requires more time due to the substantially larger search space. As the expressions become more complex, a clear pattern emerges: the intro-duction of non-commutative operators is the primary driver of increased diffi-culty. While it is generally known and accepted that larger formulae are harder to find back, especially as they have more fractions and non-linear operators, our results confirm that non-commutative operators can make it harder as sus-pected in [10, 13]. For the Division and Subtraction problems, discovery of the exact expression becomes increasingly unreliable. Both division and subtraction are non-commutative, meaning the order of operands matter, which reduces the number of global optima in the search space. Adding multiplication does not substantially change this, since multiplication is commutative and does not in-troduce additional ordering constraints. Interestingly, the Squaring problem (i.e., the original Feynman equation), despite being structurally more complex than Subtraction and Multiplication, proves easier to solve. This is likely because squaring eliminates the ordering GP-GOMEA with GPU-Based Fitness Evaluations 13 
+
+Fig. 6: Top rows: NMSE over time across problems with template depths of 6 and 8, and different restart configurations. Bottom row: success rate, defined as the percentage of folds that reached NMSE ≤ 10 −6.constraint on the subtraction operands, i.e.,: (a − b)2 = ( b − a)2, making the subtraction effectively commutative within that context. This is supported by the success rate results in Figure 6: success drops sharply when subtraction is introduced into the problem, and partially recovers when the square operator is introduced and renders the subtraction essentially non-commutative. 
+
+Effect of Template Depth and Convergence Settings A template depth of 6 leads to equal or better performance than a template depth of 8 across all problems. Although a deeper template can represent more complex expressions, it also dra-matically increases the size of the search space, requiring substantially more time to converge. Since none of these problems require the representational capacity of depth 8, the additional complexity is counterproductive. The difference between restart settings is less pronounced. However, the 
+
+log 10 (P ) criterion with a starting population of 2,000 performs marginally bet-ter than the log 2(P ) criterion with a starting population of 65,536. The more frequent restarts with smaller populations being beneficial could be indicative that these problems are highly multi-modal, where the local optima are likely largely disconnected with little exploitable global structure. 
+
+## 5 Discussion 
+
+The GPU implementation performs orders of magnitude more evaluations per minute, particularly on larger datasets. Since fitness evaluation dominates the 14 J. Post et al. 
+
+computational cost in symbolic regression, this enables more extensive explo-ration of the search space and, consequently, improved solution quality. The experiments also show that the effectiveness of GPU acceleration is problem-dependent, with the largest gains occurring on large datasets where enough parallelism potential exists to fully utilize the GPU. Another notable observation is the impact of numerical precision. The GPU implementation relies on single-precision arithmetic, which can introduce small numerical errors compared to the double-precision CPU implementation. This becomes more apparent when expressions start to contain redundant subexpres-sions, as such subexpressions can amplify rounding errors, or redundant opera-tions, which can even improve the NMSE. For practical use, NMSE is not the only relevant criterion: users may rea-sonably prefer a less complex expression with slightly higher error. Moreover, highly complex expressions are more prone to overfitting, so focusing solely on the best-NMSE solution is undesirable. For this reason, it is important for future work to bring the added value of GPU accelerations to a natively multi-objective version of GP-GOMEA. This would also help with avoiding redundant opera-tions that improve the NMSE unexpectedly due to floating precision limitations. In this paper, only evaluations are accelerated, while other components such as variation and linkage learning remain CPU-bound. Parallelizing these com-ponents could further improve scalability. Finally, evolutionary real-valued optimization, modularity, and semantic in-heritance were recently integrated into GP-GOMEA [11, 9, 18] and shown to lead to even better results. While it has not been tested whether GPU paral-lelization would have equally beneficial impact when all these facets, including multi-objective optimization, are integrated, we see no major limitations to do this and thereby obtain a highly practically efficient and effective GP-GOMEA version. 
+
+## 6 Conclusion 
+
+In this work, we investigated the use of GPU acceleration to address the com-putational bottleneck in GP-GOMEA: fitness evaluations. By restructuring the variation loop, introducing a GPU-friendly linear representation, and designing an efficient parallel evaluation strategy, we enabled effective utilization of GPU hardware without altering the core algorithmic principles of GP-GOMEA. Our results demonstrate that GPU GP-GOMEA significantly improves eval-uation throughput, achieving up to a 600 × increase in evaluations per unit of time compared to the CPU implementation for larger datasets where GPU par-allelism can be fully exploited. This enables GP-GOMEA to scale its effective search to much larger expressions without bloating, due to the use of a tem-plate, and makes it possible, for the first time, to recover a very large expression (Feynman I.9.18) within a 4-hour runtime in 78% of runs. GP-GOMEA with GPU-Based Fitness Evaluations 15 
+
+## References 
+
+1. Baeta, F., Correia, J., Martins, T., Machado, P.: TensorGP - Genetic Programming Engine in Tensorflow. In: Castillo, P.A., Jiménez Laredo, J.L. (eds.) Applications of Evolutionary Computation. pp. 763–778. Springer International Publishing, Cham (2021) 2. Bruneton, J.P.: Enhancing symbolic regression with quality-diversity and physics-inspired constraints (2025). https://doi.org/10.48550/ARXIV.2503.19043, https://arxiv.org/abs/2503.19043 3. Burlacu, B., Kronberger, G., Kommenda, M.: Operon C++: an Efficient Genetic Programming Framework for Symbolic Regression. In: Proceed-ings of the 2020 Genetic and Evolutionary Computation Conference Com-panion. p. 1562–1570. GECCO ’20, Association for Computing Machin-ery, New York, NY, USA (2020). https://doi.org/10.1145/3377929.3398099, https://doi.org/10.1145/3377929.3398099 4. Cava, W.L., Orzechowski, P., Burlacu, B., de França, F.O., Virgolin, M., Jin, Y., Kommenda, M., Moore, J.H.: Contemporary Symbolic Regression Methods and their Relative Performance (2021), https://arxiv.org/abs/2107.14351 5. Cranmer, M.: Interpretable Machine Learning for Science with PySR and Symbol-icRegression (2023), https://arxiv.org/abs/2305.01582 6. Dushatskiy, A., Virgolin, M., Bouter, A., Thierens, D., Bosman, P.A.: Parameter-less Gene-pool Optimal Mixing Evolutionary Algorithms. Evolutionary computa-tion 32 (4), 371–397 (2024) 7. Ferreira, R., Martiniano, A., Ferreira, A., Ferreira, A., Sassi, R.: Daily De-mand Forecasting Orders. UCI Machine Learning Repository (2016), DOI: https://doi.org/10.24432/C5BC8T 8. Fortin, F.A., De Rainville, F.M., Gardner, M.A.G., Parizeau, M., Gagné, C.: DEAP: Evolutionary Algorithms Made Easy. The Journal of Machine Learning Research 13 (1), 2171–2175 (2012) 9. Harrison, J., Bosman, P.A.N., Alderliesten, T.: Thinking Outside the Template with Modular GP-GOMEA (2025), https://arxiv.org/abs/2505.01262 10. Janikow, C.Z., Aleshunas, J.: Impact of commutative and non-commutative func-tions on symbolic regression with acgp. In: 2013 IEEE Congress on Evolutionary Computation. pp. 2290–2297 (2013). https://doi.org/10.1109/CEC.2013.6557842 11. Koch, J., Alderliesten, T., Bosman, P.A.N.: Simultaneous Model-Based Evolution of Constants and Expression Structure in GP-GOMEA for Symbolic Regression. In: Affenzeller, M., Winkler, S.M., Kononova, A.V., Trautmann, H., Tušar, T., Machado, P., Bäck, T. (eds.) Parallel Problem Solving from Nature – PPSN XVIII. pp. 238–255. Springer Nature Switzerland, Cham (2024) 12. Koch, J., Alderliesten, T., Bosman, P.A.: Introns and Templates Matter: Rethink-ing Linkage in GP-GOMEA. arXiv preprint arXiv:2602.02311 (2026) 13. Maxwell, S.R.: Why Might Some Problems Be Difficult for Genetic Programming to Find Solutions? In: Koza, J.R. (ed.) Late Breaking Papers at the Genetic Pro-gramming 1996 Conference Stanford University July 28-31, 1996. pp. 125–128. Stanford Bookstore, Stanford University, CA, USA (28–31 Jul 1996) 14. Meurer, A., Smith, C.P., Paprocki, M., Čertík, O., Kirpichev, S.B., Rocklin, M., Kumar, A., Ivanov, S., Moore, J.K., Singh, S., Rathnayake, T., Vig, S., Granger, B.E., Muller, R.P., Bonazzi, F., Gupta, H., Vats, S., Johansson, F., Pedregosa, F., Curry, M.J., Terrel, A.R., Roučka, v., Saboo, A., Fernando, I., Kulal, S., Cimrman, R., Scopatz, A.: SymPy: symbolic computing in Python. 16 J. Post et al. PeerJ Computer Science 3, e103 (Jan 2017). https://doi.org/10.7717/peerj-cs.103, https://doi.org/10.7717/peerj-cs.103 15. Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M., Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D., Brucher, M., Perrot, M., Duchesnay, E.: Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12 , 2825–2830 (2011) 16. Quinlan, R.: Auto MPG. UCI Machine Learning Repository (1993), DOI: https://doi.org/10.24432/C5859H 17. Romano, J.D., Le, T.T., La Cava, W., Gregg, J.T., Goldberg, D.J., Chakraborty, P., Ray, N.L., Himmelstein, D., Fu, W., Moore, J.H.: PMLB v1.0: an open source dataset collection for benchmarking machine learning methods. arXiv preprint arXiv:2012.00058v2 (2021) 18. Schlender, T., Malafaia, M., Alderliesten, T., Bosman, P.: Improv-ing the efficiency of GP-GOMEA for higher-arity operators. In: Pro-ceedings of the Genetic and Evolutionary Computation Conference. p. 971–979. GECCO ’24, Association for Computing Machinery, New York, NY, USA (2024). https://doi.org/10.1145/3638529.3654118, https://doi.org/10.1145/3638529.3654118 19. Shojaee, P., Meidani, K., Gupta, S., Farimani, A.B., Reddy, C.K.: Llm-sr: Sci-entific equation discovery via programming with large language models (2024). https://doi.org/10.48550/ARXIV.2404.18400, https://arxiv.org/abs/2404.18400 20. Stephens, T.: gplearn: Genetic programming in Python, with a scikit-learn inspired API. URL https://github. com/trevorstephens/gplearn. Accessed pp. 05–22 (2024) 21. Udrescu, S.M., Tegmark, M.: AI Feynman: A physics-inspired method for symbolic regression. Science Advances 
+
+6(16), eaay2631 (2020). https://doi.org/10.1126/sciadv.aay2631, https://www.science.org/doi/abs/10.1126/sciadv.aay2631 22. Virgolin, M., Alderliesten, T., Witteveen, C., Bosman, P.A.N.: Scalable Genetic Programming by Gene-Pool Optimal Mixing and Input-Space Entropy-Based Building-Block Learning. In: Proceedings of the Genetic and Evolutionary Com-putation Conference. p. 1041–1048. GECCO ’17, Association for Computing Ma-chinery, New York, NY, USA (2017). https://doi.org/10.1145/3071178.3071287, https://doi.org/10.1145/3071178.3071287 23. de Vries, S., Keemink, S.W., van Gerven, M.A.J.: Kozax: Flexible and Scalable Genetic Programming in JAX. In: Proceedings of the Genetic and Evolutionary Computation Conference Companion. p. 603–606. GECCO ’25 Companion, Association for Computing Machin-ery, New York, NY, USA (2025). https://doi.org/10.1145/3712255.3726681, https://doi.org/10.1145/3712255.3726681 24. Wu, Z., Wang, L., Sun, K., Li, Z., Cheng, R.: Enabling Population-Level Parallelism in Tree-Based Genetic Programming for GPU Acceleration (2026), https://arxiv.org/abs/2501.17168 25. Zhang, R., Lensen, A., Sun, Y.: Speeding up Genetic Programming Based Sym-bolic Regression using GPUs. In: PRICAI 2022: Trends in Artificial Intelligence: 19th Pacific Rim International Conference on Artificial Intelligence, PRICAI 2022, Shanghai, China, November 10–13, 2022, Proceedings, Part I. p. 519–533. Springer-Verlag, Berlin, Heidelberg (2022). https://doi.org/10.1007/978-3-031-20862-1_38 GP-GOMEA with GPU-Based Fitness Evaluations 17 
+
+## A Additional Experiment Results 
+
+A.1 Training MSE for GOMEA 
+
+Fig. 7: Median training MSE and interquartile ranges (shaded areas) over all runs for different population sizes across problems with template depths of 4 and 6. 
+
+A.2 Validation and Training MSE for GP Frameworks 
+
+On Auto MPG, GPU GP-GOMEA is narrowly outperformed by Operon (see Figure 8), likely because Operon employs linear scaling by default and has many coefficients hard-coded in the expression (one per tree node). While linear scaling has been implemented for GP-GOMEA [12], it is not yet supported in combina-tion with the GPU evaluation introduced in this work. This limitation is mostly relevant for datasets where the underlying expression is unknown and may in-clude coefficients (Auto MPG and California Housing). 
+
+Algorithmic Differences of Frameworks A direct comparison of validation and training MSE across frameworks is complicated due to how each framework en-forces structural constraints on expression trees. GP-GOMEA guarantees that a tree never exceeds the specified depth limit during variation. The other frame-works, however, do not uphold this guarantee. While trees are initialized with either a maximum depth, maximum number of nodes, or both, the depth con-straint is not enforced during variation, only the node limit is. As a result, the expression trees produced by these frameworks can represent a substantially wider class of expressions than those produced by GP-GOMEA, constituting a methodological inconsistency that makes direct MSE comparisons unreliable. This is illustrated by the expressions with the lowest MSE found for the Auto MPG dataset at a specified depth of 4 (maximum of 31 nodes) by EvoGP, Kozax, and Operon respectively (coefficients are rounded to 2 decimal places): 
+
+3.88 
+
+vuut x5
+
+ x5 + 39 .64 cos 4(6 .52 x5)
+
+x0 − (x0 − 9.07) cos 2
+
+
+
+x1/43
+
+
+
++ 82 .31 
+
+(3) 18 J. Post et al. 
+
+Fig. 8: Median validation MSE and interquartile ranges (shaded areas) over all runs for different population sizes across problems with template depths of 4 and 6. 
+
+log 2
+
+ x5
+
+x4
+
+
+
++ sin 
+
+
+
+log 2
+
+−x0 + 2 ( −x5 + sin( x5)) 2 
+
++
+
+x4
+
+ x4 − x5 + sin  x25
+
+ 2
+
+x3
+
+(4) 
+
+2.90 + 8 .37 ·
+
+e e
+
+log(1 .29) 
+
+esin( −0.49 x5)
+
++ cos  (0 .24 x5)2 − 0.63 x5
+
+ + 0 .24 x5
+
+ ×
+
+0.36 x6 + 0 .24 x5 + cos  (0 .46 x2)2 − sin(6 .26 x4)
+
+0.45 x2 + 0 .05 x3
+
+(5) All three expressions require tree depths well in excess of the specified limit of 4. Additionally, Operon applies linear scaling and assigns an individual coefficient to every variable, meaning it violates not only the depth constraint but also the node limit. EvoGP and Kozax, by contrast, do adhere to the node limit. For reference, the expressions found by the CPU and GPU implementations of GP-GOMEA for the same dataset and depth limit are: 
+
+x5 − 25 .15 
+
+√19 .58 +
+
+ −33 .86 31 .63 
+
+x1x6
+
++ x25 − (x3 + x2)(x2 + 44 .79) + ( x0 + x6) (6) GP-GOMEA with GPU-Based Fitness Evaluations 19 
+
+Fig. 9: Median training MSE and interquartile ranges (shaded areas) over all runs for different population sizes across problems with template depths of 4 and 6. 
+
+x25
+
+√x3
+
+cos( −26 .91) + log( x2) + cos( −6.83 x5) − log( x4)
+
+x6
+
+(7) These expressions are visibly more compact and conform strictly to the im-posed depth limit, reflecting GP-GOMEA’s stricter enforcement of structural constraints throughout the search process. 
+
+A.3 Evaluation Throughput for GP Frameworks 
+
+Operon consistently outperforms CPU GP-GOMEA in throughput and scales similarly, but is only competitive with GPU GP-GOMEA on the smallest dataset (see Figure 10). 20 J. Post et al. 
+
+Fig. 10: Median number of evaluations per minute and interquartile ranges (shaded areas) over all runs for different population size across problems with template depths of 4 and 6. 
+
+## B Reproducibility and Software Environment 
+
+To facilitate reproducibility, this section provides details on the software envi-ronment and hyperparameter configuration used in all experiments. 
+
+Software Versions Table 4 lists the specific versions and commit hashes of all the evaluated frameworks. EvoGP did not include a dedicated evaluation counter, so the project was forked to add this functionality 4.Table 4: Software versions and commit hashes for all evaluated frameworks.     
+
+> Framework Version/Commit Hash
+> EvoGP 19b597130df6b53e3b6cbc0e66ad2d30374f1b69 Kozax 0.0.11 Operon 0.6.0
+
+Hyperparameters Hyperparameters not explicitly discussed in Section 4 were kept at their default values. Since default values may change across future ver-sions, the version number and commit hashes in Table 4 serve as a stable refer-ence for reproducing the exact configuration used here.

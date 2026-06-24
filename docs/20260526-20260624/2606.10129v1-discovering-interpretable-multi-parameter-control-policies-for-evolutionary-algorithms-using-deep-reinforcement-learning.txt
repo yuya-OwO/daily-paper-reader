@@ -1,0 +1,954 @@
+Title: Discovering Interpretable Multi-Parameter Control Policies for Evolutionary Algorithms Using Deep Reinforcement Learning
+
+URL Source: https://arxiv.org/pdf/2606.10129v1
+
+Published Time: Wed, 10 Jun 2026 00:13:28 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+> 1
+
+# Discovering Interpretable Multi-Parameter Control Policies for Evolutionary Algorithms Using Deep Reinforcement Learning 
+
+Tai Nguyen , Phong Le , Carola Doerr , Nguyen Dang 
+
+Abstract —While deep Reinforcement Learning (deep-RL) has been increasingly applied to parameter control in evolutionary algorithms, rigorous theoretical analysis of parameter control remains largely restricted to single-parameter settings, owing to the difficulty of deriving effective, interpretable multi-parameter policies amenable to formal study. We demonstrate how deep-RL can be leveraged to overcome this barrier, using the (1+( λ,λ))-genetic algorithm optimizing OneMax, one of the few problems where a super-constant speedup of dynamic control has been formally proven, as a representative case study. We first show that standard approaches struggle to converge in this multi-parameter setting, and introduce algorithm-agnostic enhancements targeting action-space decomposition, reward shifting, and long-horizon discounting. With these in place, we compare common deep-RL methods and find that Double Deep Q-Networks uniquely avoid the policy collapse observed in Proximal Policy Optimization, yielding trajectories suitable for downstream analysis. Crucially, we move beyond the “black-box” nature of neural networks by distilling the learned behaviors into a transparent, symbolic control policy. This resulting policy does not only offer inter-pretability for future theoretical analysis but also yields excep-tional performance, consistently outperforming existing baselines across a wide range of problem sizes. 
+
+Index Terms —Parameter control, dynamic algorithm configu-ration, reinforcement learning, symbolic representations. 
+
+I. I NTRODUCTION 
+
+# PARAMETER CONTROL studies how to best adjust the parameters of an evolutionary algorithm (EA) during its execution [1]. State-of-the-art EAs often strongly benefit from parameter control methods [2], as these methods enable the algorithms to adapt their search behavior to meet the varying requirements of different stages in the optimization process. For example, it is often desirable to converge from a global search exploring the most promising regions of the search space to a local search, which exploits the latter to identify local optima. Parameter control is an intensively studied topic in evolutionary computation (EC), both from an empirical angle [3], [4], [5] and from a running time analysis perspective [6]. However, identifying optimal or reasonably good control policies remains a challenging endeavor. Traditionally, identifying these parameter control policies has relied on paradigms with inherent limitations. Determin-istic schedules are typically inflexible to handle complex 
+
+Tai Nguyen is with University of St Andrews, St Andrews, United Kingdom and Sorbonne Universit´ e, CNRS, LIP6, Paris, France (Email: 
+
+dptn1@st-andrews.ac.uk ). Phong Le is with University of St Andrews, St Andrews, United Kingdom (Email: pl200@st-andrews.ac.uk ). Carola Doerr is with Sorbonne Universit´ e, CNRS, LIP6, Paris, France (Email: carola.doerr@lip6.fr ). Nguyen Dang is with University of St Andrews, St Andrews, United Kingdom (Email: nttd@st-andrews.ac.uk ). 🕹 
+
+Deep-RL 
+
+Oracle 
+
+Hand-crafted 
+
+Representations 
+
+Trajectories  📉 📈 
+
+🕹  🕹 
+
+Fine-tuned 
+
+Representations 
+
+🕹 
+
+# 🧠 
+
+SMAC3 
+
+Parameterized 
+
+Representations 
+
+EA 
+
+Parameters 
+
+Stage I  Stage II 
+
+> Developing  Testing
+
+Fitness  Parameters Fitness 
+
+EA 
+
+Fig. 1. The proposed two-stage distillation framework for discovering symbolic multi-parameter control policies. The DAC setting of (1+( λ,λ))-GA solving the O NE MAX problem is represented by the loop (bottom). To bridge the gap between empirical deep-RL performance and theoretical interpretability, our methodology operates in two stages. Stage I: A deep-RL oracle generates optimal parameter trajectories, which are distilled into explicit, Hand-crafted Representations (e.g., λc = 2 × πTHEORY ). Stage II: These equations are generalized into Parameterized Representations (e.g., 
+
+λc = ω × πTHEORY ) and optimized via SMAC3 [16], resulting in Fine-tuned Representations (e.g., λc = 4 .9 × πTHEORY ). 
+
+search landscapes, while hand-crafted adaptive policies [7], [8] demand deep, domain-specific expert intuition. Conversely, self-adaptive mechanisms attempt to evolve the parameters alongside the candidate solutions [9], but they often incur substantial computational overhead [10], delayed feedback, and potential misalignment between parameter values and fitness gains [11], [12]. Another popular direction involves “on-the-fly” online learning via bandit-based approaches [13], [14], [15]; however, because these methods learn from scratch during each run, they fundamentally lack the capacity to transfer learned algorithmic behaviors across different problem instances. To overcome barriers of conventional parameter control methodologies, the EC community has increasingly turned to the Dynamic Algorithm Configuration (DAC) paradigm, where deep reinforcement learning (deep-RL) has emerged as the state-of-the-art methodology for parameter control [17], [18], [19]. In this framework, the algorithm-problem interaction is modeled sequentially: the optimization progress is character-ized by observable states , and the EA parameters serve as the actions . By interacting with the environment through a dedicated “offline” training phase, an RL agent learns a robust policy that maps states to hopefully optimal parameter adjust-ments or actions. Crucially, these learned policies can then be deployed online on unseen problem instances, successfully enabling the transfer of effective parameter trajectories, an 
+
+> arXiv:2606.10129v1 [cs.LG] 8 Jun 2026 2
+
+advantage never achieved in bandit-strategy approaches. Although recent studies demonstrate that deep-RL agents can discover policies that drastically outperform traditional baselines, relying entirely on these neural networks creates a critical “black-box” bottleneck for both theoreticians and prac-titioners. To truly advance algorithmic configuration, they do not just need a black-box oracle that outputs good parameter values; they need a symbolic blueprint , explicit mathematical rules that can be analyzed, verified, and generalized. Specif-ically, transitioning from neural to symbolic representation addresses several core limitations in modern DAC. First, unlike neural networks that often overfit to distributions of training instances [17], [20], mathematical operators (i.e., building blocks of symbolic representations) are inherently agnostic to problem-specific details. A symbolic update rule operates identically regardless of the problem dimension, enabling zero-shot generalization across entirely unseen problem instances and extended optimization horizons. From a computational and theoretical perspective, symbolic policies also offer stark advantages in efficiency and transparency. Evaluating a simple algebraic equation incurs merely an O(1) overhead, bypassing the heavy matrix multiplications of deep network forward passes. Most crucially, symbolic representations provide the actionable interpretability required for formal running time analysis. While the distributed weights of a neural network fundamentally obscure the precise rules driving algorithmic phase transitions, symbolic approaches distill these strate-gies into explicit, human-readable equations. This allows researchers to transparently observe algorithmic phase tran-sitions, directly bridging the gap between empirical policy discovery and theoretical verification. This work is an extension of [21] that employs Double Deep Q-Networks (DDQN), a widely used deep-RL method, to uncover effective hand-crafted symbolic representations for multi-parameter control policies in the (1 + ( λ, λ )) -GA on ONE MAX . Building on the initial successes of that earlier work, we continue to bridge the gap between empirical deep-RL and theoretical EC by offering diverse analyses of various deep-RL methods and then distilling the symbolic policies in a two-stage process. Our contributions are:  
+
+> •
+
+Comparative efficacy of deep-RL methods: To identify the most robust deep-RL oracle for distilling the symbolic representations, we conduct a comprehensive empirical comparison between two commonly used algorithms: DDQN (expanding the results from [21]) and Proximal Policy Optimization (PPO). More importantly, we con-duct an extensive experiment on reward shifting in PPO, which is crucial for the effectiveness of DDQN in this context [22]; however, its applicability to PPO remains an open question. We observe that, while PPO is widely praised for its stability in general RL environments, such as games and robotics, it frequently experiences policy collapse due to the challenging exploration required in this specific DAC environment. Conversely, the DDQN agent from [21] successfully navigates this challenge, cementing its role as the effective deep-RL algorithm to generate the high-quality trajectories required for our symbolic extraction.  
+
+> •
+
+Discovery of symbolic policies: We elevate the symbolic distillation proposed in [21] to a new level by propos-ing a two-stage process to derive simple, interpretable, yet highly effective multi-parameter control policies, as shown in Figure 1. We consider the hand-crafted symbolic equations, informed by the behavior of high-performing deep-RL agents in [21], as the initial stage. Subsequently, we refine these mathematical structures through automated algorithm configuration, yielding a more powerful symbolic policy that surpasses the original formulation in [21] by 6.8% . 
+
+> •
+
+Bridging theory and practice: Our derived symbolic policies significantly outperform previously known pa-rameter control rules. By providing explicit mathematical control equations, we supply theory-focused researchers with formulas that can stimulate the extension and re-finement of existing runtime proofs. Simultaneously, we highlight critical design considerations for empirical re-searchers employing RL in algorithmic contexts. 
+
+Reproducibility: Our code and data are available at [23]. II. B ACKGROUND 
+
+This section offers the necessary background for this work. We first review the Dynamic Algorithm Configuration prob-lem, the natural alignment between the problem and the se-quential decision-making problem targeted by RL. Finally, we briefly describe the two commonly used deep-RL algorithms, namely Deep Q-networks and Proximal Policy Optimization, which are used in this study. 
+
+A. Dynamic Algorithm Configuration (DAC) 
+
+The task of automated algorithm configuration aims at finding the best parameter setting(s) for a given parameter-ized algorithm. This task can be categorized into two main paradigms: static and dynamic [24], [25], [26]. The static algorithm configuration task, which is often referred to as 
+
+algorithm configuration (AC) , aims at finding a parameter setting that remains constant throughout the algorithm’s ex-ecution. More formally, it involves determining a parameter setting (i.e., a configuration) θ∗ ∈ Θ for a specific algorithm 
+
+A that achieves the best possible expected performance with respect to an instance distribution DI over a set I of prob-lem instances [27]. Here, the performance of an algorithm configuration θ on a given problem instance i is defined by the cost function c(θ, i ) (e.g., the average runtime to solve the instance). Formally, the AC problem aims at finding the optimal configuration θ∗ ∈ arg min θ∈Θ Ei∼D I c(θ, i ).On the other hand, dynamic algorithm configuration (DAC) 
+
+aims at dynamically adjusting algorithm parameters during the solving process [26]. More formally, DAC involves learning a parameter control policy π∗ : S × I → Θ, where π∗(s, i )
+
+is a mapping function from the current state s of the solving process on a problem instance i to the best parameter setting 
+
+θ∗ ∈ Θ (i.e., configuration) for that pair of state and instance. In other words, π∗ ∈ arg min π Ei∼D I c(π, i ), where c(π, i )
+
+is the cost of solving instance i using the given algorithm A
+
+under the parameter control policy π.3
+
+There is a large body of existing works in the literature that address similar dynamic algorithm configuration settings. They include parameter control [24], operator selection [28], 
+
+automated algorithm selection [29], and hyper-heuristics [30], [31]. In this study, we adopt the formal definition proposed in Biedenkapp et al. [26] and use the term DAC to refer to the considered learning setting, where the parameter control policy is represented as a machine learning model (in our case, a neural network) and is learned via a dedicated offline training phase. A natural learning framework for this training phase, as we describe in the next section, is deep-RL. 
+
+B. Deep Reinforcement Learning 
+
+As proposed in [26], DAC can be formulated as a contextual Markov Decision Process (MDP) MI := {M i}i∈I . For a given problem instance i ∈ I , the contextual MDP Mi is given by ⟨S , A, Ti, Ri⟩, where S represents the state space (e.g., a cost metric of the configured target algorithm A), A
+
+is the action space (i.e,. used to adjust configuration θ), Ti
+
+is the transition function S × A × S → [0 , 1] that maps a triple (s, a, s ′) to the probability Ti(s, a, s ′) = P (st+1 = s′ |
+
+st = s, a t = a) that choosing action a in state s leads to state 
+
+s′, and the reward Ri : S × A → R is the reward after the transition that is intended to be designed to reflect the quality of applying action a when observing state st.By formulating DAC within the contextual MDP frame-work, reinforcement learning, a class of solutions for MDP, is clearly well-suited for data-driven DAC [17], [26]. The application of RL for DAC can be divided into offline and 
+
+online DAC policies [32], distinguished by the timing of policy execution for controlling the configuration (i.e., use time). In an offline setting, a policy is trained using a training set and then applies the acquired knowledge to solve a new or unseen testing set. Conversely, in the online DAC setting, there is no concept of “use time,” as the policy continuously learns and solves the problem simultaneously. The diverse successes of RL for DAC have been prominently observed in offline setting due to its generalization [33], [34], [35], [36], [37]. During the offline configuration phase, the RL policy engages in trial-and-error interactions with the environment (i.e., the target algorithm A solving a set of problem instances). At each timestep t, the RL policy selects an action at based on its estimation of the action’s quality. It begins by observing the state information st, recalling its learned knowledge, and then making a decision. Immediately, the RL agent receives a reward signal rt measuring the true quality of the selected action, uses that reward to update its policy, and then the environment transitions to a new state st+1 . Typically, the RL policy is stored in a matrix with dimensions |S| × |A| ,where each row corresponds to a unique state s and each column corresponds to a distinct action a. Each cell (s, a )
+
+holds the current estimate of the expected return (i.e., cumu-lative reward) for that particular state-action pair. The training objective is to maximize the return until the end of a running episode. For problems with small-moderate state and action spaces, a look-up table (i.e., matrix) is often utilized to keep track the policy, commonly known as a Q-table. However, as the dimensionality of these spaces increases, the look-up table approach becomes obsolete and is surpassed by robust function approximation techniques employing neural networks, commonly referred to as deep -RL. 
+
+Double Deep Q-Network (DDQN). One of the most widely used deep-RL approaches is DDQN [38], which employs a neural network to approximate the action-value function with parameters ϕ, denoted as Q(s, a ; ϕ). The DDQN represents an enhancement of the original Deep Q-Network (DQN) [39], wherein the policy training process is designed to learn a 
+
+Q-function (i.e., value function) that quantifies the expected quality of a particular action given a specific state. This ob-jective introduced by Watkins et al. [40], employs a temporal-difference (TD) method to update the Q-function using the immediate reward rt observed following the agent’s action. The update is defined as: TD (st, a t; ϕ) = rt + γ max  
+
+> a
+
+Q(st+1 , a ; ϕ) − Q (st, a t; ϕ),
+
+where γ denotes the discount factor, which regulates the sig-nificance assigned to future rewards in the estimation process. Unlike the traditional DQN, DDQN employs two distinct 
+
+Q-functions to separate the steps of selecting and evaluat-ing the optimal next action, thereby reducing overestimation bias. The policy learned by DDQN can be expressed as: 
+
+π(s) = arg max a Q(s, a ; ϕ). DDQN is widely recognized as a prominent representative of value-based RL methods, noted for their improved sample efficiency. In value-based RL, a replay buffer is employed to store transitions generated by the policy over time. During the training phase, the agent samples batches of transitions from this buffer, allowing it to learn effectively from successful experiences generated by previous policies while mitigating correlations between con-secutive samples. This mechanism enhances learning stability and overall performance. 
+
+Proximal Policy Optimization (PPO). Policy gradient methods directly parameterize the control policy π(a|s; ϕ)
+
+unlike learning via a value function such as DQN. While early approaches like REINFORCE [41] utilize the policy gradient theorem to optimize parameters, they suffered from high variance and sample inefficiency due to their reliance on full trajectory returns. To mitigate this, modern architectures adopt an actor-critic framework [42], introducing a value function baseline to compute advantage function A(s, a ) = 
+
+Q(s, a ) − V (s). This metric isolates the specific contribution of an action relative to the state’s average value, significantly stabilizing the learning signal. PPO [43] refines the actor-critic approach by addressing a critical instability in standard policy gradients: the risk of destructively large policy updates. PPO enforces a trust region constraint not via complex second-order optimization, but through a simpler capped surrogate objective: 
+
+L(ϕ) = Et
+
+
+
+min 
+
+
+
+ρt(ϕ) ˆAt, clip (ρt(ϕ), 1 − ε, 1 + ε) ˆAt
+
+ 
+
+,
+
+where the probability ratio ρt(ϕ) = π(at|st;ϕ) 
+
+> π(at|st;ϕold )
+
+quantifies the divergence between the current and the previous policies. The hyperparameter ε specifies an acceptable range for policy up-dates. Concretely, it prevents large policy updates by clipping 4
+
+Algorithm 1: The (1 + ( λ, λ )) -GA with four fitness-dependent parameters: the population sizes λm (for the mutation phase) and λc (for the crossover phase), the mutation rate coefficient α, and the crossover bias coefficient β.
+
+Input: Problem size n, function f : {0, 1}n → R 
+
+> 1
+
+x ← a sample from {0, 1}n chosen u.a.r.;  
+
+> 2
+
+while x is not the optimal solution do  
+
+> 3
+
+Choose λm, λc, α and β based on f (x) 
+
+> 4
+
+Mutation phase:  
+
+> 5
+
+p = αλ m/n ; ▷ mutation rate  
+
+> 6
+
+Sample ℓ from Bin >0(n, p ); 
+
+> 7
+
+for i = 1 , . . . , λ m do x(i) ← flip ℓ(x); Evaluate 
+
+f (x(i)); 
+
+> 8
+
+Choose x′ ∈ { x(1) , . . . , x (λm)} with 
+
+f (x′) = max {f (x(1) ), . . . , f (x(λm))} u.a.r.;  
+
+> 9
+
+Crossover phase:  
+
+> 10
+
+c = β/λ c; ▷ crossover bias  
+
+> 11
+
+Y ← ∅ ; 
+
+> 12
+
+for i = 1 , . . . , λ c do  
+
+> 13
+
+y(i) ← cross c(x, x ′); 
+
+> 14
+
+if y(i) /∈ { x, x ′} then Evaluate f (y(i)); Add 
+
+y(i) to Y; 
+
+> 15
+
+Selection and update step:  
+
+> 16
+
+Choose y ∈ { x′} ∪ Y with 
+
+f (y) = max {f (x′), max y′∈Y f (y′)} u.a.r.;  
+
+> 17
+
+if f (y) ≥ f (x) then x ← y;the objective when the new policy deviates too far from the old one. This limits the benefit of extreme changes, encouraging stable, incremental improvements rather than drastic updates. 
+
+C. Our Use-Case: Controlling Four Parameters of the (1+( λ,λ))-GA Optimizing ONE MAX 
+
+We choose a use case for which a super-constant advantage of dynamic parameter choices over any possible static ones has been formally proven, the optimization of the O NE MAX 
+
+function using the (1 + ( λ, λ )) GA. 
+
+a) The (1 + ( λ, λ )) GA: We use a variant of the (1 + (λ, λ )) GA with four controllable parameters: the population sizes λm, λ c ∈ N for the mutation and crossover phases, respectively, the mutation rate coefficient α ∈ R>0, and the 
+
+crossover bias coefficient β ∈ R>0. In line with previous works [22], [35], [44], [45], we seek control policies that use fitness-dependent parameter choices, i.e., we search policies that choose λm, λc, α, and β in dependence of the quality 
+
+f (x) of the current-best solution x.Algorithm 1 summarizes this algorithm, which works as follows. Starting from an initial solution, the (1+( λ,λ))-GA iteratively runs until an optimal solution is found. 1 In each 
+
+> 1In practice one would cap the maximally allowed number of evaluations. However, here we focus on investigating (and eventually minimizing) the expected optimization time and therefore ignore this implementation detail by choosing a large enough evaluation budget that allows the (1+( λ,λ))-GA to find the optimum with a very high probability.
+
+iteration, the algorithm consists of three phases: the mutation phase, the crossover phase, and the selection step. 
+
+Mutation phase. During the mutation phase, λm offspring solutions are created by applying standard bit mutation to the current-best solution x. More precisely, a mutation strength 
+
+ℓ is sampled from the binomial distribution Bin >0(n, p ) that is conditioned on returning a value ℓ > 0 through rejection sampling; i.e., ℓ is sampled from Bin (n, p ) until a positive value is returned. Following the suggestions made in [46], [47], the mutation rate p ∈ (0 , 1] is parametrized as p = αλ m/n .Each of the λm offspring x(i) is then obtained by applying the flip ℓ operator to x, which flips exactly ℓ pairwise different bits in x, chosen uniformly at random (u.a.r.). 
+
+Crossover phase. The top solution among the λm offspring obtained during the mutation phase, labeled x′, is chosen for the crossover phase; in case of ties a random one among the best offspring is chosen. It is worth noting that x′ may (and frequently will) be worse than the current incumbent solution 
+
+x. The goal of the crossover phase is to repair it, see [46] for a detailed intuition behind the (1+( λ,λ))-GA. In a nutshell, the crossover acts as a genetic repair mechanism that mitigates the potential loss of beneficial genes from the parent due to the aggressive mutation rate while preserving them in the off-spring. To this end, λc offspring are generated by combining x′
+
+with its parent x through the biased crossover operator cross c,which creates a new search point by choosing, independently for each position 1 ≤ i ≤ n, the entry of the second input with probability c and choosing the entry from the first argument otherwise. We refer to c ∈ (0 , 1] as the crossover bias, and we parametrize c = β/λ c, again following the suggestions made in [46], [47]. As an implementation detail, also in line with experiments made in previous work [48, Section 4.1], we only evaluate solutions y(i) that are different from both, x and x′.This implies that the number of evaluations in this crossover phase can be smaller than λc.
+
+Selection step. The best of all offspring, y (selected again u.a.r. among all best options), replaces the parent x if (and only if) it is at least as good as it. 
+
+b) Minimizing expected running time on OneMax: We consider the DAC problem in which the objective is to minimize the expected optimization time (i.e., the expected total number of function evaluations) that the (1 + ( λ, λ )) GA requires to identify the maximum of any O NE MAX function ONE MAX z : {0, 1}n → R, x 7 → |{ 1 ≤ i ≤ n|xi = zi},
+
+z ∈ { 0, 1}, a problem also referred to as Mastermind with two colors [49]. This problem has spurred much interest of the runtime analysis community in parameter control since it was first empirically observed in [46] and later formally proven in [47] that an adaptation of the so-called one-fifth success rule , a classical control policy in evolution strategies [50], [51], [52], to discrete search spaces [53] can achieve linear expected optimization time, a performance that is impossible to obtain with any static parameter setting [47]. Follow-up works such as [54], [48], [55] study different ways of selecting parameters to achieve similar speedups. As an implementation detail, we note that we only need to consider the optimization of the classical O NE MAX function ONE MAX (1 ,..., 1) : {0, 1}n → R, x 7 → Pni=1 xi since the 5
+
+(1+( λ,λ))-GA is an unbiased algorithm in the sense of Lehre and Witt proposed in [56]. Its performance is hence identical on all functions O NE MAX z , z ∈ { 0, 1}n.
+
+c) Previous results for single-parameter control policies: 
+
+In the early works studying parameter control policies for the (1+( λ,λ))-GA optimizing O NE MAX , only λm is controlled, and a static dependence of λc = λm and static choice α =
+
+β = 1 were used. As mentioned, a variant of the (1+( λ,λ))-GA equipped with the one-fifth success rule to control λm was shown to yield a super-constant speed-up over any possible static choice [46], [47]. In this variant, λm does not depend on the quality of the current-best solution; instead it is adjusted in a success-based manner. Initialized as λm = 1 , the value of λm is increased to Aλ m when a strictly better solution is found. Here, A > 1 is a fixed constant, referred to as the 
+
+update strength . The population size λm is updated to βλ m
+
+otherwise, with 0 < β < 1 being the second update strength. To stipulate the one-fifth success rule, one sets A = F (1 /4) 
+
+and b = 1 /F for some fixed factor F > 1. With this setting, 
+
+λm remains constant if on average one out of five iterations is successful in finding a strictly better solution. In an effort to automate the identification of effective param-eter control policies, Chen et al. [57] considered Algorithm 1 with λc = λm and α = β = 1 to investigate how well the automated algorithm configuration tool IRACE [58] would approximate a good policy for controlling λm. While a na¨ ıve application of IRACE was unable to find good policies, an iterative “binning-and-cascading” approach was able to learn control policies that were significantly better than all pre-viously known policies. However, the iterative configuration approach is computationally expensive, leading Nguyen et al. [22] to investigate the effectiveness of employing deep-RL, particularly DDQN, to dynamically control λm, resulting not only in highly effective control policies but also a significant improvement in the sampling efficiency of the learning step compared to [57]. 
+
+d) Previous results for multi-parameter control policies: 
+
+A generalization of the (1+( λ,λ))-GA using the one-fifth success rule was investigated in [59], with the goal to under-stand the potential of fine-tuning the dependencies between the different parameters. As in Algorithm 1, [59] considers 
+
+p = αλ m/n as mutation rate and c = β/λ c as crossover bias. The crossover population size is parametrized as λc = γλ m.All in all, [59] investigates the advantage of tuning all five parameters: α, γ, β, A, and b using IRACE . Their policy suggests α = 0 .3594 , β = 1 .4128 , γ = 1 .2379 , A = 1 .1672 ,and b = 0 .691 . Equipped with these parameter values, the (1+( λ,λ))-GA was empirically shown to yield constant-factor improvements over the previously known policies, suggesting that a more flexible coupling of the five parameters can be beneficial. Note that we further extend these results by adding an additional layer of flexibility, completely decoupling the parameters from each other, and allowing each of them to be determined by the quality of the current-best solution, irrespective of the value of the other parameters. III. D EEP -RL FOR MULTI -PARAMETER CONTROL OF 
+
+(1+( λ,λ))-GA ON ONE MAX 
+
+Problem formulation. When the framework of contex-tual MDP is extended for multi-parameter control, the func-tion MI introduced in Section II-B can be expressed as 
+
+Mi := S, {A d}Dd=1 , Ti, Ri , with D-dimensional action spaces {A d}Dd=1 , and transition function Ti : S × {A d}Dd=1 ×S → [0 , 1] , and reward function Ri : S × {A d}Dd=1 → R.
+
+State space. The fitness value f (x) ∈ { 0, . . . , n − 1} of the current-best solution is used as the observation for deep-RL training. 
+
+Action space. While PPO is naturally capable of handling both discrete and continuous action spaces with ease, DDQN requires discrete action spaces. It is therefore necessary to discretize the domains of the parameters of the (1+( λ,λ))-GA. Following [22], [35], we define the portfolio of λm
+
+and λc as D1 = {1, 2, 4, 8, 16 , 32 , 64 }. The upper bound was chosen based on results suggested in [22], where it was observed that the population size in the best policies learned by deep-RL never exceeded 64 for all tested problem sizes of n ≤ 2,000 .2 For α and β, we use [0 .25 , 2] as the domain, following the setting in [59]. We discretize this domain uniformly for our multi-dimensional discrete action space experiments. For simplicity, we use the same number of choices as in D1, i.e., α and β are chosen from the set of 
+
+D2 = {0.25 , 0.542 , 0.833 , 1.125 , 1.417 , 1.708 , 2}.
+
+Reward function. We explore multiple reward functions proposed in [22] and further examined in [35], beginning with the conventional reward function: rt = −Et + ∆ ft,where Et is the total number of solution evaluations in the current iteration and ∆ft = f (xt+1 ) − f (xt) measures the fitness improvement. We then follow the proposed adaptive shifted variant rt = −Et + ∆ ft + b− 
+
+> a
+
+introduced by Nguyen et al. [22], where b− 
+
+> a
+
+is an adaptive bias term computed from the replay buffer during the warm-up phase; it helps to address the under-exploration issue. In this DAC setting, the advantages of reward shifting were explicitly observed in DDQN. Its application in policy-based RL algorithms remains an open direction, although there is some evidence in the general RL literature that policy-based RL can be enhanced by reward shaping [60], [61]. In this study, we aim to address the gap in the capabilities of deep-RL algorithms in this context by examining both conventional and shifted reward functions. In the remainder of this section, we provide a brief overview of how to engineer deep-RL algorithms to transition smoothly from single-parameter to multi-parameter control. The primary distinction lies in the action space representation, which serves as the interface between the deep-RL agent and the evolu-tionary algorithm. In the literature, two architectures of action space enable RL agents to interact with multiple aspects of the environment: combinatorial action representation and factored 
+
+action representation.  
+
+> 2In our experiments, we observed that this choice also works for very large
+> nup to 40,000. 6
+
+(a) Combinatorial action representation  (b) Factored action representation                   
+
+> state state
+> sub-actions
+> 2,401 nodes 7 nodes each
+> 4 branches
+> Fig. 2. Deep neural network architectures for (a) Combinatorial and (b) Factored action space representations for the (1+( λ,λ))-GA with four controllable parameters, each of which is selected from a set of 7 possible values. The number of output nodes for the combinatorial representation is 74= 2 ,401 . These diagrams depict the architectural mapping from a given state sto a generic score function h(s, a;ϕ)during inference. We refer to Sections III-A and III-B for a detailed explanation of the mapping from score function h(·)to action a.
+
+A. Combinatorial Representation 
+
+Combinatorial action space representation is frequently con-sidered the simplest method because it condenses a multi-dimensional action space into a single-dimensional one by merging multiple discrete action spaces into a single list of unique combinations. Formulating ⟨λm, α, λ c, β ⟩ as a unified combinatorial action allows us to directly leverage established methods like [22] to map environmental states to optimal parameter configurations. In practice, implementing this with a DDQN requires only mi-nor architectural adjustments: the output layer of the baseline 
+
+Q-network (shown in Figure 2a) is simply widened to en-compass every discrete combination in the joint action space. During inference, an agent in state st (at step t) determines the best combinatorial parameter setting by computing: 
+
+at = arg max 
+
+> a
+
+h(st, a; ϕ)= arg max 
+
+> ⟨λm,α,λ c,β ⟩
+
+Q(st, ⟨λm, α, λ c, β ⟩ ; ϕ) , (1) where h(·) is the mapping function that represents the Q-values generated by the network. This logic extends naturally to PPO, where the actor net-work is structured to output a categorical probability distribu-tion over the entire combinatorial action space using SOFTMAX 
+
+function: 
+
+π(a|st; ϕ) = exp( h(st, a; ϕ)) 
+
+P 
+
+> a′
+
+exp( h(st, a′; ϕ)) = exp( h(st, ⟨λm, α, λ c, β ⟩ ; ϕ)) 
+
+P 
+
+> a′
+
+exp( h(st, a′; ϕ)) , (2) where the denominator sums over all valid parameter config-urations a′ in the combinatorial space. During deterministic inference, the agent selects the combined action a that maxi-mize the learned policy: 
+
+at = arg max 
+
+> a
+
+π(a|st; ϕ)= arg max 
+
+> ⟨λm,α,λ c,β ⟩
+
+π(⟨λm, α, λ c, β ⟩ | st; ϕ) . (3) 
+
+B. Factored Representation 
+
+Using combinatorial actions treats each unique combination of sub-actions (i.e., individual parameter values) as a distinct atomic action without considering the internal structure. If there are nd possible values for each sub-action and an action is composed of D sub-actions ⟨a1, . . . , a D ⟩, then the total action space grows exponentially as QDd=1 nd. Such a combi-natorial explosion poses serious challenges for RL, particularly for value-based methods like DDQN, as it hinders learning efficiency and increases inference cost [62], [63], [64], [65]. To address this issue, prior work has explored hierarchical action selection [66], common-sense constraints [67], and learning-based reduction strategies [68] to effectively prune the action space. To investigate the aforementioned issue, we employ a factored action structure, with assumptions of independence. For DDQN, similar to [69], we decompose each action into 
+
+D sub-actions, each of which will be modeled independently using a dedicated architecture. Specifically, for each coordinate 
+
+1 ≤ d ≤ D, we define a distinct action-value function 
+
+Qd(s, a d) that estimates the expected return of taking sub-action ad in state s, based on a local d-th Q-function. As a result, we can train these functions independently, each of which captures only the marginal contribution of each coordinate/parameter, without explicitly modeling interactions between sub-actions. This decomposition dramatically reduces the effective action space size and enhances scalability. To operationalize this structure, we adopt the action branching framework introduced by [69], which offers an efficient and empirically validated approach for learning in factored action spaces. In our im-plementation, we construct a shared neural network backbone (illustrated in Figure 2b) with D = 4 output branches (or “heads ”), each corresponding to a generic score function 
+
+hd(·; ϕ). At inference time, the final joint action is constructed by independently selecting the optimal value in each sub-7
+
+action dimension: 
+
+at =
+
+* arg max h1(st, λ m; ϕ)arg max h2(st, α ; ϕ)arg max h3(st, λ c; ϕ)arg max h4(st, β ; ϕ)
+
++
+
+=
+
+* arg max Q1(st, λ m; ϕ)arg max Q2(st, α ; ϕ)arg max Q3(st, λ c; ϕ)arg max Q4(st, β ; ϕ)
+
++
+
+. (4) This factored representation extends naturally to PPO, where the generic output heads hd(·; ϕ) represent raw log-probabilities (logits). A SOFTMAX activation normalizes these logits across the discrete choices for each dimension to yield independent marginal policy distributions: 
+
+πd(ad|st; ϕ) = exp( hd(st, a d; ϕ)) 
+
+P 
+
+> a′
+
+exp( hd(st, a ′; ϕ)) . (5) Assuming conditional independence between the sub-actions given the state st, the joint policy over the entire pa-rameter configuration is simply the product of these marginals: 
+
+π(⟨λm, α, λ c, β ⟩ | st; ϕ) = Y
+
+> ad∈{ λm,α,λ c,β }
+
+πd(ad|st; ϕ) . (6) Consequently, during deterministic inference, the aggre-gated action is constructed by independently selecting the mode of each marginal policy: 
+
+at =
+
+* arg max π1(λm|st; ϕ)arg max π2(α|st; ϕ)arg max π3λc|st; ϕ)arg max π4(β|st; ϕ)
+
++
+
+. (7) Note that while both DDQN and PPO utilize the ARGMAX 
+
+operator, PPO applies it to identify the mode of the distribu-tion, whereas DDQN uses it to determine the action with the highest expected value. IV. E XPERIMENTAL SETUP 
+
+Following [45], [22], [35], we employ a neural network function approximator with two hidden layers, each containing 50 nodes, as the feature extractor for both the DDQN and PPO algorithms. For the output heads, the DDQN with combinato-rial representation consists of 74 = 2 ,401 output nodes. The DDQN with a branching network and the PPO actor network share the same architecture featuring four heads, each offering seven possible choices. We also follow previous works that employ a default setting for DDQN’s hyperparameter: 3 an ε-greedy value of 0.2, a replay buffer of 1 million transitions, and pre-fill it with 
+
+10 ,000 random samples. Optimization uses Adam [71] with a batch size of 2,048 and a learning rate of 0.001 . We examine the effect of the discount factor γ on learning performance when employing DDQN algorithms. A recent work [35] has highlighted the critical role of the discount factor in reward estimation, noting its sensitivity in the O NE MAX benchmark 
+
+> 3The hyperparameter configuration adheres to the recommendation in [39], with the exception of the optimizer and learning rate, which are derived from the defaults in Stable Baselines [70].
+
+due to the long-horizon nature of the problem. Accordingly, high value of discount factor or undiscounted learning is advantageous in this DAC setting to prevent underestimation of future rewards. Based on these insights, we evaluate three discount factor values, γ ∈ {0.99 , 0.9998 , 1.0}, where the latter options apply minimal discounting to more effectively capture long-term reward signals. For PPO, we use the Stable Baselines [70] implementation and experiment PPO with default hyperparameters: a learning rate of 0.0003 , 2,048 rollout steps, a batch size of 64 , and 10 
+
+training epochs. We set a GAE [72] coefficient of 0.95 , and a clip range of 0.2, with advantage normalization for stable learning. Unlike DDQN experiments, which investigate three values of the discount factor, the PPO experiment sets the discount factor to 0.99 , as previous work [35] has shown that the discount factor has less impact on PPO performance in this DAC context. The O NE MAX problem can be treated as an episodic task ,in which the optimization process is naturally divided into episodes. Each episode begins from a defined initial state and ends either when the global optimum is reached (i.e., 
+
+f (x) = n) or when a predefined time limit is exceeded. To prevent excessive use of the training budget on ineffective policies, we impose a maximum of 0.8n2 solution evaluations per (1+( λ,λ))-GA run, where n denotes the problem size. This maximal budget is significantly larger than the linear running times we expect to see according to [47] and also larger than empirical running times observed, for example, in [48]. Our experiments reveal that fewer than 5% of RL policies result in runtimes reaching the threshold of 0.8n2, with most of these occurrences happening at the start of the training process when the parameters of deep-RL policies are initialized randomly. RL training is conducted per problem size with a training budget of 200 ,000 training time steps for each RL training run. Following previous work [22] on the same benchmark, to select the best policy from each RL training, we evaluate the learned policy at every 2,000 training time steps with a budget of 100 runs per evaluation. At the end of the training, we collect the top 5 best learned policies, re-evaluate each of them 1,000 times and extract the best one. As deep-RL is commonly known to be unstable [73], [74], and since our main focus in this work is to leverage deep-RL to discover new parameter control policies for this particular benchmark, for each RL setting, we repeat the training 5 times and use the best policy among those trainings as the final policy. 
+
+Computing resources. All experiments are conducted on a machine equipped with a single-socket AMD EPYC 7443 24-core processor. For the RL training phase we use a single core, while for the evaluation phase, we parallelize 16 threads. The total wall-time for each RL training ranges between 30 minutes to one hour, depending on the problem size. This budget is smaller than the IRACE -based approach where a tuning was reported to take up to 2 days with 20 parallel threads [59]. 
+
+Performance metric. We gather the runtimes across 1,000 
+
+random seeds and report them as the Expected Runtime (ERT), which serves as our performance metric. These runtimes are defined as the total number of solution evaluations used dur-ing one (1+( λ,λ))-GA run. To enhance comparative analyses 8                                                                                             
+
+> TABLE I NORMALIZED ERT ( AND ITS STANDARD DEVIATION )OF THE BEST POLICIES (DDQN ONLY )ACHIEVED BY EACH COMBINATION OF
+> COMBINATORIAL AND FACTORED ACTION REPRESENTATIONS (AR), NA¨IVE AND ADAPTIVE SHIFTING (AS) REWARD FUNCTIONS ,AND DISCOUNT FACTORS (γ). BOLD :THE BEST NORMALIZED ERT. UNDERLINED :NOT SIGNIFICANTLY WORSE THAN THE BEST (CONFIDENCE LEVEL OF 0.95 ).
+> n=100 n=200 n=500
+> πTHEORY [46], [47] 5.826 (1.18) 6.167 (0.97) 6.474 (0.67)
+> AR Reward γ
+> CNa¨ ıve 0.99 4.510 (1.07) 5.057 (0.83) 5.959 (0.79)
+> CAS 0.99 4.392 (0.77) 4.961 (0.76) 5.583 (0.74)
+> CNa¨ ıve 0.9998 4.350 (0.80) 4.969 (0.72) 6.531 (0.61)
+> CAS 0.9998 4.777 (0.81) 4.835 (0.59) 5.198 (0.51)
+> CNa¨ ıve 1.04.528 (0.82) 4.712 (0.69) 5.369 (0.74)
+> CAS 1.04.584 (0.80) 5.326 (0.60) 5.843 (0.55)
+> FNa¨ ıve 0.99 4.952 (1.38) 5.731 (1.42) 6.835 (1.47)
+> FAS 0.99 4.395 (0.97) 4.689 (0.79) 5.948 (0.93)
+> FNa¨ ıve 0.9998 4.467 (0.98) 4.472 (0.63) 4.932 (0.52)
+> FAS 0.9998 4.318 (0.83) 4.483 (0.65) 4.814 (0.42)
+> FNa¨ ıve 1.04.518 (0.99) 4.449 (0.71) 4.848 (0.48)
+> FAS 1.04.189 (0.81) 4.564 (0.74) 4.938 (0.48)
+
+across problem sizes, we present the performance metric in a normalized form, dividing ERT by the problem size (ERT /n ). 
+
+Statistical tests. In all result tables, the policy with the best ERT /n is highlighted in bold . We perform a Wilcoxon signed-rank test (confidence level of 0.95 ) comparing each of the remaining policies against the best one. Policies that are not statistically significantly worse than the best are underlined. We apply the Holm-Bonferroni method to correct for multiple comparisons. 
+
+Baselines. We compare our deep-RL multi-parameter con-trol policies against several baselines from the literature as outlined in Section II-C, including:  
+
+> •
+
+the theory-derived single-parameter control policy pro-posed in [46], [47], namely πTHEORY , where λm =pn/ (n − f (x)) . 
+
+> •
+
+the single-parameter control policy based on the one-fifth success rule [53], [75];  
+
+> •
+
+the multi-parameter control policy obtained from  
+
+> IRACE
+
+[59];  
+
+> •
+
+the two single-parameter control policies based on the two deep-RL methods, πDDQN/sp and πPPO/sp , obtained in [22], [35]. 4
+
+Note that we do not explicitly compare to the results presented in [48] and [54] since both are much worse than those obtained by πTHEORY , with ERTs exceeding 12 n for [48] and results worse than the (1+1) EA (and hence much worse than the (1+( λ,λ))-GA equipped with πTHEORY ) in [54]. Among the baselines, the IRACE -based approach [59] is the strongest one. This is not too surprising, as this is the only baseline that tunes all four parameters of (1+( λ,λ))-GA separately. 
+
+> 4The ERT reported in [22] was based on average performance across five RL training runs. However, in our work, we report the best policy because we will use it to derive a symbolic policy. To ensure a fair comparison, we re-run their experiments and report performance of the best policy across five RL training runs instead of taking the average.
+
+V. R ESULTS 
+
+Comparison of DDQN Approaches. We first evaluate the impact of the three DDQN’s design choices, including: (i) action space representation (combinatorial vs. factored); (ii) reward function (na¨ ıve vs. adaptive reward shifting, as in [22]); and (iii) various values of discount factor. Table I presents the performance of all combinations of those three design alternatives on three problem sizes n ∈{100; 200; 500 }. Interestingly, when the na¨ ıve reward function and the commonly used discount factor γ = 0 .99 are used, there is no clear advantage in using factored action space rep-resentation. In contrast, when adaptive reward shifting and/or higher discount factor is adopted, the factored representation starts outperforming its combinatorial counterpart across all problem sizes (as shown in the last four rows of Table I). Additionally, the learned policies are statistically significantly superior to all others. These observations significantly enhance the findings in [35], where the higher discount factor (e.g., γ = 0 .9998 
+
+or 1.0) was considered only as an alternative to the adaptive reward shifting mechanism in the long-horizon environment. Their combination has previously been seen as an implicit conflict, resulting in performance degradation. However, the results in this section offer a new perspective, demonstrating that these two enhancements no longer conflict but can actually support each other in this multi-parameter control benchmark. 
+
+Policy Collapse in PPO. While the advantages of reward shaping in policy-gradient-based RL have been discussed in the literature, particularly in general RL applications (i.e., see [60]), this remains an open question in this DAC context, across both single- and multi-dimensional action spaces. In this section, we examine the performance of PPO across three axes: i) single- versus multi-parameter controls; ii) combinatorial versus factored action space representations in the case of multi-parameter control; and iii) conventional versus shifted reward functions. However, unlike the reward shifting successfully applied in DDQN, the adaptive shifting mechanism proposed in [22] is tailored specifically for DDQN as it relies on the replay buffer of the off-policy RL family. Although we cannot elegantly apply adaptive reward shifting in PPO, we still conduct it through a brute-force search by testing a grid of potential negative shifting bias 5 values such as b ∈ { 0, −1, −3, −5, −7}, where b = 0 denotes the conventional reward function. We present performances of PPO across three problem sizes: {100 , 200 , 500 } in Table II. Interestingly, all multi-parameter control policies, whether enhanced by reward shift-ing or not, and regardless of the action space representation, outperform the theory-derived policy in the first two problem sizes. However, no single-parameter control policies, even with reward shifting, achieve this level of advantage. Although the dominance of multi-parameter control policies cannot be maintained for a problem size of n = 500 , these are still capable of discovering better policies (ERTs are closer to the theory-derived policy) than any single-parameter control 
+
+> 5As shown in [22], adding a negative shifting bias into the conventional reward function can induce exploration. 9
+
+TABLE II NORMALIZED ERT ( AND ITS STANDARD DEVIATION ) OF THE BEST POLICIES (PPO ONLY ) ACROSS PARAMETER CONTROL (S INGLE VERSUS 
+
+MULTIPLE ), ACTION SPACE REPRESENTATION (AR), INCLUDING 
+
+COMBINATORIAL VERSUS FACTORED , IN MULTI -PARAMETER CONTROL ,
+
+> AND REWARD SHIFTING BIAS
+
+. BOLD : THE BEST NORMALIZED ERT. UNDERLINED : NOT SIGNIFICANTLY WORSE THAN THE BEST (CONFIDENCE LEVEL OF 0.95 ). 
+
+n = 100 n = 200 n = 500 
+
+πTHEORY [46], [47] 5.826 (1.18) 6.167 (0.97) 6.474 (0.67) 
+
+Parameter AR Bias 
+
+Single 
+
+0 6.147 (1.61) 7.003 (1.65) 7.572 (0.97) 
+
+−1 6.183 (1.71) 6.642 (1.07) 8.009 (0.95) 
+
+−3 6.138 (1.66) 6.568 (1.10) 7.031 (0.99) 
+
+−5 6.019 (1.27) 5.967 (1.14) 8.333 (1.61) 
+
+−7 6.078 (1.13) 6.020 (1.08) 8.142 (1.57) 
+
+Multiple 
+
+C 0 4.962 (1.45) 5.791 (1.44) 6.642 (1.20) 
+
+C −1 5.327 (1.53) 5.840 (1.45) 6.847 (1.51) 
+
+C −3 4.957 (1.41) 5.755 (1.39) 6.876 (1.40) 
+
+C −5 4.968 (1.45) 6.147 (1.41) 6.694 (1.38) 
+
+C −7 4.908 (1.43) 5.737 (1.47) 6.718 (1.37) 
+
+Multiple 
+
+F 0 4.905 (1.32) 5.691 (1.45) 6.704 (1.33) 
+
+F −1 4.878 (1.42) 5.652 (1.41) 6.715 (1.36) 
+
+F −3 4.906 (1.40) 5.692 (1.37) 6.716 (1.43) 
+
+F −5 4.910 (1.39) 5.649 (1.33) 6.707 (1.44) 
+
+F −7 4.863 (1.39) 5.668 (1.34) 6.692 (1.39) 
+
+policies. Regarding the impact of reward shifting biases, they almost have no effect in both single- and multi-parameter settings. Concretely, in the first two problem sizes in multi-parameter control using factored action space representation, where all shifting biases yield identical results in the statistical test. Although the shifted reward function does not offer any benefits for PPO, the impact of multi-parameter control is quite evident. To investigate whether this improvement is due to mere chance or genuine effectiveness, we plot the PPO learning curves for two problem sizes of {100; 500 },where n = 100 demonstrates the predominance of the multi-parameter control policy, while n = 500 exhibits performance fairly competitive with the theory-derived policy. It should be noted that the normalized ERTs in Table II are derived from extensive testing (over 1,000 runs) of the best policy found during training, whereas each recorded point on the learning curve, shown in Figure 3, represents the mean normalized ERT (over 100 runs) during training across 5 random seeds. This implies that thorough testing will be carried out on the cost-effective, less accurate policy identified on the learning curve, resulting in some differences between them. Remark-ably, the learning curves of the combinatorial action space representation are significantly less stable than the factored representation. In n = 100 , although some of running seeds in the combinatorial representation setting appear to discover a good policy more quickly than the factored one within the first 50 , 000 training steps, as indicated by the shaded orange area, they subsequently experience a rapid collapse and exhibit unstable learning until the end. In a more challenging problem size of n = 500 , this collapse is evident; those PPO policies stagnate at a suboptimal policy by the end of the training process (starting from training step 150 , 000 ). In contrast, the 50 100 150 200        
+
+> #Training steps (x 1000)
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> ERT / n
+> n= 100
+> πPPO /sp
+> πPPO /mp /comb
+> πPPO /mp /fact πTHEORY 50 100 150 200
+> #Training steps (x 1000)
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> 12
+> ERT / n
+> n= 500
+> πPPO /sp
+> πPPO /mp /comb
+> πPPO /mp /fact πTHEORY
+
+Fig. 3. Learning curves for PPO under single-parameter control ( πPPO/sp )and multi-parameter control with combinatorial (πPPO/mp/comb ) factored (πPPO/mp/fact ) action space representations for two problem sizes. The solid lines represent the mean normalized ERTs, while the shaded areas indicate the standard deviation across 5 PPO runs. 100 200 500 
+
+> Problem size ( n)
+> 5
+> 10
+> 15
+> ERT /  n
+> πTHEORY
+> πPPO /sp
+> πPPO /mp /comb
+> πPPO /mp /fact
+> πDDQN /mp /comb
+> πDDQN /mp /fact
+
+Fig. 4. Normalized ERT ( ↓) comparison of deep-RL policies against the theory-derived baseline πTHEORY for problem sizes n ∈ { 100 , 200 , 500 }. We evaluate single-parameter PPO [35], our multi-parameter PPO variants, and the top DDQN policies from Table I. 
+
+factored action space representation consistently demonstrates learning stability across both problem sizes. We conclude that, although the factored representation cannot guarantee that PPO consistently outperforms the theory-derived policy, it can help stabilize the training process to some extent. Nonetheless, upon closer examination of the learned PPO policies in both action space representations, we find that neither converges to a meaningful policy. Once the learning curves stabilize, we observe that the best learned PPO policy is λm = 1 , α = 0 .25 , λc = 1 , and these parameters are kept constant across all fitness states, while β tends to fluctuate randomly with values greater than 1 (which is permissible, as the crossover bias β/λ c is bounded within 1). This observation highlights a policy collapse in PPO method, indicating that PPO becomes fixated on an ineffective policy instead of genuinely converging to a more performant one. This finding aligns with the investigation in [35], where the PPO policies persistently sample the population size of λm = 1 . Despite attempting various RL enhancement techniques to address this challenge, such as entropy regularization [76], [77], reward normalization [78], undiscounted setting [79], and even em-ploying Hyperparameter Optimization (HPO) for tuning seven crucial hyperparameters, none of these methods appear to be effective. Therefore, we acknowledge that the policy collapse issue of PPO inherently occurs in both single- and multi-parameter settings. Finally, when comparing the two most commonly used RL 10 
+
+TABLE III NORMALIZED ERT ( AND ITS STANDARD DEVIATION ) OF SEVERAL BASELINES FROM THE LITERATURE AND THE BEST POLICIES ACHIEVED THROUGH DEEP -RL METHODS IN SINGLE - AND MULTI -PARAMETER CONTROL (WITH FACTORED ACTION SPACE REPRESENTATION ), USING THREE TYPES OF REWARD FUNCTIONS : NA ¨IVE , ADAPTIVE , AND FIXED SHIFTING . BOLD : THE BEST NORMALIZED ERT. 
+
+n = 1,000 n = 1,500 n = 2,000 
+
+πTHEORY [46], [47] 6.587 (0.53) 6.647 (0.44) 6.681 (0.39)  
+
+> IRACE
+
+[59] 5.587 (0.35) 5.621 (0.29) 5.666 (0.26) 
+
+> ONE
+
+-FIFTH [53], [75] 6.886 (0.54) 6.931 (0.48) 7.008 (0.41) 
+
+Deep-RL Parameter Reward 
+
+DDQN Single AS 6.338 (0.55) 6.209 (0.41) 6.608 (0.41) 
+
+PPO Multi/Fact Na¨ ıve 7.544 (1.39) 7.938 (1.50) 8.294 (1.44) 
+
+PPO Multi/Fact FS 7.016 (0.60) 7.940 (1.45) 8.267 (1.42) 
+
+DDQN Multi/Fact AS 5.397 (0.41) 4.971 (0.29) 5.162 (0.29) 
+
+methods side-by-side, despite the improvements in PPO with factored action space representation in the multi-parameter setting, it still falls short of DDQN approaches. As shown in Figure 4, we visualize the normalized ERTs of all the RL policies we have evaluated. Across all three problem sizes tested, DDQNs consistently emerge as the dominant approach, especially when equipped with the three components discussed in the previous section. 
+
+Extensive Comparative Analysis. Our primary objec-tive is to identify the best-fit deep-RL algorithm for this DAC environment as the foundation for policy discovery later. Above, we have gained initial insights with small-scale instances: (i) the combination of factored representation, adaptive reward shifting, and a higher discount factor value of γ = 0.9998 performs as the best overall configuration for DDQN (Section V); and (ii) while the combination of factored action space representation shows promising results, the learned PPO policies consistently collapse to a suboptimal policy (Section V). In this section, we extend the experiments using the best settings for each RL algorithm obtained in the previous sections on a broader range of problem sizes, with 
+
+n ∈ { 1,000; 1 ,500; 2 ,000 }, shown in Table III. Although reward shifting has not shown any impact in PPO experiments, we aim to confirm these findings on a larger scale. Therefore, we choose the combination of factored representation and two reward functions, one conventional and another with a fixed bias shift of b = −7, for our extensive analysis. Unexpectedly, the shifted reward function demonstrates an improvement over the conventional reward for a problem size of n = 1 ,000 ; however, they quickly become identical as the problem size increases in Table III. It is not surprising that PPO policies consistently fail to explore any useful policies compared to the simplest baseline of theory-derived policy. Unlike the collapse of PPO, DDQN equipped with fac-tored action space representation, adaptive reward shifting, and a higher discount factor (as discussed in Section V) consistently demonstrate its advantage in large-scale problem sizes, highlighted in blue in Table III. This setting even outperforms the strongest baseline using IRACE for tuning the same parameters. This finding aligns with the conclusion in [35], where DDQN is suggested as the best practice for RL-
+
+TABLE IV NORMALIZED ERT ( AND ITS STANDARD DEVIATION ) OF DIFFERENT VERSIONS WITH VARYING NUMBERS OF CONTROLLED PARAMETERS . T HE TERM Qd DENOTES DYNAMIC CONTROL ACHIEVED THROUGH DDQN (SEE EQUATION (4)), WHEREAS α = β = 1 AND λc = λm INDICATE NO DYNAMIC CONTROL . BOLD : THE BEST NORMALIZED ERT. U NDERLINED : 
+
+> NOT SIGNIFICANTLY WORSE THAN THE BEST
+
+(CONFIDENCE LEVEL OF 
+
+0.95 ).                                                                                  
+
+> n=500 n=1,000 n=1,500 n=2,000
+> πTHEORY [46], [47] 6.474 (0.67) 6.587 (0.53) 6.647 (0.44) 6.681 (0.39)
+> λmαλcβ
+> Q11λm16.017 (0.63) 6.338 (0.55) 6.209 (0.41) 6.608 (0.41)
+> Q11Q315.052 (0.48) 5.268 (0.38) 5.504 (0.39) 6.133 (0.39)
+> Q1Q2λm15.064 (0.60) 5.187 (0.37) 5.282 (0.39) 5.277 (0.34)
+> Q11λmQ46.170 (0.67) 6.220 (0.53) 6.384 (0.44) 6.722 (0.44)
+> Q1Q2λmQ45.191 (0.63) 5.303 (0.43) 5.609 (0.33) 5.410 (0.32)
+> Q1Q2Q314.738 (0.40) 4.869 (0.34) 5.196 (0.34) 5.297 (0.32)
+> Q1Q2Q3Q44.814 (0.42) 5.397 (0.41) 4.971 (0.29) 5.162 (0.29) (λ)(λm,α)(λm,α,λc)(λm,α,λc,β)
+> 4.5
+> 5.0
+> 5.5
+> 6.0
+> 6.5
+> 7.0
+> ERT /  n
+> n= 500
+> n= 1000
+> n= 1500
+> n= 2000
+
+Fig. 5. Transition from controlling only one parameter of (1+( λ,λ))-GA on ONE MAX to controlling all four parameters with DDQN across different problem sizes. Each point shows the normalized ERT (and its standard deviation) of the corresponding learned policy. 
+
+based DAC in this benchmark. The extensive analysis further reinforces the established insights and effectively supports the symbolic policy discovery process. VI. A BLATION STUDY ON PARAMETER IMPORTANCE 
+
+We analyze the significance of each parameter to deci-pher the policies learned by the DDQN and provide the interpretable insights for the symbolic policy discovery. This investigation is conducted on four problem sizes: n ∈{500; 1 ,000; 1 ,500; 2 ,000 }.We repeat the DDQN training to control only the mu-tation population size ( λm), while the remaining parame-ters {α, λ c, β } are determined by the theory-derived policy 
+
+πTHEORY , i.e., λc = λm and α = β = 1 . Gradually, we integrate more parameters into the set of controllable parameters by DDQN. For instance, in the second round, we conduct DDQN trainings for three possible pairs: {λm,λc}, {λm,α}, and 
+
+{λm,β}. We then select the most effective combination as the starting point for the third step, and so on. This is repeated until all four parameters are included. Table IV shows the performance of all combinations in each round across the four problem sizes, and a summary version, displaying only the best combination at each iteration, is presented in Figure 5. 11 
+
+When comparing the theory-derived policy and the policies obtained from simultaneously controlling mutation population size and the mutation rate coefficient, the average improve-ments achieved are over 18% . Although the average expected runtimes of {λm, α } do not always outperform {λm, λ c},our Wilcoxon signed-rank test’s results suggest that there is no statistical difference between these two combinations. This observation highlights the crucial role of α in almost four tested problem sizes, and we conclude that α is the next parameter that should be controlled. Therefore, we then verify the impact of integrating one of the two parameters of the crossover phase into the combination. The advancements increase over 22% when we incorporate the offspring popu-lation size of crossover. On the contrary, replacing λc with β
+
+adversely affects the overall performance. Controlling the pair of {λm, β } also leads to the same observations, suggesting that dynamically adjusting the factor of crossover bias is not an effective way to enhance the optimization process. The common trend across four problem sizes is shown in Figure 5, where we observe an overall improvement in most cases when a new parameter is added into the set of controllable parameters. There are only a few exceptions, such as the last point in the transition path of n = 1 ,000 
+
+where the performance got worse. We attribute those cases to DDQN’s learning instability and the challenges when the size of the action space is increased. This observation is not too surprising as this kind of learning instability behavior has been observed in previous work on theory-derived dynamic algorithm configuration benchmarks [45], [22]. We leave for future work a more thorough investigation into improving the learning stability in such cases. Overall, we observe intense drops during the transition from controlling λm alone to 
+
+{λm, α }, followed by {λm, α, λ c}, and finally, we achieve full control over four parameters. This order reflects the important degree of each parameter: λm ≫ α ≫ λc ≫ β.VII. F ROM BLACK -BOX TO WHITE -BOX CONTROL 
+
+POLICIES 
+
+Although the policies learned via RL show strong perfor-mance, they are problem-dependent. Moreover, as a neural network-based approach, each learned policy functions is a black box function. Those aspects may hinder the usefulness of our findings for theoretical insights. To address this limitation, in this section, based on the parameter importance analysis and the policies suggested by DDQN, we derive a new symbolic policy that is not only interpretable but also exhibit strong performance and generalization. This symbolic policy is derived through a two-stage process. We first manually design a symbolic parameter control policy based on the empirical data of the policies learned by DDQN. This policy is then further refined via a fine-tuning process using SMAC3 [16]. As demonstrated later in this section, both the hand-crafted and the tuned policies consistently outperform all existing base-lines, even on very large problem sizes of up to n = 40 ,000 .
+
+A. Hand-Crafted Design for Multi-Parameter Control 
+
+We begin the process by designing a hand-crafted policy using policies learned by DDQN for all problem sizes tested 0.5 0.6 0.7 0.8 0.9 1.0                       
+
+> f(x)/ n
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> 30
+> λm
+> 0.5 0.6 0.7 0.8 0.9 1.0
+> f(x)/ n
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> α
+> 0.5 0.6 0.7 0.8 0.9 1.0
+> f(x)/ n
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> λc
+> 0.5 0.6 0.7 0.8 0.9 1.0
+> f(x)/ n
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> β
+> π(100)
+> DDQN /mp
+> π(200)
+> DDQN /mp
+> π(500)
+> DDQN /mp
+> π(1000)
+> DDQN /mp
+> π(1500)
+> DDQN /mp
+> π(2000)
+> DDQN /mp
+> πTHEORY
+> Fig. 6. DDQN-based policies and the theory-derived policy across six problem sizes. Note that the evolution path of λmand λcin the theory-derived policy
+> πTHEORY is exactly the same for all problem sizes, however, the upper bound for those parameters increases as problem size increases. Here we plot those values to the maximum upper bound, which corresponds to n= 2 ,000 .
+
+in the previous section. We plot all the policies on the same canvas by normalizing fitness values and then compare them with the theory-derived policy, as shown in Figure 6. The design process prioritizes the parameters based on their significance, as explored in Section VI, with the more valuable parameters being designed first. 
+
+Population size λm for the mutation phase . Overall, this parameter was set as one by DDQN for most of the fitness range (as shown in Figure 6, top-left). Only later in the search, where the fitness value is around 0.95 n on average, that λm starts increasing. The magnitudes of λm in that later part are fairly close to the values suggested by theory (i.e., 
+
+λm = pn/ (n − f (x)) ). The symbolic representation of this parameter is as follows: 
+
+λm =
+
+(
+
+1 if f (x)/n ≤ 0.95 
+
+pn/ (n − f (x)) otherwise (8) 
+
+Coefficient α for the mutation rate . A common trend for this parameter is that it starts jumping to a high value when f (x) ≥ 0.95 n. Therefore, we design a policy where α
+
+is set as a small value (e.g., 0.001 ) during the first part of the search 6, and is then increased to 1 when the fitness reaches a certain distance to the optimum, such as 0.95 n. As a result, the parameter is formulated as follows:                             
+
+> 6Note that in Figure 6 for a few problem sizes, DDQN appears to suggest a “U-shape” policy where αreceives a large value before dropping and then increasing. We also experimented with this U-shape policy where we set α=0.5if f(x)<0.85 n,α= 0 .001 if 0.85 n≤f(x)≤0.95 n, and α= 1
+> otherwise. However, this policy performs worse than the one where we simply set α= 0 .001 for all f(x)≤0.95 n. The differences are small, though, this alternative U-shaped policy achieves a normalized ERT of around 6.212
+> averaged across seven tested problem sizes. 12
+
+TABLE V NORMALIZED ERT ( AND ITS STANDARD DEVIATION ) FOR SEVEN PROBLEM SIZES OF DIFFERENT VERSIONS OF THE NEWLY HAND -CRAFTED POLICY .EACH TERM IN EQ.(·) CORRESPONDS TO THE EQUATION OF THE NEW SYMBOLIC FORM FOR EACH PARAMETER . T HE CASES WHERE α = β = 1 AND 
+
+λc = λm DENOTE NO DYNAMIC CONTROL . BOLD : THE BEST NORMALIZED ERT. 
+
+n = 3,000 n = 4,000 n = 5,000 n = 10 ,000 n = 20 ,000 n = 30 ,000 n = 40 ,000 
+
+πTHEORY [46], [47] 6.723 (0.32) 6.763 (0.28) 6.768 (0.26) 6.834 (0.20) 6.855 (0.14) 6.877 (0.13) 6.882 (0.11) 
+
+λm α λc β
+
+Eq.(8) 1 λm 1 6.353 (0.35) 6.384 (0.30) 6.404 (0.28) 6.475 (0.21) 6.545 (0.16) 6.581 (0.15) 6.602 (0.14) 
+
+πTHEORY Eq.(9) λm 1 5.905 (0.32) 5.957 (0.30) 5.980 (0.26) 6.044 (0.20) 6.096 (0.16) 6.142 (0.15) 6.157 (0.14) 
+
+πTHEORY 1 Eq.(10) 1 5.891 (0.24) 5.923 (0.22) 5.930 (0.20) 5.978 (0.15) 6.029 (0.12) 6.051 (0.11) 6.076 (0.10) 
+
+πTHEORY Eq.(9) Eq.(10) 1 5.167 (0.24) 5.199 (0.21) 5.216 (0.19) 5.269 (0.14) 5.309 (0.12) 5.336 (0.11) 5.362 (0.10) 
+
+Eq.(8) 1 Eq.(10) 1 6.006 (0.26) 6.022 (0.23) 6.045 (0.20) 6.090 (0.16) 6.132 (0.13) 6.156 (0.11) 6.172 (0.10) 
+
+Eq.(8) Eq.(9) Eq.(10) 1 4.827 (0.23) 4.859 (0.21) 4.870 (0.19) 4.930 (0.15) 4.964 (0.12) 4.998 (0.12) 5.006 (0.10) 
+
+α =
+
+(
+
+0.001 if f (x)/n ≤ 0.95 1 otherwise (9) 
+
+Population size λc for the crossover phase . Although the theory-derived policy suggests a dependency of λm = λc,our RL-based DAC policy imposes a much larger value for 
+
+λc. The range of this parameter might be approximately twice that suggested by theory. This observation somewhat aligns with the findings in [59], where IRACE also suggested that λc = 2λm. Notably, the learned DDQN policies are able to recognize this correlation without having to explicitly formulate the relationship between λc and λm. This allows for more flexibility compared to the IRACE -based approach: since 
+
+λm and λc are completely decoupled from each other, DDQN can choose to “delay” increasing λm during the early part of the search. The formula for this parameter is as follows: 
+
+λc = 2 × pn/ (n − f (x)) (10) 
+
+Coefficient β for the crossover bias . The values explored by DDQN for this parameter show a less clear trend, and since this parameter was indicated in Section VI as the least important one among the four parameters, we decide to keep this parameter as a constant of β = 1 (i.e., similar to the theory-derived policy). 
+
+Ablation analysis. We assess the newly hand-crafted policy across a range of problem sizes from n = 500 to n = 40 ,000 
+
+and compare it with the theory-derived policy. As shown in the second row ( πTHEORY ) and the last row of Table V, the derived policy consistently outperforms the theory-derived one across all problem sizes tested, including the very large problem size of n = 40 , 000 .To gain insights into the importance of each component of the derived policy, we conduct an ablation analysis where we replace each of the three parameters, λm, α, and λc, with the ones in the theory-derived policy during the ablation path. The results are shown in Table V (row 3 onward), where the expected runtime values are again normalized by the problem size. We observe that λc plays a crucial role in improving the ERT, resulting in an average reduction of over 12% ,followed by the mutation rate coefficient α which improves by approximately 11 .5% . We next examine the combination of two parameters, where the set of {α, λ c} exhibits an average 
+
+TABLE VI COMPARISON OF PARAMETERS IN THE NEWLY DERIVED POLICY WITH HAND -CRAFTED INSIGHTS AND INCUMBENTS IDENTIFIED BY SMAC3. 
+
+Parameter Search Space Hand-crafted SMAC3 
+
+κm interval (0 .5, 1.0) 0.95 0.9596 
+
+ω interval (1 .0, 5.0) 2.0 4.8923 
+
+κα interval (0 .5, 1.0) 0.95 0.9590 
+
+υ interval (0 .001 , 0.1) 0.001 0.00104 
+
+improvement of over 22 .5% , significantly outperforming the set of {λm, λ c} (which only yields a 10% improvement). This observation highlights the negative impact of merging λm into 
+
+λc. The last row in Table V indicates a consistent performance improvement of 27 .5% over πTHEORY , confirming the positive contribution of our hand-crafted policies {λm, α, λ c} to the performance. Consequently, this motivates us to continue ex-ploring fine-grained derived policies for further improvement. 
+
+B. Parameter Tuning for the Newly Derived Policy 
+
+As demonstrated in the previous sub-section, our insight into the hand-crafted policies is fairly accurate. This encourages us to use the algorithm configuration tool to adjust those policies more finely. Concretely, we re-parameterize the multi-parameter control policy in Algorithm 1 by introducing four new parameters: (i) the switching point ( κm) for λm; (ii) the amplification factor ( ω) for λc; (iii) the switching point ( κα)and (iv) the lower bound ( υ) for α: 
+
+> •
+
+Population size for the mutation phase with κm:
+
+λm =
+
+(
+
+1 if f (x)/n ≤ κm
+
+pn/ (n − f (x)) otherwise (11)  
+
+> •
+
+Population size for the crossover phase with ω:
+
+λc = ω × pn/ (n − f (x)) (12)  
+
+> •
+
+Mutation rate coefficient with κα and υ:
+
+α =
+
+(
+
+υ if f (x)/n ≤ κα
+
+1 otherwise (13)  
+
+> •
+
+Crossover bias coefficient: β = 1 
+
+Search spaces. We define the search spaces for all four parameters: κm, ω, κα, and υ as shown in Table VI. While 13 500 2,000 5,000 10,000 20,000 30,000 40,000                         
+
+> Problem size ( n)
+> 4.0
+> 4.5
+> 5.0
+> 5.5
+> 6.0
+> 6.5
+> 7.0
+> ERT /  n
+> 6.8%
+> 19.4%
+> 32.2%
+> THEORY IRACE-BASED HAND-CRAFTED SMAC3-BASED
+> Fig. 7. Normalized ERT (and its standard deviation) of our two newly derived policies ( HAND -CRAFTED and SMAC 3-BASED ), compared to the theory-derived policy [46], [47] ( THEORY ) and the IRACE -based approach [59] ( IRACE -BASED ). 0.6 0.8 1.0
+> 5.0
+> 5.5
+> 6.0
+> ERT /  n
+> 12345
+> 5.0
+> 5.5
+> 6.0
+> 0.6 0.8 1.0
+> m
+> 5.2
+> 5.5
+> 5.8
+> 6.0
+> ERT /  n
+> 0.000 0.025 0.050 0.075 0.100
+> 5.0
+> 5.2
+> 5.4
+> predicted ERT / nstd
+> Fig. 8. Marginal performance plots of καand ω, the two most important parameters during SMAC3’s tuning process, identified by fANOVA. The y-axis shows the marginal performance, i.e., the average algorithm performance predicted by fANOVA for a given parameter value (x-axis).
+
+these value ranges are informed by our insights, we adhere to the philosophy that a well-defined search space should balance exploration with computational feasibility. 
+
+Algorithm configuration setup. We use the SMAC3 frame-work [16] as the optimizer. SMAC3 is an upgraded version of SMAC [80], which is a highly established automated algorithm configuration tool. The optimization employs amulti-fidelity strategy, using the Hyperband [81] intensifier. The fidelity parameter determines the number of repetitions (budget) for evaluating a single configuration. We allocate 100 repetitions for the initial screening and 1,000 repetitions for high-confidence evaluation. The optimization is limited to a total budget of one million units, which is consumed by the number of repetitions; for instance, a single full-fidelity evaluation uses 1,000 units. This approach ensures that poor configurations are eliminated early (after 100 runs), while promising configurations are accelerated to the maximum fidelity ( 1,000 runs) to guarantee statistical significance. In order to speed up the tuning process, we distribute the tuning across 20 CPUs, allowing for parallel evaluation of candidate configurations. We use the normalized ERT averaged across four problem sizes ( n ∈ {200; 500; 1 ,000; 2 ,000 }) as the objective value for the SMAC3 optimizer. The incumbents identified by SMAC3, as shown in Ta-ble VI, are notably very close to our hand-crafted values. We provide a comprehensive performance evaluation across four methods: the theory-derived policy ( πTHEORY [46], [47]), the strongest baseline achieved by IRACE in previous study, and our two newly derived policies described above. As illustrated in Figure 7, our policy supported by SMAC3 significantly surpasses the others for all tested problem sizes. Notably, the normalized ERT seems to remain constant across all problem sizes, approximately 6.9, 5.8, 5.0, and 4.7 for the theory-derived policy, the IRACE -based one, and our two newly developed policies, respectively, suggesting a generalizable constant speedup that could be studied in future theoretical analysis on this benchmark. As shown in Table VI, after tuning with SMAC3, parameter 
+
+υ remains unchanged, while κm and κα stay close to their default values. Only ω undergoes a substantial change. To better understand the significance of the decisions made by SMAC3, we employ the parameter importance analysis tool fANOVA [82]. Developed by the same authors as SMAC, fANOVA reuses the performance data collected during the tuning process to provide insights into the configurator’s decisions. Specifically, fANOVA constructs a random forest model that takes an algorithm configuration as input and predicts the corresponding performance. This model is then used to quantify the contribution of each parameter, as well as their low-order interactions, to the variance in performance. Interestingly, fANOVA identifies the switching point κα
+
+and the amplification factor ω as the two most important parameters, accounting for 30 .84% and 30 .29% of the total performance variance, respectively. These findings suggest that (i) our hand-crafted rule for λm is already close to optimal; and (ii) it is crucial to decouple the two population sizes, λm
+
+and λc, with a substantially larger λc being highly beneficial. The remaining parameters, namely the switching point κm
+
+and the lower bound υ, have considerably smaller effects, con-tributing 7.25% and 2.52% to the total variance, respectively. There is also a 7.79% pairwise interaction effect between the two most important parameters, κα, ω , followed by a 
+
+6.91% interaction between κm, ω . These interaction effects indicate that the corresponding parameter pairs cannot be tuned independently. VIII. C ONCLUSION 
+
+In this work, we have shown that (deep) RL can be a pow-erful tool to discover high-performing, theoretically tractable multi-parameter control policies for evolutionary computation. By leveraging results suggested by deep-RL for controlling 14 
+
+four parameters of the the (1+( λ,λ))-GA optimizing O NE -MAX , and then finetuning these policies with an algorithm configuration tool, we have derived a symbolic policy that outperforms all existing policies on this task. We believe our work offers new insights for researchers interested in reinforcement learning, algorithm configuration, or in theoretical aspects of evolutionary computation (EC). For the EC community, it is worth noting that our derived policies are fairly simple and may be tractable for a fine-grained running time analysis. However, we note that, to date, no reasonably good bounds for the constant factors of the linear expected running time of the (1+( λ,λ))-GA with suitable dynamic parameter choices are known, even though experimental results for up to n = 222 in [48] suggest that the constant factor of the default 1/5-th success rule proposed in [46], [47] is somewhere around 6.9, perfectly in line with our empirical results. The interested reader may have noticed that the constant factors for all algorithms and parameter control policies increase with increasing problem dimension n, and this includes the settings for which we have proven guarantees of linear running times. However, as [48, Section 4.3] acknowledges, the few formally proven upper bounds for the constant factors (for their algorithm choosing 
+
+λ from a heavy-tailed power-law distribution) seem to be far too pessimistic. Since the precision of running time results has drastically increased over the last years, fine-grained per-formance analyses of the original self-adjusting (1+( λ,λ))-GA and the (1+( λ,λ))-GA equipped with our discovered policies may already be feasible or become feasible in the near future. From a more general perspective, we hope that this work, in line with others e.g., [83] (expanding upon [84]) and [85] (de-riving running time guarantees for observations made in [86]) underlines the benefits of tying sound empirical investigations with rigorous theoretical analyses, and vice-versa. On the empirical side, we conjecture that the more robust deep-RL policies provide a richer foundation for symbolic pol-icy discovery. Therefore, further improving the performance of deep-RL algorithms is one of the most feasible next steps. Multi-agent reinforcement learning (MARL) [87], [88], [89] can serve as a guiding principle, especially given its recent ex-amination in the DAC context [90], [91]. Concerning the fail-ures of policy-gradient-based RL methods, we plan to explore the long-standing concept of offline RL [92] and Imitation Learning (IL) [93], where we anticipate that offline transitions will assist RL algorithms in exploring effective policies. For policy discovery, several straightforward approaches, such as the tree search [94] can be used to approximate the RL agent’s policy. Another advanced technique is to simultaneously con-duct the RL training and symbolic policy regression [95], [96]. ACKNOWLEDGMENTS 
+
+The project is financially supported by the European Union (ERC, “dynaBBO”, grant no. 101125586), by ANR project ANR-23-CE23-0035 Opt4DAC, and by an Interna-tional Emerging Action funded by CNRS Sciences informa-tiques. This work used the supercomputer at MeSU Plat-form (https://sacado.sorbonne-universite.fr/plateforme-mesu). Tai Nguyen acknowledges funding from the St Andrews Global Doctoral Scholarship programme. This publication is based upon work from COST Action CA22137 “Randomized Optimization Algorithms Research Network” (ROAR-NET), supported by COST (European Cooperation in Science and Technology). REFERENCES [1] A. E. Eiben, Z. Michalewicz, M. Schoenauer, and J. E. Smith, “Pa-rameter control in evolutionary algorithms,” in Parameter setting in evolutionary algorithms . Springer, 2007, pp. 19–46. [2] A. Aleti and I. Moser, “A systematic literature review of adaptive pa-rameter control methods for evolutionary algorithms,” ACM Computing Surveys (CSUR) , 2016. [3] G. Karafotias, S. K. Smit, and A. E. Eiben, “A generic approach to parameter control,” in Proc. of EvoApplications , 2012. [4] A. E. Eiben, R. Hinterding, and Z. Michalewicz, “Parameter control in evolutionary algorithms,” TEVC , 1999. [5] A. Aleti and I. Moser, “A systematic literature review of adaptive pa-rameter control methods for evolutionary algorithms,” ACM Computing Surveys , 2016. [6] B. Doerr and C. Doerr, “Theory of parameter control for discrete black-box optimization: Provable performance gains through dynamic parame-ter choices,” Theory of Evolutionary Computation: Recent Developments in Discrete Optimization , 2020. [7] N. Hansen and A. Ostermeier, “Adapting arbitrary normal mutation distributions in evolution strategies: The covariance matrix adaptation,” in Proc. of IEEE ICEC , 1996. [8] A. Auger and N. Hansen, “A restart CMA evolution strategy with increasing population size,” in IEEE CEC , 2005. [9] G. Karafotias, M. Hoogendoorn, and ´ A. E. Eiben, “Parameter control in evolutionary algorithms: Trends and challenges,” IEEE TEVC , 2014. [10] X.-J. Bi and J. Xiao, “Classification-based self-adaptive differential evo-lution with fast and reliable convergence performance,” Soft Computing ,2011. [11] A. K. Qin and P. N. Suganthan, “Self-adaptive differential evolution algorithm for numerical optimization,” in 2005 IEEE CEC , 2005. [12] R. Mallipeddi and P. N. Suganthan, “Empirical study on the effect of population size on differential evolution algorithm,” in IEEE CEC , 2008. [13] L. DaCosta, A. Fialho, M. Schoenauer, and M. Sebag, “Adaptive operator selection with dynamic multi-armed bandits,” in GECCO , 2008. [14] ´A. Fialho, L. Da Costa, M. Schoenauer, and M. Sebag, “Analyzing bandit-based adaptive operator selection mechanisms,” Annals of Math-ematics and Artificial Intelligence , 2010. [15] B. Doerr, C. Doerr, and J. Yang, “k-bit mutation with self-adjusting k outperforms standard bit mutation,” in Proc. of PPSN , 2016. [16] M. Lindauer, K. Eggensperger, M. Feurer, A. Biedenkapp, D. Deng, C. Benjamins, T. Ruhkopf, R. Sass, and F. Hutter, “SMAC3: A versatile Bayesian optimization package for hyperparameter optimization,” JMLR ,2022. [17] M. Sharma, A. Komninos, M. L´ opez-Ib´ a˜ nez, and D. Kazakov, “Deep reinforcement learning based parameter control in differential evolution,” in Proc. of GECCO , 2019. [18] G. Shala, A. Biedenkapp, N. Awad, S. Adriaensen, M. Lindauer, and F. Hutter, “Learning step-size adaptation in CMA-ES,” in PPSN , 2020. [19] J. Sun, X. Liu, T. B¨ ack, and Z. Xu, “Learning adaptive differential evolution algorithm from optimization experiences by policy gradient,” 
+
+IEEE TEVC , 2021. [20] Z. Ma, J. Chen, H. Guo, Y. Ma, and Y.-J. Gong, “Auto-configuring exploration-exploitation tradeoff in evolutionary computation via deep reinforcement learning,” in Proc. of GECCO , 2024. [21] T. Nguyen, P. Le, C. Doerr, and N. Dang, “Multi-parameter control for the (1 + ( λ, λ )) -GA on OneMax via deep reinforcement learning,” in 
+
+Proc. of FOGA , 2025. [22] T. Nguyen, P. Le, A. Biedenkapp, C. Doerr, and N. Dang, “On the importance of reward design in reinforcement learning-based dynamic algorithm configuration: A case study on OneMax with (1 + ( λ, λ )) -GA,” in Proc. of GECCO , 2025. [23] T. Nguyen, P. Le, C. Doerr, and N. Dang, https://github.com/taindp98/ OneMax-MPDAC/tree/dev/extension, 2025. [24] ´A. E. Eiben, R. Hinterding, and Z. Michalewicz, “Parameter control in evolutionary algorithms,” IEEE TEVC , 1999. [25] M. Birattari and J. Kacprzyk, Tuning metaheuristics: a machine learning perspective . Springer, 2009, vol. 197. 15 
+
+[26] A. Biedenkapp, H. F. Bozkurt, T. Eimer, F. Hutter, and M. Lin-dauer, “Dynamic algorithm configuration: Foundation of a new meta-algorithmic framework,” in ECAI . IOS Press, 2020, pp. 427–434. [27] F. Hutter, H. H. Hoos, K. Leyton-Brown, and T. St¨ utzle, “ParamILS: an automatic algorithm configuration framework,” JAIR , 2009. [28] J. E. Pettinger and R. M. Everson, “Controlling genetic algorithms with reinforcement learning,” in Proc. of GECCO , 2002. [29] M. G. Lagoudakis, M. L. Littman et al. , “Algorithm selection using reinforcement learning.” in ICML , 2000. [30] E. K. Burke, M. Gendreau, M. Hyde, G. Kendall, G. Ochoa, E. ¨ Ozcan, and R. Qu, “Hyper-heuristics: A survey of the state of the art,” Journal of the Operational Research Society , 2013. [31] R. Qu, G. Kendall, and N. Pillay, “The general combinatorial optimiza-tion problem: Towards automated algorithm design,” IEEE Computa-tional Intelligence Magazine , 2020. [32] S. Adriaensen, A. Biedenkapp, G. Shala, N. Awad, T. Eimer, M. Lin-dauer, and F. Hutter, “Automated dynamic algorithm configuration,” 
+
+JAIR , 2022. [33] M. Tessari and G. Iacca, “Reinforcement learning based adaptive meta-heuristics,” in Proc. of GECCO Companion , 2022. [34] D. Speck, A. Biedenkapp, F. Hutter, R. Mattm¨ uller, and M. Lindauer, “Learning heuristic selection with dynamic algorithm configuration,” in 
+
+Proc. of ICAPS , 2021. [35] T. Nguyen, P. Le, A. Biedenkapp, C. Doerr, and N. Dang, “Deep reinforcement learning for dynamic algorithm configuration: A case study on optimizing OneMax with the (1 + ( λ, λ )) -GA,” arXiv preprint arXiv:2512.03805 , 2025. [36] T. Xu, H. C. Chen, and J. He, “Accelerate evolution strategy by proximal policy optimization,” in Proc. of GECCO , 2024. [37] H. Guo, S. Ma, Z. Huang, Y. Hu, Z. Ma, X. Zhang, and Y.-J. Gong, “Re-inforcement learning-based self-adaptive differential evolution through automated landscape feature learning,” in Proc. of GECCO , 2025. [38] H. Van Hasselt, A. Guez, and D. Silver, “Deep reinforcement learning with double Q-learning,” in Proc. of AAAI , 2016. [39] V. Mnih, K. Kavukcuoglu, D. Silver, A. A. Rusu, J. Veness, M. G. Bellemare, A. Graves, M. Riedmiller, A. K. Fidjeland, G. Ostrovski 
+
+et al. , “Human-level control through deep reinforcement learning,” 
+
+nature , 2015. [40] C. J. Watkins and P. Dayan, “Q-learning,” Machine learning , 1992. [41] R. J. Williams, “Simple statistical gradient-following algorithms for connectionist reinforcement learning,” Machine learning , 1992. [42] R. Sutton and A. Barto, “Reinforcement learning: An introduction,” 
+
+IEEE Transactions on Neural Networks , 1998. [43] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Prox-imal policy optimization algorithms,” arXiv preprint arXiv:1707.06347 ,2017. [44] A. Lissovoi, P. S. Oliveto, and J. A. Warwicker, “Simple hyper-heuristics control the neighbourhood size of randomised local search optimally for leadingones,” Evolutionary Computation , 2020. [45] A. Biedenkapp, N. Dang, M. S. Krejca, F. Hutter, and C. Doerr, “Theory-inspired parameter control benchmarks for dynamic algorithm configuration,” in Proc. of GECCO , 2022. [46] B. Doerr, C. Doerr, and F. Ebel, “From black-box complexity to designing new genetic algorithms,” Theoretical Computer Science , 2015. [47] B. Doerr and C. Doerr, “Optimal static and self-adjusting parameter choices for the (1+( λ, λ)) genetic algorithm,” Algorithmica , 2018. [48] D. Antipov, M. Buzdalov, and B. Doerr, “Fast mutation in crossover-based algorithms,” Algorithmica , 2022. [49] B. Doerr and C. Winzen, “Playing Mastermind with constant-size memory,” Theory of Computing Systems , 2014. [50] M. A. Schumer and K. Steiglitz, “Adaptive step size random search,” 
+
+IEEE Transactions on Automatic Control , 1968. [51] I. Rechenberg, Evolutionsstrategie . Stuttgart: Friedrich Fromman Verlag (G¨ unther Holzboog KG), 1973. [52] L. Devroye, The compound random search . Ph.D. dissertation, Purdue Univ., West Lafayette, IN, 1972. [53] S. Kern, S. D. M¨ uller, N. Hansen, D. B¨ uche, J. Ocenasek, and P. Koumoutsakos, “Learning probability distributions in continuous evo-lutionary algorithms–a comparative review,” Natural Computing , 2004. [54] D. Antipov, M. Buzdalov, and B. Doerr, “Lazy parameter tuning and control: Choosing all parameters randomly from a power-law distribu-tion,” Algorithmica , 2024. [55] A. O. Bassin, M. V. Buzdalov, and A. A. Shalyto, “The “one-fifth rule” with rollbacks for self-adjustment of the population size in the (1 + (λ, λ )) genetic algorithm,” Autom. Control. Comput. Sci. , 2021. [56] P. K. Lehre and C. Witt, “Black-box search by unbiased variation,” 
+
+Algorithmica , 2012. [57] D. Chen, M. Buzdalov, C. Doerr, and N. Dang, “Using automated algorithm configuration for parameter control,” in Proc. of FOGA , 2023. [58] M. L´ opez-Ib´ a˜ nez, J. Dubois-Lacoste, L. P. C´ aceres, M. Birattari, and T. St¨ utzle, “The irace package: Iterated racing for automatic algorithm configuration,” Operations Research Perspectives , 2016. [59] N. Dang and C. Doerr, “Hyper-parameter tuning for the (1 + ( λ, λ )) 
+
+GA,” in Proc. of GECCO , 2019. [60] Z. Zheng, J. Oh, and S. Singh, “On learning intrinsic rewards for policy gradient methods,” NeurIPS , 2018. [61] J. Dierkes, E. Cramer, S. Trimpe, and H. Hoos, “Combining automated optimisation of hyperparameters and reward shape,” in Seventeenth European Workshop on Reinforcement Learning , 2024. [62] G. Dulac-Arnold, D. Mankowitz, and T. Hester, “Challenges of real-world reinforcement learning,” arXiv preprint arXiv:1904.12901 , 2019. [63] P. Covington, J. Adams, and E. Sargin, “Deep neural networks for YouTube recommendations,” in Proc. of the 10th ACM conference on recommender systems , 2016. [64] G. Dulac-Arnold, R. Evans, H. van Hasselt, P. Sunehag, T. Lillicrap, J. Hunt, T. Mann, T. Weber, T. Degris, and B. Coppin, “Deep rein-forcement learning in large discrete action spaces. arXiv 2015,” arXiv preprint arXiv:1512.07679 .[65] T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, and D. Wierstra, “Continuous control with deep reinforcement learning,” in ICLR , 2016. [66] J. He, M. Ostendorf, X. He, J. Chen, J. Gao, L. Li, and L. Deng, “Deep reinforcement learning with a combinatorial action space for predicting popular Reddit threads,” in Proc. of EMNLP , Nov. 2016. [67] F. Rasheed, K.-L. A. Yau, R. M. Noor, C. Wu, and Y.-C. Low, “Deep reinforcement learning for traffic signal control: A review,” IEEE Access ,2020. [68] T. Zahavy, M. Haroush, N. Merlis, D. J. Mankowitz, and S. Mannor, “Learn what not to learn: Action elimination with deep reinforcement learning,” NeurIPS , 2018. [69] A. Tavakoli, F. Pardo, and P. Kormushev, “Action branching architectures for deep reinforcement learning,” in Proc. of AAAI , 2018. [70] A. Hill, A. Raffin, M. Ernestus, A. Gleave, A. Kanervisto, R. Traore, P. Dhariwal, C. Hesse, O. Klimov, A. Nichol, M. Plappert, A. Radford, J. Schulman, S. Sidor, and Y. Wu, “Stable baselines,” https://github.com/ hill-a/stable-baselines, 2018. [71] D. P. Kingma and J. Ba, “Adam: A method for stochastic optimization,” in ICLR , 2015. [72] J. Schulman, P. Moritz, S. Levine, M. Jordan, and P. Abbeel, “High-dimensional continuous control using generalized advantage estimation,” 
+
+arXiv preprint arXiv:1506.02438 , 2015. [73] P. Henderson, R. Islam, P. Bachman, J. Pineau, D. Precup, and D. Meger, “Deep reinforcement learning that matters,” in Proc. of AAAI , 2018. [74] R. Islam, P. Henderson, M. Gomrokchi, and D. Precup, “Reproducibil-ity of benchmarked deep reinforcement learning tasks for continuous control,” arXiv preprint arXiv:1708.04133 , 2017. [75] A. Auger, “Benchmarking the (1+1) evolution strategy with one-fifth success rule on the BBOB-2009 function testbed,” in Proc. of GECCO: Late Breaking Papers , 2009. [76] T. Haarnoja, H. Tang, P. Abbeel, and S. Levine, “Reinforcement learning with deep energy-based policies,” in ICML , 2017. [77] Z. Ahmed, N. Le Roux, M. Norouzi, and D. Schuurmans, “Understand-ing the impact of entropy on policy optimization,” in ICML , 2019. [78] L. Engstrom, A. Ilyas, S. Santurkar, D. Tsipras, F. Janoos, L. Rudolph, and A. Madry, “Implementation matters in deep RL: A case study on PPO and TRPO,” in ICLR , 2019. [79] A. C. Li, P. Vaezipoor, R. T. Icarte, and S. A. McIlraith, “Challenges to solving combinatorially hard long-horizon deep RL tasks,” arXiv preprint arXiv:2206.01812 , 2022. [80] F. Hutter, H. H. Hoos, and K. Leyton-Brown, “Sequential model-based optimization for general algorithm configuration,” in International conference on learning and intelligent optimization , 2011. [81] L. Li, K. Jamieson, G. DeSalvo, A. Rostamizadeh, and A. Talwalkar, “Hyperband: A novel bandit-based approach to hyperparameter opti-mization,” JMLR , 2018. [82] F. Hutter, H. Hoos, and K. Leyton-Brown, “An efficient approach for assessing hyperparameter importance,” in ICML , 2014. [83] D. Vermetten, J. Lengler, D. Rusin, T. B¨ ack, and C. Doerr, “Empirical analysis of the dynamic binary value problem with IOHprofiler,” in Proc. of PPSN , 2024. [84] J. Lengler and S. Riedi, “Runtime analysis of the (μ + 1) -EA on the dynamic BinVal function,” SN Comput. Sci. , 2022. [85] B. Doerr, C. Doerr, and J. Lengler, “Self-adjusting mutation rates with provably optimal success rules,” Algorithmica , 2021. 16 
+
+[86] C. Doerr and M. Wagner, “Simple on-the-fly parameter selection mech-anisms for two classical discrete black-box optimization benchmark problems,” in Proc. of GECCO , 2018. [87] P. Sunehag, G. Lever, A. Gruslys, W. M. Czarnecki, V. Zambaldi, M. Jaderberg, M. Lanctot, N. Sonnerat, J. Z. Leibo, K. Tuyls et al. ,“Value-decomposition networks for cooperative multi-agent learning,” 
+
+arXiv preprint arXiv:1706.05296 , 2017. [88] T. Rashid, M. Samvelyan, C. S. De Witt, G. Farquhar, J. Foerster, and S. Whiteson, “Monotonic value function factorisation for deep multi-agent reinforcement learning,” JMLR , 2020. [89] C. Yu, A. Velu, E. Vinitsky, J. Gao, Y. Wang, A. Bayen, and Y. Wu, “The surprising effectiveness of PPO in cooperative multi-agent games,” 
+
+NeurIPS , 2022. [90] K. Xue, J. Xu, L. Yuan, M. Li, C. Qian, Z. Zhang, and Y. Yu, “Multi-agent dynamic algorithm configuration,” NeurIPS , 2022. [91] C. Lu, K. Xue, L. Yuan, Y. Wang, Y. Wang, S. Fu, and C. Qian, “Se-quential multi-agent dynamic algorithm configuration,” arXiv preprint arXiv:2510.23535 , 2025. [92] S. Levine, A. Kumar, G. Tucker, and J. Fu, “Offline reinforcement learning: Tutorial, review, and perspectives on open problems,” arXiv preprint arXiv:2005.01643 , 2020. [93] F. Torabi, G. Warnell, and P. Stone, “Behavioral cloning from observa-tion,” arXiv preprint arXiv:1805.01954 , 2018. [94] F. O. de Franc ¸a, “A greedy search tree heuristic for symbolic regression,” 
+
+Information Sciences , 2018. [95] Q. Delfosse, H. Shindo, D. Dhami, and K. Kersting, “Interpretable and explainable logical policies via neurally guided symbolic abstraction,” 
+
+NeurIPS , 2023. [96] Y. Gu, K. Zhang, Q. Liu, W. Gao, L. Li, and J. Zhou, “ π-light: Programmatic interpretable reinforcement learning for resource-limited traffic signal control,” in Proc. of AAAI , 2024.

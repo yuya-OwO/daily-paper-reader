@@ -1,0 +1,1092 @@
+Title: Data-Driven Stabilizing Controller Design for Linear Infinite Networks
+
+URL Source: https://arxiv.org/pdf/2606.17509v1
+
+Published Time: Wed, 17 Jun 2026 00:30:55 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+# Data-Driven Stabilizing Controller Design for Linear Infinite Networks ⋆
+
+Mahdieh Zaker ∗, Andrii Mironchenko ∗∗ , Amy Nejati ∗,
+
+Abolfazl Lavaei ∗∗ School of Computing, Newcastle University, United Kingdom (e-mails: {m.zaker2, amy.nejati, abolfazl.lavaei }@newcastle.ac.uk)  
+
+> ∗∗
+
+Department of Mathematics, University of Bayreuth, Germany (e-mail: andrii.mironchenko@uni-bayreuth.de) 
+
+Abstract: We propose a direct data-driven method for controller synthesis of infinite networks composed of unknown linear time-invariant subsystems. Using a single set of noise-corrupted input-state trajectories collected from each subsystem, and provided that certain linear matrix inequalities hold, each subsystem is rendered exponentially input-to-state stable (eISS) by locally constructing an eISS control Lyapunov function together with an exponentially input-to-state stabilizing feedback controller. We then compose these local components under a compositional small-gain condition in infinite-dimensional spaces to obtain a global control Lyapunov function and an associated stabilizing controller, ensuring uniform global exponential stability of the infinite network. The approach is validated on a physical case study with unknown dynamics. 
+
+Keywords: Infinite networks, data-driven control, uniform global exponential stability, infinite-dimensional compositional approach, formal methods 1. INTRODUCTION Modern engineered systems increasingly operate as large-scale interconnected networks, such as transportation sys-tems, power grids, and cyber-physical platforms. Ensuring stability and safety in such networks remains challeng-ing due to the scalability limitations of existing analysis and control methods. In many practical applications, in-cluding connected vehicles and smart cities, subsystems may dynamically join or leave the network, leading to uncertain and time-varying sizes (Bamieh et al., 2002; Noroozi et al., 2022). As a result, finite-dimensional models with a prescribed state dimension may not adequately represent the evolving structure and operating conditions of such systems. This motivates the concept of infinite 
+
+networks, in which finite networks of unknown or varying size are over-approximated by countably infinite intercon-nections of finite-dimensional subsystems (Dashkovskiy et al., 2019). The behavior of such systems is governed by subsystem interactions, through which local disturbances may propagate and cause cascading effects, making input-to-state stability (ISS) a fundamental tool for analyzing these phenomena (Sontag, 2008). Stability results for finite ISS networks do not directly extend to infinite interconnections; for instance, infinite cascades of ISS systems may fail to preserve input-to-state stability. Leveraging advances in infinite-dimensional ISS theory (Chaillet et al., 2023; Karafyllis and Krstic, 2019; Schwenninger, 2020; Mironchenko and Prieur, 2020) and small-gain theory for finite networks (Dashkovskiy et al., 2007, 2010), recent studies have developed small-gain con-         
+
+> ⋆A. Mironchenko has been supported by the Heisenberg grant (MI1886/3-1) of the German Research Foundation (DFG).
+
+ditions tailored to infinite networks (Kawan et al., 2020; Dashkovskiy et al., 2019; Kawan et al., 2023). However, all these results rely on accurate system models, which are often unavailable in practice, motivating direct data-driven approaches that aim to infer stability guarantees directly from data (De Persis and Tesi, 2020). While promising, most data-driven stability and control methods address monolithic systems and are inherently limited to low-dimensional settings (De Persis and Tesi, 2020; Chen et al., 2025; Berberich et al., 2020; Taylor et al., 2021). A smaller body of work combines data-driven techniques with compositional analysis for finite intercon-nected networks using subsystem ISS properties (Lavaei and Angeli, 2023; Zaker et al., 2025b; Samari et al., 2025), but these approaches neither scale to infinite networks nor handle noisy data. Only very recently have data-driven methods been proposed for infinite networks, focusing primarily on safety verification (Aminzadeh et al., 2024; Zaker et al., 2025a). These noise-free methods, however, rely on state-space gridding, incur high sample complexity, and do not address controller synthesis. 
+
+Contribution. In contrast to the aforementioned data-driven approaches that primarily target monolithic sys-tems or finite interconnections, we propose a direct data-driven framework for controller synthesis of infinite net-works composed of unknown linear time-invariant subsys-tems. Using only a single set of noise-corrupted input-state trajectories collected from each subsystem, we locally con-struct exponential ISS (eISS) control Lyapunov functions together with exponential input-to-state stabilizing feed-back laws, thereby avoiding explicit model identification and restrictive noise-free assumptions. These eISS control Lyapunov functions for subsystems and eISS controllers 
+
+> arXiv:2606.17509v1 [eess.SY] 16 Jun 2026
+
+are then composed upon validity of an infinite-dimensional small-gain condition to obtain a global control Lyapunov function and a stabilizing controller for the overall net-work. Unlike the few recent data-driven methods for in-finite networks that primarily focus on safety verification and rely on computationally expensive state-space grid-ding, our approach enables controller synthesis with formal guarantees of uniform global exponential stability using a limited amount of data. 
+
+Notation. We denote by R, R+0 , and R+ the sets of real, non-negative real, and positive real numbers, re-spectively, while N+ := {1, 2, . . . } indicates the set of positive integers. A sequence with a countably infinite number of vectors xi ∈ Rni is written as x = ( xi)i∈N+ .An infinite block matrix with blocks Aij is denoted by 
+
+A = (Aij )i,j ∈N+ , while a block diagonal matrix with countably many blocks is written as B = diag 
+
+> i∈N+
+
+(Bi). For a vector xi = [ x1i x2i . . . x nii]⊤ ∈ Rni its p-norm is written as |xi|p and is given by |xi|p =
+
+Pni 
+
+> j=1
+
+|xji |p
+
+1/p
+
+, where | · | 
+
+denotes the absolute value of a real number. The space ℓp
+
+denotes the Banach space of real sequences x = ( xi)i∈N+
+
+that have a finite norm |x|p = ( P∞ 
+
+> i=1
+
+|xi|pp)1/p. Note that ℓ2
+
+is a Hilbert space when endowed with the canonical scalar product. The space ℓ∞ is a Banach space of bounded se-quences endowed with the norm |x|∞ = sup i∈N+ |xi| < ∞.Given sets Xi, i ∈ N+, their Cartesian product is denoted by Q 
+
+> i∈N+
+
+Xi.For any symmetric matrix P , its smallest and largest eigen-values are denoted by λmin (P ) and λmax (P ). A matrix 
+
+P ∈ Rn×n is called positive definite (respectively, positive semi-definite), denoted by P ≻ 0 (respectively, P ⪰ 0), if it is symmetric and all its eigenvalues are strictly positive (respectively, non-negative). For P ≻ 0, √P denotes the unique positive definite matrix satisfying √P 2 = P . The transpose of P is denoted by P ⊤, and ⋆ denotes a trans-posed component in a symmetric position of a symmetric matrix. The identity matrix of size n × n is denoted by 
+
+In. The zero matrix in Rn×m is denoted by 𝟘 n×m. The horizontal concatenation of vectors xi ∈ Rni is written as [x1 x2 . . . xN ] ∈ Rni×N . For a matrix P , rank( P ) and 
+
+R(P ) denote its rank and range, respectively. A function 
+
+β : R+0 → R+0 belongs to class K if it is continuous, strictly increasing, and satisfies β(0) = 0. A function β : R+0 ×
+
+R+0 → R+0 belongs to class KL if it is continuous, and for each fixed s, the mapping r 7 → β(r, s ) is of class K, and for each fixed r > 0, the mapping s 7 → β(r, s ) is strictly decreasing and satisfies β(r, s ) → 0 as s → ∞ .2. PRELIMINARIES 
+
+2.1 Finite Subsystems 
+
+We commence with introducing the continuous-time linear time-invariant subsystems in the following definition. 
+
+Definition 1. Let i ∈ N+ be given. A continuous-time linear time-invariant ( ct-LTI ) subsystem is described by Ωi : ˙xi = Aixi + Biui + Diwi, (1) where xi ∈ Rni is the state and ui ∈ Rmi is the control input to be designed as a state-feedback controller. In addition, Ai ∈ Rni×ni and Bi ∈ Rni×mi denote the system matrix and the control matrix, respectively. The adversarial input and its associated matrix are defined as 
+
+wi = ( wij )j∈Ni ∈ Rpi = Y
+
+> j∈Ni
+
+Rnj , (2a) 
+
+Di = ( Dij )j∈Ni ∈ Rni×pi , (2b) where, for all i ∈ N+, Ni ⊂ N+ denotes the finite set of subsystems influencing Ω i and pi = P 
+
+> j∈Ni
+
+nj . We assume that the dimension of wij is equal to that of xj for all 
+
+i ∈ N+, j ∈ Ni, and that i / ∈ Ni for all i ∈ N+. Each subsystem is denoted by Ω i = ( Ai, B i, D i). The matrices Ai and Bi, characterizing the system’s be-havior, are assumed to be unknown, whereas Di, which models the weights of interconnections, is known. 
+
+2.2 Infinite Networks 
+
+Given the ct-LTI subsystems as described in Definition 1, we define the corresponding infinite network as follows. 
+
+Definition 2. Consider subsystems Ω i = ( Ai, B i, D i), i ∈
+
+N+, introduced in Definition 1, together with the intercon-nection structure in (2), subject to the constraint 
+
+wij = xj , ∀i ∈ N+, ∀j ∈ Ni. (3) The induced infinite network , denoted by Ω = I(Ω i)i∈N+ ,admits the dynamics Ω : ˙x = Ax + Bu, (4) where x = ( xi)i∈N+ ∈ X and u = ( ui)i∈N+ ∈ U. Here, 
+
+B := diag 
+
+> i∈N+
+
+(Bi), and A := ( Aij )i,j ∈N+ , with 
+
+Aij := 
+
+
+
+Ai, i ∈ N+, j = i, Dij , i ∈ N+, j ∈ Ni,
+
+𝟘 ni×nj , otherwise ,
+
+(5) and the state and input spaces for the network being defined as the ℓ2 spaces of sequences 
+
+X =
+
+n
+
+x xi ∈ Rni , |x|2 =
+
+ ∞X
+
+> i=1
+
+|xi|22
+
+1/2
+
+< ∞
+
+o
+
+⊂ Y
+
+> i∈N+
+
+Rni ,
+
+U =
+
+n
+
+u ui ∈ Rmi , |u|2 =
+
+ ∞X
+
+> i=1
+
+|ui|22
+
+1/2
+
+< ∞
+
+o
+
+⊂ Y
+
+> i∈N+
+
+Rmi .
+
+The infinite network in (4) is denoted by Ω = ( A, B, X, U). We define the space of admissible state-feedback operators as 
+
+UF = K : X → U | K is a bounded linear operator .
+
+For any K ∈ U F , the corresponding feedback controller is given by u = Kx . The closed-loop infinite network under this controller takes form ΩK : ˙x = ( A + BK )x, 
+
+which is denoted by Ω K = IK (Ω i)i∈N+ and its corre-sponding tuple is represented by Ω K = ( A, B, K, X, U). Assuming that A : X → X, B : U → X, and K : X → U
+
+are bounded linear operators, the closed-loop infinite net-work Ω K = (A, B, K, X, U) is well-posed, as A + BK 
+
+is a bounded operator generating a uniformly continuous semigroup. For a given initial condition x(0), the corre-sponding solution is thus x(t) = e(A+BK )tx(0), t ≥ 0, where e(A+BK ) is an operator exponential of A + BK .With the infinite network and its constituent subsystems specified via the interconnection constraint (3), we now present sufficient conditions that guarantee uniform global exponential stability of the network. 
+
+2.3 UGES Property Definition 3. The closed-loop network Ω K = IK (Ω i)i∈N+
+
+is called uniformly globally exponentially stable (UGES) 1
+
+if there exist M, μ > 0 such that for all x ∈ X, we have 
+
+|x(t)|2 ≤ M e −μt |x(0) |2, t ≥ 0.
+
+Since the primary objective of this work is to stabilize the infinite network Ω = I(Ω i)i∈N+ , we formally introduce the notion of uniform global exponential stabilizability. 
+
+Definition 4. If there exists K ∈ U F such that the feed-back controller u = Kx renders the closed-loop infinite network UGES, then Ω = I(Ω i)i∈N+ is said to be uni-formly globally exponentially stabilizable, and K is called an (exponentially) stabilizing feedback operator. Let us denote by ϕK (t, x ) the solution of Ω K = ( A, B, K, X,
+
+U) at time t ∈ R+0 corresponding to the initial condition 
+
+x ∈ X. For a continuous function V : X → R+0 , we define the Lie derivative ˙V (x) (along ϕK ) as the upper right-hand Dini derivative of the function t 7 → V (ϕK (t, x )) at zero: ˙V (x) := lim sup 
+
+> s→01
+> s
+
+ V (ϕK (s, x )) − V (x). (6) We now define the notion of control Lyapunov function. 
+
+Definition 5. A continuous function V : X → R+0 is called a control Lyapunov function (CLF) , if there exist a feedback controller u = Kx with K ∈ U F , and constants 
+
+α, α, κ ∈ R+, such that for all x ∈ X:
+
+α|x|22 ≤ V (x) ≤ α|x|22, (7a) ˙V (x) ≤ − κV (x). (7b) Utilizing the notion of CLF, in the following theorem, we summarize sufficient conditions for Ω = I(Ω i)i∈N+
+
+to achieve UGES, as defined in Definition 3. This re-sult follows by application of the comparison principle (Mironchenko, 2023, Proposition A.35) with a linear α (see also Haidar et al. (2022) for more results of this type). 
+
+Theorem 1. Given an infinite network Ω = ( A, B, X, U), if there exist a CLF V and a state-feedback operator K ∈ U F
+
+with its corresponding state-feedback controller u = Kx ,as defined in Definition 5, then the closed-loop infinite network Ω K is UGES with M := 
+
+q αα and μ := κ 
+
+> 2
+
+.Deriving a CLF that certifies UGES for an infinite-dimensional network is, in general, computationally very expensive, even if full knowledge of the system dynamics is available. An effective workaround is to render eISS properties at the subsystem level, and to infer UGES of the overall network via a small-gain-based compositional analysis. In the following definition, we formally define the 
+
+eISS control Lyapunov function for each subsystem. 
+
+Definition 6. Given a subsystem Ωi = (Ai, B i, D i) as in (1), a continuously differentiable function Vi : Rni →          
+
+> 1In this paper, UGES may refer either to global exponential stability or uniformly globally exponentially stable, depending on the context.
+
+R+0 is an exponential ISS (eISS) control Lyapunov function if there are constants αi, α i, κ i ∈ R+, and ρi ∈ R+0 , such that 
+
+αi|xi|22 ≤ Vi(xi) ≤ αi|xi|22, ∀xi ∈ Rni , (8a) and for all xi ∈ Rni , there exists ui ∈ Rmi , such that for all wi ∈ Rpi ,
+
+LVi(xi) ≤ − κiVi(xi) + ρi|wi|22, (8b) where 
+
+LVi(xi) = ∂V i(xi)
+
+∂x i
+
+(Aixi + Biui + Diwi), (9) is the Lie derivative of Vi along the dynamics in (1). While a CLF for the infinite network Ω = I(Ω i)i∈N+
+
+can, in principle, be obtained by composing eISS control Lyapunov functions of the individual subsystems, this approach becomes impractical when the subsystem dy-namics are unknown. In particular, the absence of explicit knowledge of the matrices Ai and Bi in (9) prevents the direct construction of eISS control Lyapunov functions. To address this fundamental limitation, we propose a data-driven approach in the following section. 3. MAIN RESULTS 
+
+3.1 Data-Driven Approach 
+
+Consider an open-loop infinite network Ω = ( A, B, X, U)in (4) subject to the interconnection constraint (3). We collect N ∈ N+ data samples from the unknown ct-LTI 
+
+system in (1) with sampling time τ ∈ R+. To do so, for each subsystem initialized at xi(t0), we apply arbitrary admissible inputs ui over the period [ t0, t 0 + ( T − 1) τ ] and record the corresponding data matrices Ui and Xi as 
+
+Ui = [ ui(t0) ui(t0 + τ ) . . . u i(t0 + ( N − 1) τ )] ∈ Rmi×N ,
+
+Xi = [ xi(t0) xi(t0 + τ ) . . . x i(t0 + ( N − 1) τ )] ∈ Rni×N .
+
+(10a) Since the state data Xi of all subsystems are collected, Wi
+
+can be constructed from the corresponding neighbouring state data as Wi = ( Wij )j∈Ni ∈ Rpi×N , according to (3). Specifically, we have 
+
+Wij = Xj , ∀i ∈ N+, ∀j ∈ Ni,
+
+and consequently, 
+
+Wi = [ wi(t0) wi(t0 + τ ) . . . w i(t0 + ( N − 1) τ )] ∈ Rpi×N .
+
+(10b) The data collected in (10) constitute what we refer to as a set of input-state trajectories . For an infinite net-work with heterogeneous subsystems, this is understood in a subsystem-wise sense, meaning that one finite data set is collected from each subsystem. In practice, this requirement is naturally reduced for networks with spe-cific structure, such as homogeneous networks or networks composed of finitely many subsystem classes, where one representative data set can be collected for each class. Let the state derivative data be denoted by ˆXd 
+
+> i
+
+= [ ˙ xi(t0) ˙ xi(t0 + τ ) . . . ˙xi(t0 + ( N − 1) τ )] ∈ Rni×N .
+
+Since the state derivatives ˆXd 
+
+> i
+
+are not directly accessible, their values are obtained through numerical differentia-tion. Specifically, for each k ∈ { 0, . . . , N −1}, the derivative is approximated as ˙xi(t0 +kτ ) = xi(t0 + ( k + 1) τ ) − xi(t0 + kτ )
+
+τ +εi(t0 +kτ ),
+
+where εi(t0 +kτ ) denotes the resulting approximation error and is interpreted as measurement noise. Consequently, the data available for subsequent analysis satisfy ˆXd 
+
+> i
+
+=
+
+Xd 
+
+> i
+
++ Ei, with 
+
+Ei = [ εi(t0) εi(t0 + τ ) . . . εi(t0 + ( N − 1) τ )] ∈ Rni×N
+
+representing the unknown noise affecting the measure-ments, and Xd 
+
+> i
+
+defined by (Xd 
+
+> i
+
+)k+1 = xi(t0 + ( k + 1) τ ) − xi(t0 + kτ )
+
+τ , (10c) for k ∈ { 0, . . . , N − 1}, where ( Xd 
+
+> i
+
+)k+1 denotes the ( k + 1)-th column of Xd 
+
+> i
+
+. Although Ei is unknown, we impose the following assumption. 
+
+Assumption 1. The measurement noise data Ei ∈ Rni×N
+
+is not available, but it is assumed to admit a known quadratic bound of the form EiE⊤ 
+
+> i
+
+⪯ ΨiΨ⊤ 
+
+> i
+
+, where Ψ i of appropriate dimensions is given. 
+
+Remark 1. A valid choice of Ψ i ensuring that the inequal-ity EiE⊤ 
+
+> i
+
+⪯ ΨiΨ⊤ 
+
+> i
+
+holds is Ψ i := √¯εN Ini , where ¯ ε > 0 is a known constant such that |εi,k |22 ≤ ¯ε for all k ∈ { 1, . . . , N },with εi,k denoting each column of Ei.A common choice for eISS control Lyapunov functions for ct-LTI subsystems is quadratic functions as Vi(xi) = 
+
+x⊤ 
+
+> i
+
+Pixi, with Pi ≻ 0. We consider the state-feedback controller for each subsystem designed as ui = KiPixi,with Ki and Pi being constant matrices of appropriate dimensions, and denote Si = [ Ai Bi]. Subsequently, one can represent the closed-loop system (1) under ui as 
+
+Aixi + Biui + Diwi = Si
+
+ Ini
+
+KiPi
+
+
+
+xi + Diwi. (11) We make the following assumption, which establishes a condition for the existence of a feedback gain Ki and a positive-definite matrix Λ i := P −1 
+
+> i
+
+≻ 0, ensuring that each subsystem is eISS. 
+
+Assumption 2. Assume that there exist scalars κi, ϑ i ∈
+
+R+, γi ∈ R+0 , together with constant matrices Ki ∈
+
+Rmi×ni and Λ i ∈ Rni×ni satisfying Λ i ≻ 0, such that the following linear matrix inequality (LMI) holds: 
+
+Zi
+
+Λi
+
+Ki
+
+⊤
+
++ γi ˜Xd 
+
+> i
+
+Q⊤
+
+> i
+
+⋆ −γiQiQ⊤
+
+> i
+
+ ⪯ 0, (12) where ˜Xd 
+
+> i
+
+= Xd 
+
+> i
+
+− DiWi, Qi = [ X⊤ 
+
+> i
+
+U⊤ 
+
+> i
+
+]⊤,
+
+and 
+
+Zi = ( ϑi + κi)Λ i − γi( ˜Xd 
+
+> i
+
+˜Xd
+
+> i
+> ⊤
+
+− ΨiΨ⊤ 
+
+> i
+
+).
+
+Remark 2. For the proposed LMI in (12) to be feasible, it is necessary that the pair ( Ai, B i) be stabilizable. However, stabilizability alone does not, by itself, guarantee the feasibility of (12). Indeed, feasibility is also affected by the collected data (cf. Remark 3) and by the noise bound ΨiΨ⊤ 
+
+> i
+
+. Accordingly, the LMI in (12) should be interpreted as a sufficient condition for the construction of an eISS control Lyapunov function and its associated controller. By exploiting the data set in (10) together with the closed-loop representation in (11), and considering As-sumptions 1–2, we establish the following theorem, which guarantees eISS of each subsystem. 
+
+Theorem 2. Consider a ct-LTI Ωi = ( Ai, B i, D i), with the closed-loop representation (11), where matrices Ai and 
+
+Bi are both unknown. Suppose that Assumptions 1–2 hold. Then Vi(xi) = x⊤ 
+
+> i
+
+Pixi is an eISS control Lyapunov function, with Pi = Λ −1 
+
+> i
+
+, α i = λmin (Pi), αi = λmax (Pi), 
+
+ρi = ∥√Pi∥22∥Di∥22 
+
+> ϑi
+
+, where ∥ · ∥ 2 denotes the induced 2-norm, and ui = KiPixi is its associated eISS controller, rendering Ωi exponentially input-to-state stable. The proof of Theorem 2 is provided in the Appendix. 
+
+Remark 3. To preclude a structural obstruction poten-tially caused by a singular bottom-right block of (12), it follows that the matrix QiQ⊤ 
+
+> i
+
+should preferably be full rank, i.e. , QiQ⊤ 
+
+> i
+
+≻ 0, which is equivalent to requiring rank( Qi) = ni + mi. Since rank( Qi) ≤ min {ni + mi, N },this condition implies the collection of at least N ≥ ni +
+
+mi data samples, while the input is persistently excit-ing (Willems et al., 2005). In practice, this lower bound may not be enough, and a larger data set is typically re-quired to reliably satisfy the rank condition. We note that condition (12) may still be feasible even if QiQ⊤ 
+
+> i
+
+is rank-deficient. In such a case, feasibility is ensured only if the off-diagonal block in (12) lies within the range R(Qi). This requirement can be restrictive and introduces a nontrivial additional constraint, which motivates our emphasis on ensuring that QiQ⊤ 
+
+> i
+
+is full rank during the data collection using a persistently exciting input. 
+
+3.2 Infinite-Dimensional Compositional Reasoning 
+
+In this section, we establish a sum-type compositional con-dition under which the data-driven eISS control Lyapunov functions of the individual subsystems collectively induce a CLF for the infinite network Ω = ( A, B, X, U). The derivation exploits the interconnection constraint (3) and formulates a small-gain requirement expressed through a linear gain operator, inspired by Kawan et al. (2020). Under Assumptions 1–2, Theorem 2 ensures that each subsystem Ω i admits a data-driven eISS control Lyapunov function Vi(xi) and its associated eISS controller ui, sat-isfying (8a)–(8b), with parameters αi, α i, κ i ∈ R+ and 
+
+ρi ∈ R+0 , all designed purely based on data. Given these parameters, we introduce the infinite diagonal matrix K := diag 
+
+> i∈N+
+
+(κi) and the infinite matrix ∆ := ( δij )i,j ∈N+ , where 
+
+δij := ρi
+
+> αj
+
+for j ∈ Ni, and δij = 0 otherwise, according to constraint (3). We further define the gain operator Φ := K−1∆ = ( φij )i,j ∈N+ , φij := δij 
+
+κi
+
+. (13) We assume that the local Lyapunov and decay parameters are uniformly bounded in the sense that there exist con-stants ξ, ξ, κ ∈ R+ and ρ ∈ R+0 such that, for all i ∈ N+,0 < ξ ≤ αi ≤ αi ≤ ξ < ∞, κ ≤ κi, ρi ≤ ρ, (14) In addition, we assume that the matrix ∆ satisfies 
+
+∥∆∥1,1 := sup 
+
+> j∈N+
+
+X
+
+> i∈N+
+
+δij < ∞, (15) which is equivalent to boundedness of the operator ∆ : 
+
+ℓ1 → ℓ1. Here, the double subscript indicates that the operator norm is induced by the ℓ1-norm on both the domain and co-domain. Under these assumptions, the operator Φ defined in (13) acts as a linear gain operator Φ : ℓ1 → ℓ1 according to (Φ x)i = X
+
+> j∈N+
+
+φij xj , ∀i ∈ N+, (16) and is bounded on ℓ1. We impose the small-gain condition that the spectral radius of Φ, denoted by r(Φ), satisfies 
+
+r(Φ) < 1. (17) Under these assumptions, we present the following theo-rem, which characterizes sufficient conditions for the com-positional synthesis of a CLF for Ω from the data-driven eISS control Lyapunov functions of Ω i.
+
+Theorem 3. Consider the infinite network Ω = I(Ω i)i∈N+
+
+defined in Definition 2. Suppose that, for each i ∈ N+,an eISS controller ui and a corresponding eISS control Lyapunov function Vi are obtained from data via Theo-rem 2 under Assumptions 1–2. Assume further that con-ditions (14)–(17) are satisfied. Then, for any ϵ > 0, there exists a vector η = ( ηi)i∈N+ ∈ ℓ∞ such that η ≤ ηi ≤ η for all i ∈ N+, where η := inf i(ηi) > 0 and η := sup i(ηi) > 0, together with a constant κ∞ > 0, satisfying 
+
+κ∞ ≥ (1 − r(Φ)) κ − ϵ. 
+
+Furthermore, 
+
+V (x) := X
+
+> i∈N+
+
+ηiVi(xi), with x = ( xi)i∈N+ ∈ X, (18) is a CLF for the infinite network in the sense of Theorem 1 under the fully decentralized controller u = ( ui)i∈N+ =(KiPixi)i∈N+ ∈ UF , with parameters α := η ξ , α := 
+
+η ξ , and κ := κ∞, where ξ := inf i(αi), ξ := sup i(αi), 
+
+κ := inf i(κi), and ρ := sup i(ρi). Consequently, the infinite network Ω K is UGES. The proof of Theorem 3 follows the same arguments as those used in (Zaker et al., 2026, Theorem 4.1) and is therefore omitted. 
+
+Remark 4. The local certificates may be obtained either from the data-driven LMI in Theorem 2 or, for subsystems with known dynamics, from a corresponding model-based LMI. Hence, the compositional result applies to mixed net-works containing both unknown and known subsystems. 4. SIMULATION RESULTS In this section, we demonstrate the effectiveness of our data-driven framework by applying it to an infinite net-work of physical subsystems. The subsystem matrices Ai
+
+and Bi are assumed to be unknown, and eISS control Lya-punov functions together with corresponding controllers are synthesized for all subsystems based on collected data via the results of Theorem 2, under Assumptions 1– 2. These subsystem-level constructions are subsequently combined to obtain a CLF for the infinite network Ω = 
+
+I(Ω i)i∈N+ by verifying the compositional condition (17). The main LMI (12) is solved in Matlab R2023b using YALMIP (L¨ ofberg, 2004) with the MOSEK solver (ApS, 2024), on a MacBook Pro equipped with an Apple M2 Pro processor and 16 GB of memory. We apply our approach to an infinite network of iden-tical inverted pendulums coupled by springs, adapted from (Guinaldo et al., 2013), where N1 = {2} and Ni =
+
+{i−1, i +1 } for i ≥ 2, forming a bidirectional line topology. Each subsystem is described by (1) with 
+
+Ai =
+
+ 0 1 
+
+> gl
+
+− Card (Ni) kml 2 0
+
+
+
+, B i =
+
+ 0
+
+> 1
+> ml 2
+
+
+
+,
+
+where Card (Ni) denotes the cardinality of a set Ni,
+
+g = 9.8, m = 1.5, l = 3, and k = 2. Considering 
+
+wi = ( wij )j∈Ni = ( xj )j∈Ni and Di = ( Dij )j∈Ni according to (3) and (2b), respectively, where Dij =
+
+ 0 0 
+
+> kml 2
+
+0
+
+
+
+, the influence of other subsystems is captured by 
+
+Diwi =
+
+
+
+0
+
+X
+
+> j∈Ni
+
+kml 2 x1j
+
+.
+
+Here, Ai and Bi are assumed to be unknown and are included only for completeness, whereas Dij is known. As Card (Ni) ≤ 2 for all i, and assuming Ai, Bi and Di
+
+are uniformly bounded, the operators A and B remain bounded. We collect N = 6 samples with a sampling period of 
+
+τ = 0.1. Assuming each element of Ei lies within the interval [ −0.01 , 0.01], Remark 1 yields Ψ iΨ⊤ 
+
+> i
+
+= 0 .0012 I2.Upon choosing κi = 1 and ϑi = 2, we solve the LMI in (12) using the collected data and obtain the eISS control Lyapunov functions as 
+
+Vi(xi) = 7983 .0889 x21i + 7794 .0053 x1ix2i + 2470 .3523 x22i,
+
+and the eISS controllers as 
+
+ui = −82 .1719 x1i − 45 .8755 x2i, (19) with γi = 0 .068, αi = 453 .4412, αi = 10 4, and ρi =219 .4787. Employing the gains obtained from data, we examine whether the compositional condition (17) holds. To this end, we construct the infinite gain matrix Φaccording to (13), which takes the following form: Φ = 
+
+
+
+0 0.4840 0 0 0 . . . 
+
+0.4840 0 0.4840 0 0 . . . 
+
+0 0.4840 0 0.4840 0 . . . 
+
+0 0 0.4840 0 0.4840 . . . 
+
+... . . . . . . . . . . . . . . .
+
+. (20) To verify the small-gain condition, we simply use the following sufficient condition: 
+
+r(Φ) ≤ ∥ Φ∥1,1 = sup 
+
+> j∈N+
+
+X
+
+> i∈N+
+
+φij < 1. (21) Exploiting the specific structure of Φ in (20) and the fact that all subsystems are identical, we assess condition (17) using (21). We obtain the bound r(Φ) ≤ ∥Φ∥1,1 ≤
+
+0.9681 < 1, which confirms that condition (17) holds. Moreover, since κi = 1 for all i ∈ N+, one has ∆ = Φ. Hence, ∥∆∥1,1 = ∥Φ∥1,1 ≤ 0.9681 < ∞, which verifies condition (15). As a consequence, this enables the construction of the CLF V (x) = P 
+
+> i∈N+
+
+ηiVi(xi) for Ω, together with its decentralized controller u = ( ui)i∈N+ ,thereby ensuring that the infinite network is UGES. (a) Open-loop evolutions (b) Closed-loop evolutions 
+
+Fig. 1. Illustration of state evolution of some arbitrary subsystems with and without control, where a rep-resentative subsystem is highlighted in bold and the remaining subsystems are shown in a faded style. We apply the designed stabilizing controller to the network starting from arbitrary and large initial conditions in the interval [ −8×10 8, 8×10 8]2 for finite number of subsystems and [0 0] ⊤ for the rest. Figure 1(b) exhibits the trajec-tories of some arbitrary subsystems under the designed controller (19), while Figure 1(a) shows that the open-loop subsystems are unstable, verifying the effectiveness of our data-driven approach. REFERENCES Aminzadeh, A., Swikir, A., Haddadin, S., and Lavaei, A. (2024). Compositional safety verification of infinite networks: A data-driven approach. In Proceedings of the 2024 European Control Conference (ECC) , 545–551. ApS, M. (2024). The MOSEK optimization tool-box for MATLAB manual. Version 10.1. URL 
+
+http://docs.mosek.com/10.1/toolbox/index.html .Bamieh, B., Paganini, F., and Dahleh, M.A. (2002). Dis-tributed control of spatially invariant systems. IEEE Transactions on Automatic Control , 47(7), 1091–1107. Berberich, J., K¨ ohler, J., M¨ uller, M.A., and Allg¨ ower, F. (2020). Data-driven model predictive control with stability and robustness guarantees. IEEE Transactions on Automatic Control , 66(4), 1702–1717. Bhatia, R. and Davis, C. (1995). A Cauchy-Schwarz in-equality for operators with applications. Linear algebra and its applications , 223, 119–129. Chaillet, A., Karafyllis, I., Pepe, P., and Wang, Y. (2023). The ISS framework for time-delay systems: A survey. 
+
+Mathematics of Control, Signals, and Systems , 35(2), 237–306. Chen, H., Bisoffi, A., and De Persis, C. (2025). Data-driven input-to-state stabilization of polynomial sys-tems. SIAM Journal on Control and Optimization ,63(6), 3915–3940. Dashkovskiy, S., Mironchenko, A., Schmid, J., and Wirth, F. (2019). Stability of infinitely many interconnected systems. IFAC-PapersOnLine , 52(16), 550–555. Dashkovskiy, S., R¨ uffer, B.S., and Wirth, F.R. (2007). An ISS small gain theorem for general networks. Mathe-matics of Control, Signals, and Systems (MCSS) , 19(2), 93–122. Dashkovskiy, S.N., R¨ uffer, B.S., and Wirth, F.R. (2010). Small gain theorems for large scale systems and con-struction of ISS Lyapunov functions. SIAM Journal on Control and Optimization , 48(6), 4089–4118. De Persis, C. and Tesi, P. (2020). Formulas for data-driven control: Stabilization, optimality, and robustness. IEEE Transactions on Automatic Control , 65(3), 909–924. Guinaldo, M., Dimarogonas, D.V., Johansson, K.H., S´ anchez, J., and Dormido, S. (2013). Distributed event-based control strategies for interconnected linear sys-tems. IET Control Theory & Applications , 7(6), 877– 886. Haidar, I., Chitour, Y., Mason, P., and Sigalotti, M. (2022). Lyapunov characterization of uniform exponen-tial stability for nonlinear infinite-dimensional systems. 
+
+IEEE Transactions on Automatic Control , 67(4), 1685– 1697. Karafyllis, I. and Krstic, M. (2019). Input-to-State Stabil-ity for PDEs . Springer. Kawan, C., Mironchenko, A., Swikir, A., Noroozi, N., and Zamani, M. (2020). A Lyapunov-based small-gain theorem for infinite networks. IEEE Transactions on Automatic Control , 66(12), 5830–5844. Kawan, C., Mironchenko, A., and Zamani, M. (2023). A Lyapunov-based ISS small-gain theorem for infinite networks of nonlinear systems. IEEE Transactions on Automatic Control , 68(3), 1447–1462. Lavaei, A. and Angeli, D. (2023). Data-driven stability certificate of interconnected homogeneous networks via ISS properties. IEEE Control Systems Letters , 7, 2395– 2400. L¨ ofberg, J. (2004). YALMIP : A toolbox for modeling and optimization in MATLAB. In Proceedings of the CACSD Conference .Mironchenko, A. (2023). Input-to-State Stability: Theory and Applications . Communications and Control En-gineering. Springer, 1 edition. doi:10.1007/978-3-031-14674-9. Mironchenko, A. and Prieur, C. (2020). Input-to-state stability of infinite-dimensional systems: Recent results and open questions. SIAM Review , 62(3), 529–614. Noroozi, N., Mironchenko, A., and Wirth, F.R. (2022). A relaxed small-gain theorem for discrete-time infinite networks. Automatica , 142. Samari, B., Incremona, G.P., Ferrara, A., and Lavaei, A. (2025). From data to sliding mode control of uncertain large-scale networks with unknown dynamics. 
+
+arXiv:2502.19806 .Schwenninger, F.L. (2020). Input-to-state stability for parabolic boundary control: Linear and semilinear sys-tems. In Control theory of infinite-dimensional systems ,83–116. Springer. Sontag, E.D. (2008). Input to state stability: Basic concepts and results. In Nonlinear and Optimal Control Theory , chapter 3, 163–220. Springer, Heidelberg. doi: 10.1007/978-3-540-77653-6 3. Taylor, A.J., Dorobantu, V.D., Dean, S., Recht, B., Yue, Y., and Ames, A.D. (2021). Towards robust data-driven control synthesis for nonlinear systems with actuation uncertainty. In Proceedings of the 60th Conference on Decision and Control (CDC) , 6469–6476. Willems, J.C., Rapisarda, P., Markovsky, I., and De Moor, B.L. (2005). A note on persistency of excitation. 
+
+Systems & Control Letters , 54(4), 325–329. Yakubovich, V.A., Leonov, G.A., and Gelig, A.K. (2004). 
+
+Stability of Stationary Sets in Control Systems with Discontinuous Nonlinearities . World Scientific. Young, W.H. (1912). On classes of summable functions and their Fourier series. Proceedings of the Royal Society of London A: Mathematical, Physical and Engineering Sciences , 87(594), 225–229. Zaker, M., Mironchenko, A., Nejati, A., and Lavaei, A. (2026). Data-driven global stabilization of unknown infinite networks. arXiv: 2604.11024 .Zaker, M., Nejati, A., and Lavaei, A. (2025a). Data-driven safety certificates of infinite networks with unknown models and interconnection topologies. 
+
+arXiv:2507.10979 .Zaker, M., Nejati, A., and Lavaei, A. (2025b). From data to global asymptotic stability of unknown large-scale networks with provable guarantees. In Proceedings of the 28th ACM International Conference on Hybrid Systems: Computation and Control , 1–14. APPENDIX 
+
+Proof of Theorem 2. We first verify that condition (8a) holds for the candidate eISS control Lyapunov function. Since 
+
+λmin (Pi)|xi|22 ≤ x⊤ 
+
+> i
+
+Pixi
+
+| {z }
+
+> Vi(xi)
+
+≤ λmax (Pi)|xi|22,
+
+selecting αi = λmin (Pi) and αi = λmax (Pi) directly ensures (8a). We next show that condition (8b) holds, as well. Using the closed-loop representation (11), we obtain 
+
+LVi(xi) = 2 x⊤ 
+
+> i
+
+Pi
+
+
+
+Si
+
+ Ini
+
+KiPi
+
+
+
+xi + Diwi
+
+
+
+= 2 x⊤ 
+
+> i
+
+PiSi
+
+ Ini
+
+KiPi
+
+
+
+xi + 2 x⊤ 
+
+> i
+
+PiDiwi
+
+= 2 x⊤ 
+
+> i
+
+PiSi
+
+P −1
+
+> i
+
+Ki
+
+
+
+Pixi + 2 x⊤ 
+
+> i
+
+PiDiwi
+
+= x⊤ 
+
+> i
+
+PiSi
+
+P −1
+
+> i
+
+Ki
+
+
+
+Pixi + x⊤ 
+
+> i
+
+Pi
+
+P −1
+
+> i
+
+Ki
+
+⊤
+
+S⊤ 
+
+> i
+
+Pixi
+
++ 2 x⊤ 
+
+> i
+
+PiDiwi
+
+= x⊤ 
+
+> i
+
+Pi
+
+
+
+Si
+
+P −1
+
+> i
+
+Ki
+
+
+
++
+
+P −1
+
+> i
+
+Ki
+
+⊤
+
+S⊤
+
+> i
+
+
+
+Pixi + 2 x⊤ 
+
+> i
+
+PiDiwi
+
+= x⊤ 
+
+> i
+
+Pi
+
+Ini
+
+S⊤
+
+> i
+
+⊤
+
+𝟘 ni×ni
+
+P −1
+
+> i
+
+Ki
+
+⊤
+
+⋆ 𝟘 si×si
+
+Ini
+
+S⊤
+
+> i
+
+
+
+Pixi
+
++ 2 x⊤ 
+
+> i
+
+PiDiwi
+
+| {z }
+
+> ♣
+
+,
+
+where si = ni + mi. We bound the term ♣ by applying the Cauchy-Schwarz inequality (Bhatia and Davis, 1995) in the form ab ≤ | a|2|b|2 for any a⊤, b ∈ Rn, with the choices a = x⊤
+
+> i
+
+√Pi and b = √PiDiwi, followed by Young’s inequality (Young, 1912) as |a|2|b|2 ≤ ϑi 
+
+> 2
+
+|a|22 + 12ϑi |b|22, for any ϑi > 0, resulting in 
+
+LVi(xi) ≤
+
+> hi(xi)
+
+z }| {
+
+x⊤ 
+
+> i
+
+Pi
+
+Ini
+
+S⊤
+
+> i
+
+⊤
+
+𝟘 ni×ni
+
+P −1
+
+> i
+
+Ki
+
+⊤
+
+⋆ 𝟘 si×si
+
+Ini
+
+S⊤
+
+> i
+
+
+
+Pixi
+
++ ϑi x⊤ 
+
+> i
+
+Pixi
+
+| {z }
+
+> Vi(xi)
+
++ ∥√Pi∥22∥Di∥22
+
+ϑi
+
+| {z }
+
+> ρi
+
+|wi|22
+
+= hi(xi) + ϑiVi(xi)
+
+| {z }
+
+> Hi(xi)
+
++ρi|wi|22.
+
+To conclude (8b), it remains to ensure that 
+
+Hi(xi) ≤ − κiVi(xi), (22) or, equivalently, 
+
+Hi(xi) + κiVi(xi) ≤ 0 (23) holds for some κi ∈ R+. Since Si = [ Ai Bi] is unknown, this condition cannot be verified directly. However, letting 
+
+Qi = [ X⊤ 
+
+> i
+
+U⊤ 
+
+> i
+
+]⊤, the collected data in (10) satisfy 
+
+Xd 
+
+> i
+
+= AiXi + BiUi + DiWi
+
+| {z }
+
+> ˆXd
+> i
+
+−E i = SiQi + DiWi − E i,
+
+which implies Ei = −(Xd 
+
+> i
+
+− DiWi
+
+| {z }
+
+> ˜Xd
+> i
+
+−SiQi). Under As-sumption 1, we have ( ˜Xd 
+
+> i
+
+− SiQi)( ˜Xd 
+
+> i
+
+− SiQi)⊤ − ΨiΨ⊤ 
+
+> i
+
+⪯ 0,
+
+which yields 
+
+Ini
+
+S⊤
+
+> i
+
+⊤ "
+
+˜Xd 
+
+> i
+
+˜Xd 
+
+> i
+> ⊤
+
+− ΨiΨ⊤ 
+
+> i
+
+− ˜Xd 
+
+> i
+
+Q⊤
+
+> i
+
+⋆ QiQ⊤
+
+> i
+
+# Ini
+
+S⊤
+
+> i
+
+| {z }
+
+> Ξi
+
+⪯ 0.
+
+Pre-multiplying and post-multiplying Ξ i ∈ Rni×ni by 
+
+x⊤ 
+
+> i
+
+Pi and Pixi, respectively, results in 
+
+zi(xi) := x⊤ 
+
+> i
+
+PiΞiPixi ≤ 0. (24) We now use the S-procedure (Yakubovich et al., 2004) to enforce (23) while respecting the data-consistency con-straint (24). In particular, if there exists γi ≥ 0 such that 
+
+Hi(xi) + κiVi(xi) − γizi(xi) ≤ 0, (25) then (23) holds for all xi, and all Si consistent with the data requirement in (24). By reformulating Vi(xi) as 
+
+Vi(xi) = x⊤ 
+
+> i
+
+Pixi = x⊤ 
+
+> i
+
+PiP −1
+
+> i
+
+| {z } 
+
+> Ini
+
+Pixi
+
+= x⊤ 
+
+> i
+
+Pi
+
+Ini
+
+S⊤
+
+> i
+
+⊤ P −1 
+
+> i
+
+𝟘 ni×si
+
+𝟘 si×ni 𝟘 si×si
+
+ Ini
+
+S⊤
+
+> i
+
+
+
+Pixi,
+
+and defining Λ i := P −1 
+
+> i
+
+, enforcing condition (12) yields (25), and therefore (22) holds. Consequently, 
+
+LVi(xi) ≤ − κiVi(xi) + ρi|wi|22,
+
+which completes the proof. ■

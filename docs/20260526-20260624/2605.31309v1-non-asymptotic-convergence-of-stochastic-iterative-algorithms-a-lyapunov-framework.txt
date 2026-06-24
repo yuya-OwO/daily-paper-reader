@@ -1,0 +1,2279 @@
+Title: Non-Asymptotic Convergence of Stochastic Iterative Algorithms: A Lyapunov Framework
+
+URL Source: https://arxiv.org/pdf/2605.31309v1
+
+Published Time: Mon, 01 Jun 2026 01:16:38 GMT
+
+Number of Pages: 44
+
+Markdown Content:
+# Non-Asymptotic Convergence of Stochastic Iterative Algorithms: A Lyapunov Framework 
+
+Zaiwei Chen ∗ and Siva Theja Maguluri †
+
+> ∗
+
+Purdue IE, chen5252@purdue.edu 
+
+> †
+
+Georgia Tech IE, siva.theja@gatech.edu 
+
+Abstract 
+
+We survey Lyapunov-based techniques for the finite-time analysis of stochas-tic iterative algorithms, also known as stochastic approximation (SA) algo-rithms, for solving fixed-point equations ¯F (x) = x, where the operator ¯F (·)can only be accessed through a noisy oracle. We first focus on the standard setting in which ¯F (·) is contractive with respect to some norm and the noise is i.i.d., and explain how generalized Moreau envelopes serve as universal Lya-punov functions, regardless of the underlying norm. We then show how this framework yields mean-square convergence guarantees and applies to stochastic gradient descent, linear SA, and value-based reinforcement learning algorithms such as Q-learning and temporal-difference learning. Finally, we discuss exten-sions to Markovian noise, seminorm-contractive operators, dissipative opera-tors, and high-probability bounds, and conclude with open problems. The goal is to present a unified and self-contained roadmap for the finite-time analysis of SA and its applications, especially in reinforcement learning. 
+
+# 1 Introduction 
+
+Root-finding problems, in particular the task of solving fixed-point equations, provide a unifying framework for formulating and analyzing a broad spectrum of computational and analytical tasks that arise across the mathematical sciences. For example, minimizing a convex objective function is equivalent to finding the zeros of its gradient operator [8]. In reinforcement learning (RL) [13, 113], which has seen a surge of interest in recent years [89, 107], computing an optimal policy reduces to solving a fixed-point equation known as the Bellman equation [9]. Additional applications of fixed-point equations arise in game theory and differential equations [15, 122]. Formally, let ¯F : Rd → Rd be an operator. The fixed-point equation of ¯F (·) takes the form ¯F (x) = x, and any solution is called a fixed point of ¯F (·). A natural question is: when does ¯F (x) = x admit a (unique) solution? Classical results such as the Banach fixed-point theorem [5] provide sufficient conditions. In particular, it states that if ¯F (·) is a contraction mapping with respect to some norm, denoted by ∥ · ∥ c, then ¯F (x) = x has a unique solution x∗. Moreover, the fixed-point iteration xk+1 = ¯F (xk) converges to x∗ at a geometric rate in ∥ · ∥ c.While such fixed-point iterations are appealing in theory, in practice one often lacks the infor-mation or computational resources required to evaluate ¯F (·) exactly. For instance, in large-scale optimization, computing the full gradient may be prohibitively expensive; in RL, the underlying stochastic model is typically unknown, preventing direct evaluation of the Bellman operator. In 1
+
+> arXiv:2605.31309v1 [cs.LG] 29 May 2026
+
+these situations, one must design algorithms that rely on noisy estimates of ¯F (·), which leads naturally to the stochastic approximation (SA) method [99]. SA forms a foundational framework underlying many modern large-scale methods, including stochastic gradient descent [20], temporal-difference (TD) learning [111], Q-learning [121], and fictitious play [59]. The generic SA scheme for solving the fixed-point equation ¯F (x) = x takes the form 
+
+xk+1 = xk + αk
+
+> (
+
+F (xk, Y k) − xk
+
+> )
+
+, ∀ k ≥ 0, (1) where {Yk} is a stochastic process taking values in a set Y, F : Rd × Y → Rd is an operator, and 
+
+αk > 0 is the stepsize. For simplicity, we assume that Y is finite, that {Yk} is an i.i.d. sequence with distribution μ ∈ ∆( Y), 1 and that the operator F (·, ·) satisfies EY ∼μ[F (x, Y )] = ¯F (x), so that 
+
+F (xk, Y k) provides a conditionally unbiased estimate of ¯F (xk). In later sections, we will discuss several extensions, including settings where the noise process {Yk} is not i.i.d. but instead forms a Markov chain, and settings where ¯F (·) is not a contraction but admits other useful structural properties. Early work on SA focused on asymptotic convergence. A powerful analytical tool in this setting is the ordinary differential equation (ODE) method [17, 19, 66, 80], which relates the discrete-time stochastic process defined by the SA iteration (1) to the continuous-time ODE ˙x(t) = ¯F (x(t)) − x(t). (2) Under mild conditions on the operators F (·, ·) and ¯F (·), as well as on the decay rate of the stepsize sequence {αk}, if the equilibrium point x∗ of ODE (2) is globally asymptotically stable [54, 62], then the SA iterates satisfy lim k→∞ xk = x∗ almost surely [17]. Although such asymptotic theory is powerful, it does not quantify the rate of convergence. For many practical applications, particularly in large-scale learning systems, finite-time or non-asymptotic guarantees are more relevant. These guarantees characterize how quickly an algorithm approaches the desired limit and, in data-driven settings, provide concrete guidance on the number of samples or iterations required to achieve a prescribed accuracy [116]. In finite-time analysis, the objective is to understand how the error ∥xk − x∗∥c decays with k. Two common performance metrics are the mean squared error and high-probability bounds. This survey emphasizes mean squared error while also reviewing results that provide high-probability error guarantees. A central tool for the finite-time analysis we review is the Lyapunov-drift approach . Originally developed to study stability in ODEs [54, 62, 67], this method constructs a scalar function M :
+
+Rd → R (a Lyapunov or potential function) whose evolution tracks the decay of the ODE towards equilibrium. For example, consider the ODE ˙x(t) = −x(t), which is a special case of (2) with ¯F (x) ≡ 0. For this ODE, the choice M (x) = ∥x∥22 yields ˙M (x(t)) = −2M (x(t)), implying the geometric decay M (x(t)) = M (x(0)) e−2t for any t ≥ 0. By adapting such Lyapunov arguments to the discrete and stochastic setting, one expects to obtain convergence rates for the SA iteration (1). However, constructing a valid Lyapunov function is well known to be challenging, and this difficulty is amplified in the context of SA algorithms. The Lyapunov function must, on the one hand, induce a negative drift, and on the other hand, enable control of errors arising from stochasticity and discretization. In this survey, we present a detailed roadmap for the systematic construction of      
+
+> 1Given a finite set X, we use ∆( X) to denote the set of probability distributions supported on X.
+
+2valid Lyapunov functions tailored to SA. The remainder of this survey is organized as follows. Section 2 presents the full mean-square analysis of the SA recursion (1), highlighting the construction of a valid Lyapunov function. Sec-tion 3 discusses applications in RL. Section 4 reviews several generalizations, such as SA with Markovian noise, SA with seminorm-contractive operators, and SA with dissipative operators, as well as their applications in RL. Section 5 surveys high-probability bounds. We conclude in Sec-tion 6 with open research directions. 
+
+# 2 Stochastic Approximation: Mean-Square Bounds 
+
+Consider the SA recursion (1). We begin by stating the assumptions regarding the operators ¯F (·), 
+
+F (·, ·), and the noise process {Yk}.
+
+Assumption 2.1. There exist a norm ∥·∥ c and a constant γc ∈ (0 , 1) such that ∥ ¯F (x1)− ¯F (x2)∥c ≤
+
+γc∥x1 − x2∥c for any x1, x 2 ∈ Rd.
+
+Assumption 2.2. The stochastic process {Yk} is an i.i.d. sequence of random variables with distribution μ ∈ ∆( Y). 
+
+Assumption 2.3. It holds that EY ∼μ[F (x, Y )] = ¯F (x). Moreover, there exist L1, L 2 > 0 such that (1) ∥F (x1, y ) − F (x2, y )∥c ≤ L1∥x1 − x2∥c for any x1, x 2 ∈ Rd and y ∈ Y ;(2) ∥F (0 , y )∥c ≤ L2 for any y ∈ Y .Under Assumption 2.1, the fixed-point equation ¯F (x) = x admits a unique solution, denoted by x∗ [5]. As a remark, Assumption 2.1 can be relaxed to the setting where ¯F (·) is a pseudo-contraction mapping, meaning that ∥ ¯F (x) − x∗∥c ≤ γc∥x − x∗∥c for all x ∈ Rd [13]. In that case, however, the existence of x∗ does not follow automatically and must be imposed separately. Since our goal is to review the Lyapunov approach for analyzing SA algorithms, we adopt Assumption 2.2 for ease of presentation. Extensions to more general noise models will be discussed in Section 4.1. Assumption 2.3 is standard even in the classical literature on asymptotic convergence of SA [17], and it is satisfied in a wide range of applications, such as TD-learning and Q-learning in RL. In the remainder of this section, we present our detailed approach for establishing the mean-square bounds of {xk} generated by the SA recursion (1). Adopting the Lyapunov-drift approach, we begin by illustrating the main challenges in constructing a valid Lyapunov function in Sec-tion 2.1. Building on these insights, we then describe a systematic method for constructing a smooth Lyapunov function using the generalized Moreau envelope in Section 2.2. With a valid Lyapunov function in hand, we proceed to derive a one-step Lyapunov-drift inequality for the SA recursion in Section 2.3, and finally obtain the finite-time bound by solving the resulting recursion in Section 2.4. 
+
+2.1 Fundamental Challenges 
+
+To provide intuition, assume for now that the contraction norm ∥ · ∥ c is the ℓp-norm for some p ∈
+
+[2 , ∞). Consider the ODE (2) associated with the SA algorithm. It was shown in [17, Chapter 10] 3that W (x) = ∥x − x∗∥p satisfies ˙W (x(t)) ≤ − κW (x(t)) for some κ > 0. This inequality implies that the solution x(t) of ODE (2) converges to its equilibrium point x∗ at a geometric rate, which in turn ensures the asymptotic convergence of the SA algorithm via the ODE approach [17, 80]. The ODE approach yields asymptotic convergence but does not provide finite-time guaran-tees. To obtain finite-time bounds, we analyze the SA algorithm directly rather than its ODE counterpart. Observe that the SA algorithm in recursion (1) can be equivalently written as 
+
+xk+1 − xk = αk 
+
+> (
+
+¯F (xk) − xk  
+
+> )︸︷︷ ︸
+> Noiseless Update
+
++ αk
+
+> (
+
+F (xk, Y k) − ¯F (xk)  
+
+> )︸︷︷ ︸
+> Effective Noise
+
+. (3) Due to discretization and stochastic errors, the ODE Lyapunov function W (x) generally cannot be directly used to analyze the SA algorithm. Suppose there exists a function M (x) that induces a negative drift for the ODE in the sense that ˙M (x(t)) ≤ − κ′M (x(t)) and, in addition, is L-smooth with respect to some norm, denoted by ∥·∥ s. Then we can handle both discretization and stochastic errors to obtain 
+
+E[M (xk+1 − x∗)] ≤ (1 − O (αk) + o(αk)) E[M (xk − x∗)] + o(αk), (4) which implies an almost contraction in E[M (xk+1 − x∗)]. A finite-time bound then follows by recursively applying (4). The key point is that the smoothness of M (·), together with its negative drift in the ODE dynamics, yields a contraction factor of the form (1 − O (αk) + o(αk)) for {xk}.In the case of ℓp-norm contraction, a natural choice is the norm-square function M (x) = ∥x − x∗∥2
+
+> p
+
+,which is known to be smooth [8, Example 5.11]. In the case where the contraction norm ∥ · ∥ c is arbitrary, the norm-square function f (x) = 
+
+∥x − x∗∥2 
+
+> c
+
+is not necessarily smooth, and the key difficulty lies in constructing a smooth Lyapunov function that also induces a negative drift. An important special case is when ∥ · ∥ c = ∥ · ∥ ∞, which is particularly relevant in RL, since the Bellman operator is a contraction mapping with respect to 
+
+∥ · ∥ ∞.We address this challenge by constructing a smoothed convex envelope M (x), referred to as the generalized Moreau envelope , that is smooth and closely approximates the original norm-square function f (x) in the sense that aM (x) ≤ f (x) ≤ bM (x) for some constants a, b close to one. The approximation property ensures that M (·) serves as a valid Lyapunov function with a negative drift, while the smoothness property enables us to control both the discretization error and the stochastic error in the SA algorithm. 
+
+2.2 Construction of the Lyapunov Function 
+
+To present the construction of a valid Lyapunov function, we need the following definitions. 
+
+Definition 2.1. Let g : Rd → R be a convex and differentiable function. We say that g(·) is 
+
+L-smooth with respect to some norm ∥ · ∥ (which can be arbitrary, rather than the ℓ2-norm) if 
+
+g(y) ≤ g(x) + ⟨∇ g(x), y − x⟩ + L
+
+2 ∥x − y∥2, ∀ x, y ∈ Rd.
+
+Intuitively, the L-smoothness ensures that the function does not curve too sharply: all higher-4order terms in the Taylor expansion of g(y) around x can be uniformly bounded by a constant multiple of the quadratic term ∥x − y∥2.Next, we introduce the generalized Moreau envelope. 
+
+Definition 2.2. Let h1 : Rd → R be a closed and convex function, and let h2 : Rd → R be a convex and L-smooth function with respect to some norm ∥ · ∥ . For any θ > 0, the generalized Moreau envelope of h1(·) with respect to h2(·) is defined as 
+
+M θ,h 2 
+
+> h1
+
+(x) = min 
+
+> u∈Rd
+
+{
+
+h1(u) + 1
+
+θ h2(x − u)
+
+}
+
+.
+
+In the existing literature, M θ,h 2 
+
+> h1
+
+(·) in Definition 2.2 is also referred to as the infimal convolution 
+
+[8] between h1(·) and h2(·)/θ , and is sometimes denoted by h1□(h2/θ ) [8, 53]. In the special case where h2(x) = ∥x∥22 and θ = 1, M θ,h 2 
+
+> h1
+
+(·) reduces to the classical Moreau envelope [8]. Let f (x) = 12 ∥x∥2 
+
+> c
+
+, where ∥ · ∥ c is the contraction norm of ¯F (·). Let ∥ · ∥ s be an arbitrary norm on Rd such that g(x) := 12 ∥x∥2 
+
+> s
+
+is L-smooth with respect to ∥ · ∥ s for some L > 0. For example, 
+
+∥ · ∥ s may be chosen as the ℓp-norm for any p ∈ [2 , ∞) [8, Example 5.11]. We use the generalized Moreau envelope of f (·) with respect to g(·), i.e., 
+
+M θ,g f (x) = min 
+
+> u∈Rd
+
+{
+
+f (u) + 1
+
+θ g(x − u)
+
+}
+
+,
+
+as our Lyapunov function for analyzing the SA recursion (1), where θ > 0 is a tunable parameter to be specified. The following proposition shows that M θ,g f (·) serves as a smooth approximation of the norm-square function f (·). The proof of Proposition 2.1 is provided in Appendix A.1. 
+
+Proposition 2.1. The function M θ,g f (·) has the following properties. (1) There exists a norm ∥ · ∥ m such that M θ,g f (x) = 12 ∥x∥2
+
+> m
+
+.(2) Let ℓcs ∈ (0 , 1] and ucs ∈ [1 , ∞) be such that ℓcs ∥ · ∥ s ≤ ∥ · ∥ c ≤ ucs ∥ · ∥ s. Then we have 
+
+ℓcm ∥x∥m ≤ ∥ x∥c ≤ ucm ∥x∥m for all x ∈ Rd, where ℓcm = (1 + θℓ 2
+
+> cs
+
+)1/2 and ucm = (1 + θu 2
+
+> cs
+
+)1/2.(3) M θ,g f (·) is convex and Lθ -smooth with respect to ∥ · ∥ s.
+
+Proposition 2.1 (1) states that this generalized Moreau envelope is itself a norm-square function. Propositions 2.1 (2) and (3) together show that M θ,g f (·) provides a smooth approximation of f (·). 
+
+2.3 Establishing a One-Step Contractive Inequality 
+
+For simplicity of notation, we henceforth write M (x) for M θ,g f (x). For any k ≥ 0, by the smoothness of M (·) and the SA recursion (1), we have 
+
+M (xk+1 − x∗) ≤ M (xk − x∗) + ⟨∇ M (xk − x∗), x k+1 − xk⟩ + L
+
+2θ ∥xk+1 − xk∥2
+
+> s
+
+= M (xk − x∗) + αk⟨∇ M (xk − x∗), F (xk, Y k) − xk⟩
+
++ Lα 2
+
+> k
+
+2θ ∥F (xk, Y k) − xk∥2
+
+> s
+
+= M (xk − x∗) + αk⟨∇ M (xk − x∗), ¯F (xk) − xk⟩
+
+︸ ︷︷ ︸
+
+> E1: The expected update
+
+5+ αk⟨∇ M (xk − x∗), F (xk, Y k) − ¯F (xk)⟩
+
+︸ ︷︷ ︸ 
+
+> E2: The error due to noise Yk
+
++ Lα 2
+
+> k
+
+2θ ∥F (xk, Y k) − xk∥2
+
+> s
+
+︸ ︷︷ ︸
+
+> E3: The error due to discretization and noise
+
+. (5) The term E1 on the right-hand side of Inequality (5) captures the deterministic part of the SA iteration (1), and is bounded in the following lemma. The proof of Lemma 2.1 is provided in Appendix A.2. 
+
+Lemma 2.1. The following inequality holds for all k ≥ 0:
+
+E1 ≤ − 2αk
+
+(
+
+1 − γcucm 
+
+ℓcm 
+
+)
+
+M (xk − x∗).
+
+By choosing the tunable parameter θ such that 1 − γc ucm /ℓ cm ∈ (0 , 1), which is always feasible since lim θ→0 ucm /ℓ cm = 1 (cf. Proposition 2.1) and γc ∈ (0 , 1), Lemma 2.1 ensures a negative drift. We next consider the term E2 in Inequality (5). Since {Yk} is an i.i.d. sequence, we have by the tower property of conditional expectations that 
+
+E[E2] = αkE
+
+[〈 
+
+∇M (xk − x∗), E[F (xk, Y k) | F k] − ¯F (xk)
+
+〉] 
+
+= 0 , (6) where Fk denotes the σ-algebra generated by {Yn}0≤n≤k−1. Equation (6) follows from the fact that 
+
+xk is measurable with respect to Fk and Yk is independent of Fk. In the more general setting where 
+
+{Yk} forms a Markov chain, more sophisticated arguments are required to control E[E2], which will be discussed in Section 4.1. Lastly, we bound the term E3 from Inequality (5) in the following lemma. The proof of Lemma 2.2 relies primarily on the Lipschitz continuity of F (·, ·) (cf. Assumption 2.3) and is deferred to Appendix A.3. 
+
+Lemma 2.2. It holds for any k ≥ 0 that 
+
+E3 ≤ 2L(L1 + 1) 2u2
+
+> cm
+
+α2
+
+> k
+
+θℓ 2
+
+> cs
+
+M (xk − x∗) + Lα 2
+
+> k
+
+θℓ 2
+
+> cs
+
+(( L1 + 1) ∥x∗∥c + L2)2
+
+Using Lemma 2.1, Equation (6), and Lemma 2.2 together in Inequality (5), we obtain the following one-step contractive inequality, whose proof is presented in Appendix A.4. For simplicity of notation, we denote Mk = E[M (xk − x∗)]. 
+
+Lemma 2.3. When α0 ≤ ϕ0 := θℓ 2
+
+> cs (1 −γcucm /ℓ cm )2L(L1+1) 2u2
+> cm
+
+, the following inequality holds for all k ≥ 0:
+
+Mk+1 ≤
+
+(
+
+1 −
+
+(
+
+1 − γcucm 
+
+ℓcm 
+
+)
+
+αk
+
+)
+
+Mk + Lα 2
+
+> k
+
+θℓ 2
+
+> cs
+
+(( L1 + 1) ∥x∗∥c + L2)2 . (7) Lemma 2.3 has the desired form (4), showing that the SA recursion (1) is overall contractive with respect to the Lyapunov function M (·) up to higher-order error terms. 62.4 Solving the Recursion 
+
+The last step is to solve the recursion (7) and evaluate the resulting bounds under stepsizes with different decay rates. Let ϕ2 = 1 − γcucm /ℓ cm . By repeatedly applying Inequality (7), we have for all k ≥ 0 that 
+
+Mk ≤
+
+> k−1
+
+∏
+
+> j=0
+
+(1 − ϕ2αj ) M0 + Lθℓ 2
+
+> cs
+
+((L1 + 1) ∥x∗∥c + L2
+
+)2 k−1∑
+
+> i=0
+
+α2
+
+> ik−1
+
+∏
+
+> j=i+1
+
+(1 − ϕ2αj ) .
+
+After using Proposition 2.1 (2) to translate Mk back to the mean squared error E[∥xk − x∗∥2 
+
+> c
+
+], we obtain for all k ≥ 0 that 
+
+E[∥xk − x∗∥2 
+
+> c
+
+] ≤ ϕ1
+
+> k−1
+
+∏
+
+> j=0
+
+(1 − ϕ2αj ) + ϕ3
+
+> k−1
+
+∑
+
+> i=0
+
+α2
+
+> ik−1
+
+∏
+
+> j=i+1
+
+(1 − ϕ2αj ) , (8) where 
+
+ϕ1 = ∥x0 − x∗∥2 
+
+> c
+
+u2
+
+> cm
+
+ℓ2
+
+> cm
+
+, ϕ3 = 2u2
+
+> cm
+
+Lθℓ 2
+
+> cs
+
+((L1 + 1) ∥x∗∥c + L2
+
+)2.
+
+The final step is to evaluate the right-hand side of Inequality (8) for different choices of stepsizes. Specifically, we consider stepsizes of the form αk = α/ (k + h)z , where α, h > 0 and z ∈ [0 , 1]. Note that z = 0 corresponds to a constant stepsize, while z ∈ (0 , 1] corresponds to diminishing stepsizes. Evaluating such terms under this type of stepsize schedule is well studied in the convergence-rate analysis of iterative algorithms [8, 110] and is omitted here; see [28, Appendix A.8] for additional details. 
+
+2.5 Finite-Time Mean-Square Bounds 
+
+After evaluating Inequality (8) under the specified stepsize rule, we obtain the finite-time bounds for the SA recursion (1) stated in the following theorem. 
+
+Theorem 2.1. Suppose that Assumptions 2.1–2.3 hold, and that αk = α/ (k + h)z , where z ∈ [0 , 1] 
+
+and α, h are chosen such that α0 ≤ ϕ0. Then we have the following results. (1) When z = 0 , for all k ≥ 0,
+
+E[∥xk − x∗∥2 
+
+> c
+
+] ≤ ϕ1(1 − ϕ2α)k + ϕ3
+
+ϕ2
+
+α. 
+
+(2) When z = 1 , for all k ≥ 0,
+
+E[∥xk − x∗∥2 
+
+> c
+
+] ≤
+
+
+
+ϕ1
+
+( hk + h
+
+)ϕ2α
+
++ 8α2ϕ3
+
+1 − ϕ2α
+
+1(k + h)ϕ2α , α < 1/ϕ 2,beginalign ∗0.35 em ]ϕ1
+
+hk + h + 8α2ϕ3 log( k + h)
+
+k + h , α = 1 /ϕ 2,beginalign ∗0.35 em ]ϕ1
+
+( hk + h
+
+)ϕ2α
+
++ 4eϕ 3α2
+
+ϕ2α − 11
+
+k + h , α > 1/ϕ 2.
+
+7(3) When z ∈ (0 , 1) , for all k ≥ 0,
+
+E[∥xk − x∗∥2 
+
+> c
+
+] ≤ ϕ1e− ϕ2α 
+
+> 1−z
+
+((k+h)1−z −(h)1−z ) + 4ϕ3αϕ2
+
+1(k + h)z .
+
+In view of Theorem 2.1, it is clear that the choice of stepsizes plays an important role in determining the convergence rate of the SA algorithm. Before illustrating each case of Theorem 2.1 in detail, we provide a high-level intuition. For ease of illustration, consider the special case where the contraction norm ∥ · ∥ c is the Euclidean norm ∥ · ∥ 2. In this case, we have the following standard decomposition: 
+
+E[∥xk − x∗∥22]  
+
+> ︸︷︷ ︸
+> Mean Squared Error
+
+= ∥E[xk] − x∗∥22  
+
+> ︸︷︷ ︸
+> Squared bias
+
++ E[∥xk − E[xk]∥22]  
+
+> ︸︷︷ ︸
+> Variance
+
+.
+
+Suppose there is no noise, i.e., F (·, y ) ≡ ¯F (·) for any y ∈ Y , so the variance term vanishes and the mean-square error reduces to the squared bias. In this case, we should choose a large stepsize to maximize the per-step improvement. This is indeed the case: choosing αk ≡ 1 recovers the fixed-point iteration and yields geometric convergence. When there is noise, however, a trade-off arises in choosing the stepsizes. The bias term favors large stepsizes, as discussed above, while the variance term favors small stepsizes. This is because at each iteration the effective noise injected into xk+1 is αk(F (xk, Y k) − ¯F (xk)), whose variance is proportional to α2
+
+> k
+
+. With this high-level intuition regarding the bias–variance trade-off in choosing the stepsizes in mind, we next discuss the three cases presented in Theorem 2.1. In all cases of Theorem 2.1, the convergence bound consists of a bias term (the first term on the right-hand side of the inequality) and a variance term (the second term on the right-hand side). A constant stepsize yields geometric decay of the bias with a constant variance that is proportional to the stepsize. When using diminishing stepsizes of the form αk = α/ (k +h), and when the parameter 
+
+α is above a certain threshold, namely 1 /ϕ 2, both terms decay to zero at a rate of O(1 /k ). However, when α is not chosen properly, the convergence rate can be arbitrarily bad. We will return to this issue in Section 6 when discussing open problems in SA. Finally, when using diminishing stepsizes of the form αk = α/ (k + h)z with z ∈ (0 , 1), the bias term decays to zero at an almost geometric rate, while the variance term decays at a suboptimal rate of O(1 /k z ), so the overall convergence rate is 
+
+O(1 /k z ). Importantly, the convergence rate in this case, while being sub-optimal, is independent of α (which only appears as a multiplicative constant), and is therefore more robust. 
+
+2.6 Connection to SGD and linear SA 
+
+In this section, we illustrate that while we present the finite-time mean squared bound for a generic contractive SA framework, the result also captures several other popular SA settings, including SGD and linear SA. 
+
+Stochastic Gradient Descent. Consider the problem min x∈Rd J(x). With access to a noisy oracle that returns a stochastic estimate of the gradient ∇J(x), the SGD updates xk according to 
+
+xk+1 = xk + βk 
+
+> (
+
+− ∇ J(xk) + wk
+
+> )
+
+,
+
+8where wk denotes the mean-zero noise and βk is the stepsize. For any η > 0, since the SGD update rule can be equivalently written as 
+
+xk+1 = xk + βk
+
+η (−η∇J(xk) + xk + ηw k − xk) ,
+
+by defining αk = βk/η , Yk = ηw k, and F (x, y ) = −η∇J(x) + x + y, the SGD update can be formulated as an instance of the SA recursion (1). Moreover, under the assumption that J(·) is both smooth and strongly convex, with parameters LJ and σJ , respectively, the operator ¯F (x) = 
+
+−η∇J(x) + x is Lipschitz with respect to the Euclidean norm ∥ · ∥ 2, with Lipschitz constant 
+
+LSGD = max( |1 − ησ J |, |1 − ηL J |) [101]. Therefore, when η ∈ (0 , 2/L J ), we have LSGD < 1, and hence the operator ¯F (·) is a contraction with respect to ∥ · ∥ 2. As a result, Theorem 2.1 applies to SGD in this setting. 
+
+Linear Stochastic Approximation. A linear SA is a recursion of the form 
+
+xk+1 = xk + βk(Akxk − bk), (9) where {Ak} and {bk} are sequences of i.i.d. random matrices and vectors, respectively, and βk is the stepsize. Letting ¯A = E[Ak] and ¯b = E[bk], the linear SA can be viewed as iteratively solving the linear system of equations ¯Ax = ¯b. Popular algorithms such as linear regression and a large class of TD-learning-based algorithms in RL, e.g., TD(0), n-step TD, TD( λ), off-policy TD-learning, and TD-learning with linear function approximation, can all be formulated as linear SA of the form presented above. Assuming that ¯A is Hurwitz, that is, all of its eigenvalues have negative real parts, such a linear SA algorithm can be reformulated as a contractive SA in the form of (1). Specifically, for any 
+
+η > 0, observe that the update rule (9) is equivalent to 
+
+xk+1 = xk + βk
+
+η
+
+> (
+
+(I + ηA k)xk − ηb k − xk
+
+> )
+
+.
+
+Therefore, by defining αk = βk/η , Yk = ( Ak, b k), and F (x, y ) = F (x, A, b ) = ( I + ηA )x − ηb ,the linear SA presented above is a special instance of the generic SA recursion (1). Moreover, since ¯A is Hurwitz, there exists a unique positive definite matrix P that solves the Lyapunov equation ¯A⊤P + P ¯A + I = 0 [62]. As a result, with an appropriately chosen η, the operator ¯F (x) = ( I +η ¯A)x−η¯b is a contraction mapping with respect to the weighted norm ∥x∥P = √x⊤P x .To see this, note that for any x1, x 2 ∈ Rd, we have 
+
+∥ ¯F (x1) − ¯F (x2)∥2 
+
+> P
+
+= ( x1 − x2)⊤(I + η ¯A)⊤P (I + η ¯A)( x1 − x2)= ( x1 − x2)⊤(P + η ¯A⊤P + ηP ¯A + η2 ¯A⊤P ¯A)(x1 − x2)= ( x1 − x2)⊤(P − ηI + η2 ¯A⊤P ¯A)(x1 − x2)
+
+≤
+
+> (
+
+1 − ηλmax (P ) + η2λmax ( ¯A⊤P ¯A)
+
+λmin (P )
+
+> )
+
+∥x1 − x2∥2
+
+> P
+
+=
+
+> (
+
+1 − λmin (P )4λmax ( ¯A⊤P ¯A)λmax (P )2
+
+> )
+
+∥x1 − x2∥2 
+
+> P
+
+,
+
+9where the last inequality follows by choosing 
+
+η = λmin (P )2λmax ( ¯A⊤P ¯A)λmax (P ) .
+
+Since the operator ¯F (·) is a contraction with respect to ∥ · ∥ P , Theorem 2 applies to linear SA. 
+
+2.7 Related Work 
+
+The SA method was originally proposed in [99] for solving root-finding problems under a noisy oracle. 
+
+The Asymptotic Results. The asymptotic convergence of SA has been studied extensively in the literature. A central line of work is based on the ODE method, which compares the interpolated trajectory of the discrete-time recursion with the flow of the mean ODE. Under standard stability and noise assumptions, if the stepsizes are non-summable and square summable, and if the relevant equilibrium point of the ODE is globally asymptotically stable, then the SA iterates converge almost surely [12, 17, 66, 80]. Such almost-sure convergence results are quite general: the ODE can be replaced by a differential inclusion, which is useful for set-valued or nonsmooth mean fields [10, 11], and the classical square-summability condition on the stepsizes can be relaxed in several directions [70, 88]. Beyond almost-sure convergence, a parallel line of work studies asymptotic rates and distribu-tional limits. For smooth mean fields, after linearizing the mean drift ¯F (x) − x around a locally stable equilibrium x∗, the suitably normalized error process satisfies central-limit-theorem-type re-sults; for instance, under stepsizes of order 1 /k , the last iterate typically has √k-scale fluctuations whose covariance is determined by the Jacobian of the mean field and the covariance of the mar-tingale noise [12, 32, 47, 102]. These results provide asymptotic convergence rates and form the basis for statistical inference based on SA iterates. A major refinement is Polyak–Ruppert averag-ing, which shows that averaging the iterates can achieve the optimal asymptotic covariance under substantially less delicate stepsize tuning than is required for the last iterate [92, 100]. More recent CLT and asymptotic efficiency results have further extended this theory to controlled Markovian dynamics, parameter-dependent Markovian noise, nonsmooth problems, and decision-dependent data distributions [16, 33, 35, 48]. 
+
+The Non-Asymptotic Results. Finite-time analysis has received a lot of attention in the last decade [69, 85, 110]. A central approach for establishing mean-square bounds is the Lyapunov method: one constructs a scalar function that simultaneously captures the stability of the limiting dynamics and permits control of the stochastic and discretization errors. In the strongly stable case, this typically leads to a one-step recursion consisting of a contracting bias term and a variance term. For example, with a constant stepsize, such recursions often yield a geometrically decaying transient plus an O(α) steady-state error, whereas with a properly tuned diminishing stepsize they yield an 
+
+O(1 /k ) mean-square rate. For linear SA [68, 84, 110], the Lyapunov function is usually constructed from the solution of a Lyapunov equation associated with the Hurwitz mean matrix [54, 62]. This quadratic structure has 10 led to sharp finite-time mean-square bounds for both last iterates and averaged iterates, including results that clarify the role of constant stepsizes and Polyak–Ruppert averaging. For nonlinear SA, finite-time analysis is more delicate, and existing results typically exploit additional structure, such as stochastic gradient methods and their variants [6, 38, 41, 69, 85], contractive SA [26, 28, 97, 119], or SA under dissipativity assumptions [30]. These structural conditions play the role of producing a negative drift. Beyond standard mean-square bounds, finite-time analysis can be carried out in a more refined way by separating the optimization bias, the asymptotic bias, and the variance [125, 126]. Another important direction concerns weakly stable operators, especially nonexpansive opera-tors. The study of SA under nonexpansive maps has a long history in reinforcement learning [1], and recent work has developed finite-time analyses for stochastic approximation with non-expansive operators. In this setting, because strict contraction and uniqueness of the fixed point may fail, the guarantees are often stated in terms of fixed-point residuals rather than mean-square distance to a distinguished fixed point [21]. More recently, finite-sample analyses have also been developed for nonexpansive SA with Markovian noise [14]. 
+
+# 3 Applications in Reinforcement Learning 
+
+In this section, we show how to use the SA results presented in the previous section to establish finite-time bounds of popular RL algorithms. RL provides a principled framework for sequential decision-making under uncertainty [113], with broad applications in game playing [108], robotics [72], recommendation systems [2], and large language models (LLMs) [89], inspiring a surge of the-oretical research aimed at deepening the mathematical foundations of RL and guiding its practical deployment. More formally, an RL problem is usually modeled as a Markov decision process (MDP) [95]. In this survey, we consider a discounted infinite-horizon MDP consisting of a finite state space S, a finite action space A, a transition kernel {p(· | s, a )}(s,a )∈S×A , a reward function R : S × A → [0 , 1], and a discount factor γ ∈ (0 , 1). Since we work with finite MDPs, assuming bounded rewards is indeed without loss of generality. Notably, the parameters of the stochastic model, such as the reward function and the transition kernel, are unknown to the agent. Given a stationary policy π : S → ∆( A), the associated value function V π : S → R and Q-function Qπ : S × A → R are defined as 
+
+V π(s) = Eπ 
+
+> [∞∑
+> k=0
+
+γkR(Sk, A k) 
+
+> ∣∣∣∣∣
+
+S0 = s
+
+> ]
+
+, ∀ s ∈ S ,Qπ(s, a ) = Eπ 
+
+> [∞∑
+> k=0
+
+γkR(Sk, A k) 
+
+> ∣∣∣∣∣
+
+S0 = s, A 0 = a
+
+> ]
+
+, ∀ (s, a ) ∈ S × A ,
+
+respectively, where we use Eπ[·] to indicate that the actions are selected according to the policy π.Alternatively, the value function and the Q-function can be viewed as vectors in R|S| and R|S||A| .The goal is to find an optimal policy π∗ so that its value function V ∗, or equivalently its Q-function Q∗, is uniformly maximized [13, 113]; that is, V ∗(s) ≥ V π(s) for all π and s, respectively, 
+
+Q∗(s, a ) ≥ Qπ(s, a ) for all π and ( s, a ). It is known that such an optimal policy always exists [13]. 11 In RL, the problem of finding an optimal policy is called the control problem. One of the most popular algorithms for solving the control problem is Q-learning [121]. While the ultimate goal is to find an optimal policy, there is usually a smaller goal of finding the value function of a given policy, which is called the prediction problem and is typically solved with TD-learning and its variants [111]. Both Q-learning and TD-learning are, in nature, SA algorithms for solving their associated Bellman equations. Therefore, the results of SA unify the finite-time analysis of value-based RL algorithms. We next present a detailed case study using Q-learning. 
+
+3.1 Q-Learning 
+
+The Q-learning algorithm proposed in [121] finds an optimal policy π∗ by computing the optimal Q-function Q∗ = Qπ∗
+
+. The motivation for Q-learning is based on the following fact: π is an optimal policy if and only if {a | π(a | s) > 0} ⊆ arg max a∈A Q∗(s, a ) for all s ∈ S [13, 113]. Therefore, finding the optimal Q-function is sufficient for finding an optimal policy. We next present the Bellman equation for the optimal Q-function Q∗, which serves as the foundation for the design of Q-learning. Let H : R|S||A| → R|S||A| be the Bellman operator defined as [H(Q)]( s, a ) = R(s, a ) + γ E
+
+> [
+
+max  
+
+> a′∈A
+
+Q(Sk+1 , a ′) 
+
+> ∣∣∣∣
+
+Sk = s, A k = a
+
+> ]
+
+for all Q ∈ R|S||A| and ( s, a ). Then, the Bellman equation is simply the fixed-point equation of the Bellman operator H(·): 
+
+Q = H(Q).
+
+It is well known that H(·) is a contraction mapping with respect to ∥ · ∥ ∞, with Q∗ as its unique fixed point [95]. Therefore, a natural approach to finding Q∗ is to perform the fixed-point iteration 
+
+Qk+1 = H(Qk). However, carrying out such a fixed-point iteration requires complete knowledge of the transition probabilities of the underlying MDP, and hence is not feasible in RL when the stochastic model is unknown. The Q-learning algorithm is then proposed as a data-driven stochastic variant of this fixed-point iteration. Let πb be the behavior policy, i.e., the policy used to collect samples. Assuming that the Markov chain {Sk} induced by πb is irreducible, it admits a unique stationary distribution κb ∈ ∆( S)satisfying κb(s) > 0 for all s ∈ S [71]. Then, with a sequence of i.i.d. samples {(Sk, A k, S ′
+
+> k
+
+)}
+
+generated as Sk ∼ κb(·), Ak ∼ πb(· | Sk), and S′ 
+
+> k
+
+∼ p(· | Sk, A k) for all k ≥ 0, the Q-learning algorithm is given in Algorithm 1. In this survey paper, we assume i.i.d. sampling for ease of exposition. Finite-time bounds for Q-learning under Markovian sampling can be established using results on Markovian SA, to be presented in later sections (see Theorem 4.1). To establish the finite-time bounds for Q-learning, we first reformulate Q-learning in the form of the SA recursion (1). Let Yk = ( Sk, A k, S ′
+
+> k
+
+) ∈ Y := S × A × S for all k ≥ 0. It is clear that {Yk}
+
+is an i.i.d. sequence with distribution μ ∈ ∆( Y) satisfying μ(s, a, s ′) = κb(s)πb(a | s)p(s′ | s, a ). Let F : R|S||A| × Y → R|S||A| be an operator defined such that, given inputs Q ∈ R|S||A| and 12 Algorithm 1 Q-Learning with i.i.d. Sampling  
+
+> 1:
+
+Input: Initialization Q0, and a sample trajectory {(Sk, A k, S ′
+
+> k
+
+)}k≥0. 
+
+> 2:
+
+for k = 0 , 1, 2, · · · do  
+
+> 3:
+
+Compute the temporal difference δk = R(Sk, A k) + γ max a′ Qk(S′
+
+> k
+
+, a ′) − Qk(Sk, A k).  
+
+> 4:
+
+Update the Q-function according to 
+
+Qk+1 (s, a ) = Qk(s, a ) + αk1{(Sk ,A k )=( s,a )}δk, ∀ (s, a ) ∈ S × A . 
+
+> 5:
+
+end for 
+
+y0 = ( s0, a 0, s 1), the ( s, a )-th component of the output is [F (Q, y 0)]( s, a ) = 
+
+
+
+R(s0, a 0) + γ max  
+
+> a′∈A
+
+Q(s1, a ′), (s, a ) = ( s0, a 0),Q(s, a ), (s, a )̸ = ( s0, a 0).
+
+Then, the update equation of the Q-learning algorithm presented in Line 4 of Algorithm 1 can be equivalently written as 
+
+Qk+1 = Qk + αk (F (Qk, Y k) − Qk) , ∀ k ≥ 0,
+
+which is in the same form as the SA recursion (1). The next step is to verify that all assumptions required to apply Theorem 2.1 are satisfied in the context of Q-learning. Assumption 2.2 is clearly satisfied since {Yk} is a sequence of i.i.d. samples. We next show that Assumptions 2.1 and 2.3 are satisfied. To present the result, let Db
+
+be an |S||A| × |S||A| diagonal matrix with diagonal components {κb(s)πb(a | s)}(s,a )∈S×A . Denote the minimum diagonal entry of Db by Db, min . The proof of the following proposition can be found in [28]. 
+
+Proposition 3.1. The operator ¯F (·) := EY ∼μ[F (·, Y )] is explicitly given as ¯F (Q) = DbH(Q) + (I − Db)Q for all Q ∈ R|S||A| . In addition, we have the following results. (1) ¯F (·) is a ˆγc-contraction mapping with respect to ∥ · ∥ ∞, where ˆγc = 1 − Db, min (1 − γ);(2) It holds for all Q1, Q 2 and y = ( s, a, s ′) that ∥F (Q1, y ) − F (Q2, y )∥∞ ≤ 2∥Q1 − Q2∥∞ and 
+
+∥F (0 , y )∥∞ ≤ 1.
+
+We next present the mean-square bounds for Q-learning. For simplicity, we focus on the case of constant stepsize; the extension to diminishing stepsizes is straightforward in view of Theorem 2.1. 
+
+Theorem 3.1. Suppose that αk ≡ α is appropriately chosen. Then for all k ≥ 0,
+
+E[∥Qk − Q∗∥2
+
+> ∞
+
+] ≤ c1∥Q0 − Q∗∥2
+
+> ∞
+
+(
+
+1 − Db, min (1 − γ)α
+
+2
+
+)k
+
++ c2 log( |S||A| )
+
+D2
+
+> b, min
+
+(1 − γ)2 (∥Q∗∥∞ + 1) 2α, 
+
+where c1, c 2 are absolute constants. As a result, given ϵ > 0, to achieve E[∥Qk − Q∗∥∞] ≤ ϵ, the sample complexity is ˜O(ϵ−2(1 − γ)−5D−3
+
+> b, min
+
+).
+
+13 Remark. Since the SA framework presented here is a general tool and is not specifically designed for Q-learning, which admits other properties such as uniform boundedness of the iterates [52], the sample complexity of Q-learning presented in this work does not match the statistical lower bound [49]. To achieve the minimax lower bound, other advanced algorithmic ideas (such as variance reduction) and a more tailored analysis are needed; see [76] for more details. Beyond Q-learning, most value-based RL algorithms can be modeled as SA algorithms under contractive operators. Consequently, the SA results presented in this survey paper apply to a broad class of RL methods. We briefly discuss a few examples below. 
+
+3.2 The Efficiency of Bootstrapping in TD-Learning 
+
+Given a target policy π, consider the problem of predicting its value function V π (or its Q-function 
+
+Qπ). Such problems are typically solved with TD-learning [111] and its variants. At a high level, TD-learning estimates V π iteratively using a sample trajectory collected by applying the target policy π to interact with the environment. An important idea for potentially improving the per-formance of TD-learning is to use bootstrapping, with typical examples including n-step TD and TD( λ) [113]. Intuitively, the degree of bootstrapping is determined by how much the current es-timate depends on previous estimates. For instance, in n-step TD, n = 1 corresponds to extreme bootstrapping (the next iterate depends solely on the previous one), whereas n = ∞ corresponds to no bootstrapping at all, in which case the method reduces to Monte Carlo. Despite strong empirical evidence, theoretically analyzing the effect of bootstrapping remains challenging. It is listed as one of the four major open problems in [112], which states that “ While it remains unclear exactly what should or could be proved here, it is clear that this [referring to the efficiency of bootstrapping] is a key open question at the heart of current and future RL. ” The results presented here for general contractive SA algorithms allow us to establish finite-time bounds for n-step TD (and TD( λ)) as explicit functions of n (and λ), thereby providing theoretical insight into the efficiency of bootstrapping. We emphasize that the open problem is not resolved here: to provide a definitive answer, upper bounds alone are insufficient; a matching lower bound is needed. As an aside, since TD-learning is often used within an actor–critic framework [64] to ultimately compute an optimal policy, the finite-time analyses of TD-learning also enable a deeper under-standing of the performance of a variety of actor–critic algorithms. 
+
+3.3 The Bias-Variance Trade-Off in Off-Policy TD-Learning 
+
+Given a target policy π, the TD-learning algorithm for predicting V π (or Qπ) can be divided into two categories: on-policy TD and off-policy TD. In on-policy TD-learning, the samples are collected under the target policy π, which was discussed in the previous section. In off-policy TD, samples are generated by a behavior policy πb̸ = π. Off-policy sampling is used for three important reasons: (1) it is typically necessary to incorporate exploration in the behavior policy πb, which makes it differ from the target policy π; (2) it is widely used in multi-agent training, where different agents collect rewards using behavior policies that lag behind the target policies in an actor–critic framework [45]; and (3) it enables learning from historical data, thereby improving sample efficiency. In practice, off-policy TD-learning is implemented via importance sampling to obtain an unbi-ased estimate of the desired value function. However, the product of importance sampling ratios 14 induces high variance in the estimate [50], which is a fundamental issue in off-policy learning. To mitigate this problem, many variants of off-policy TD-learning have been proposed, including the 
+
+Qπ(λ) algorithm [56], the TB( λ) algorithm [94], the Retrace( λ) algorithm [86], and the Q-trace algorithm [28]. These methods modify the importance sampling ratios in various ways to reduce variance, albeit at the cost of introducing bias in the limit. While numerical experiments can com-pare their empirical performance, the lack of analytical tools has made the bias–variance trade-off in tuning the importance sampling ratios unclear. The results for generic contractive SA presented in this survey paper enable a unified theoretical analysis of all these algorithms and provide quantitative characterizations of the associated bias– variance trade-offs; see [27] for further details. 
+
+# 4 Beyond Contractive Stochastic Approximation with i.i.d. Noise 
+
+So far, we have focused on SA under a contractive operator with i.i.d. noise sequences. In this section, we discuss several extensions of the SA framework. 
+
+4.1 Stochastic Approximation under Markovian Noise 
+
+In RL, the samples, namely trajectories of state-action pairs, are typically collected by an agent implementing a behavior policy to interact with the environment. In this case, the resulting sample trajectory forms a Markov chain rather than an i.i.d. sequence [13]. In this section, we discuss how to extend the finite-time analysis to the Markovian noise setting. To begin, we state the assumption that formalizes the notion of Markovian noise. 
+
+Assumption 4.1. {Yk} is a finite, irreducible, and aperiodic Markov chain. 
+
+Remark. In general, aperiodicity is not a necessary requirement for a Markovian SA to converge. We will later present two approaches to relax the aperiodicity assumption. Assumption 4.1 implies that {Yk} has a unique stationary distribution μ ∈ ∆( Y). In this case, the expected operator ¯F (·) := EY ∼μ[F (·, Y )] is defined with respect to the stationary dis-tribution μ. In addition, {Yk} mixes at a geometric rate; that is, there exist C > 0 and 
+
+ρ ∈ (0 , 1) such that max y∈Y ∥P k(y, ·) − μ(·)∥TV ≤ Cρ k for all k ≥ 0, where ∥ · ∥ TV denotes the total variation distance and P ∈ R|Y|×|Y| is the transition probability matrix of {Yk} [71]. Let 
+
+tα := min 
+
+> {
+
+k ≥ 0 : max y∈Y ∥P k(y, ·) − μ(·)∥TV ≤ α
+
+> }
+
+, which captures how fast the distribution of 
+
+Yk converges to its stationary distribution μ and is called the mixing time of the Markov chain 
+
+{Yk} with precision α. Note that under Assumption 4.1, we have tα = O(log(1 /α )). We next state the finite-time bounds for Markovian SA under contractive operators. 
+
+Theorem 4.1. Consider {xk} generated by the SA recursion (1). Suppose that Assumptions 2.1, 2.3, and 4.1 are satisfied, and that αk ≡ α is small enough. Then we have: 
+
+E[∥xk − x∗∥2 
+
+> c
+
+] ≤ ¯ϕ1(1 − ¯ϕ2α)k−tα + ¯ ϕ3αt α, ∀ k ≥ tα, (10) 
+
+where ¯ϕ1, ¯ϕ3 > 0 and ¯ϕ2 ∈ (0 , 1) are problem-dependent constants. 
+
+15 For ease of exposition, we consider only constant stepsizes in Theorem 4.1. See [28] for results under diminishing stepsizes. Compared with the finite-time bound of SA under i.i.d. noise (cf. Theorem 2.1 (1)), there are two differences in Theorem 4.1. The first is that the bound holds only when k ≥ tα instead of for all t ≥ 0. Intuitively, this is because the distribution of Yk is not “stable” until {Yk} is sufficiently mixed. Moreover, the second term on the right-hand side of Inequality (10) includes an additional factor of tα = O(log(1 /α )), which also arises from the Markovian noise. Other than these two points, Theorem 4.1 is qualitatively similar to Theorem 2.1, as the mean squared error consists of a geometrically decaying bias and a constant variance of order O(α log(1 /α )). To establish Theorem 4.1, the high-level idea is identical to that of Theorem 2.1 in Section 2, namely to use the generalized Moreau envelope as a Lyapunov function and to establish a one-step contractive inequality. After the error decomposition in Inequality (5), the main challenge under Markovian noise is to control the expected value of the term E2 from Inequality (5), which we rewrite below as ˆE2 to avoid confusion: ˆE2 = αkE[⟨∇ M (xk − x∗), F (xk, Y k) − ¯F (xk)⟩].
+
+In view of Lemma 2.1, since the negative drift is O(αk), we need to show that ˆE2 = o(αk) so that it is dominated by the negative drift. When {Yk} is an i.i.d. sequence, as considered in Section 2, we immediately have ˆE2 = 0 by the tower property of conditional expectations. When {Yk} is a Markov chain, controlling ˆE2 requires additional effort. We next present the high-level idea of an approach for bounding ˆE2 using a conditioning argu-ment, which was first developed in [110] for linear SA and later extended in [30] to nonlinear SA. The first step is to rewrite the term ˆE2 as ˆE2 = αkE[⟨∇ M (xk−t − x∗), F (xk−t, Y k) − ¯F (xk−t)⟩] + residual terms , (11) where t is a positive integer yet to be chosen, and the residual terms arise from replacing xk with 
+
+xk−t from the original expression of ˆE2.For the first term on the right-hand side of (11), by applying the tower property of conditional expectations, we have 
+
+αkE[⟨∇ M (xk−t − x∗), F (xk−t, Y k) − ¯F (xk−t)⟩]= αkE[⟨∇ M (xk−t − x∗), E[F (xk−t, Y k) | F k−t] − ¯F (xk−t)⟩]
+
+≤ αkO(Cρ t),
+
+where Fk−t is the σ-algebra generated by {Yn}0≤n≤k−t−1, and the last inequality can be established using the geometric mixing of {Yk}. As for the residual terms in (11), since there are t updates required to obtain xk from xk−t, and each update contributes an amount proportional to the stepsize, we can show that 
+
+residual terms = O
+
+> 
+
+αkk∑
+
+> ℓ=k−t
+
+αℓ 
+
+> 
+
+.
+
+16 Finally, by choosing t = O(log(1 /α k)), we obtain ˆE2 = o(αk) as desired. See [30, 110] for more details regarding the conditioning argument for dealing with Markovian noise. 
+
+Relaxing the Aperiodicity Assumption. To relax the aperiodicity requirement, the most straightforward approach is to apply an aperiodic transformation to the data samples. Specifically, for a finite Markov chain that is irreducible, the corresponding lazy chain is both irreducible and aperiodic. Moreover, with an aperiodicity transformation, also known as the Schweitzer transfor-mation [105], one can construct a trajectory from the original sample path as if it were generated by the lazy transition matrix. Specifically, let {Yk} be a finite and irreducible Markov chain with transition matrix P . Fix some η ∈ (0 , 1) and define the lazy transition matrix ˜P = (1 − η)P + ηI . Given a realized trajectory 
+
+{Yk}, we construct a new trajectory {Y ′
+
+> k
+
+} as follows. Let Y ′ 
+
+> 0
+
+= Y0. For each k ≥ 0, insert a geometrically distributed number of copies of Yk (with success probability 1 − η) before moving to Yk+1 . In other words, between Yk and Yk+1 in the original trajectory, we repeat the state Yk arandom number of times, and then append Yk+1 . The resulting process {Y ′
+
+> k
+
+} is a Markov chain with transition matrix ˜P . Since P is irreducible and η > 0, the matrix ˜P is irreducible and aperiodic. Therefore, by working with the modified trajectory {Y ′
+
+> k
+
+} constructed from the original sample path, one may assume without loss of generality that the underlying Markov chain is aperiodic. While the aforementioned approach is theoretically sound, it is practically inconvenient, since one needs to repeatedly insert identical samples to justify the analysis. A more direct but technically more challenging approach is to use the Poisson equation to decompose the Markovian noise. For each fixed x, define the forcing function hx(y) = F (x, y ) − ¯F (x). The Poisson equation is then given by ˆhx − P ˆhx = hx, where ˆhx is the solution (unique up to an additive constant) [40]. Using the Poisson equation, we write F (xk, Y k) − ¯F (xk) = hxk (Yk) from ˆE2 in (11) as 
+
+F (xk, Y k) − ¯F (xk) = hxk (Yk) = ˆhxk (Yk) − P ˆhxk (Yk).
+
+Adding and subtracting ˆhxk (Yk+1 ), we obtain 
+
+F (xk, Y k) − ¯F (xk) = (ˆhxk (Yk) − ˆhxk (Yk+1 )) + (ˆhxk (Yk+1 ) − P ˆhxk (Yk)).
+
+The second term satisfies E[ˆhxk (Yk+1 ) − P ˆhxk (Yk) | F k] = 0, so it forms a martingale difference sequence, while the first term telescopes across iterations. This representation separates the Marko-vian dependence from the stochastic fluctuations, allowing the finite-time analysis to proceed by combining martingale arguments with bounds on the Poisson solution ˆhx. A detailed illustration of the Poisson equation-based approach for dealing with Markovian noise can be found in [23, 55, 87]. 
+
+4.2 Stochastic Approximation under Seminorm Contractive Operators 
+
+In this section, instead of imposing the contraction assumption, we consider SA under seminorm contractive operators. This setting is motivated by average-reward RL, where the Bellman operator is not contractive in any norm but can be seminorm contractive under certain structural assump-tions on the underlying MDP [95], and by control problems in which only partial stability can be established [54]. We begin by defining what we mean by a seminorm. 17 Definition 4.1. A real-valued function p : Rd → R is called a seminorm if and only if it is nonnegative and satisfies: (1) triangle inequality : p(x1 + x2) ≤ p(x1) + p(x2) for all x1, x 2 ∈ Rd,and (2) absolute homogeneity : p(αx ) = |α| p(x) for all x ∈ Rd and α ∈ R.Recall that a norm ∥ · ∥ must also satisfy ∥x∥ = 0 if and only if x = 0, a property that is not required for a seminorm. Before proceeding, we present two representative examples of seminorms. 
+
+• The span seminorm sp (·) is defined as sp (x) = max i xi − min j xj for all x ∈ Rd. One can easily verify that sp (·) is indeed a seminorm. The span seminorm is widely used in studying the convergence behavior of learning algorithms for solving average-reward MDPs [95]. 
+
+• Let P ∈ Rd×d be a positive semidefinite matrix. Then the function p(x) = √x⊤P x is a seminorm. Such seminorms are widely used in the analysis of least-squares methods and in control, where quadratic Lyapunov functions naturally induce such seminorm structures [54]. Returning to the SA recursion (1), we impose the following assumptions on the operators ¯F (·)and F (·, ·). 
+
+Assumption 4.2. There exist a seminorm pc(·) and a constant γc ∈ (0 , 1) such that pc( ¯F (x1) −
+
+¯F (x2)) ≤ γcpc(x1 − x2) for all x1, x 2 ∈ Rd.
+
+Assumption 4.3. It holds that EY ∼μ[F (x, Y )] = ¯F (x). Moreover, there exist L′
+
+> 1
+
+, L ′ 
+
+> 2
+
+> 0 such that (1) pc(F (x1, y ) − F (x2, y )) ≤ L′
+
+> 1
+
+pc(x1 − x2) for any x1, x 2 ∈ Rd and y ∈ Y ;(2) pc(F (0 , y )) ≤ L′ 
+
+> 2
+
+for any y ∈ Y .Similar to the case of norm-contractive operators, seminorm-contractive operators also enjoy several useful properties. In particular, the set of solutions to the seminorm fixed-point equation 
+
+pc( ¯F (x) − x) = 0 must be of the form x∗ + ker( pc), where x∗ is a particular solution and ker( pc) = 
+
+{x | pc(x) = 0 }. Moreover, the fixed-point iteration xk+1 = ¯F (xk) converges geometrically in the seminorm: pc(xk − x∗) ≤ γkc pc(x0 − x∗). See [31] for more details. We next state the finite-time bounds of SA under seminorm-contractive operators. 
+
+Theorem 4.2. Consider {xk} generated by the SA recursion (1). Suppose that Assumptions 4.2, 4.3, and 2.2 hold and that αk ≡ α is chosen sufficiently small. Then, for all k ≥ 0,
+
+E[pc(xk − x∗)2] ≤ ˆϕ1(1 − ˆϕ2α)k + ˆ ϕ3α, 
+
+where ˆϕ1, ˆϕ3 > 0 and ˆϕ2 ∈ (0 , 1) are (problem-dependent) constants. 
+
+Theorem 4.2 is qualitatively similar to Theorem 2.1, except that the norm is replaced by the seminorm. The proof of Theorem 4.2 also follows a Lyapunov approach, where we choose the following variant of the generalized Moreau envelope, ˆM (x) := min  
+
+> u∈Rd
+> {
+
+12 p2 
+
+> c
+
+(u) + 12θ ∥x − u∥2
+
+> s
+> }
+
+, (12) as the Lyapunov function. The resulting analysis is similar to that of Theorem 2.1; see [31] for more details. 18 4.3 Stochastic Approximation under a Dissipativity Assumption 
+
+The following assumption introduces a dissipative operator. 
+
+Assumption 4.4. There exists a unique x∗ ∈ Rd such that ¯F (x∗) = x∗. Moreover, there exist a positive definite matrix ¯P and a constant ¯ c0 > 0 such that, for all x ∈ Rd,(x − x∗)⊤ ¯P ( ¯F (x) − x) ≤ − ¯c0(x − x∗)⊤ ¯P (x − x∗).
+
+Assumption 4.4 can be viewed as an exponential dissipativity property of the ODE (2) with the quadratic storage function x⊤ ¯P x [54], which motivates referring to Assumption 4.4 as the dissipativity assumption. A special case in which Assumption 4.4 holds is linear SA with a Hurwitz matrix, i.e., 
+
+xk+1 = xk + αk
+
+> (
+
+A(Yk)xk − b(Yk))
+
+= xk + αk
+
+> (
+
+(A(Yk) + Id)xk − b(Yk)     
+
+> ︸︷︷ ︸
+> F(xk,Y k)
+
+−xk
+
+> )
+
+,
+
+where A : Y → Rd×d and b : Y → Rd are deterministic functions. Denote ¯A = EY ∼μ[A(Y )], assumed to be Hurwitz, and ¯b = EY ∼μ[b(Y )]. In this case, ¯F (x) = ( ¯A + Id)x − ¯b and the unique fixed point of ¯F (·) is x∗ = ¯A−1¯b. Since ¯A is Hurwitz, there exists a unique positive definite matrix ¯P such that ¯A⊤ ¯P + ¯P ¯A + Id = 0 [62]. Consequently, for any x ∈ Rd,(x − x∗)⊤ ¯P ( ¯F (x) − x) = ( x − x∗)⊤ ¯P ( ¯Ax − ¯b)= ( x − x∗)⊤ ¯P ¯A(x − x∗)= 12 (x − x∗)⊤( ¯A⊤ ¯P + ¯P ¯A)(x − x∗)= − 12 (x − x∗)⊤(x − x∗)
+
+≤ − 12λmax ( ¯P ) (x − x∗)⊤ ¯P (x − x∗),
+
+where λmax ( ¯P ) is the largest eigenvalue of ¯P . Hence, Assumption 4.4 is satisfied. Under Assumptions 2.2, 2.3, and 4.4, using ˜M (x) = x⊤ ¯P x as the Lyapunov function and following the approach in Section 2, we can establish finite-time guarantees for the SA algorithm with update (1), achieving a qualitatively similar rate of convergence as in Theorem 2.1. See [30] for more details. 
+
+4.4 Other Applications in Reinforcement Learning 
+
+The extensions (SA with Markovian noise, semi-norm contractive SA, and SA under a dissipativity assumption) presented in earlier sections enables studying many other RL algorithms. We will briefly talk about a few in the following. 19 4.4.1 Q-Learning with Linear Function Approximation 
+
+In practice, RL algorithms are typically combined with function approximation to overcome the curse of dimensionality, which refers to the computational bottleneck as the size of the state-action space increases. One of the most successful practical algorithms is the deep Q-network, which is essentially Q-learning with neural network approximation [83]. On the other hand, the behavior of Q-learning with function approximation is not yet fully understood theoretically and was identified in [112] as an open problem. In fact, the infamous deadly triad [113] arises in Q-learning with function approximation, and hence even in the basic setting with linear function approximation, the algorithm can be unstable in general [4]. The SA results in the previous sections not only allow us to analyze existing RL algorithms but also enable the development of new RL algorithms with theoretical performance guarantees. Specifically, they lead to a variant of Q-learning with linear function approximation that incorpo-rates a target network and truncation, is provably stable, and achieves a ˜O(ϵ−2) sample complexity up to a function approximation error [25]. 
+
+4.4.2 Robust Reinforcement Learning 
+
+Robust RL studies sequential decision-making when the transition model used for training may differ from the transition model encountered at deployment. This is often formulated through robust MDPs, where the goal is to optimize the worst-case value over an ambiguity set of transition kernels. In the discounted setting, under rectangular uncertainty sets, the robust Bellman operator retains a contraction structure. This contraction property is the key reason why value-based robust RL algorithms can be analyzed through the same contractive-SA perspective. This connection is made explicit in [120]. Although the robust Bellman update involves an inner worst-case optimization problem, the induced robust Bellman operator remains contractive in ∥ · ∥ ∞. Hence, the analysis uses the generalized Moreau-envelope Lyapunov function to establish the one-step drift bound. The same SA viewpoint is used in robust policy optimization. In [78], stochastic robust policy mirror descent relies on repeated robust policy evaluation from samples. The resulting robust TD subroutine is a Markovian contractive SA recursion, so Theorem 4.1 provides the finite-time critic bound, which is then propagated through the mirror-descent analysis to obtain the overall sample-complexity guarantee. More recently, [123] applied this Lyapunov approach to robust average-reward policy evaluation. Since discounting is absent, the key structural step is to show that the robust average-reward Bellman operator is contractive under a suitable seminorm. The robust TD recursion is then analyzed with a Moreau-envelope-type Lyapunov function, analogous to ˆM (·) in Equation (12). 
+
+4.4.3 Federated Reinforcement Learning 
+
+Federated RL studies settings where multiple agents collaboratively learn a shared value function or Q-function while keeping their local trajectories, data, and possibly behavior policies private. This setting is natural in RL because sampling is often the computational bottleneck, and parallel data collection across N agents can in principle reduce the sample complexity. In [63], the authors extend the Markovian-SA Lyapunov framework to this federated setting. They introduce a general federated stochastic approximation scheme with Markovian noise, which 20 includes federated on-policy TD-learning, off-policy TD-learning, and Q-learning as special cases. The analysis again makes use of the generalized Moreau-envelope Lyapunov function to obtain a one-step drift inequality for the global averaged iterate. 
+
+# 5 Stochastic Approximation: High Probability Bounds 
+
+In this section, we survey results on high-probability bounds for the SA recursion (1), i.e., bounds on the quantity P(∥xk − x∗∥c ≤ ϵ) for some ϵ > 0. High-probability bounds are often preferable to mean-square bounds because they provide both a convergence rate and a confidence level. A naive way to obtain such bounds from a mean-square guarantee is to apply Markov’s inequality [117]; however, this yields only polynomially decaying tails. Establishing high-probability bounds with super-polynomial tails (i.e., tails lighter than polynomial tails) is substantially more challenging. For example, even in the classical setting of the law of large numbers, 2 deriving exponential tail bounds, such as Hoeffding’s inequality, the Chernoff bound, or Bernstein’s inequality, requires significantly more work. To establish high-probability bounds with super-polynomial tails for the SA recursion (1), the tail behavior of the effective noise term F (xk, Y k) − ¯F (xk) plays a central role. Although As-sumption 2.2 ensures that this noise is conditionally mean zero, its tail behavior depends on the interplay between the random process {Yk} and the iterates {xk}, in particular, whether Yk is additive or multiplicative with respect to xk. In the remainder of this section, we focus on the additive (yet unbounded) noise setting. The Lyapunov technique introduced here can be extended to the multiplicative noise case, but the latter requires substantially more technical work. 
+
+5.1 Stochastic Approximation under Sub-Gaussian Additive Noise 
+
+Consider the SA recursion (1). In addition to Assumptions 2.1 and 2.2, we impose the following condition on the tail behavior of the effective noise F (xk, Y k) − ¯F (xk). Let Fk denote the σ-algebra generated by {Yn}0≤n≤k−1.
+
+Assumption 5.1. There exist ¯ σ > 0 and a (possibly) dimension-dependent constant cd > 0 such that the following inequalities hold for any k ≥ 0 and Fk-measurable d-dimensional random vector 
+
+v:
+
+E
+
+[
+
+exp 
+
+(
+
+λ⟨F (xk, Y k)− ¯F (xk), v ⟩
+
+)∣ ∣∣Fk
+
+]
+
+≤ exp 
+
+(
+
+λ2 ¯σ2∥v∥2
+
+> c, ∗
+
+/2
+
+)
+
+, ∀ λ > 0, (13) 
+
+E
+
+[
+
+exp 
+
+(
+
+λ
+
+∥∥∥F (xk, Y k)− ¯F (xk)
+
+∥∥∥2
+
+> c
+
+)∣ ∣∣∣Fk
+
+]
+
+≤
+
+(
+
+1−2λ¯σ2)− cd 
+
+> 2
+
+, ∀ λ ∈
+
+(
+
+0, 12¯ σ2
+
+)
+
+, (14) where ∥ · ∥ c, ∗ is the dual norm of the contraction norm ∥ · ∥ c.Assumption 5.1 generalizes the standard notion of a random vector being norm sub-Gaussian [60] to the setting where an arbitrary norm ∥·∥ c is used in place of ∥·∥ 2. Indeed, when ∥·∥ c = ∥·∥ 2 and 
+
+cd = d, Inequalities (13) and (14) specialize exactly to the equivalent definitions of a sub-Gaussian random vector [60, 118]. Since we allow an arbitrary norm, we correspondingly allow a (possibly  
+
+> 2The sample average 1
+> k
+
+∑k−1             
+
+> i=0 Yican be computed iteratively as xk+1 =xk+1
+> k+1 (−xk+Yk) with x0= 0, which is a special case of Algorithm (1).
+
+21 different) dimension-dependent constant cd. A representative setting in which Assumptions 2.2, 2.1, and 5.1 all hold is when the noise Yk is purely additive and forms an i.i.d. mean-zero sequence with sub-Gaussian tails. We next state the high-probability bound of the SA recursion (1). 
+
+Theorem 5.1 ([29]) . Consider {xk} generated by recursion (1) . Suppose Assumptions 2.1, 2.2, and 5.1 are satisfied and αk = α/ (k + h) with α and h chosen appropriately. Then, for any δ > 0
+
+and K ≥ 0, we have with probability at least 1 − δ that, for all k ≥ K,
+
+∥xk − x∗∥2 
+
+> c
+
+≤ ¯c1 log(1 /δ )
+
+k + h + ¯c2h∥x0 − x∗∥2 
+
+> c
+
++ ¯ c3 + ¯ c4 log ((k + 1) /K 1/2)
+
+k + h ,
+
+where {¯ci}1≤i≤4 are problem-dependent constants. 
+
+The first term captures the deterministic contraction of the initial error, while the remaining terms capture the stochastic fluctuations. The logarithmic factors arise from controlling the mar-tingale terms uniformly over time. Next, we discuss the implications of Theorem 5.1 in terms of its dependence on δ, K, and k. Since the tolerance level δ appears as log(1 /δ ) in the norm-square bound, the norm error ∥xk − x∗∥c has a sub-Gaussian tail. As for the dependence on K and k,Theorem 5.1 implies that, with probability at least 1 − δ, all the iterates lie in a cone with radius ˜Θ((log(1 /δ )1/2 + log( k/K 1/2)) k−1/2) for all k ≥ K. As byproducts of Theorem 5.1, one can also establish high-probability bounds for a fixed time K (rather than for all k ≥ K), as well as the full tail bound on the quantity P(∥xk − x∗∥c > ϵ ). Consequently, using the formula 
+
+E[∥xk − x∗∥rc ] =  
+
+> ∫∞
+> 0
+
+P(∥xk − x∗∥rc > x ) dx 
+
+for any positive integer r, we can integrate the tail bound to obtain moment bounds for the error at any fixed time. These results are omitted here. 
+
+5.2 High Probability Bounds of Q-Learning 
+
+Theorem 5.1 enables us to establish the concentration bounds of Q-learning (cf. Algorithm 1) for solving the RL problem, which is presented in the following. 
+
+Theorem 5.2 ([29]) . Suppose that {(Sk, A k, S ′
+
+> k
+
+)}k≥0 are sampled i.i.d. according to the stationary sampling distribution induced by πb and the transition kernel, and αk = α/ (k+h) with appropriately chosen α and h. Then for any K ≥ 0, with probability at least 1 − δ the following inequality holds for all k ≥ K:
+
+∥Qk − Q∗∥2 
+
+> ∞
+
+≤ cq log( |S||A| )
+
+D3
+
+> b, min
+
+(1 − γ)5 
+
+> (
+
+log(1 /δ )
+
+k + h + h + 1 + log(( k + 1) /K 1/2)
+
+k + h
+
+> )
+
+,
+
+where cq is a constant. 
+
+Theorem 5.2 is qualitatively similar to Theorem 5.1 in that Q-learning achieves a 1 /k conver-gence rate with a sub-Gaussian tail. While Theorem 5.1 is useful for studying Q-learning, it requires the noise to appear in an additive manner. In the context of RL, this limits the applicability of the results to the on-policy 22 and/or tabular setting (i.e., without function approximation). To study RL in the off-policy and/or function approximation setting, we need to analyze SA with multiplicative noise, which is presented in full detail in Appendix B for interested readers. 
+
+5.3 Proof Sketch of Theorem 5.1 
+
+Recall that in the establishment of classical concentration inequalities such as Hoeffding’s inequality, the main idea is to bound the moment-generating function (MGF) of the random variable and then use Markov’s inequality to derive the concentration results. Inspired by this approach, we develop a Lyapunov method to prove Theorem 5.1, where we first bound the MGF of the generalized Moreau envelope and then use Ville’s maximal inequality to establish the maximal concentration bounds. 
+
+5.3.1 Bounding the Log-MGF of the Generalized Moreau Envelope 
+
+Let λk = θ/α k, where αk is the stepsize and θ > 0 is a tunable parameter. For any k ≥ 0, let 
+
+Zk = log ( E [exp ( λkM (xk − x∗))]) be the log-MGF, where M (·) is the generalized Moreau envelope introduced in Section 2 as a smooth approximation of the norm-square function f (x) = 12 ∥x∥2 
+
+> c
+
+. The properties of M (·) were summarized in Proposition 2.1. We view Zk as our Lyapunov function, and the key step is to derive a bound for Zk.Working with E[exp( λkM (xk − x∗))] presents new challenges, as the nonlinear nature of the log-MGF prevents us from exploiting the linearity of expectation, which was used extensively in deriving mean-square bounds. Instead, after expressing Zk+1 in terms of Zk, we obtain the expectation of a product of random variables. To overcome this difficulty, we use a conditioning argument along with Assumption 5.1 to obtain the following inequality: 
+
+Zk ≤ W1 
+
+> (
+
+hk + h
+
+> )αD 0/2−1
+
++ W2, ∀ k ≥ 0, (15) where D0, W1, and W2 are problem-dependent constants. 
+
+5.3.2 An Exponential Supermartingale and Ville’s Maximal Inequality 
+
+Let M k = exp( λkM (xk − x∗) − W3 
+
+> ∑k−1
+> i=0
+
+αi) for all k ≥ 0, where W3 is a constant. Using Inequality (15), we show that {M k} is a supermartingale with respect to the filtration {F k} [44], which enables us to use Ville’s maximal inequality [44] together with Inequality (15) to establish a maximal concentration inequality. Specifically, for any K ≥ 0, we have 
+
+P
+
+> (
+
+sup 
+
+> k≥K
+> {
+
+λkM (xk − x∗) − W3
+
+> k−1∑
+> i=0
+
+αi
+
+> }
+
+> ϵ 
+
+> )
+
+= P
+
+> (
+
+sup 
+
+> k≥K
+> {
+
+exp 
+
+> (
+
+λkM (xk − x∗) − W3
+
+> k−1∑
+> i=0
+
+αi
+
+> )}
+
+> e ϵ
+
+> )
+
+23 ≤ exp 
+
+> (
+
+W1 
+
+> (
+
+hK + h
+
+> )αD 0/2−1
+
++ W2 − W3
+
+> K−1∑
+> i=0
+
+αi − ϵ
+
+> )
+
+,
+
+where the last line follows from Ville’s maximal inequality and Inequality (15). The result fol-lows by rearranging terms in the previous inequality and then connecting M (·) with ∥ · ∥ 2 
+
+> c
+
+using Proposition 2.1 (2). 
+
+5.4 Related Work 
+
+There is now a substantial literature on high-probability bounds for SA-type algorithms. For stochastic optimization, such results have been developed for SGD and mirror-descent-type methods under various assumptions on convexity, boundedness, and tail behavior of the noise [41, 57, 58, 81, 98, 114]. For general nonlinear SA, one line of work uses the ODE method and Alekseev’s formula to obtain lock-in or concentration bounds near stable equilibria [18, 115]. Another line focuses on contractive SA and derives maximal concentration bounds for martingale- difference or Markovian noise, with applications to asynchronous Q-learning and TD-learning [23, 29, 96]. More recent work has also studied time-uniform concentration for general iterative algorithms and high-probability bounds for SA with Markovian and heavy-tailed noise [3, 91]. For linear SA, high-probability bounds have been obtained for both last iterates and Polyak– Ruppert averaged iterates, including settings with i.i.d. and Markovian data [34, 42, 43, 84]. In reinforcement learning, high-probability analyses have been developed for Q-learning and its asynchronous variants [46, 73–75, 97], as well as for TD-learning and policy evaluation with linear function approximation [34, 77, 90, 93, 103, 115]. These results differ along several important dimen-sions: whether the iterates are projected or otherwise known to remain in a compact set, whether the noise is additive or multiplicative, whether the noise is bounded, sub-Gaussian, Markovian, or heavy-tailed, whether the stepsize depends on the target confidence level or time horizon, and whether the guarantee is fixed-time, finite-horizon uniform, or anytime. See [29] for a more detailed comparison of these assumptions and guarantee formats. 
+
+# 6 Future Research Directions 
+
+There are many potential future directions for this line of work. We highlight three of them below. 
+
+6.1 Multiple Time-Scale Stochastic Approximation 
+
+The SA algorithm considered in earlier sections maintains a single sequence of iterates {xk}, updated with stepsizes {αk}. In many applications, however, the algorithm must update several coupled sequences on different time scales. A canonical example is actor–critic learning in RL, where the critic estimates the value function on a faster time scale while the actor updates the policy on a slower time scale. Similar multi-time-scale structures also arise in gradient TD methods with auxiliary variables, constrained RL, bilevel optimization, and multi-agent learning. The asymptotic theory of multiple time-scale SA has a long history and is typically based on the ODE method; see [17] and the references therein. More recently, general stability and conver-gence conditions have also been developed for N -time-scale stochastic recursions [36]. In compari-24 son, finite-time theory is more fragmented. Existing results cover several important special cases, including linear two-time-scale SA, two-timescale TD-learning, and actor–critic-type algorithms [34, 37, 39, 61, 65]. Recent work has further extended the Lyapunov/Moreau-envelope approach to nonlinear two-time-scale SA with arbitrary-norm contractions and Markovian noise [24], while another line develops accelerated multi-time-scale schemes that achieve ˜O(1 /k ) rates under strong monotonicity-type assumptions [124]. Despite the progress, it remains unclear whether the obtained convergence bounds are tight in terms of their dependence on rates and other important problem-dependent parameters. For example, despite the extensive existing analyses of actor-critic methods, there are no results showing that two-timescale actor-critic can achieve the statistical lower bound [49]. As another example, consider the simple two-time-scale recursion 
+
+xk+1 = xk + αk(F (xk, Y k) − xk), (16) ¯xk+1 = ¯ xk + 1
+
+k + 1 (−¯xk + xk), (17) where (17) computes the Polyak average ¯ xk = k−1 ∑k−1 
+
+> i=0
+
+xi. Polyak averaging is known to have strong asymptotic efficiency and robustness properties [92]; for example, it can achieve the optimal asymptotic O(1 /k ) mean-square rate under stepsizes such as αk = α/ (k + h)z with z ∈ (0 , 1). However, finite-time explanations of this robustness phenomenon were obtained only relatively recently in linear SA [42, 68, 84]. In general, a sharp and unified finite-time theory for general multiple time-scale SA remains incomplete. 
+
+6.2 Stochastic Approximation with Rapidly Time-Inhomogeneous Markovian Noise 
+
+The Markovian-noise theory discussed in Section 4.1 assumes that the driving process {Yk} is a time-homogeneous Markov chain with a fixed transition matrix P . In many adaptive algorithms, however, the sampling process is itself affected by the current iterate or by another evolving decision variable. A generic model takes the form 
+
+xk+1 = xk + αk
+
+> (
+
+F (xk, Y k) − xk
+
+> )
+
+, P(Yk+1 = y′ | F k, Y k = y) = Pθk (y, y ′),
+
+where θk may be a function of xk, e.g., a policy in RL, a strategy profile, or a belief vector in learning in games. Thus, the noise process is Markovian only conditionally on the current value of 
+
+θk, and the transition kernel changes over time. When the map θ 7 → Pθ is Lipschitz and θk evolves slowly, existing controlled-Markov-noise and Poisson-equation techniques can often be adapted. Indeed, the Lipschitz dependence of Pθ, the invariant distribution, and the corresponding Poisson-equation solution allows one to control the error caused by replacing Pθk with an earlier kernel Pθk−t . This is the slowly time-inhomogeneous regime, and it is closely related to classical SA with parameter-dependent Markov chains [12, 17, 22]. A substantially more difficult regime arises when the transition kernel changes rapidly with the iterate. In this case, ∥Pθk+1 − Pθk ∥ need not be of order ∥xk+1 − xk∥, and hence need not be of order αk. The usual mixing-time or Poisson-equation residual terms can then contain order-one 25 jumps, rather than small perturbations accumulated over a mixing window. This phenomenon is not specific to reinforcement learning. It is a general SA issue that appears whenever the sampling kernel is generated by a nonsmooth, discontinuous, or set-valued decision rule. Two motivating examples illustrate the difficulty. In RL with ϵ-greedy exploration, the behav-ior policy is a discontinuous function of the current Q-estimate: a small perturbation of Q can change the identity of the greedy action and hence produce an order-one change in the state-action transition matrix. This discontinuity is closely related to the chattering and policy-oscillation phe-nomena observed in value-based RL with ϵ-greedy exploration [51]. A similar issue arises in learning in games. In fictitious play and best-response-type dynamics, strategies may switch abruptly when a belief or payoff estimate crosses an indifference surface. When the play of the agents determines the sampling distribution or the state transition law, such strategy switches induce rapidly time-inhomogeneous Markovian noise in the underlying SA recursion. This issue is especially natural in stochastic games, where fictitious-play-type algorithms combine belief updates, value-function estimates, and greedy or best-response decisions [7, 82, 104]. Recent work has started to address special cases of this problem. For example, [87] develops a finite-time analysis of Q-learning with time-varying learning policies using a Poisson-equation decomposition and sensitivity bounds, while [79] studies SA with fast-changing transition functions in the analysis of linear Q-learning with ϵ-softmax exploration. High-probability bounds for time-inhomogeneous Markovian SA have also begun to appear in the analysis of online Q-learning [109]. Nevertheless, these results do not yet constitute a general Lyapunov theory for SA with rapidly time-inhomogeneous Markovian noise. Developing such a theory, especially for discontinuous or set-valued kernel maps such as ϵ-greedy policies and best-response dynamics, remains an important open direction. 
+
+6.3 Stochastic Approximation under Nonexpansive Operators 
+
+Another natural direction is to go beyond contractive or seminorm-contractive operators and con-sider SA driven by nonexpansive operators. An operator ¯F (·) is nonexpansive with respect to a norm ∥ · ∥ c if 
+
+∥ ¯F (x1) − ¯F (x2)∥c ≤ ∥ x1 − x2∥c, ∀x1, x 2 ∈ Rd.
+
+This setting is substantially more delicate than the contractive case. Fixed points need not exist; even when they exist, they need not be unique; and the plain fixed-point iteration xk+1 = ¯F (xk)need not converge to a fixed point. For example, ¯F (x) = x + 1 has no fixed point, ¯F (x) = x has every point as a fixed point, and a reflection map may cycle rather than converge. Suppose that the fixed-point set X = {x : ¯F (x) = x} is nonempty. In the Euclidean setting, a standard way to restore convergence is to use the averaged operator ¯Fη(x) = (1 − η)x + η ¯F (x), η ∈ (0 , 1) ,
+
+which has the same fixed-point set as ¯F . The resulting Krasnosel’skii–Mann iteration converges to a fixed point under suitable assumptions, and deterministic rates are typically stated in terms of 26 the fixed-point residual, e.g., min  
+
+> 0≤i≤k
+
+∥ ¯Fη(xi) − xi∥22 = O(1 /k ).
+
+Finite-sample analyses of stochastic fixed-point iterations for nonexpansive maps have been devel-oped for martingale-difference noise and arbitrary finite dimensional normed spaces [21]. More re-cently, [14] studied nonexpansive SA with Markovian noise, using Poisson-equation decompositions to obtain both asymptotic and finite-sample results, with applications to tabular average-reward TD-learning. Despite this progress, the convergence rates obtained in [14, 21] imply a sample complexity of ˜O(ϵ−10 ) in terms of the expected residual. An important future direction is to determine whether this sample complexity can be improved, identify the corresponding fundamental lower bounds, and develop sharp, possibly optimal finite-time rates under general norms, Markovian or controlled Markovian noise, multiplicative or unbounded noise, and high-probability criteria. 
+
+# 7 Conclusion 
+
+In this tutotial paper, we surveyed Lyapunov-based techniques for the finite-time analysis of stochas-tic approximation algorithms under contractive operators. We explained how generalized Moreau envelopes yield smooth Lyapunov functions for arbitrary contraction norms, and how the resulting drift arguments lead to mean-square and high-probability guarantees. We also discussed extensions to Markovian noise, seminorm-contractive operators, and dissipative operators, with applications to reinforcement learning algorithms such as Q-learning and TD-learning. We conclude by high-lighting several open directions. 
+
+# References 
+
+[1] Abounadi, J., Bertsekas, D. P., and Borkar, V. (2002). Stochastic approximation for nonexpan-sive maps: Application to q-learning algorithms. SIAM Journal on Control and Optimization ,41(1):1–22. [2] Afsar, M. M., Crump, T., and Far, B. (2022). Reinforcement learning based recommender systems: A survey. ACM Computing Surveys , 55(7):1–38. [3] Agrawal, S., Maguluri, S. T., and Zubeldia, M. (2026). Concentration of general stochastic approximation under heavy-tailed Markovian noise. Preprint Arxiv: 2605.20999 .[4] Baird, L. (1995). Residual algorithms: Reinforcement learning with function approximation. In 
+
+Machine learning proceedings 1995 , pages 30–37. Elsevier. [5] Banach, S. (1922). Sur les op´ erations dans les ensembles abstraits et leur application aux ´equations int´ egrales. Fund. math , 3(1):133–181. [6] Bansal, N. and Gupta, A. (2019). Potential-function proofs for gradient methods. Theory of Computing , 15(1):1–32. 27 [7] Baudin, L. and Laraki, R. (2022). Fictitious play and best-response dynamics in identical interest and zero-sum stochastic games. In International Conference on Machine Learning , pages 1664–1690. PMLR. [8] Beck, A. (2017). First-Order Methods in Optimization . SIAM. [9] Bellman, R. (1957). Dynamic programming. Press Princeton, New Jersey , 39. [10] Bena¨ ım, M., Hofbauer, J., and Sorin, S. (2005). Stochastic approximations and differential inclusions. SIAM Journal on Control and Optimization , 44(1):328–348. [11] Bena¨ ım, M., Hofbauer, J., and Sorin, S. (2006). Stochastic approximations and differential inclusions, part ii: Applications. Mathematics of Operations Research , 31(4):673–695. [12] Benveniste, A., M´ etivier, M., and Priouret, P. (2012). Adaptive Algorithms and Stochastic Approximations , volume 22. Springer Science & Business Media. [13] Bertsekas, D. P. and Tsitsiklis, J. N. (1996). Neuro-Dynamic Programming . Athena Scientific. [14] Blaser, E. and Zhang, S. (2026). Asymptotic and finite sample analysis of nonexpansive stochastic approximations with markovian noise. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 40, pages 19764–19772. [15] Border, K. C. (1985). Fixed-Point Theorems with Applications to Economics and Game Theory .Cambridge university press. [16] Borkar, V., Chen, S., Devraj, A., Kontoyiannis, I., and Meyn, S. (2025). The ode method for asymptotic statistics in stochastic approximation and reinforcement learning. The Annals of Applied Probability , 35(2):936–982. [17] Borkar, V. S. (2009). Stochastic Approximation: A Dynamical Systems Viewpoint , volume 48. Springer. [18] Borkar, V. S. (2021). A concentration bound for contractive stochastic approximation. Systems & Control Letters , 153:104947. [19] Borkar, V. S. and Meyn, S. P. (2000). The ODE method for convergence of stochastic approx-imation and reinforcement learning. SIAM Journal on Control and Optimization , 38(2):447–469. [20] Bottou, L., Curtis, F. E., and Nocedal, J. (2018). Optimization methods for large-scale machine learning. Siam Review , 60(2):223–311. [21] Bravo, M. and Cominetti, R. (2024). Stochastic fixed-point iterations for nonexpansive maps: Convergence and error bounds. SIAM Journal on Control and Optimization , 62(1):191–219. [22] Car` e, A., Cs´ aji, B. C., Gerencs´ er, B., Gerencs´ er, L., and R´ asonyi, M. (2026). Stochastic approximation in a markovian framework revisited: Lipschitz continuity of the poisson equation. 
+
+Mathematics of Control, Signals, and Systems , pages 1–43. [23] Chandak, S., Borkar, V. S., and Dodhia, P. (2022). Concentration of contractive stochastic approximation and reinforcement learning. Stochastic Systems , 12(4):411–430. 28 [24] Chandak, S., Haque, S. U., and Bambos, N. (2025). Finite-time bounds for two-time-scale stochastic approximation with arbitrary norm contractions and markovian noise. In 2025 IEEE 64th Conference on Decision and Control (CDC) , pages 6095–6101. IEEE. [25] Chen, Z., Clarke, J.-P., and Maguluri, S. T. (2023). Target network and truncation overcome the deadly triad in q-learning. SIAM Journal on Mathematics of Data Science , 5(4):1078–1101. [26] Chen, Z., Maguluri, S. T., Shakkottai, S., and Shanmugam, K. (2020). Finite-sample analysis of contractive stochastic approximation using smooth convex envelopes. Advances in Neural Information Processing Systems , 33:8223–8234. [27] Chen, Z., Maguluri, S. T., Shakkottai, S., and Shanmugam, K. (2021). Finite-sample analysis of off-policy td-learning via generalized bellman operators. Advances in Neural Information Processing Systems , 34:21440–21452. [28] Chen, Z., Maguluri, S. T., Shakkottai, S., and Shanmugam, K. (2024). A Lyapunov the-ory for finite-sample guarantees of Markovian stochastic approximation. Operations Research ,72(4):1352–1367. [29] Chen, Z., Maguluri, S. T., and Zubeldia, M. (2025a). Concentration of contractive stochastic approximation: Additive and multiplicative noise. The Annals of Applied Probability , 35(2):1298– 1352. [30] Chen, Z., Zhang, S., Doan, T. T., Clarke, J.-P., and Maguluri, S. T. (2022). Finite-sample analysis of nonlinear stochastic approximation with applications in reinforcement learning. Au-tomatica , 146:110623. [31] Chen, Z., Zhang, S., Zhang, Z., Haque, S. U., and Maguluri, S. T. (2025b). A non-asymptotic theory of seminorm lyapunov stability: From deterministic to stochastic iterative algorithms. 
+
+Preprint Arxiv:2502.14208 .[32] Chung, K. L. (1954). On a stochastic approximation method. The Annals of Mathematical Statistics , pages 463–483. [33] Cutler, J., Diaz, M., and Drusvyatskiy, D. (2024). Stochastic approximation with decision-dependent distributions: Asymptotic normality and optimality. Journal of Machine Learning Research , 25(90):1–49. [34] Dalal, G., Thoppe, G., Sz¨ or´ enyi, B., and Mannor, S. (2018). Finite sample analysis of two-timescale stochastic approximation with applications to reinforcement learning. In Conference On Learning Theory , pages 1199–1233. PMLR. [35] Davis, D., Drusvyatskiy, D., and Jiang, L. (2024). Asymptotic normality and optimality in nonsmooth stochastic approximation. The Annals of Statistics , 52(4):1485–1508. [36] Deb, R., Ganesh, S., and Bhatnagar, S. (2025). Multi-timescale stochastic approximation: Stability and convergence. Preprint Arxiv:2112.03515 .29 [37] Doan, T. T. (2021). Finite-time analysis and restarting scheme for linear two-time-scale stochastic approximation. SIAM Journal on Control and Optimization , 59(4):2798–2819. [38] Doan, T. T. (2022a). Finite-time analysis of markov gradient descent. IEEE Transactions on Automatic Control , 68(4):2140–2153. [39] Doan, T. T. (2022b). Nonlinear two-time-scale stochastic approximation: Convergence and finite-time performance. IEEE Transactions on Automatic Control , 68(8):4695–4705. [40] Douc, R., Moulines, E., Priouret, P., and Soulier, P. (2018). Markov Chains , volume 4. Springer. [41] Duchi, J. C., Agarwal, A., Johansson, M., and Jordan, M. I. (2012). Ergodic mirror descent. 
+
+SIAM Journal on Optimization , 22(4):1549–1578. [42] Durmus, A., Moulines, E., Naumov, A., and Samsonov, S. (2025). Finite-time high-probability bounds for polyak–ruppert averaged iterates of linear stochastic approximation. Mathematics of Operations Research , 50(2):935–964. [43] Durmus, A., Moulines, E., Naumov, A., Samsonov, S., Scaman, K., and Wai, H.-T. (2021). Tight high probability bounds for linear stochastic approximation with fixed stepsize. Advances in Neural Information Processing Systems , 34:30063–30074. [44] Durrett, R. (2019). Probability: Theory and Examples , volume 49. Cambridge university press. [45] Espeholt, L., Soyer, H., Munos, R., Simonyan, K., Mnih, V., Ward, T., Doron, Y., Firoiu, V., Harley, T., Dunning, I., et al. (2018). Impala: Scalable distributed deep-rl with importance weighted actor-learner architectures. In International Conference on Machine Learning , pages 1407–1416. [46] Even-Dar, E. and Mansour, Y. (2003). Learning rates for Q-learning. Journal of Machine Learning Research , 5(Dec):1–25. [47] Fabian, V. (1968). On asymptotic normality in stochastic approximation. The Annals of Mathematical Statistics , pages 1327–1332. [48] Fort, G. (2015). Central limit theorems for stochastic approximation with controlled markov chain dynamics. ESAIM: Probability and Statistics , 19:60–80. [49] Gheshlaghi Azar, M., Munos, R., and Kappen, H. J. (2013). Minimax pac bounds on the sample complexity of reinforcement learning with a generative model. Machine learning , 91(3):325–349. [50] Glynn, P. W. and Iglehart, D. L. (1989). Importance sampling for stochastic simulations. 
+
+Management science , 35(11):1367–1392. [51] Gopalan, A. and Thoppe, G. (2023). Demystifying approximate reinforcement learning with 
+
+ϵ-greedy exploration: A differential inclusion view. [52] Gosavi, A. (2006). Boundedness of iterates in Q-learning. Systems & control letters , 55(4):347– 349. 30 [53] Guzm´ an, C. and Nemirovski, A. (2015). On lower complexity bounds for large-scale smooth convex optimization. Journal of Complexity , 31(1):1–14. [54] Haddad, W. M. and Chellaboina, V. (2011). Nonlinear Dynamical Systems and Control: A Lyapunov-Based Approach . Princeton University Press. [55] Haque, S. U. and Maguluri, S. T. (2025). Stochastic approximation with unbounded markovian noise: A general-purpose theorem. In Proceedings of The 28th International Conference on Artificial Intelligence and Statistics , volume 258 of Proceedings of Machine Learning Research ,pages 3718–3726. PMLR. [56] Harutyunyan, A., Bellemare, M. G., Stepleton, T., and Munos, R. (2016). Q( λ) with off-policy corrections. In International Conference on Algorithmic Learning Theory , pages 305–320. Springer. [57] Harvey, N. J. A., Liaw, C., and Randhawa, S. (2019). Simple and optimal high-probability bounds for strongly-convex stochastic gradient descent. Preprint Arxiv:1909.00843 .[58] Hazan, E. and Kale, S. (2014). Beyond the regret minimization barrier: Optimal algorithms for stochastic strongly-convex optimization. Journal of Machine Learning Research , 15:2489–2512. [59] Hofbauer, J. and Sandholm, W. H. (2002). On the global convergence of stochastic fictitious play. Econometrica , 70(6):2265–2294. [60] Jin, C., Netrapalli, P., Ge, R., Kakade, S. M., and Jordan, M. I. (2019). A short note on concentration inequalities for random vectors with subgaussian norm. Preprint arXiv:1902.03736 .[61] Kaledin, M., Moulines, E., Naumov, A., Tadic, V., and Wai, H.-T. (2020). Finite time anal-ysis of linear two-timescale stochastic approximation with markovian noise. In Conference on Learning Theory , pages 2144–2203. PMLR. [62] Khalil, H. K. and Grizzle, J. W. (2002). Nonlinear Systems , volume 3. Prentice hall Upper Saddle River, NJ. [63] Khodadadian, S., Sharma, P., Joshi, G., and Maguluri, S. T. (2022). Federated reinforcement learning: Linear speedup under markovian sampling. In Proceedings of the 39th International Conference on Machine Learning , volume 162 of Proceedings of Machine Learning Research ,pages 10997–11057. PMLR. [64] Konda, V. R. and Tsitsiklis, J. N. (2000). Actor-critic algorithms. In Advances in neural information processing systems , pages 1008–1014. Citeseer. [65] Konda, V. R. and Tsitsiklis, J. N. (2004). Convergence rate of linear two-time-scale stochastic approximation. The Annals of Applied Probability , 14(2):796–819. [66] Kushner, H. J. and Clark, D. S. (2012). Stochastic Approximation Methods for Constrained and Unconstrained Systems , volume 26. Springer Science & Business Media. [67] La Salle, J. and Lefschetz, S. (2012). Stability by Liapunov’s Direct Method with Applications ,volume 4. Elsevier. 31 [68] Lakshminarayanan, C. and Szepesv´ ari, C. (2018). Linear stochastic approximation: How far does constant step-size and iterate averaging go? In Proceedings of the Twenty-First International Conference on Artificial Intelligence and Statistics , volume 84 of Proceedings of Machine Learning Research , pages 1347–1355. PMLR. [69] Lan, G. (2020). First-Order and Stochastic Optimization Methods for Machine Learning .Springer. [70] Lauand, C. K. and Meyn, S. (2024). Revisiting step-size assumptions in stochastic approxi-mation. Preprint Arxiv:2405.17834 .[71] Levin, D. A. and Peres, Y. (2017). Markov Chains and Mixing Times , volume 107. American Mathematical Soc. [72] Levine, S., Finn, C., Darrell, T., and Abbeel, P. (2016). End-to-end training of deep visuomotor policies. Journal of Machine Learning Research , 17(39):1–40. [73] Li, G., Cai, C., Chen, Y., Gu, Y., Wei, Y., and Chi, Y. (2021). Tightening the dependence on horizon in the sample complexity of q-learning. In Proceedings of the 38th International Conference on Machine Learning , volume 139 of Proceedings of Machine Learning Research ,pages 6296–6306. PMLR. [74] Li, G., Cai, C., Chen, Y., Wei, Y., and Chi, Y. (2024a). Is q-learning minimax optimal? atight sample complexity analysis. Operations Research , 72(1):222–236. [75] Li, G., Wei, Y., Chi, Y., Gu, Y., and Chen, Y. (2020a). Breaking the sample size barrier in model-based reinforcement learning with a generative model. Advances in neural information processing systems , 33. [76] Li, G., Wei, Y., Chi, Y., Gu, Y., and Chen, Y. (2020b). Sample complexity of asynchronous q-learning: Sharper analysis and variance reduction. In Advances in Neural Information Processing Systems , volume 33, pages 7031–7043. Curran Associates, Inc. [77] Li, G., Wu, W., Chi, Y., Ma, C., Rinaldo, A., and Wei, Y. (2024b). High-probability sample complexities for policy evaluation with linear function approximation. IEEE Transactions on Information Theory , 70(8):5969–5999. [78] Li, Y., Lan, G., and Zhao, T. (2022). First-order policy optimization for robust markov decision process. Preprint Arxiv:2209.10579 .[79] Liu, X., Xie, Z., and Zhang, S. (2025). Linear q-learning does not diverge in l2: Convergence rates to a bounded set. In Proceedings of the 42nd International Conference on Machine Learning ,volume 267 of Proceedings of Machine Learning Research , pages 39871–39897. PMLR. [80] Ljung, L. (1977). Analysis of recursive stochastic algorithms. IEEE transactions on automatic control , 22(4):551–575. [81] Lou, Z., Zhu, W., and Wu, W. B. (2022). Beyond sub-gaussian noises: Sharp concentration analysis for stochastic gradient descent. Journal of Machine Learning Research .32 [82] Mertikopoulos, P., Hsieh, Y.-P., and Cevher, V. (2024). A unified stochastic approximation framework for learning in games. Mathematical Programming , 203:559–609. [83] Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., Graves, A., Riedmiller, M., Fidjeland, A. K., Ostrovski, G., et al. (2015). Human-level control through deep reinforcement learning. nature , 518(7540):529–533. [84] Mou, W., Li, C. J., Wainwright, M. J., Bartlett, P. L., and Jordan, M. I. (2020). On lin-ear stochastic approximation: Fine-grained polyak-ruppert and non-asymptotic concentration. In Proceedings of Thirty Third Conference on Learning Theory , volume 125 of Proceedings of Machine Learning Research , pages 2947–2997. PMLR. [85] Moulines, E. and Bach, F. (2011). Non-asymptotic analysis of stochastic approximation algo-rithms for machine learning. Advances in neural information processing systems , 24:451–459. [86] Munos, R., Stepleton, T., Harutyunyan, A., and Bellemare, M. G. (2016). Safe and efficient off-policy reinforcement learning. In Proceedings of the 30th International Conference on Neural Information Processing Systems , pages 1054–1062. [87] Nanda, P. and Chen, Z. (2025). A minimal-assumption analysis of q-learning with time-varying policies. Preprint Arxiv:2510.16132 .[88] Nguyen, Q. D. T., Nguyen, D. A., Nguyen, H. H., and Maguluri, S. T. (2026). Almost sure convergence of nonlinear stochastic approximation: An interplay of noise and step size. Preprint Arxiv:2602.10580 .[89] Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., Zhang, C., Agarwal, S., Slama, K., Ray, A., et al. (2022). Training language models to follow instructions with human feedback. Advances in neural information processing systems , 35:27730–27744. [90] Patil, G., L.A., P., Nagaraj, D., and Precup, D. (2023). Finite time analysis of temporal difference learning with linear function approximation: Tail averaging and regularisation. In 
+
+Proceedings of The 26th International Conference on Artificial Intelligence and Statistics , volume 206 of Proceedings of Machine Learning Research , pages 5438–5448. PMLR. [91] Pham, T., Rinaldo, A., and Sarkar, P. (2025). Time-uniform concentration bounds for iterative algorithms. Preprint Arxiv:2511.18273 .[92] Polyak, B. T. and Juditsky, A. B. (1992). Acceleration of stochastic approximation by aver-aging. SIAM journal on control and optimization , 30(4):838–855. [93] Prashanth, L. A., Korda, N., and Munos, R. (2021). Concentration bounds for temporal difference learning with linear function approximation: The case of batch data and uniform sampling. Machine Learning , 110:559–618. [94] Precup, D., Sutton, R. S., and Singh, S. P. (2000). Eligibility traces for off-policy policy evaluation. In Proceedings of the Seventeenth International Conference on Machine Learning ,pages 759–766. 33 [95] Puterman, M. L. (2014). Markov Decision Processes: Discrete Stochastic Dynamic Program-ming . John Wiley & Sons. [96] Qian, X., Xie, Z., Liu, X., and Zhang, S. (2024). Almost sure convergence rates and concen-tration of stochastic approximation and reinforcement learning with markovian noise. Preprint Arxiv:2411.13711 .[97] Qu, G. and Wierman, A. (2020). Finite-time analysis of asynchronous stochastic approximation and q-learning. In Conference on Learning Theory , pages 3185–3205. PMLR. [98] Rakhlin, A., Shamir, O., and Sridharan, K. (2012). Making gradient descent optimal for strongly convex stochastic optimization. In International Conference on Machine Learning .[99] Robbins, H. and Monro, S. (1951). A stochastic approximation method. The Annals of Mathematical Statistics , pages 400–407. [100] Ruppert, D. (1988). Efficient estimations from a slowly convergent robbins-monro process. Technical Report 781, Cornell University, School of Operations Research and Industrial Engi-neering. Revised December 1988. [101] Ryu, E. K. and Boyd, S. (2016). Primer on monotone operator methods. Appl. Comput. Math , 15(1):3–43. [102] Sacks, J. (1958). Asymptotic distribution of stochastic approximation procedures. The Annals of Mathematical Statistics , 29(2):373–405. [103] Samsonov, S., Tiapkin, D., Naumov, A., and Moulines, E. (2024). Improved high-probability bounds for the temporal difference learning algorithm via exponential stability. In Proceedings of Thirty Seventh Conference on Learning Theory , volume 247 of Proceedings of Machine Learning Research , pages 4511–4547. PMLR. [104] Sayin, M. O., Parise, F., and Ozdaglar, A. (2022). Fictitious play in zero-sum stochastic games. SIAM Journal on Control and Optimization , 60(4):2095–2114. [105] Schweitzer, P. J. (1971). Iterative solution of the functional equations of undiscounted Markov renewal programming. Journal of Mathematical Analysis and Applications , 34(3):495–501. [106] Shalev-Shwartz, S. et al. (2012). Online learning and online convex optimization. Foundations and Trends ® in Machine Learning , 4(2):107–194. [107] Silver, D., Huang, A., Maddison, C. J., Guez, A., Sifre, L., Van Den Driessche, G., Schrit-twieser, J., Antonoglou, I., Panneershelvam, V., Lanctot, M., et al. (2016). Mastering the game of go with deep neural networks and tree search. nature , 529(7587):484. [108] Silver, D., Schrittwieser, J., Simonyan, K., Antonoglou, I., Huang, A., Guez, A., Hubert, T., Baker, L., Lai, M., Bolton, A., et al. (2017). Mastering the game of go without human knowledge. 
+
+Nature , 550(7676):354. 34 [109] Singh, R., Chandak, S., Moulines, E., Borkar, V. S., and Bambos, N. (2026). Regret and sample complexity of online q-learning via concentration of stochastic approximation with time-inhomogeneous markov chains. Preprint Arxiv:2602.16274 .[110] Srikant, R. and Ying, L. (2019). Finite-time error bounds for linear stochastic approximation and td-learning. In Conference on Learning Theory , pages 2803–2830. [111] Sutton, R. S. (1988). Learning to predict by the methods of temporal differences. Machine learning , 3(1):9–44. [112] Sutton, R. S. (1999). Open theoretical questions in reinforcement learning. In European Conference on Computational Learning Theory , pages 11–17. Springer. [113] Sutton, R. S. and Barto, A. G. (2018). Reinforcement Learning: An Introduction . MIT press. [114] Telgarsky, M. (2022). Stochastic linear optimization never overfits with quadratically-bounded losses on general data. In Conference on Learning Theory , pages 5453–5488. PMLR. [115] Thoppe, G. and Borkar, V. (2019). A concentration bound for stochastic approximation via alekseev’s formula. Stochastic Systems , 9(1):1–26. [116] Vapnik, V. N. (1999). An overview of statistical learning theory. IEEE transactions on neural networks , 10(5):988–999. [117] Vershynin, R. (2018). High-Dimensional Probability: An Introduction with Applications in Data Science , volume 47. Cambridge university press. [118] Wainwright, M. J. (2019a). High-Dimensional Statistics: A Non-Asymptotic Viewpoint , vol-ume 48. Cambridge university press. [119] Wainwright, M. J. (2019b). Stochastic approximation with cone-contractive operators: Sharp 
+
+ℓ∞-bounds for q-learning. Technical Report arXiv:1905.06265, University of California, Berkeley. [120] Wang, S., Si, N., Blanchet, J., and Zhou, Z. (2023). A finite sample complexity bound for distributionally robust q-learning. In Proceedings of The 26th International Conference on Artificial Intelligence and Statistics , volume 206 of Proceedings of Machine Learning Research ,pages 3370–3398. PMLR. [121] Watkins, C. J. and Dayan, P. (1992). Q-learning. Machine learning , 8(3-4):279–292. [122] Xu, D. and Guo, X. (2013). Fixed point analytical method for nonlinear differential equations. 
+
+Journal of Computational and Nonlinear Dynamics , 8(1). [123] Xu, Y., Mondal, W., and Aggarwal, V. (2026). Finite-sample analysis of policy evaluation for robust average reward reinforcement learning. Advances in Neural Information Processing Systems , 38:151870–151915. [124] Zeng, S. and Doan, T. T. (2024). Accelerated multi-time-scale stochastic approximation: Optimal complexity and applications in reinforcement learning and multi-agent games. Preprint Arxiv:2409.07767 .35 [125] Zhang, Y., Huo, D. L., Chen, Y., and Xie, Q. (2024). Prelimit coupling and steady-state convergence of constant-stepsize nonsmooth contractive sa. SIGMETRICS Perform. Eval. Rev. ,52(1):35–36. [126] Zhang, Y. and Xie, Q. (2024). Constant stepsize q-learning: Distributional convergence, bias and extrapolation. Reinforcement Learning Journal , 3:1168–1210. 36 Appendices 
+
+# A Proof of All Technical Results in Section 2 
+
+A.1 Proof of Proposition 2.1 
+
+(1) It is clear from the definition of M θ,g f (·) that it is non-negative and is equal to zero if and only if x = 0. Now for any c̸ = 0 (the case c = 0 is immediate), we have 
+
+M θ,g f (cx ) = min 
+
+> u
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θ ∥cx − u∥2
+
+> s
+
+}
+
+= min 
+
+> v
+
+{ 12 ∥cv ∥2 
+
+> c
+
++ 12θ ∥cx − cv ∥2
+
+> s
+
+}
+
+(change of variable u = cv )= |c|2M θ,g f (x).
+
+Therefore, we have 
+
+√
+
+M θ,g f (cx ) = |c|
+
+√
+
+M θ,g f (x). We next show the triangle inequality. For any 
+
+x1, x 2 ∈ Rd, let 
+
+u1 ∈ arg min 
+
+> u∈Rd
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θ ∥x1 − u∥2
+
+> s
+
+}
+
+,u2 ∈ arg min 
+
+> u∈Rd
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θ ∥x2 − u∥2
+
+> s
+
+}
+
+.
+
+Then we have 
+
+M θ,g f (x1 + x2)= min 
+
+> u
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θ ∥x1 + x2 − u∥2
+
+> s
+
+}
+
+≤ 12 ∥u1 + u2∥2 
+
+> c
+
++ 12θ ∥x1 + x2 − u1 − u2∥2 
+
+> s
+
+(choose u = u1 + u2)
+
+≤ 12 (∥u1∥c + ∥u2∥c)2 + 12θ (∥x1 − u1∥s + ∥x2 − u2∥s)2
+
+= M θ,g f (x1) + M θ,g f (x2) + ∥u1∥c∥u2∥c + 1
+
+θ ∥x1 − u1∥s∥x2 − u2∥s
+
+≤ M θ,g f (x1) + M θ,g f (x2)+ 2 
+
+√ 12 ∥u1∥2 
+
+> c
+
++ 12θ ∥x1 − u1∥2
+
+> s
+
+√ 12 ∥u2∥2 
+
+> c
+
++ 12θ ∥x2 − u2∥2
+
+> s
+
+= M θ,g f (x1) + M θ,g f (x2) + 2 
+
+√
+
+M θ,g f (x1)M θ,g f (x2).
+
+It follows that 
+
+√
+
+M θ,g f (x1 + x2) ≤
+
+√
+
+M θ,g f (x1) + 
+
+√
+
+M θ,g f (x2) for any x1, x 2 ∈ Rd. Therefore, 
+
+M θ,g f (·) is a norm-square function and we can write M θ,g f (x) = 12 ∥x∥2 
+
+> m
+
+for some norm ∥ · ∥ m.(2) We first derive the upper bound. By definition of M θ,g f (·), we have 
+
+M θ,g f (x) = min 
+
+> u∈Rd
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θ ∥x − u∥2
+
+> s
+
+}
+
+37 ≥ min 
+
+> u∈Rd
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θu 2
+
+> cs
+
+∥x − u∥2
+
+> c
+
+}
+
+(∥ · ∥ c ≤ ucs ∥ · ∥ s)
+
+≥ min 
+
+> u∈Rd
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θu 2
+
+> cs
+
+(∥x∥c − ∥ u∥c)2
+
+}
+
+(triangle inequality) = min 
+
+> y∈R
+
+{ 12 y2 + 12θu 2
+
+> cs
+
+(∥x∥c − y)2
+
+}
+
+(change of variable: y = ∥u∥c)= min 
+
+> y∈R
+
+{( 12 + 12θu 2
+
+> cs
+
+)
+
+y2 − 1
+
+θu 2
+
+> cs
+
+∥x∥cy + 12θu 2
+
+> cs
+
+∥x∥2
+
+> c
+
+}
+
+= 12 ∥x∥2
+
+> c
+
+1
+
+θu 2 
+
+> cs
+
++ 1 (minimum of a quadratic function) = 1
+
+θu 2 
+
+> cs
+
++ 1 f (x).
+
+It follows that f (x) ≤ (1 + θu 2
+
+> cs
+
+) M θ,g f (x) for all x, which implies ∥ · ∥ c ≤ (1 + θu 2
+
+> cs
+
+)1/2∥ · ∥ m.Next we show the lower bound. Similarly, by definition we have for any x ∈ Rd that 
+
+M θ,g f (x) = min 
+
+> u∈Rd
+
+{ 12 ∥u∥2 
+
+> c
+
++ 12θ ∥x − u∥2
+
+> s
+
+}
+
+≤ min 
+
+> α∈(0 ,1)
+
+{ 12 ∥αx ∥2 
+
+> c
+
++ 12θ ∥x − αx ∥2
+
+> s
+
+}
+
+(restrict u = αx for α ∈ (0 , 1)) 
+
+≤ 12 ∥x∥2 
+
+> c
+
+min 
+
+> α∈(0 ,1)
+
+{
+
+α2 + (1 − α)2
+
+θℓ 2
+
+> cs
+
+}
+
+(ℓcs ∥ · ∥ s ≤ ∥ · ∥ c)= 11 + θℓ 2
+
+> cs
+
+12 ∥x∥2 
+
+> c
+
+(minimum of the quadratic function) = 11 + θℓ 2
+
+> cs
+
+f (x).
+
+It follows that f (x) ≥ (1 + θℓ 2
+
+> cs
+
+) M θ,g f (x) for all x, which implies ∥ · ∥ c ≥ (1 + θℓ 2
+
+> cs
+
+)1/2∥ · ∥ m.(3) The convexity of M θ,g f (·) follows from [8, Theorem 2.19]. Since f (·) is proper, closed, and convex, and g(·) is L – smooth with respect to ∥ · ∥ s, we have by [8, Theorem 5.30 (a)] that 
+
+M θ,g f (·) is Lθ – smooth with respect to ∥ · ∥ s.
+
+A.2 Proof of Lemma 2.1 
+
+Using the fact that ¯F (x∗) = x∗, we have 
+
+⟨∇ M θ,g f (xk − x∗), ¯F (xk) − xk⟩
+
+= ⟨∇ M θ,g f (xk − x∗), ¯F (xk) − ¯F (x∗)⟩
+
+︸ ︷︷ ︸
+
+> E1,1
+
+− ⟨∇ M θ,g f (xk − x∗), x k − x∗⟩
+
+︸ ︷︷ ︸
+
+> E1,2
+
+. (18) For the gradient of M θ,g f (x), since M θ,g f (x) = 12 ∥x∥2 
+
+> m
+
+is a smooth function, we have by the chain rule of calculus that ∇M θ,g f (x) = ∥x∥m∇∥ x∥m.Now consider the term E1,1. Using H¨ older’s inequality, we have 
+
+E1,1 = ∥xk − x∗∥m⟨∇∥ xk − x∗∥m, ¯F (xk) − ¯F (x∗)⟩
+
+38 ≤ ∥ xk − x∗∥m∥∇∥ xk − x∗∥m∥∗
+
+> m
+
+∥ ¯F (xk) − ¯F (x∗)∥m, (19) where ∥ · ∥ ∗ 
+
+> m
+
+is the dual norm of ∥ · ∥ m. To further control E1,1, the following result from [106] is needed. 
+
+Lemma A.1. Let ˆh : D → R be a convex differentiable function. Then ˆh is L′ – Lipschitz over D
+
+with respect to some norm ∥ · ∥ if and only if sup w∈D ∥∇ ˆh(w)∥∗ ≤ L′, where ∥ · ∥ ∗ is the dual norm of ∥ · ∥ .
+
+Since ∥x∥m as a function of x is 1 – Lipschitz with respect to ∥ · ∥ m, we have by Lemma A.1 that ∥∇∥ xk − x∗∥m∥∗ 
+
+> m
+
+≤ 1. For the term ∥ ¯F (xk) − ¯F (x∗)∥m in Inequality (19), using Proposition 2.1 (2) and the contraction property of ¯F (·) with respect to ∥ · ∥ c, we have 
+
+∥ ¯F (xk) − ¯F (x∗)∥m ≤ 1
+
+ℓcm 
+
+∥ ¯F (xk) − ¯F (x∗)∥c
+
+≤ γc
+
+ℓcm 
+
+∥xk − x∗∥c
+
+≤ γcucm 
+
+ℓcm 
+
+∥xk − x∗∥m.
+
+Substituting the upper bounds we obtained for ∥∇∥ xk − x∗∥m∥∗ 
+
+> m
+
+and ∥ ¯F (xk) − ¯F (x∗)∥m into Inequality (19), we have 
+
+E1,1 ≤ γcucm 
+
+ℓcm 
+
+∥xk − x∗∥2 
+
+> m
+
+= 2γcucm 
+
+ℓcm 
+
+M θ,g f (xk − x∗).
+
+Now consider the term E1,2 in Inequality (18). Since the norm ∥ · ∥ m is a convex function of x,we have by definition of convexity that 
+
+∥0∥m − ∥ xk − x∗∥m ≥ ⟨∇∥ xk − x∗∥m, −(xk − x∗)⟩,
+
+which implies 
+
+E1,2 = ∥xk − x∗∥m⟨∇∥ xk − x∗∥m, x k − x∗⟩ ≥ ∥ xk − x∗∥2 
+
+> m
+
+= 2 M θ,g f (xk − x∗).
+
+Combining the bounds on E1,1 and E1,2, we obtain 
+
+E1 = αk(E1,1 − E1,2) ≤ − 2
+
+(
+
+1 − γc
+
+ucm 
+
+ℓcm 
+
+)
+
+αkM θ,g f (xk − x∗).
+
+A.3 Proof of Lemma 2.2 
+
+We first show that ∥F (x, y )∥c can grow at most affinely with respect to ∥x∥c. Indeed, by the triangle inequality, we have 
+
+∥F (x, y )∥c ≤ ∥ F (x, y ) − F (0 , y )∥c + ∥F (0 , y )∥c ≤ L1∥x∥c + L2. (20) Further, by Jensen’s inequality, we have 
+
+∥ ¯F (x)∥c ≤ L1∥x∥c + L2.
+
+39 To bound the term E3, for any k ≥ 0, we have 
+
+E3 = Lα 2
+
+> k
+
+2θ ∥F (xk, Y k) − xk∥2
+
+> s
+
+≤ Lα 2
+
+> k
+
+2θℓ 2
+
+> cs
+
+∥F (xk, Y k) − xk∥2 
+
+> c
+
+(Proposition 2.1 (2)) 
+
+≤ Lα 2
+
+> k
+
+2θℓ 2
+
+> cs
+
+(∥F (xk, Y k)∥c + ∥xk∥c)2
+
+≤ Lα 2
+
+> k
+
+2θℓ 2
+
+> cs
+
+(( L1 + 1) ∥xk∥c + L2)2 (Inequality (20)) 
+
+≤ Lα 2
+
+> k
+
+2θℓ 2
+
+> cs
+
+(( L1 + 1) ∥xk − x∗∥c + ( L1 + 1) ∥x∗∥c + L2)2
+
+≤ Lα 2
+
+> k
+
+θℓ 2
+
+> cs
+
+(L1 + 1) 2∥xk − x∗∥2 
+
+> c
+
++ Lα 2
+
+> k
+
+θℓ 2
+
+> cs
+
+(( L1 + 1) ∥x∗∥c + L2)2
+
+≤ 2L(L1 + 1) 2u2
+
+> cm
+
+α2
+
+> k
+
+θℓ 2
+
+> cs
+
+M θ,g f (xk − x∗) + Lα 2
+
+> k
+
+θℓ 2
+
+> cs
+
+(( L1 + 1) ∥x∗∥c + L2)2 ,
+
+where the last line follows from Proposition 2.1 (2). 
+
+A.4 Proof of Lemma 2.3 
+
+Using Lemma 2.1, Equation (6), and Lemma 2.2 in Inequality (5), we have for all k ≥ 0 that 
+
+Mk+1 ≤
+
+(
+
+1 − 2
+
+(
+
+1 − γcucm 
+
+ℓcm 
+
+)
+
+αk + 2L(L1 + 1) 2u2
+
+> cm
+
+α2
+
+> k
+
+θℓ 2
+
+> cs
+
+)
+
+Mk
+
++ Lα 2
+
+> k
+
+θℓ 2
+
+> cs
+
+(( L1 + 1) ∥x∗∥c + L2)2
+
+≤
+
+(
+
+1 −
+
+(
+
+1 − γcucm 
+
+ℓcm 
+
+)
+
+αk
+
+)
+
+Mk + Lα 2
+
+> k
+
+θℓ 2
+
+> cs
+
+(( L1 + 1) ∥x∗∥c + L2)2 ,
+
+where the last inequality follows from choosing 
+
+α0 ≤ ϕ0 = θℓ 2 
+
+> cs
+
+(1 − γcucm /ℓ cm )2L(L1 + 1) 2u2
+
+> cm
+
+.
+
+# B Stochastic Approximation under Bounded Multiplicative Noise 
+
+The following assumption explains what we mean by multiplicative noise. 
+
+Assumption B.1. There exists σ > 0 such that ∥F (xk, Y k) − ¯F (xk)∥c ≤ σ(1 + ∥xk∥c) a.s. for all 
+
+k ≥ 0. Assumption B.1 is in fact a relaxed version of Assumption 2.3. To see this, suppose that Assumption 2.3 is satisfied. Then we have the affine growth property (cf. Equation (20)), which in turn implies that 
+
+∥F (xk, Y k) − ¯F (xk)∥c ≤ ∥ F (xk, Y k)∥c + ∥ ¯F (xk)∥c
+
+40 = ∥F (xk, Y k)∥c + ∥EY ∼μ[F (xk, Y )] ∥c
+
+≤ ∥ F (xk, Y k)∥c + EY ∼μ[∥F (xk, Y )∥c] (Jensen’s inequality) 
+
+≤ 2L1∥xk∥c + 2 L2.
+
+Therefore, Assumption B.1 is satisfied with σ = 2 max( L1, L 2). The almost sure boundedness in Assumption B.1 is necessary for us to establish high probability bounds with super-polynomial tail. To see this, consider scalar-valued linear SA xk+1 = xk+αk ˜akxk,and suppose that ˜ ak ∼ N (−1/2, 1). Note that ˜ ak is negative in expectation but is not bounded. It is easy to see that xk = x0 
+
+> ∏k−1
+> j=0
+
+(1 + αj ˜aj ). Since 1 + αk ˜ak ∼ N (1 − αk/2, α 2
+
+> k
+
+), the tail of xk gets heavier and heavier as k increases. For example, x1 has sub-Gaussian tail, x2 has a X 2-distribution (which only has sub-exponential tail), x3 has no MGF, etc. One special case where Assumption B.1 is satisfied is when the operator F (x, y ) is Lipschitz continuous in x (cf. Assumption 2.3). The implication easily follows from using triangle inequality. Observe that under Assumptions 2.1 and B.1, we have by triangle inequality that 
+
+∥xk+1 ∥c ≤ (1 − αk)∥xk∥c + αk∥F (xk, Y k)∥c
+
+≤ (1 − αk)∥xk∥c + αk∥F (xk, Y k) − ¯F (xk)∥c
+
++ αk∥ ¯F (xk) − ¯F (0) ∥c + αk∥ ¯F (0) ∥c
+
+≤ (1 + ( σ + γc − 1) αk)∥xk∥c + αk(σ + ∥ ¯F (0) ∥c).
+
+Note that the parameter γc captures the contraction effect of the expected operator and the param-eter σ captures the expansive effect of the noise. The combined effect is captured by the parameter 
+
+D := σ + γc − 1. When using αk = α/ (k + h), the previous inequality implies that ∥xk∥c is ei-ther uniformly bounded by a deterministic constant or grow at most logarithmically when D ≤ 0. However, when D > 0, ∥xk∥c can grow at a polynomial rate O(kαD ). See Proposition B.1 for more details. We next state the result. For ease of exposition, we only state the result for D > 0 and D < 0. The case D = 0 is a straightforward extension. We use αk = α/ (k + h) as our stepsize, and assume that 2 αD is an integer, which is in fact without loss of generality because D = σ + γc − 1 and if Assumption 2.3 holds with some σ > 0 it also holds for any σ′ > σ . Let m = 2 αD + 1. The parameters {ci}1≤i≤4, c′
+
+> 1
+
+, and D0 ∈ (0 , 1) used to present the following theorem are constants. 
+
+Theorem B.1 ([29]) . Consider {xk} generated by Algorithm (1). Suppose that Assumptions 2.2, 2.1, and B.1 are satisfied. (1) When D < 0, α > 2/D 0, and h is appropriately chosen, for any δ > 0 and K ≥ 0, with probability at least 1 − δ, we have for all k ≥ K that 
+
+∥xk − x∗∥2 
+
+> c
+
+≤ c′
+
+> 1
+
+α∥x0 − x∗∥2
+
+> c
+
+k + h
+
+> [
+
+log  
+
+> (
+
+1
+
+δ
+
+> )
+
++ c2 
+
+> (
+
+hK + h
+
+> )αD 0/2−1
+
++c3 + c4 log  
+
+> (
+
+k − 1 + hK − 1 + h
+
+> )]
+
+.
+
+(2) When D > 0, α > 2/D 0, and h is appropriately chosen, for any δ > 0 and K ≥ 0, with 
+
+41 probability at least 1 − δ, we have for all k ≥ K that 
+
+∥xk − x∗∥2 
+
+> c
+
+≤ c1α∥x0 −x∗∥2
+
+> c
+
+k + h
+
+> [
+
+log  
+
+> (
+
+mδ
+
+> )
+
++c2 +c3 +c4 log  
+
+> (
+
+k − 1 + hh − 1
+
+> )] m−1
+
+×
+
+> [
+
+log  
+
+> (
+
+mδ
+
+> )
+
++ c2 
+
+> (
+
+hK + h
+
+> )αD 0/2−1
+
++ c3 + c4 log  
+
+> (
+
+k − 1 + hK − 1 + h
+
+> )]
+
+.
+
+Several remarks are in order. We first discuss the convergence rate in k. Since the dominant polynomial term in k is O(1 /k ) in both cases of Theorem B.1 (i.e., D < 0 and D > 0), the norm-square error achieves O(1 /k ) rate of convergence. This agrees with the mean-square bound presented in Section 2, and existing results on SGD [69]. We next discuss the tail. In the case D < 0, Theorem B.1 (1) states that Algorithm (1) achieves 
+
+O(1 /k ) rate of convergence with sub-Gaussian tail, as δ appears as log(1 /δ ) in the norm-square bound. This is not surprising as D < 0 implies that ∥xk∥c is uniformly bounded by a deterministic constant (cf. Proposition B.1). Therefore, we in fact only have bounded (hence sub-Gaussian) additive noise. The case where D > 0 is more complicated. In this case, the tail depends on the parameter m.Since m = 2 αD + 1 and D > 0, we in general only have super-polynomial tail since the probability tolerance level δ appears as [log( m/δ )] m in the bound. The fact that m is affine in D makes intuitive sense as larger D implies noisier updates, which in turn implies heavier tail. In terms of the dependency on k and K, Theorem B.1 (2) states that, with probability at least 1 − δ, all the iterates lie in a cone that starts with radius ˜Θ((1 + log m/ 2(1 /δ )) K−1/2) when k = K ≥ 0, and then (for all k > K ) its radius is of order ˜Θ((log m/ 2(1 /δ ) + log 1/2(k/K )) k−1/2). Moreover, for small values of k, this bound can be tightened by an a.s. bound that is polynomial in k (cf. Proposition B.1). Note that, as a function of k, the initial radius is always of order at most K−1, matching the rate obtained for the mean-square error in [28]. On the other hand, the radius decays at only a slightly slower rate than the initial radius as a function of k.Anytime concentration bounds immediately imply concentration bounds for a fixed iteration number (cf. Corollary B.2), which in turn gives the full tail bound (cf. Corollary B.3) and the sample complexity result (cf. Corollary B.4). For ease of exposition, we only state the results when 
+
+D > 0. 
+
+Corollary B.2. Suppose that D > 0. Under the same assumptions in Theorem B.1 (2), for any 
+
+δ > 0 and k ≥ 0, we have with probability at least 1 − δ that 
+
+∥xk − x∗∥2 
+
+> c
+
+≤ c1α∥x0 − x∗∥2
+
+> c
+
+k + h
+
+> [
+
+log  
+
+> (
+
+mδ
+
+> )
+
++ c2 + c3 + c4 log  
+
+> (
+
+k − 1 + hh − 1
+
+> )] m
+
+.
+
+Corollary B.2 follows by setting K = k in Theorem B.1 (2). 
+
+Corollary B.3. Suppose that D > 0. Under the same assumptions in Theorem B.1 (2), there exists C1 > 0 such that the following inequality holds for all ϵ > 0 and k ≥ 0:
+
+P 
+
+> (
+
+√k + h ∥xk − x∗∥c
+
+(log( k)) m/ 2 > ϵ 
+
+> )
+
+< m exp 
+
+> (
+
+−C1ϵ2/m )
+
+.
+
+42 Corollary B.3 is a direct implication of Corollary B.2, and provides an upper bound for the whole complementary cumulative distribution function (CDF) of the error ∥xk −x∗∥c for any iterate k ≥ 0, which can be integrated to obtain bounds for any moment of the error at any point in time. 
+
+Corollary B.4. Given ϵ > 0, to achieve ∥xk − x∗∥c ≤ ϵ with probability at least 1 − δ, the sample complexity is ˜O((1 + log m(1 /δ )) ϵ−2).
+
+As we see from Corollary B.4, the sample complexity dependency on ϵ is ˜O(ϵ−2), which is known to be optimal (up to a logarithmic factor). In addition, we have super-polynomial tail as δ appears as log m(1 /δ ) in the bound. Theorem B.1 shows that SA with multiplicative noise in general is able to achieve an ˜O(1 /k )rate of convergence with a super-polynomial tail. One may ask if sub-Gaussian (or sub-exponential) tail is achievable. In fact, for SA with multiplicative noise, it is in general not possible to obtain sub-exponential tail bound. See [29] for more details. 
+
+B.1 Proof Sketch of Theorem B.1 
+
+The main challenge of obtaining super-polynomial high probability bounds is due to the combination of unbounded iterates and multiplicative noise . While having unbounded iterates and multiplicative noise are not too problematic in isolation, the combination of both creates a setting where the variance of the noise is unbounded. In this case, since we allow the multiplicative noise to be large enough so that the “noisy” operator can be expansive with positive probability, the error can grow extremely fast with a significant probability. This creates a challenge that no approach in the literature can deal with in general. To overcome this challenge, we develop a novel bootstrapping argument. The high level ideas are presented in the following. 
+
+B.1.1 Initialization: Time-Varying Worst-Case Bounds 
+
+While the iterates of SA with multiplicative noise are not uniformly bounded by a constant, we show in the following proposition that they do admit a time-varying a.s. bound. The behavior of such time-varying bound depends on the contraction effect in the expected operator and the expansive effect in the multiplicative noise. In general, the bound can be polynomially increasing 
+
+with time. 
+
+Proposition B.1 ([29]) . Consider {xk} generated by Algorithm (1). Suppose that Assumptions 2.1 and B.1 are satisfied, and αk = α/ (k + h) for all k ≥ 0, where α, h > 0 are constants. Then we have ∥xk − x∗∥c ≤ Bk(D) a.s. for all k ≥ 0, where 
+
+Bk(D) =  
+
+> (
+
+k−1+ hh−1 
+
+> )αD (
+
+∥x0 −x∗∥c + σ(1+ ∥x∗∥c)
+
+D
+
+> )
+
+− σ(1+ ∥x∗∥c)
+
+D , D > 0,
+
+∥x0 − x∗∥c + σ(1 + ∥x∗∥c)α log  
+
+> (
+
+k − 1 + hh − 1
+
+> )
+
+, D = 0 ,
+
+∥x0 − x∗∥c − σ(1 + ∥x∗∥c)
+
+D , D < 0.
+
+43 B.1.2 Bootstrapping: An Iterative Framework to Improve the Bound 
+
+The key in the bootstrapping argument is to start with a non-decreasing sequence {Tk(δ)}k≥0 such that 
+
+P(∥xk − x∗∥2 
+
+> c
+
+≤ Tk(δ), ∀ k ≥ 0) ≥ 1 − δ, 
+
+and obtain a sequence {Tk(δ, δ ′)}k≥0, with Tk(δ, δ ′) = ˜O(Tk(δ)/k ), such that 
+
+P(∥xi − x∗∥2 
+
+> c
+
+≤ Tk(δ, δ ′), ∀ k ≥ 0) ≥ 1 − δ − δ′.
+
+This blueprint enables us to start with the time-varying worst-case bound for the error (which can be polynomially increasing) and iteratively improve it to obtain our super-polynomial concentration bound with the desired convergence rate. To establish this blueprint, we develop a refined variant of the two-step Lyapunov approach presented in Section 5.3. 44

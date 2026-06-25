@@ -6,49 +6,41 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-24
-- 运行时间：2026-06-24 21:59:08 UTC
+- 最新运行日期：2026-06-25
+- 运行时间：2026-06-25 22:25:08 UTC
 - 运行状态：成功
-- 本次总论文数：9
+- 本次总论文数：7
 - 精读区：4
-- 速读区：5
+- 速读区：3
 
 ### 今日简报（AI）
-今日精读4篇，重点关注PDE符号表征与IGO收敛分析两大方向。  
-最值得看：《Agentic Symbolic Search》提出超越手工表达与网格的PDE表征新思路；《Beyond IGO-Flow》给出连续空间IGO收敛理论。  
-建议普通读者优先阅读《Agentic Symbolic Search》了解前沿方法，再结合《TRIDENT》理解多智能体安全强化学习的解耦路径。
-- 详情：[/202606/24/README](/202606/24/README)
+今日精读两篇9分论文，分别聚焦通用逼近器与Lyapunov证明系统；速读覆盖微分方程鲁棒性、自适应随机梯度及HJB偏微分方程。最值得看的是EML树的通用逼近特性和优化中Lyapunov风格证明的系统化交互检索。建议优先精读这两篇高分论文，再选择性浏览速读内容。
+- 详情：[/202606/25/README](/202606/25/README)
 
 ### 精读区论文标签
-1. [Agentic Symbolic Search: Characterizing PDEs Beyond Hand-crafted Expressions, Meshes, and Neural Networks](/202606/24/2606.20467v1-agentic-symbolic-search-characterizing-pdes-beyond-hand-crafted-expressions-meshes-and-neural-networks)  
-   标签：评分：10.0/10、query:sr
-   evidence：进化搜索符号PDE表达式
-2. [Beyond IGO-Flow: Toward Convergence Analysis of IGO in Continuous Spaces](/202606/24/2606.17523v1-beyond-igo-flow-toward-convergence-analysis-of-igo-in-continuous-spaces)  
+1. [EML Trees Are Universal Approximators](/202606/25/2606.23179v1-eml-trees-are-universal-approximators)  
+   标签：评分：9.0/10、query:sr
+   evidence：EML树用于符号函数逼近
+2. [Toward a Systematic Understanding and Interactive Search of Lyapunov-Style Proofs in Optimization](/202606/25/2606.26077v1-toward-a-systematic-understanding-and-interactive-search-of-lyapunov-style-proofs-in-optimization)  
+   标签：评分：9.0/10、query:lyapunov-ai
+   evidence：优化中李雅普诺夫风格证明的系统框架
+3. [FactorLibrary: From Polynomials to Circuits via Recursive Subgoals](/202606/25/2606.25394v1-factorlibrary-from-polynomials-to-circuits-via-recursive-subgoals)  
    标签：评分：8.0/10、query:sr
-   evidence：分析了离散时间IGO的收敛性，该进化优化方法可直接用于符号回归任务
-3. [Interpreting Neural Combinatorial Optimization via Evolving Programmatic Bottlenecks](/202606/24/2606.19741v1-interpreting-neural-combinatorial-optimization-via-evolving-programmatic-bottlenecks)  
-   标签：评分：8.0/10、query:sr
-   evidence：使用大型语言模型演化程序化瓶颈来解释神经组合优化策略
-4. [Compensated Splitting For Generalized Lyapunov Equations](/202606/24/2606.22245v1-compensated-splitting-for-generalized-lyapunov-equations)  
+   evidence：强化学习用于符号表达式发现
+4. [Learning to Adapt: Reptile-D-Learning for Robust and Efficient Control Under Parametric Uncertainty](/202606/25/2606.25659v1-learning-to-adapt-reptile-d-learning-for-robust-and-efficient-control-under-parametric-uncertainty)  
    标签：评分：8.0/10、query:lyapunov-ai
-   evidence：提出补偿分裂法求解广义李雅普诺夫方程，属于构建李雅普诺夫函数的传统数值方法
+   evidence：基于神经网络的李雅普诺夫函数
 
 ### 速读区论文标签
-1. [TRIDENT: Breaking the Hybrid-Safety-Physics Coupling for Provably Safe Multi-Agent Reinforcement Learning](/202606/24/2606.18308v1-trident-breaking-the-hybrid-safety-physics-coupling-for-provably-safe-multi-agent-reinforcement-learning)  
-   标签：评分：7.0/10、query:lyapunov-ai
-   evidence：使用李雅普诺夫受限信赖域更新实现安全多智能体强化学习
-2. [Stable Transformer-Actor-Critic Model Predictive Control: A Contraction Analysis Approach](/202606/24/2606.20197v2-stable-transformer-actor-critic-model-predictive-control-a-contraction-analysis-approach)  
-   标签：评分：7.0/10、query:lyapunov-ai
-   evidence：基于Transformer的稳定模型预测控制，使用收缩分析确保李雅普诺夫类稳定性
-3. [Gradient-Descent Steps to Success over Mean Accuracy: A Paradigm Shift for ML](/202606/24/2606.22053v1-gradient-descent-steps-to-success-over-mean-accuracy-a-paradigm-shift-for-ml)  
-   标签：评分：7.0/10、query:sr
-   evidence：借鉴遗传编程中的计算努力概念，与进化算法符号回归相关
-4. [Weight Adaptation for Improving Parallel Performance of Adaptive Stochastic Natural Gradient](/202606/24/2606.19861v1-weight-adaptation-for-improving-parallel-performance-of-adaptive-stochastic-natural-gradient)  
+1. [Differential Equation Inductive Robustness Axiomatization](/202606/25/2606.18685v1-differential-equation-inductive-robustness-axiomatization)  
+   标签：评分：6.0/10、query:lyapunov-ai
+   evidence：通过公理化方法证明多项式动力系统的鲁棒安全性，与Lyapunov稳定性分析相关
+2. [Weight Adaptation for Improving Parallel Performance of Adaptive Stochastic Natural Gradient](/202606/25/2606.19861v1-weight-adaptation-for-improving-parallel-performance-of-adaptive-stochastic-natural-gradient)  
    标签：评分：6.0/10、query:sr
-   evidence：具有权重自适应机制的进化算法，可应用于符号回归
-5. [Hierarchical Reinforcement Learning for Sparse-Reward Search in Commutative Algebra](/202606/24/2606.22922v1-hierarchical-reinforcement-learning-for-sparse-reward-search-in-commutative-algebra)  
-   标签：评分：6.0/10、query:sr
-   evidence：使用层次强化学习搜索代数反例，类似符号表达式发现
+   evidence：针对基于概率模型的进化算法提出权重自适应机制，提升并行性能，可应用于符号回归
+3. [Hessian-augmented Supervised Learning for Hamilton-Jacobi-Bellman PDEs](/202606/25/2606.23827v1-hessian-augmented-supervised-learning-for-hamilton-jacobi-bellman-pdes)  
+   标签：评分：6.0/10、query:lyapunov-ai
+   evidence：海森增强的监督学习用于值函数逼近，可应用于李雅普诺夫函数发现
 
 
 <div class="dpr-home-promo-card">

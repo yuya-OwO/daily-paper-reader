@@ -1,0 +1,601 @@
+Title: Learning to Adapt: Reptile-D-Learning for Robust and Efficient Control Under Parametric Uncertainty
+
+URL Source: https://arxiv.org/pdf/2606.25659v1
+
+Published Time: Thu, 25 Jun 2026 00:56:06 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Learning to Adapt: Reptile-D-Learning for Robust and Efficient Control Under Parametric Uncertainty 
+
+Haipeng Cao, Zhaolong Shen and Quan Quan* 
+
+Abstract — Learning-based Lyapunov Control (LLC) provides formal stability guarantees for nonlinear systems, but its validity relies heavily on accurate system models. Parameter variations and uncertainties may invalidate stability constraints, leading to costly retraining. Although D-learning can estimate Lyapunov derivatives without relying on explicit dynamics models, it remains limited by single-task dynamics and degrades under large parameter shifts. We propose Reptile-D-learning, a framework that leverages the Reptile meta-learning algorithm to capture shared dynamical structures across systems with different parameters, thereby learning a generalizable Lya-punov network initialization and a high-performance controller. Experiments on multiple nonlinear control systems demonstrate that Reptile-D-learning significantly improves both generaliza-tion and rapid adaptation to unseen parameter configurations. 
+
+I. INTRODUCTION Learning-based Lyapunov Control (LLC) methods [1]–[5] have emerged as a principled framework by jointly learning Lyapunov functions and control policies. These methods provide formal stability guarantees for neural network con-trollers, thereby addressing the inherent opacity and lack of safety certificates in deep reinforcement learning, but such guarantees can be brittle in dynamic environments. The standard Lyapunov condition ˙ V (x) < 0 is inherently tied to a specific nominal dynamics model f (x, u). In practical robotic applications, physical parameters such as mass, friction co-efficients, and payloads are often time-varying or uncertain, which can distort the underlying energy landscape, invalidate learned stability certificates, and necessitate costly retraining [6], [7]. Although D-learning [8] relaxes model dependence by using an auxiliary network D(x, u) for model-free Lyapunov derivative estimation, it often overfits to single-task dynam-ics. Significant parameter shifts cause dynamics mismatch, leading to biased derivative estimates and degraded control [9], [10], as illustrated in Fig. 1. This is especially critical during online operation, where data collection is limited, expensive, and time-sensitive. These observations motivate a cross-parameter learning principle: instead of learning for a fixed instance, we learn an initialization capturing shared structures across task dis-tributions for rapid adaptation. This mechanism must pre-serve stability objectives while remaining computationally            
+
+> This work was supported in part by the National Natural Science Foundation of China under Grant 62573021. The authors are with the School of Automation Science and Electrical En-gineering, Beihang University, Beijing 100191, P.R. China.
+
+{20375039, shenzhaolong, qq_buaa}@buaa.edu.cn 
+
+> *Corresponding author.
+
+Fig. 1. 3D trajectory comparison under 1.5 × mass pertur-bation. The D-learning controller diverges, while Reptile-D-learning converges to the target. tractable for the cascaded Lyapunov, Dfunction, and policy networks. To address these challenges, we propose Reptile-D-learning , a unified bilevel framework for robust cross-parameter stabilization. We represent the Lyapunov network, D-network, and control policy as a joint meta-parameter 
+
+Θ = {θV , ψD, φ }, and optimize the expected post-adaptation stability loss over a task distribution. Reptile [11] is adopted as a first-order approximate solver for this bilevel objective. Compared with second-order methods such as MAML [12], this design avoids expensive dense block-Hessian compu-tations and is therefore better suited to D-learning’s three-network coupled constraints. The main contributions are summarized as follows:  
+
+> •
+
+We formulate cross-parameter LLC adaptation as a
+
+unified bilevel optimization problem over the joint meta-parameter Θ. We cast D-learning as the task-specific inner solver and Reptile as the first-order meta-optimizer.  
+
+> •
+
+We demonstrate that Reptile is a computationally ef-ficient first-order solver specifically suited for the cascaded constraints of D-learning. Furthermore, we provide a gradient-level analysis showing that the meta-update preserves cross-task gradient consistency under a dynamics decomposition.  
+
+> •
+
+We evaluate Reptile-D-learning on three nonlinear benchmarks, showing improved generalization, rapid limited-data adaptation, and stable control performance. 
+
+> arXiv:2606.25659v1 [cs.RO] 24 Jun 2026
+
+Fig. 2. Overview of the Reptile-D-learning framework. Three meta-networks (Meta-Lyapunov NN, Meta-Dfunction NN, Meta-Controller NN) are copied to initialize N parallel sub-tasks sampled from the task distribution p(Ξ). Each sub-task runs inner-loop adaptation via D-learning: the Policy Evaluation phase trains the Lyapunov and Dfunction networks, and the Policy Improvement phase updates the controller. The adapted parameters are aggregated via the Reptile meta-update to refine the meta-networks. II. RELATED WORK 
+
+Learning-based Lyapunov Control. LLC methods jointly learn control policies and Lyapunov functions to provide verifiable stability guarantees for nonlinear systems [1]–[3], [5], [13], [14]. Existing approaches typically embed stability conditions into policy optimization or constrained learning pipelines to ensure closed-loop stability alongside control performance [4], [15]. However, these methods generally rely on a single nominal dynamics model or a fixed parameter distribution. When parameters such as mass, friction, or payload drift, the original Lyapunov certificate can become invalid, often necessitating costly retraining on the new task [6], [7]. 
+
+D-learning. To reduce the dependency on explicit dynamics models, D-learning introduces a Dfunction network to esti-mate the Lyapunov derivative, thereby decoupling stability constraints from dynamics modeling [8]. This approach offers advantages for black-box systems. However, existing D-learning methods are primarily designed for single-task or narrow-distribution training. When facing large distribution shifts across parameters, the derivative estimation network can exhibit systematic mismatch, degrading both the trans-ferability of stability constraints and control performance [9], [10]. 
+
+Meta-Learning for Adaptive Control. Meta-reinforcement learning has been applied to initialize policies, value func-tions, or system identification modules for control under parametric uncertainty [16]–[18], significantly reducing fine-tuning steps in new environments. More broadly, transfer-learning and reward-driven RL paradigms, from survey-level perspectives to classical value-based methods, emphasize adaptation efficiency [19], [20]. However, most of these methods optimize reward without explicit Lyapunov or sta-bility constraints. Recent works [21] begin to bridge this gap by integrating MAML with Neural Lyapunov Functions for adaptive stability certification, yet they require explicit dynamics models, learn only the Lyapunov function without jointly optimizing the controller, and rely on second-order derivatives that incur substantial computational overhead when the inner-loop involves multiple interacting networks. Unlike meta-NLF [21], which requires explicit dynamics and learns only V , and unlike reward-focused meta-RL [16], [17], which provides no stability certificates, the proposed Reptile-D-learning jointly meta-learns V , D, and π in a model-free, stability-guaranteed framework. III. PRELIMINARIES 
+
+A. Lyapunov Stability and Parametric Uncertainty 
+
+Consider a closed-loop dynamical system with parametric uncertainty: ˙x = f (x, u; ξ ), u = πφ (x), x(0) = x0, (1) where x ∈ X ⊆ Rn is the state, u ∈ U ⊆ Rm is the control input, f is the Lipschitz-continuous dynamics, πφ is aparameterized control policy, and ξ ∈ Ξ ⊆ Rp represents unknown or time-varying physical parameters (e.g., mass, friction, payload). A continuously differentiable function V (x) defined on an open neighborhood D of the origin is a Lyapunov function 
+
+if it satisfies: 
+
+V (0) = 0, V (x) > 0, ˙V (x) < 0, ∀x ∈ D \ { 0}, (2) where ˙V (x) = ∇xV (x)⊤ f (x, πφ (x); ξ ). Satisfaction of (2) certifies asymptotic stability of the origin. Crucially, this condition is tied to a specific ξ ; when ξ changes, the certificate may be invalidated. 
+
+B. D-learning and Dynamics Encoding 
+
+D-learning [8] introduces a Dfunction network DψD (x, u)
+
+to approximate the Lyapunov derivative without explicit knowledge of f :
+
+DψD (x, u) ≈ ∇xVθV (x)⊤ f (x, u; ξ ). (3) By fitting DψD to the discrete-time difference of the learned Lyapunov function VθV , the D-network implicitly encodes the system dynamics. The stability condition ˙V (x) < 0 is then enforced through DψD (x, πφ (x)) < 0, decoupling stability verification from model knowledge. D-learning operates in a policy evaluation–policy improve-ment loop: the evaluation phase trains VθV and DψD on sampled trajectories, and the improvement phase uses DψD to guide the controller πφ toward faster convergence. We denote the joint parameter of all three networks as 
+
+Θ = {θV , ψD, φ }, (4) and the task-level loss as LTξ (Θ) (detailed in Section IV-A). This dynamics encoding property has a direct consequence for cross-parameter generalization. Decomposing the dynam-ics into a shared component and a task-specific perturbation, 
+
+f (x, u; ξi) = ¯f (x, u) + δi(x, u; ξi), (5) where ¯f (x, u) = Eξ [ f (x, u; ξ )] is the mean dynamics across the parameter distribution and δi is the residual for task ξi,the Dfunction decomposes accordingly: 
+
+DψD (x, u) ≈ ∇xVθV (x)⊤ ¯f (x, u)
+
+| {z }
+
+> ¯D: shared component
+
++ ∇xVθV (x)⊤δi(x, u)
+
+| {z }
+
+> ∆Di: task-specific
+
+. (6) This decomposition reveals that adapting D-learning to a new parameter configuration amounts to calibrating the task-specific component ∆Di from a shared baseline ¯D. If a meta-initialization captures ¯ D well, the remaining adaptation focuses on residual correction rather than relearning the full dynamics. 
+
+C. Cross-Parameter Adaptation Problem 
+
+We treat each parameter configuration ξi ∼ p(Ξ) as defin-ing an independent control task Tξi . Each task involves the same network architecture Θ but is governed by distinct dynamics f (·; ξi). The goal is to learn a meta-initialization 
+
+Θ∗ such that a small number of task-level updates yields a stabilizing controller and reliable Lyapunov certificates on newly sampled tasks. As a concrete example, in the UAV system with mass and inertia shifted from nominal values (e.g., 1 .5×), adaptation from Θ∗ should reach high success rates and fast convergence in substantially fewer steps than retraining standard D-learning on the shifted system. This is formalized as the bilevel optimization: min  
+
+> Θ
+
+J (Θ) = Eξ ∼p(Ξ)
+
+h
+
+LTξ
+
+
+
+ΘK
+
+> ξ
+
+i 
+
+, (7) Here, LTξ denotes the task-level training objective for task 
+
+Tξ . Its explicit decomposition and optimization procedure are presented in Section IV-A. where ΘK 
+
+> ξ
+
+denotes the pa-rameters obtained after K steps of D-learning adaptation on task Tξ starting from Θ:
+
+Θ0 
+
+> ξ
+
+= Θ, Θk+1 
+
+> ξ
+
+= Θk 
+
+> ξ
+
+− α ∇ΘLTξ (Θk 
+
+> ξ
+
+). (8) Computing the exact gradient of (7) via MAML [12] requires differentiating through the K-step adaptation, in-volving the Hessian of LTξ with respect to Θ. As we show in Section IV-B, the cascading dependencies in D-learning produce a dense block Hessian, making this computation intractable. Instead, we adopt Reptile [11] as a first-order approximate solver: 
+
+Θ ← Θ + ε · 1
+
+N
+
+> N
+
+# ∑
+
+> i=1
+
+(ΘK 
+
+> ξi
+
+− Θ), (9) which requires only the parameter difference before and after adaptation. In Section IV, we show that this first-order update not only approximates the same meta-objective as MAML, but also preserves cross-task gradient consistency under the dynamics decomposition (5). IV. PROPOSED METHOD An overview of the proposed Reptile-D-learning frame-work is shown in Fig. 2. 
+
+A. Task-Level D-learning Losses 
+
+For each task Tξ , the adaptation in (8) minimizes the joint loss LTξ (Θ) = LV + LD + Lπ . Given a dataset {(xi, x′
+
+> i
+
+, ai)}Mi=1
+
+collected under πφ with x′ 
+
+> i
+
+= xi + ∆t · f (xi, ai; ξ ), the three components are: 
+
+Lyapunov loss. Enforces positive-definiteness and derivative negativity: 
+
+LV (θV ) = 1
+
+M
+
+> M
+
+# ∑
+
+> i=1
+
+max (−VθV (xi), 0) + max ( ˙VθV (xi), 0)+V 2 
+
+> θV
+
+(0),
+
+(10) where ˙ VθV (xi) = ( VθV (x′
+
+> i
+
+) −VθV (xi)) /∆t.
+
+Dfunction loss. Fits DψD to the discrete Lyapunov derivative: 
+
+LD(ψD, θV ) = 1
+
+M
+
+> M
+
+# ∑
+
+> i=1
+
+ DψD (xi, ai) − ˙VθV (xi)
+
+∥xi∥2 + λ
+
+2
+
++ D2 
+
+> ψD
+
+(0, 0),
+
+(11) where λ > 0 prevents division by zero and D2 
+
+> ψD
+
+(0, 0) en-forces the equilibrium boundary condition ˙ V (0) = 0. 
+
+Controller loss. Drives πφ to minimize the Dfunction, i.e., to ensure ˙ V < 0: 
+
+Lπ (φ , ψD) = 1
+
+M
+
+> M
+
+# ∑
+
+> i=1
+
+ DψD (xi, πφ (xi)) 
+
+∥xi∥2 + λ ′ + max  DψD (xi, πφ (xi)) , 0
+
+.
+
+(12) Cascading dependency. These losses are coupled L D de-pends on VθV through its supervision signal ˙ VθV , and Lπ de-pends on DψD through its evaluation metric. This cascading structure directly implies the choice of meta-optimizer, as analyzed next. 
+
+B. Reptile as First-Order Solver 
+
+To optimize the bilevel objective (7), MAML computes the meta-gradient by differentiating through the K-step adapta-tion. For K = 1: 
+
+∇ΘJMAML = Eξ
+
+ I − α Hξ
+
+ ∇Θ1
+
+> ξ
+
+LTξ (Θ1 
+
+> ξ
+
+)
+
+
+
+, (13) where Hξ = ∇2
+
+> Θ
+
+LTξ (Θ) is the Hessian. Due to the cascading dependency, Hξ has a dense block structure with non-zero off-diagonal blocks: 
+
+Hξ =
+
+     
+
+> ∂2L
+> ∂ θ 2
+> V
+> ∂2LD
+> ∂ θ V∂ ψ D
+
+000     
+
+> ∂2LD
+> ∂ ψ D∂ θ V
+> ∂2L
+> ∂ ψ 2
+> D
+> ∂2Lπ
+> ∂ ψ D∂ φ
+
+000 ∂ 2Lπ  
+
+> ∂ φ ∂ ψ D
+> ∂2L
+> ∂ φ 2
+
+. (14) The cross-blocks arise because LD couples (θV , ψD) and Lπ
+
+couples (ψD, φ ). MAML incurs substantially higher cost due to repeated Hessian-vector products. Reptile avoids explicit Hessian computation entirely. A Taylor expansion of the K = 2 Reptile update yields [11]: 
+
+Eξ [Θ2 
+
+> ξ
+
+− Θ] = −2α ¯g
+
+| {z } 
+
+> average gradient
+
++ α2Eξ [Hξ g0 
+
+> ξ
+
+]
+
+| {z }
+
+> implicit second-order term
+
++O(α3),
+
+(15) where ¯g = Eξ [∇ΘLTξ ] and g0 
+
+> ξ
+
+= ∇ΘLTξ (Θ). The second-order term α2Hξ g0 
+
+> ξ
+
+matches the MAML gradient (13) struc-ture but is produced implicitly via forward adaptation. 
+
+Remark 1 (Why not other meta-learning methods?): 
+
+(i) MAML requires the dense Hessian (14), incurring substantially higher computational cost. (ii) FO-MAML 
+
+implementation complexity is higher due to alternating inner updates rather than a single inner objective descent. (iii) iMAML [22] avoids Hessians via implicit differentiation but requires inner convergence to a fixed point, conflicting with our alternating structure. (iv) Latent methods learn task embeddings but lack stability certificates; conditioning 
+
+VθV (x; z) on z offers no guarantee that (2) holds universally. 
+
+C. Gradient Consistency under Dynamics Decomposition 
+
+We now show Reptile’s meta-update preserves cross-task gradient consistency, providing formal justification beyond computational convenience. 
+
+Assumption 1 (Task perturbation structure): The task-specific perturbations δi in (5) satisfy: (i) Zero mean: 
+
+Eξ [δi(x, u; ξ )] = 0; (ii) Weak correlation: Eξi̸ =ξ j [δ ⊤ 
+
+> i
+
+δ j] ≈ 0; (iii) Gradient sensitivity: ∇ΘLδi ≈ JΘδi on D, where JΘ is a bounded, approximately task-invariant sensitivity Jacobian. Under decompositions (5) and (6), the task gradient de-composes as ∇ΘLTξi = ∇ΘL ¯f (Θ) + ∇ΘLδi (Θ), where L ¯f
+
+Algorithm 1 Reptile-D-learning 
+
+Require: Task distribution p(Ξ), batch size N, steps K, rates 
+
+ε, α
+
+Ensure: Meta-parameters Θ∗ = {θ ∗ 
+
+> V
+
+, ψ∗
+
+> D
+
+, φ ∗} 
+
+> 1:
+
+Initialize Θ = {θV , ψD, φ } 
+
+> 2:
+
+for meta-iteration t = 1, 2, . . . , T do  
+
+> 3:
+
+for j = 1, . . . , N do  
+
+> 4:
+
+Sample ξ j ∼ p(Ξ); set Θ j ← Θ 
+
+> 5:
+
+for k = 1, . . . , K do  
+
+> 6:
+
+Collect trajectories under πφ j in f (·; ξ j) 
+
+> 7:
+
+Policy evaluation:  
+
+> 8:
+
+Update θV, j via ∇θV LV (10)  
+
+> 9:
+
+Update ψD, j via ∇ψD LD (11)  
+
+> 10:
+
+Policy improvement:  
+
+> 11:
+
+Update φ j via ∇φ Lπ (12)  
+
+> 12:
+
+end for  
+
+> 13:
+
+Store adapted parameters ΘKj 
+
+> 14:
+
+end for  
+
+> 15:
+
+Reptile meta-update:  
+
+> 16:
+
+Θ ← Θ + ε · 1 
+
+> N
+
+∑Nj=1(ΘKj − Θ) 
+
+> 17:
+
+end for 
+
+corresponds to shared dynamics and Lδi to the residual. Expanding the cross-task gradient inner product: 
+
+D
+
+∇ΘLTξi , ∇ΘLTξ j
+
+E
+
+= ∇ΘL ¯f
+
+> 2
+
++
+
+D
+
+∇ΘL ¯f , ∇ΘLδi + ∇ΘLδ j
+
+E
+
++
+
+D
+
+∇ΘLδi , ∇ΘLδ j
+
+E
+
+. (16) Condition (iii) bridges dynamics residuals to parameter-space gradients via ∇ΘLδi ≈ JΘδi, so conditions (i)–(ii) imply the cross-terms in (16) vanish in expectation: 
+
+Proposition 1 (Cross-task gradient consistency): Under Assumption 1, 
+
+Eξi̸ =ξ j
+
+hD 
+
+∇ΘLTξi , ∇ΘLTξ j
+
+Ei 
+
+≈ ∇ΘL ¯f
+
+> 2
+
+. (17) 
+
+Proof: By Assumption 1(iii), ∇ΘLδi ≈ JΘδi. Condi-tion (i) gives E[∇ΘLδi ] ≈ JΘE[δi] = 0, and condition (ii) gives E[⟨∇ΘLδi , ∇ΘLδ j ⟩] ≈ E[δ ⊤ 
+
+> i
+
+J⊤ 
+
+> Θ
+
+JΘδ j] ≈ 0. Substituting into (16) yields (17). Since Reptile’s meta-update implicitly increases gradient agreement [11], Proposition 1 suggests the update is pri-marily influenced by shared dynamics ¯ f , consistent with the Dfunction decomposition (6). 
+
+D. Algorithm and Stability Analysis 
+
+The complete Reptile-D-learning procedure is summarized in Algorithm 1. 
+
+Stability implications of meta-initialization. Suppose the controller satisfies Dψ∗ 
+
+> D
+
+(x, πφ ∗ (x)) < −η0∥x∥2 for x ∈ D \{ 0}
+
+under ¯f . For a new task ξnew , the actual derivative is: ˙V (x) = Dψ∗ 
+
+> D
+
+(x, πφ ∗ (x)) + ∇xVθ ∗ 
+
+> V
+
+(x)⊤δnew (x)
+
+< −η0∥x∥2 + LV · εδ , (18) where LV = sup x∈D ∥∇xVθ ∗ 
+
+> V
+
+(x)∥ and εδ = sup x∈D ∥δnew (x)∥.Fig. 3. UAV stabilization trajectories under the benchmark system. Compared with the baseline and standard D-learning, Reptile-D-learning achieves faster and more reliable convergence to the target. 
+
+Fig. 4. Phase-portrait comparison for the inverted pendulum under the benchmark system. Reptile-D-learning demon-strates superior convergence performance compared to the baseline and standard D-learning. 
+
+Fig. 5. Single-track car performance comparison. (a) Vehicle trajectory tracking; (b) tracking error over time. Reptile-D-learning achieves the smallest tracking error and closest trajectory to the target path. 
+
+Proposition 2 (Robustness of meta-initialization): If there exists cδ < η0 such that 
+
+∇xVθ ∗ 
+
+> V
+
+(x)⊤δnew (x) ≤ cδ ∥x∥2, ∀ x ∈ D \ { 0},
+
+then ˙ V (x) ≤ − (η0 − cδ )∥x∥2 < 0, preserving Lyapunov neg-ativity. Otherwise, adaptation compensates the residual per-turbation. 
+
+Proof: From (18), for all x ∈ D \ { 0},˙V (x) = Dψ∗ 
+
+> D
+
++ ∇xV ⊤  
+
+> θ∗
+> V
+
+δnew 
+
+≤ − η0∥x∥2 + cδ ∥x∥2 = −(η0 − cδ )∥x∥2 < 0,
+
+by standard Lyapunov perturbation arguments [23]. 
+
+Practical notes. (i) Policy evaluation and improvement use separate data batches to avoid coupling bias. (ii) Differential meta-learning rates (εV , εD, επ ) are recommended. V captures energy topology (less sensitive), while D and π encode dynamics details (more sensitive). V. EXPERIMENTS In this section, we assess Reptile-D-learning under cross-parameter uncertainty and compare it with baseline methods. We focus on three questions: controller performance and TABLE I Benchmark Systems                  
+
+> System Varied parameters Evaluation metrics Inverted Pendulum
+> ξ= ( m,L,b)Convergence steps Single-Track Car
+> ξ= ( a,b,m,Iz,pdy 1)Mean tracking error UAV Stabiliza-tion
+> ξ= ( m,Ixx ,Iyy ,Izz )Convergence time; stabilization success rate
+
+cross-parameter generalization, few-step adaptation, and the contribution of each component through ablation. 
+
+A. Experimental Setup 
+
+Experiments are conducted on three nonlinear systems with increasing complexity: an inverted pendulum, a single-track car error dynamics model from the CommonRoad benchmark [24], and a 3D UAV stabilization task using the Crazyflie nano-quadrotor platform [25], [26]. This design evaluates whether a single meta-initialization can transfer across tasks ranging from low-dimensional stabilization to high-dimensional tracking and control under parameter un-Fig. 6. Comparison of estimated regions of attraction. Reptile method achieves a larger region with stronger gradients compared to standard D-learning. TABLE II Performance Under Different Parameter Configurations                             
+
+> Parameters Approach Initial States Convergence Steps mLbθ˙θ
+> 2.0 1.0 0.5 D-learning 2.0 2.0 115 Reptile-D-learning 58 1.0 2.0 0.5 D-learning -2.0 2.0 176 Reptile-D-learning 106 1.0 1.0 0.8 D-learning 2.0 -2.0 119 Reptile-D-learning 49
+
+certainty. We compare Reptile-D-learning against two baselines: an LQR controller (gain-scheduled LQR for the UAV task) and standard D-learning [8]. All methods use the same network architecture to ensure a fair comparison. Table I summarizes the benchmark systems, uncertain parameters, and evaluation protocol. During training, un-certain parameters are sampled within prescribed ranges following a domain randomization strategy [27], [28]. At test time, out-of-distribution (OOD) parameter configurations are introduced to evaluate generalization beyond the training distribution. 
+
+B. Controller Performance and Generalization 
+
+In this subsection, we evaluate Reptile-D-learning from two perspectives: (i) controller performance under nominal dynamics, and (ii) generalization under parameter shifts. All methods are tested on in-range settings with the same evaluation budget. During training, inverted-pendulum pa-rameters are sampled from m ∈ [0.5, 2.0], L ∈ [0.5, 2.0], and 
+
+b ∈ [0.2, 0.8]; for the single-track car and UAV, uncertain parameters are varied within ±50% of nominal values. 
+
+Controller Performance. Under nominal parameters, the Reptile-based controller achieves faster convergence and smaller steady-state error than the baselines while preserv-ing Lyapunov-oriented stability constraints. For the inverted pendulum, the phase-portrait comparison in Fig. 4 indicates faster closed-loop stabilization with Reptile-D-learning. For the single-track car, Fig. 5 shows both lower tracking error and improved trajectory quality under identical conditions. 
+
+Fig. 7. Tracking error under parameter variation. Reptile-D-learning achieves the lowest error and variance compared with D-learning and baseline. 
+
+Fig. 8. Generalization under UAV mass shifts. Reptile-D-learning maintains higher convergence rate and lower con-vergence time as perturbation magnitude increases. For the Crazyflie UAV, Fig. 3 further demonstrates faster stabilization and shorter transient trajectories toward the target. Quantitative convergence-step results on the in-range inverted-pendulum settings are reported in Table II. We further visualize the RoA of the inverted pendulum in Fig. 6 to interpret the observed performance gains. Reptile-D-learning yields a larger and steeper RoA, which provides a stronger Lyapunov-guided optimization signal and leads to faster closed-loop response and convergence. 
+
+Cross-Parameter Generalization. When parameters move away from the training distribution, baseline methods de-grade significantly and may diverge, especially under severe shifts. In contrast, Reptile-D-learning maintains stronger stabilization and tracking performance, suggesting that the learned initialization captures transferable shared dynamics rather than overfitting to a single nominal model. This advantage is most evident in the UAV mass-shift case shown in Fig. 1: standard D-learning often fails from challenging initial states, whereas Reptile-D-learning remains robust. Quantitative trends under shifted dynamics are further shown Fig. 9. Adaptation performance on UAV under OOD mass shift. Reptile-D-learning shows better convergence-time and success-rate trade-offs, especially in the few-step regime. 
+
+Fig. 10. Adaptation-window analysis. Within early adaptation steps, Reptile initialization reaches significantly fewer steps-to-convergence than standard D-learning across convergence criteria. 
+
+Fig. 11. Unified ablation study across three systems. (a) Inverted pendulum: standard D-learning becomes non-convergent after early iterations, while Reptile-D-learning rapidly reduces convergence steps. (b) Single-track car: Reptile-D-learning steadily lowers tracking error, whereas D-learning diverges to meter-level error. (c) UAV: Reptile-D-learning shows decreasing convergence time and increasing success rate; D-learning maintains performance only in the first two rounds and then collapses to zero success rate. in Fig. 7 and Fig. 8. 
+
+Overall Trend. Across all systems, the results show a consis-tent pattern: Reptile-D-learning improves both control quality and robustness to parameter mismatch. Quantitatively, it provides (a) higher stabilization success rates, (b) faster convergence, and (c) lower final tracking error under shifted dynamics. These observations support the effectiveness of jointly meta-learning the Lyapunov network, D-network, and policy for cross-parameter control. 
+
+C. Adaptation Performance 
+
+This subsection evaluates post-adaptation performance un-der limited adaptation steps. The core question is whether Reptile initialization can recover stability or achieve better control quality on OOD parameterized systems with fewer updates. 
+
+Experimental Setup. We evaluate adaptation on two sys-tems: the inverted pendulum and a UAV, both under fixed OOD settings. For the UAV, the mass and principal moments of inertia are set to 1.5 × their nominal values. For the inverted pendulum, we use m = 3.0, L = 1.0, and b = 1.0. Under these OOD configurations, we compare standard D-learning and Reptile-D-learning as a function of adaptation steps. 
+
+Key Results. Under OOD dynamics, Reptile-D-learning con-sistently provides clear advantages in the few-step regime. For the inverted pendulum (Fig. 10), Reptile reaches stable performance after only five adaptation iterations, whereas standard D-learning still cannot match it after 20 iterations. For the higher-dimensional UAV task (Fig. 9), Reptile-D-learning rapidly improves both task success rate and stabi-lization speed within ten adaptation steps, reaching a level that system-specific D-learning requires about 50 iterations to achieve. By contrast, transfer-and-finetune D-learning re-mains below this level even after more than 50 adaptation steps. These results indicate that the meta-initialization cap-tures cross-task shared structure, so the inner loop mainly calibrates residual dynamics rather than relearning a full policy from scratch. The quantitative adaptation trends are shown in Fig. 9 and Fig. 10. 
+
+D. Ablation Study 
+
+This subsection is designed to verify that the observed performance gains are attributable to Reptile-based meta-initialization, rather than to standard D-learning alone. 
+
+Ablation results. Under the same training budget and the same degree of parameter randomization, we compare Reptile-D-learning (with Reptile meta-initialization) against standard D-learning. Results show that, once parameter randomization is introduced, standard D-learning fails to converge reliably across all three systems. Moreover, the di-vergence becomes more severe as system complexity and the number of varying parameters increase. These observations indicate that Reptile meta-initialization more effectively cap-tures and preserves task-shared dynamical structure, thereby maintaining controller generality and stabilizing the training process. A unified cross-system adaptation comparison is provided in Fig. 11. 
+
+Computational cost (Reptile vs. MAML). Compared with other meta-learning methods, Reptile provides a clear com-putational advantage for D-learning’s coupled loss structure. Under the same training configuration, Reptile typically requires no more than 5 GB of GPU memory, while MAML requires second-order gradients and full computation-graph retention, resulting in memory demand above 900 GB. Con-sequently, comparable MAML experiments are infeasible on an RTX 4080 SUPER (16 GB). Under this practical con-straint, Reptile is the most feasible meta-learning framework for D-learning. VI. CONCLUSION We presented Reptile-D-learning, a unified bilevel frame-work that integrates D-learning and first-order meta-optimization for parametric adaptation in Lyapunov-based control. By treating the Lyapunov network, Dfunction net-work, and controller as a single meta-parameter and opti-mizing post-adaptation performance across tasks, the method reduces the appearance of modular stacking and provides a coherent optimization view. Future work will focus on tighter non-asymptotic analysis of adaptation error under distribution shift and hardware validation on real robotic platforms. REFERENCES [1] Y.-C. Chang, N. Roohi, and S. Gao, “Neural lyapunov control,” in Adv. Neural Inf. Process. Syst. (NeurIPS) , vol. 32, 2019, pp. 3240–3249. [2] S. M. Richards, F. Berkenkamp, and A. Krause, “The lyapunov neural network adaptive stability certification for safe learning of dynamical systems,” in Proc. Conf. Robot Learn. (CoRL) , 2018, pp. 466–476. [3] R. Zhou, T. Quartz, H. D. Sterck, and J. Liu, “Neural lyapunov control of unknown nonlinear systems with stability guarantees,” in 
+
+Adv. Neural Inf. Process. Syst. (NeurIPS) , vol. 35, 2022, pp. 29 113– 29 125. [4] H. Dai, B. Landry, L. Yang, M. Pavone, and R. Tedrake, “Lyapunov-stable neural-network control,” in Proc. Robot. Sci. Syst. (RSS) , Virtual, Jul. 2021. [5] F. Berkenkamp, M. Turchetta, A. P. Schoellig, and A. Krause, “Safe model-based reinforcement learning with stability guarantees,” in Adv. Neural Inf. Process. Syst. (NeurIPS) , vol. 30, 2017, pp. 908–919. [6] W. Cui and B. Zhang, “Lyapunov-regularized reinforcement learning for power system transient stability,” IEEE Control Syst. Lett. , vol. 6, pp. 974–979, 2022. [7] J. Yao, M. Han, and X. Yin, “Lyapunov-based distributed reinforce-ment learning control with stability guarantee,” Comput. Chem. Eng. ,vol. 195, p. 108979, 2025. [8] Q. Quan, K.-Y. Cai, and C. Wang, “Control with patterns a D-learning method,” in Proc. Conf. Robot Learn. (CoRL) , vol. 270, 2025, pp. 1384–1401. [9] Z. Shen and Q. Quan, “DOPT D-learning with off-policy target toward sample efficiency and fast convergence control,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2025. [10] J. Liu, C. Wang, Z. Shen, and Q. Quan, “DL-Clip online D-learning with clipping operation for fast model-free stabilizing control,” in 
+
+Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS) , 2025. [11] A. Nichol, J. Achiam, and J. Schulman, “On first-order meta-learning algorithms,” arXiv preprint arXiv1803.02999 , 2018. [12] C. Finn, P. Abbeel, and S. Levine, “Model-agnostic meta-learning for fast adaptation of deep networks,” in Proc. Int. Conf. Mach. Learn. (ICML) , 2017, pp. 1126–1135. [13] J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou, “Physics-informed neural network lyapunov functions PDE characterization, learning, and verification,” Automatica , vol. 175, p. 112193, 2025. [14] A. Mehrjou, M. Ghavamzadeh, and B. Scholkopf, “Neural lyapunov redesign,” arXiv preprint arXiv2006.03947 , 2020. [15] T. Westenbroek, F. Castaneda, A. Agrawal, S. Sastry, and K. Sreenath, “Lyapunov design for robust and efficient robotic reinforcement learn-ing,” in Proc. Conf. Robot Learn. (CoRL) , 2023, pp. 17–36. [16] D. G. McClement et al. , “Meta-reinforcement learning for adaptive control of second order systems,” in Proc. IEEE Int. Symp. Adv. Control Ind. Process. (AdCONIP) , 2022, pp. 78–83. [17] A. Nagabandi, I. Clavera, S. Liu, R. S. Fearing, P. Abbeel, S. Levine, and C. Finn, “Learning to adapt in dynamic, real-world environments through meta-reinforcement learning,” in Proc. Int. Conf. Learn. Represent. (ICLR) , 2019. [18] T. Hospedales, A. Antoniou, P. Micaelli, and A. Storkey, “Meta-learning in neural networks: A survey,” IEEE Trans. Pattern Anal. Mach. Intell. , vol. 44, no. 9, pp. 5149–5169, 2022. [19] Z. Zhu, K. Lin, A. K. Jain, and J. Zhou, “Transfer learning in deep reinforcement learning a survey,” IEEE Trans. Pattern Anal. Mach. Intell. , vol. 45, no. 11, pp. 13 344–13 362, 2023. [20] C. J. C. H. Watkins and P. Dayan, “Q-learning,” Mach. Learn. , vol. 8, no. 3-4, pp. 279–292, 1992. [21] A. Jena, D. Kalathil, and L. Xie, “Meta-learning-based adaptive stability certificates for dynamical systems,” in Proc. AAAI Conf. Artif. Intell. , vol. 38, no. 11, 2024, pp. 12 801–12 809. [22] A. Rajeswaran, C. Finn, S. M. Kakade, and S. Levine, “Meta-learning with implicit gradients,” in Adv. Neural Inf. Process. Syst. (NeurIPS) ,vol. 32, 2019. [23] H. K. Khalil, Nonlinear Systems , 3rd ed. Upper Saddle River, NJ, USA: Prentice Hall, 2002. [24] M. Althoff, M. Koschi, and S. Manzinger, “Commonroad composable benchmarks for motion planning on roads,” in Proc. IEEE Intell. Veh. Symp. (IV) , 2017, pp. 719–726. [25] W. Giernacki, M. Skwierczy´ nski, W. Witwicki, P. Wro´ nski, and P. Kozierski, “Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering,” in Proc. Int. Conf. Methods Models Autom. Robot. (MMAR) , 2017, pp. 37–42. [26] J. Förster, “System identification of the Crazyflie 2.0 nano quadro-copter,” ETH Zürich, Tech. Rep., 2015. [27] J. Tobin, R. Fong, A. Ray, J. Schneider, W. Zaremba, and P. Abbeel, “Domain randomization for transferring deep neural networks from simulation to the real world,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS) , 2017, pp. 23–30. [28] X. B. Peng, M. Andrychowicz, W. Zaremba, and P. Abbeel, “Sim-to-real transfer of robotic control with dynamics randomization,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA) , 2018, pp. 7294–7301.

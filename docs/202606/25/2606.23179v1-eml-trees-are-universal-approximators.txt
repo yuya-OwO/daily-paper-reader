@@ -1,0 +1,1447 @@
+Title: EML Trees Are Universal Approximators
+
+URL Source: https://arxiv.org/pdf/2606.23179v1
+
+Published Time: Tue, 23 Jun 2026 03:01:46 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# EML Trees Are Universal Approximators 
+
+Joe Germany 
+
+Department of Mathematics American University of Beirut Beirut, Lebanon 
+
+jmg15@mail.aub.edu 
+
+Elie Abdo 
+
+Department of Mathematics American University of Beirut Beirut, Lebanon 
+
+ea94@aub.edu.lb 
+
+Joseph Bakarji 
+
+Department of Mechanical Engineering American University of Beirut Beirut, Lebanon 
+
+jb50@aub.edu.lb 
+
+## Abstract 
+
+The recently introduced EML (Exp-Minus-Log) function acts as continuous ana-logue of NAND gates, providing a compositional building block capable of rep-resenting elementary functions. In this work, we study the expressive power of tree-structured compositions of EML functions. We show that such trees enjoy a universal approximation property for functions in W k, ∞ for k ∈ N, drawing on classical neural network approximation arguments while exploiting the abil-ity to explicitly construct EML trees that mimic polynomial representations. We further propose a learning algorithm for EML-type trees equipped with fitting parameters, and demonstrate its feasibility in practical optimization problems. Our results establish EML trees as a theoretically grounded framework for function approximation. 
+
+## 1 Introduction 
+
+The approximation of nonlinear functions using compositional representations is a central theme in modern machine learning and approximation theory, where the goal is to understand what types of functions a given model class can represent. In particular, a fundamental question is whether a model is sufficiently expressive to approximate a broad class of target functions to arbitrary accuracy in a given function space. Such guarantees separate limitations of the model class itself from limitations of optimization or finite data. This perspective has led to a rich theory of universal approximation for a wide range of architectures, including classical neural networks, physics-informed neural networks, and neural operators. Beyond standard activation-based architectures, there has been growing interest in models built from elementary functions and symbolic primitives. These approaches aim not only at predictive performance, but also at interpretability and the recovery of compact analytic representations. Rep-resentative examples include equation learning frameworks such as EQL [ 20 ], symbolic regression methods [ 4 ], AI-Feynman [ 28 ], and related systems such as SINDy [ 3, 26 , 10 ], symbolic metamodel-ing [ 1], and hybrid symbolic–neural approaches including KAN [ 18 , 30 ]. These methods sit within the broader literature of symbolic and interpretable machine learning, where the goal is to recover human-readable functional forms from data. 
+
+> Preprint.
+> arXiv:2606.23179v1 [cs.LG] 22 Jun 2026
+
+In this work, we study compositions of the recently introduced Exp-Minus-Log (EML) function in [22]. It is defined as 
+
+EML (x, y ) = ex − Log y, (1) where Log denotes the principal branch of the complex logarithm. It was shown in [ 22 ] (and the accompanying supplementary material) that compositions of this function, together with the constant 
+
+1, can exactly represent any elementary function (by explicit construction). A natural question arising from this observation is whether compositions of EML can be used as building blocks for approximation theory. Indeed, since elementary functions can be represented within this framework, one can expect that polynomial functions, and hence sufficiently smooth functions, should be representable to arbitrary accuracy via EML compositions. The present work formalizes this intuition and develops a rigorous approximation theory for EML-based function classes. Our contributions lie in advancing the theoretical understanding of the expressive power of EML com-positions. More broadly, this connects to a large body of work establishing universal approximation properties for machine learning models, including neural networks [ 5, 13 , 25 , 2, 32 , 24 , 27 , 11 , 6], physics-informed neural networks [ 7, 8, 21 ], neural operators such as DeepONet [ 19 ] and Fourier Neural Operators [ 14 , 16 , 17 ], as well as structured architectures such as KANs [ 18 ], neural oscil-lators [ 15 ], and many others. These results formalize the expressive capacity of model classes by showing that they can approximate broad function spaces arbitrarily well under suitable conditions. Our contributions can be summarized by the following: • We introduce a generalization of the EML function (1) incorporating six learnable parameters per unit, motivated by both technical and practical reasons. • We prove a universal approximation theorem (Theorem (1) ) for trees built from the general-ized EML function in Sobolev spaces W k, ∞ on the half-open domain (0, 1]d. The result is obtained via an explicit construction of EML representations of multivariate polynomials and approximate partitions of unity, with quantified upper bounds on the size and depth of the resulting EML trees. The restriction to (0, 1]d arises from the logarithmic singularity at zero. • We extend the universal approximation result to the closed cube [0, 1]d (in Corollary (1) )by composing the approximants with a suitable affine contraction mapping that pushes the domain into the interior, thereby controlling boundary effects induced by the logarithmic singularity and transferring the W k, ∞ approximation guarantees from (0, 1]d to the closed domain [0, 1]d.• We further discuss extensions of the result to positive domains via analogous arguments (Re-mark 2), and to general non-positive domains via modified constructions of the elementary operators to prevent the logarithm singularity (Remark 3). • We then empirically validate the expressive power of generalized EML trees on five one-dimensional benchmark functions, demonstrating accurate approximation at limited depth, while also highlighting limitations in interpretability that motivate future work. 
+
+## 2 Universal Approximation Theorem 
+
+For our work, we consider a generalization of the EML function (1) , denoted EML θi , which incorpo-rates six learnable parameters and is defined as 
+
+EML θi (x, y ) = aiebix+ci + di ln (eiy + fi), (2) where we use the natural logarithm, i indexes the instance of the EML function within the tree, and 
+
+θi = {ai, b i, c i, d i, e i, f i}. (3) The original EML function (1) is recovered by setting ai = bi = ei = 1, di = −1, and ci = fi = 0.An immediate requirement for (2) is for eiy + fi > 0, ensuring that the natural logarithm is well defined. While this constraint is nontrivial in general, it is always satisfied in our explicit constructions of EML trees used in the approximation theorem. We note, however, that in order to exactly represent 2trigonometric functions and thus recover all elementary functions, one must work over the complex domain and invoke Euler’s identity, which necessitates defining an analogue of the EML θi function in (2) by replacing the natural logarithm ln with the principal branch of the complex logarithm Log .We will numerically implement this variant as well. However, for the purposes of the approximation theorem, it is unnecessary since all inputs (to the natural logarithm) are real and strictly positive, so 
+
+ln coincides with Log .Throughout the paper, we refer to individual EML θi functions as atoms , and to reusable compositions of such atoms with fixed parameters as blocks (e.g., the addition block). This generalization is motivated by both technical and practical considerations. From a theoretical standpoint, our approximation result requires the exact representation of poly-nomials using EML trees. However, the technical Lemma 2, which guarantees the existence of a polynomial approximant of the target function, does not provide bounds on the corresponding coefficients. In the original formulation (1) , constants must be constructed recursively from the digit 
+
+1, causing the size of the resulting EML tree to scale poorly with the magnitude of these coefficients. The proposed parametrization circumvents this issue by allowing coefficients to be encoded directly within each atom. From a practical perspective, the generalized form (2) enables significantly more compact represen-tations of common operators. As we demonstrate in subsequent sections, basic binary operations (+, −, ×, ÷) and other building blocks for polynomial construction can be implemented more effi-ciently using EML θi . This arises from the ability to localize exponential and logarithmic components and to incorporate arbitrary constants without increasing size, at cost of losing the strict homogeneity of identical building blocks. Empirically, this also leads to improved performance. Finally, this formulation eliminates the need to include the constant 1 as an explicit input, restricting atom input to variables or outputs of other EML atoms, thus slightly simplifying the combinatorial possibilities for arranging inputs to EMLs. 
+
+2.1 Statement of the Theorem 
+
+The universality of EML trees follows from the following main theorem: 
+
+Theorem 1 (Universal Approximation Theorem in W k, ∞(( 0, 1]d)). Let f ∈ W s, ∞([ 0, 1]d) with 
+
+s, d ∈ N. Let R > 0 as in (40) and δ > 0. There exists constants C(d, k, s, f ), N 0(d) > 0, such that for every N ∈ N with N > N0(d), there exists an EML θ tree, denoted ˜pNθ and defined over (0, 1]d, with size and depth 
+
+N (˜pNθ ) ≤ 2N d (( 8d − 3)( d + s − 1
+
+s − 1 ) + 63 d) − 3,
+
+Depth (˜pNθ ) ≤ 4d + max {2(d + s − 1
+
+s − 1 ) − 4, 7} + 2N d + 4,
+
+(4) 
+
+such that 
+
+∥f − ˜pNθ ∥L∞(( 0,1]d) ≤ (1 + δ
+
+3 ) C(d, 0, s, f )
+
+N s , (5) 
+
+and for integer 1 ≤ k < s,
+
+∥f − ˜pNθ ∥W k, ∞(( 0,1]d) ≤ 3d(1 + δ)( 2(k + 1)) 3k max {Rk, ln k (βN s+d+2)} C(d, k, s, f )
+
+N s−k , (6) 
+
+with 
+
+β = k32d√d max {1, ∥f ∥1/2 
+
+> Wk, ∞([ 0,1]d)
+
+}
+
+δ min {1, √C(d, k, s, f )} . (7) 
+
+Remark 1. Theorem 1 is stated on the half-open domain (0, 1]d because the logarithm components of the EML tree are singular at 0. Consequently, the representation becomes undefined whenever one of the inputs vanishes. However, these singularities occur only on a set of measure zero (a single point in one dimension, and boundary subsets in higher dimensions), and we expect that by extending the constructed EML tree to these points, one obtains an analogous approximation result on the closed domain [0, 1]d, as shown in Corollary 1. 
+
+32.2 Outline of the Proof 
+
+The full proof of Theorem 1 is provided in Appendix G. The required notations, technical lemmas, and groundwork constructions are developed in Appendices A–F. We now outline the main ideas underlying the proof. We partition the domain [0, 1]d into cubes of side length 1/N . To index these cubes, we introduce 
+
+AN = {1, . . . , N }d (8) of cardinality ∣AN ∣ = N d. For every j ∈ AN , we define the disjoint and overlapping cubes 
+
+INj = d
+
+⨉
+
+> i=1
+
+( ji − 1
+
+N , ji
+
+N ) , JNj = d
+
+⨉
+
+> i=1
+
+( ji − 2
+
+N , ji + 1
+
+N ) , (9) whose role is explained in Remark 5. This localization strategy is inspired by the approach of [ 6 ] for approximation theory of tanh neural networks. The proof begins by constructing, on each cube JNj , a local polynomial approximant pNj
+
+using the Bramble–Hilbert lemma (Lemma 2). This constitutes Step 1. A natural attempt at obtaining a global approximation is to patch together these local polynomials using indicator functions: 
+
+pN = ∑
+
+> j∈AN
+
+pNj χj , (10) where χj denotes the indicator function of INj . However, the resulting function is discontinuous, and therefore its derivatives are not well behaved. To overcome this issue, we replace the indicator functions by smooth approximations constructed from shifted and rescaled tanh functions. These functions, denoted by ΦNj , are designed to be close to 1 inside INj and close to 0 outside it; their construction and properties are developed in Appendix F. The family {ΦNj }j∈AN forms an approximate partition of unity, allowing us to define, in Step 2, 
+
+˜pN = ∑
+
+> j∈AN
+
+pNj ΦNj , ˜f N = ∑
+
+> j∈AN
+
+f ΦNj . (11) The remainder of the proof is devoted to controlling the three terms arising from the triangle inequality: 
+
+∥f − ˜pNθ ∥W k, ∞(( 0,1]d)
+
+≤ ∥f − ˜f N ∥W k, ∞([ 0,1]d) + ∥ ˜f N − ˜pN ∥W k, ∞([ 0,1]d) + ∥˜pN − ˜pNθ ∥W k, ∞(( 0,1]d) . (12) In Step 3, we show that the first term in (12) is small using the approximation properties of the partition of unity. In Step 4, we control the second term by combining the local polynomial approximation estimates with the properties of the functions ΦNj .Finally, Step 5 addresses the third term by explicitly constructing an EML tree representation of 
+
+˜pN using the building blocks developed throughout the appendices. This is precisely where the approximation theory for EML trees diverges from that of tanh networks: EML trees allow exact representation of the required algebraic operations. We note that the EML tree is defined over (0, 1]d
+
+to avoid the singularity of the logarithm at zeros (for the inputs). The construction relies fundamentally on the identities satisfied by the exponential and logarithm functions. For example, addition is obtained through compositions involving exponentials and logarithms, while multiplication follows from logarithmic identities. In Appendix D, we construct EML representations of the elementary operations and functions required in the proof, including addition, subtraction, multiplication, division, exponentiation, and the hyperbolic tangent function. In Appendix E, these building blocks are combined to construct EML trees representing univariate and multivariate polynomials. Finally, Appendix F develops the approximate partition of unity construction and provides its EML representation. One needs to be careful that, even when the inputs are constrained to be strictly positive, the EML constructions in the proof rely on feeding the outputs of EML atoms into subsequent ones. Without additional care, negative values could therefore be passed to the logarithm in a later EML atom. 4This motivates the "sign-based decompositions" introduced in 33, 47, and 65 for the construction of polynomials, approximate partitions of unity, and the global approximate polynomial ˜pN (from (11) ). These decompositions ensure that the output of every EML atom, except the final one, remains positive throughout the construction. Full details are provided in the appendices. 
+
+2.3 Corollary and Remarks 
+
+In this section, we will extend the scope of Theorem 1 through Corollary 1 and offer a few remarks on the obtained result. First, we prove the result that was hinted at in Remark 1 on the extendability of Theorem 1 to the closed interval [0, 1]d.
+
+Corollary 1 (Universal Approximation Theorem in W k, ∞([ 0, 1]d)). Let f ∈ W s, ∞([ 0, 1]d) with 
+
+s, d ∈ N. Let R > 0 as in (40) and η > 0. Then, there exist γ ∈ (0, 1) and an EML θ tree pγ,θ ∶
+
+[0, 1]d → R such that 
+
+∥f − pγ,θ ∥W k, ∞([ 0,1]d) ≤ η, (13) 
+
+with 
+
+N (˜pNθ ) ≤ 2N d (( 10 d − 3)( d + s − 1
+
+s − 1 ) + 87 d) − 3,
+
+Depth (˜pNθ ) ≤ 4d + max {2(d + s − 1
+
+s − 1 ) − 4, 7} + 2N d + 6.
+
+(14) 
+
+Proof. The full details of the proof are provided in Appendix H. We provide the main ideas here. The proof proceeds by composing the EML θ approximant pθ of f
+
+on (0, 1]d with a suitable affine contraction 
+
+Tγ (x) = (1 − γ)x + γ
+
+2 1,
+
+which maps [0, 1]d into the interior of (0, 1]d. Since Tγ → Id uniformly as γ → 0, and f ∈
+
+W s, ∞([ 0, 1]d) with s > k, the perturbation 
+
+∥f − f ○ Tγ ∥W k, ∞([ 0,1]d)
+
+can be made arbitrarily small. Composing the approximant with Tγ then yields a well-defined EML θ
+
+approximant on [0, 1]d while preserving the W k, ∞ approximation error. 
+
+Remark 2. Moving away from 0 (into the positive domain), we can prove an approximation theory (in W k, ∞) for functions defined over domains D = ×di=1[ai, b i] for ai, b i > 0 closely following the proof of Theorem 1, while making sure to shift the constituent functions of the approximate partition of unity appropriately. 
+
+Remark 3. The approximation results of Theorem 1 and Corollary 1 are stated on (0, 1]d and [0, 1]d
+
+to avoid the undefined-ness of the natural logarithm for negative values. However, the construction appears to extend to one-dimensional domains of the form [a, b ], with a, b ∈ R. Indeed, we can choose 
+
+n > 0 sufficiently large to ensure that all arguments entering logarithmic terms remain positive, due to the fact that the elementary operations can be rewritten as follows, 
+
+x + y = eln (x+n) + ln (ey−n), and 
+
+xy = eln (x+n)eln (y+n) − n(x + y + n). (15) 
+
+We plan to pursue this extension further, as these identities suggest that EML tree representations of polynomials may still be constructed on domains containing negative values by introducing suitable shifts inside the natural logarithmic terms. 
+
+Finally, we also remark on the non-uniqueness of the EML representations. 
+
+Remark 4. It is important to note that EML θ representations of elementary functions and operators are generally non-unique. For example, the addition block is not uniquely determined by the parameter choice θ1 = {0, 0, 0, 1, 1, 0} but, more generally, by any parameter set of the form 
+
+{0, m, n, 1, 1, 0}, m, n ∈ R. (16) 
+
+Many other equivalent parameterizations are also possible. 
+
+53 Implementation 
+
+The constructive proof of Theorem 1 establishes that the parametric EML θ can express, exactly, arbitrarily fine polynomial approximations of functions in W k, ∞. However, it does not address whether such representations can be recovered from data using gradient-based optimisation. This is a key practical question, since the constructive argument is symbolic, whereas learning proceeds in a continuous parameter space. In contrast to [ 22 ], which focuses on symbolic recovery within a discrete grammar {1, x, EML (⋅, ⋅)} 
+
+and reports a rapid collapse recovery success beyond depth five, we instead exploit the continuous parameterisation of the generalised atom EML θi (x, y ). This makes the optimisation landscape more amenable to first-order methods. This section reports a small, focused empirical study in support of the theorem’s practical content. The aim of this section is not to empirically validate the approximation theorem, but rather to provide a sanity check for the practical capability of an EML-type tree (in a slightly modified form). This modification is introduced to circumvent some of the numerical instabilities associated with the logarithm in (2). 
+
+3.1 Setup 
+
+We use the construction introduced in Equation 2, namely a complete binary tree Tθ with 2d − 1
+
+atoms. Each atom carries six parameters θi = {ai, b i, c i, d i, e i, f i} and implements the operation 
+
+EML θi (x, y ). Inputs are propagated directly between nodes, with the scalar variable x injected at the leaves. For depths d ∈ {3, 4, 5}, this corresponds to 42 , 90 , and 186 parameters respectively for univariate x. The models are implemented using NumPy [12] and PyTorch [23]. We consider two variants of the model. The first is the real-valued setting, where all parameters lie in R6. To avoid issues with the logarithm at non-positive arguments, we replace ln (⋅) with 
+
+ln (softplus (⋅) + ε), using ε = 10 −6. This ensures numerical stability while remaining close to the original operator on the positive domain. We note that this is where the implementation differs from the theoretical construction, which uses the form (2) . However, it is possible to stay loyal to the approximation theorem by considering the building block 
+
+EML θi (x, y ) = aiebix+ci + di ln (∣ ei∣y∣ + fi∣) , (17) where we place absolute values around y and around ei∣y∣ + fi to prevent cases where the intermediate values (from preceding EML atoms) and/or the learnable parameters are negative. In the explicit constructions of EML trees for the binary operations, polynomials, and approximate partitions of unity in the Appendices D-G, we always input positive y and choose positive parameters ei and fi, and hence adding the absolute values makes no difference in the proof. Thus, Theorem 1 and Corollary 1 translate exactly to the form (17) . We chose to use softplus for our demonstrative implementation since we expect it to have a better behaved loss landscape than trees with atoms of type (17). The second is a complex-valued variant, where parameters are stored as (θRi , θ Ii ) ∈ R6 × R6. The forward pass is carried out in C using the principal branch of the logarithm, and the loss is computed on the real part of the output. To discourage complex-valued drift, we add a small penalty λ∥Im Tθ ∥2
+
+with λ = 10 −3. While this doubles the parameter count, it allows for the exact construction of trigonometric functions (instead of having to approximate them with the real-valued EML trees). We do not address the case with complex numbers in the proofs because the (principal branch of the) complex logarithm does not cleanly maintain the addition and multiplication properties of the natural logarithm, requiring a more careful treatment. Nevertheless, we include it in this section to determine whether they perform better empirically due to their increase flexibility. Training is performed on N = 200 uniformly sampled points per target using a fixed 30 -second budget per experiment. We use a two-stage optimization strategy. We first run multiple Adam optimizations from random initializations (learning rate 5 × 10 −3 with cosine decay and gradient clipping at 5), keeping the best-performing run. This is followed by L-BFGS refinement with strong Wolfe line search and a memory of 20 . The final model is selected as the best between the pre- and post-refinement solutions. The number of Adam restarts per cell is determined by the budget rather than fixed and is reported in Table 1. All experiments are conducted under three simplifying assumptions. First, the real-valued model uses a smoothed log surrogate rather than the exact EML operator. Second, all training data are noiseless 6and densely sampled. Third, all results are obtained under a fixed compute budget; deeper trees therefore receive fewer optimization attempts, and comparisons across depth should be interpreted in this context. 
+
+3.2 Targets and metric 
+
+Each target function f is defined on a compact interval Ωf ⊂ R, and all errors are computed with respect to the corresponding domain. Specifically, we evaluate performance using the relative root mean squared error 
+
+relRMSE = ∥Tθ − f ∥L2(Ωf )
+
+∥f ∥L2(Ωf )
+
+,
+
+computed on a uniform grid over Ωf .We consider five one-dimensional targets: 
+
+x3 − x on [−1.5, 1.5], tanh (2x) on [−2, 2], sin (x) on [−π, π ],e−x2
+
+on [−2.5, 2.5], sin (3x)e−x2/2 on [−3, 3].
+
+For each target, we report the relative error of the best model obtained over all optimization restarts under the fixed computational budget described in Section 3.1. Notice that we test functions on intervals that contain negative functions as well to test the limits of approximation theorem for EML trees, and suggests that a result inspired by the techniques of Remark 3 is expected. 
+
+3.3 Results 
+
+Table 1 reports the best errors across depths and parameterizations. Table 1: Best relative RMSE per cell, PEM trees with real (R) and complex (C) parameters at depths 
+
+3, 4, 5. Target domains are shown in the second column. Strategy: Adam multi-restart + L-BFGS, 
+
+30 s wall-clock per cell. Parenthesised integer is the number of completed Adam restarts within the budget; parameter count is #θ = 6 (2d − 1) for R and twice that for C. Bolded entry per row is the best of the six. 
+
+Real (R) , #θ = 42 , 90 , 186 Complex (C) , #θ = 84 , 180 , 372 
+
+Target d=3 d=4 d=5 d=3 d=4 d=5
+
+x3 − x 7.58 ⋅10 −3 (15) 1.47 ⋅10 −3 (8) 4.32 ⋅10 −3 (4) 2.17 ⋅10 −2 (7) 1.37 ⋅10 −2 (4) 5.20 ⋅10 −2 (2) 
+
+tanh (2x) 4.20 ⋅10 −3 (15) 1.22 ⋅10 −3 (8) 2.10 ⋅10 −3 (4) 1.77 ⋅10 −3 (7) 5.16 ⋅10 −3 (4) 1.80 ⋅10 −2 (2) 
+
+sin (x) 3.02 ⋅10 −3 (15) 7.67 ⋅10 −3 (8) 1.01 ⋅10 −2 (4) 1.74 ⋅10 −2 (7) 3.49 ⋅10 −3 (4) 2.07 ⋅10 −2 (2) 
+
+e−x2
+
+4.13 ⋅10 −3 (15) 1.12 ⋅10 −3 (7) 4.66 ⋅10 −3 (4) 2.20 ⋅10 −2 (7) 5.27 ⋅10 −3 (3) 1.27 ⋅10 −2 (2) 
+
+sin (3x) e−x2/2 3.23 ⋅10 −2 (15) 9.80 ⋅10 −2 (7) 9.09 ⋅10 −2 (4) 6.45 ⋅10 −2 (6) 3.91 ⋅10 −2 (3) 3.57 ⋅10 −2 (2) 
+
+Several consistent patterns emerge from the results. First, real-parameterised EML trees achieve sub-percent relRMSE on 4 of 5 targets at depth 4 within 30 s of single-CPU compute, including the polynomial target x3 − x which reaches 1.47 × 10 −3 error. Second, the trigonometric case sin (x)
+
+does not require complex parameters in this setting; the real model is already sufficient to achieve low error. The softplus-stabilised log is expressive enough on this domain that the complex path is not the binding constraint at the budget shown. Finally, the hardest target, sin (3x) e−x2/2, is the one clear case where the complex parameterisation pays off: 3.6 × 10 −2 at depth 5 (in C) versus 9.1 × 10 −2 at the same depth (in R). Here, the additional expressive flexibility improves accuracy despite a reduced number of optimisation restarts under the same compute budget. Across targets, the depth-4 models tend to offer the best trade-off between expressivity and opti-misation success under a fixed computational budget. The degradation at depth five is primarily attributable to reduced optimisation coverage rather than representational limitations. 7The full sweep (5 targets × 3 depths × 2 parameterisations = 30 cells) completes in approximately 
+
+12 minutes on a single laptop CPU (Apple M-series, no GPU). Per-cell wall-clock is 30 s by construc-tion; the number of completed Adam restarts ranges from 15 at (d=3, R) down to 2 at (d=5, C). No GPU acceleration or parallelism was used. 
+
+3.4 Inspection of the fitted trees: are they symbolic? 
+
+A natural question is whether the optimisation process recovers the symbolic structure suggested by the constructive proof. In particular, the proof produces discrete parameter configurations, whereas the learned models operate in a continuous six-dimensional parameter space per node. For each of the five targets, we refit a depth-3 tree ( 7 atoms, 42 parameters) with 24 Adam restarts plus an L-BFGS refinement. We then greedily snap each parameter to the nearest member of 
+
+{−2, −1, 0, 1, 2}, accepting a snap if the loss does not grow by more than 30% , and refit the un-snapped parameters with the snapped ones held fixed. Atoms whose six parameters all snap are reported as fully discrete. Table 2 summarises the results of this test. Across all five targets, at most 7/42 (17% ) parameters are snappable, and zero atoms become fully discrete. On tanh (2x) and e−x2
+
+exactly 0 parameters snap. Table 2: Greedy snap of fitted depth-3 PEM parameters to {−2, −1, 0, 1, 2} at 30% relative-loss tolerance.                                
+
+> Target relRMSE pre relRMSE post snapped fully-discrete atoms
+> x3−x7.3⋅10 −36.9⋅10 −37/42 (17% )0tanh (2x)3.8⋅10 −33.5⋅10 −30/42 (0% )0sin (x)1.9⋅10 −31.7⋅10 −33/42 (7% )0
+> e−x2
+> 3.9⋅10 −33.2⋅10 −30/42 (0% )0sin (3x)e−x2/21.18 ⋅10 −17.7⋅10 −23/42 (7% )0
+
+Next, we take a closer look at the example for x3 − x (arguably, the most snappable target). The fitted parameter table is                                                  
+
+> atom iaibicidieifi
+> root 1.516 −0.654 0.796 −2.080 0.652 0.029
+> left child 1.218 −0.436 0.147 −0.755 −0.034 1.501
+> right child 1.803 0.473 0.138 −2.348 0.115 −0.785
+> leaf-parent 1 1.299 −1.359 0.847 −0.143 0.127 0.449
+> leaf-parent 2 1.272 −2.646 0.116 −0.065 0.357 0.841
+> leaf-parent 3 1.267 −0.072 0.504 −1.190 0.114 0.471
+> leaf-parent 4 0.913 2.388 0.475 −0.672 −0.219 1.080
+
+The a column clusters around 1–2 but contains no exact integers; the d column ranges over −2.35 
+
+to −0.07 with no values near the original-EML default d = −1; the b column spans −2.65 to 2.39 
+
+with no recognisable structure. The constructive proof builds x3 − x from 5k − 3 = 12 atoms with 
+
+a, d ∈ {0, ±1} exactly and the coefficients absorbed into c via c = log m. The fitted 7-atom tree matches the function value to 0.7% but does so by additive interference of stacked exp/log curves with arbitrary continuous slopes, not by anything resembling the proof’s polynomial expansion. The results show that only a small fraction of parameters admit stable discretisation, and no atom fully collapses to a discrete symbolic form. This suggests that the learned representations are not recovering the symbolic construction, but instead exploiting continuous degrees of freedom to achieve similar function-level accuracy. The results support the approximation content of the theorem: trees reach small error in practice. They do not support an interpretability claim about the recovered trees. Recovering discrete-parameter trees with the symbolic structure of the Appendices D–E would require additional structural regularisation (sparsity penalty toward {0, ±1}, warm-start from the construction, or a two-stage train-then-snap-then-refit at tighter tolerance). We leave these for future investigation. 83.5 Limitations 
+
+We summarize some of the main limitations of this empirical study. First, we report the best loss obtained across multiple restarts within a single experimental run, and do not average over independent reruns; as a result, variability across runs is not quantified. The conclusions are stable at the level of order-of-magnitude comparisons, although differences within a factor of roughly two should not be over-interpreted. Second, the real parameterization does not implement vanilla EML exactly, but instead replaces the logarithm with a softplus-stabilized surrogate to ensure numerical stability near zero; this coincides with EML on strictly positive inputs but deviates smoothly in its vicinity, whereas the complex setting uses the original operator without modification. Third, all experiments are restricted to one-dimensional, smooth, densely sampled, and noise-free data; although the underlying theory is dimension-agnostic, extensions to higher dimensions, sparse sampling, and noisy observations are not addressed here and remain open. Fourth, all models are trained under a fixed wall-clock budget, which induces a trade-off between depth and optimization effort, so that deeper trees receive fewer restarts; accordingly, the observed depth–error behavior reflects both expressivity and optimization constraints, and the mild degradation at larger depths is consistent with this effect. Additionally, the reported numbers are achieved errors, not bounds. They are upper-bounded by the theorem; whether they meet the rate the theorem predicts and how they scale with computational budget) are questions we do not address here. Finally, as shown in Section 3.4, the learned models should therefore be interpreted as continuous function approximators rather than symbolic reconstructions of the constructive proof, and recovering discrete symbolic structure remains an open direction requiring additional inductive bias or regularization. 
+
+## 4 Discussion 
+
+In this work, we established a universal approximation theorem for tree-structured EML θ networks (based on (2) ) in Sobolev spaces W k, ∞ through Theorem 1 and Corollary 1. Our approach combines local polynomial approximation, approximate partitions of unity constructed from shifted and rescaled 
+
+tanh functions, and explicit EML representations of the required algebraic operations and elementary functions. This yields quantitative approximation results together with constructive realizations by EML trees. We also offer some preliminary empirical testing on the expressivity of EML trees. Several theoretical and practical questions remain open. On the theoretical side, it would be interesting to extend the approximation framework to broader classes of function spaces, such as Besov or Triebel–Lizorkin spaces. Another important direction is determining whether similar approximation guarantees can be proved for vanilla EML architectures (1) . One possible route would be to develop a proof strategy based on polynomial approximants with bounded coefficients together with quantitative upper bounds on size of the EML blocks required to realize such constants. The present constructions are primarily designed to be explicit, interpretable, and easy to verify analytically. As a consequence, the resulting trees are unlikely to be optimal in either depth or parameter count. It is plausible that substantially shorter or more efficient EML trees exist that realize the same functions. Related questions include whether the number of parameters per EML atom can be reduced below the six used in the present work, and whether alternative atom designs could trade depth for increased input parameters in a manner analogous to wider neural architectures. Finally, more effort should be put into investigating the symbolic and interpretable nature of EML trees, especially with regards to possible applications to scientific machine learning [ 3, 26 , 28 , 31 , 33 ]and in relation to algorithms like symbolic regression [ 4]. We hope that our results will spur the improvements on the theoretical approximation theory of such trees and on the design of innovative techniques to train EML-type trees more effectively. 9References 
+
+[1] Ahmed M Alaa and Mihaela Van der Schaar. Demystifying black-box models with symbolic metamodels. 
+
+Advances in neural information processing systems , 32, 2019. [2] Andrew R Barron. Universal approximation bounds for superpositions of a sigmoidal function. IEEE Transactions on Information theory , 39(3):930–945, 2002. [3] Steven L Brunton, Joshua L Proctor, and J Nathan Kutz. Discovering governing equations from data by sparse identification of nonlinear dynamical systems. Proceedings of the national academy of sciences ,113(15):3932–3937, 2016. [4] Miles Cranmer, Alvaro Sanchez Gonzalez, Peter Battaglia, Rui Xu, Kyle Cranmer, David Spergel, and Shirley Ho. Discovering symbolic models from deep learning with inductive biases. Advances in neural information processing systems , 33:17429–17442, 2020. [5] George Cybenko. Approximation by superpositions of a sigmoidal function. Mathematics of control, signals and systems , 2(4):303–314, 1989. [6] Tim De Ryck, Samuel Lanthaler, and Siddhartha Mishra. On the approximation of functions by tanh neural networks. Neural Networks , 143:732–750, 2021. [7] Tim De Ryck and Siddhartha Mishra. Error analysis for physics-informed neural networks (pinns) approximating kolmogorov pdes. Advances in Computational Mathematics , 48(6):79, 2022. [8] Tim De Ryck and Siddhartha Mishra. Generic bounds on the approximation error for physics-informed (and) operator learning. Advances in Neural Information Processing Systems , 35:10945–10958, 2022. [9] Ricardo G Durán. On polynomial approximation in sobolev spaces. SIAM journal on numerical analysis ,20(5):985–988, 1983. [10] Mars Liyao Gao, Jan P Williams, and J Nathan Kutz. Sparse identification of nonlinear dynamics and koopman operators with shallow recurrent decoder networks. Proceedings of the National Academy of Sciences , 123(16):e2508144123, 2026. [11] Ingo Gühring, Gitta Kutyniok, and Philipp Petersen. Error bounds for approximations with deep relu neural networks in w s, p norms. Analysis and Applications , 18(05):803–859, 2020. [12] Charles R. Harris, K. Jarrod Millman, Stéfan J. van der Walt, Ralf Gommers, Pauli Virtanen, David Cournapeau, Eric Wieser, Julian Taylor, Sebastian Berg, Nathaniel J. Smith, Robert Kern, Matti Picus, Stephan Hoyer, Marten H. van Kerkwijk, Matthew Brett, Allan Haldane, Jaime Fernández del Río, Mark Wiebe, Pearu Peterson, Pierre Gérard-Marchant, Kevin Sheppard, Tyler Reddy, Warren Weckesser, Hameer Abbasi, Christoph Gohlke, and Travis E. Oliphant. Array programming with NumPy. Nature ,585(7825):357–362, September 2020. [13] Kurt Hornik, Maxwell Stinchcombe, and Halbert White. Multilayer feedforward networks are universal approximators. Neural networks , 2(5):359–366, 1989. [14] Nikola Kovachki, Samuel Lanthaler, and Siddhartha Mishra. On universal approximation and error bounds for fourier neural operators. Journal of Machine Learning Research , 22(290):1–76, 2021. [15] Samuel Lanthaler, T Konstantin Rusch, and Siddhartha Mishra. Neural oscillators are universal. Advances in Neural Information Processing Systems , 36:46786–46806, 2023. [16] Zongyi Li, Nikola Kovachki, Kamyar Azizzadenesheli, Burigede Liu, Kaushik Bhattacharya, Andrew Stuart, and Anima Anandkumar. Fourier neural operator for parametric partial differential equations. arXiv preprint arXiv:2010.08895 , 2020. [17] Zongyi Li, Nikola Kovachki, Kamyar Azizzadenesheli, Burigede Liu, Kaushik Bhattacharya, Andrew Stuart, and Anima Anandkumar. Neural operator: Graph kernel network for partial differential equations. 
+
+arXiv preprint arXiv:2003.03485 , 2020. [18] Ziming Liu, Yixuan Wang, Sachin Vaidya, Fabian Ruehle, James Halverson, Marin Soljaˇ ci´ c, Thomas Y Hou, and Max Tegmark. Kan: Kolmogorov-arnold networks. arXiv preprint arXiv:2404.19756 , 2024. [19] Lu Lu, Pengzhan Jin, Guofei Pang, Zhongqiang Zhang, and George Em Karniadakis. Learning nonlinear operators via deeponet based on the universal approximation theorem of operators. Nature machine intelligence , 3(3):218–229, 2021. 
+
+10 [20] Georg Martius and Christoph H Lampert. Extrapolation and learning equations. arXiv preprint arXiv:1610.02995 , 2016. [21] Siddhartha Mishra and Roberto Molinaro. Estimates on the generalization error of physics-informed neural networks for approximating pdes. IMA Journal of Numerical Analysis , 43(1):1–43, 2023. [22] Andrzej Odrzywołek. All elementary functions from a single binary operator. arXiv preprint arXiv:2603.21852 , 2026. [23] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, et al. Pytorch: An imperative style, high-performance deep learning library. Advances in neural information processing systems , 32, 2019. [24] Philipp Petersen and Felix Voigtlaender. Optimal approximation of piecewise smooth functions using deep relu neural networks. Neural Networks , 108:296–330, 2018. [25] Allan Pinkus. Approximation theory of the mlp model in neural networks. Acta numerica , 8:143–195, 1999. [26] Samuel H Rudy, Steven L Brunton, Joshua L Proctor, and J Nathan Kutz. Data-driven discovery of partial differential equations. Science advances , 3(4):e1602614, 2017. [27] Johannes Schmidt-Hieber. Nonparametric regression using deep neural networks with ReLU activation function. Ann. Stat. , 48(4):1875–1897, August 2020. [28] Silviu-Marian Udrescu and Max Tegmark. Ai feynman: A physics-inspired method for symbolic regression. 
+
+Science advances , 6(16):eaay2631, 2020. [29] Rüdiger Verfürth. A note on polynomial approximation in sobolev spaces. ESAIM: Mathematical Modelling and Numerical Analysis , 33(4):715–719, 1999. [30] Yixuan Wang, Jonathan W Siegel, Ziming Liu, and Thomas Y Hou. On the expressiveness and spectral bias of kans. arXiv preprint arXiv:2410.01803 , 2024. [31] Philippe Wyder, Judah Goldfeder, Alexey Yermakov, Yue Zhao, Stefano Riva, Jan Williams, David Zoro, Amy Rude, Matteo Tomasetto, Joe Germany, et al. Common task framework for a critical evaluation of scientific machine learning algorithms. Advances in Neural Information Processing Systems , 38, 2026. [32] Dmitry Yarotsky. Error bounds for approximations with deep relu networks. Neural networks , 94:103–114, 2017. [33] Alexey Yermakov, Yue Zhao, Marine Denolle, Yiyu Ni, Philippe M Wyder, Judah Goldfeder, Stefano Riva, Jan Williams, David Zoro, Amy Sara Rude, et al. The seismic wavefield common task framework. arXiv preprint arXiv:2512.19927 , 2025. 
+
+11 A Notation 
+
+We briefly recall the multi-index notation. Given a d-tuple of non-negative integers α ∈ Nd 
+
+> 0
+
+with d ∈ N, we have 
+
+∣α∣ = α1 + ⋯ + αd. Additionally, if α, β ∈ Nd 
+
+> 0
+
+are both multi-indices, then α ≤ β if and only if αi ≤ βi for all 
+
+1 ≤ i ≤ d. And, given a function f ∶ Ω → R where Ω ⊂ Rd, we denote 
+
+Dαf = ∂∣α∣f∂x α1 
+
+> 1
+
+⋯∂x αd
+
+> d
+
+(18) to be the classical or weak derivative of f .Moreover, we use ⨉ to denote the Cartesian product of the provided sets. 
+
+## B Sobolev Spaces 
+
+We recall the definitions of some basic functional spaces. The Lebesgue spaces, denoted by Lp(Ω), are defined as 
+
+Lp(Ω) = {f ∶ Ω → R ∣ ∫Ω
+
+∣f (x)∣ p dx < ∞} , (19) for 1 ≤ p < ∞, equipped with the norm 
+
+∥f ∥Lp(Ω) = (∫Ω
+
+∣f (x)∣ p dx )
+
+> 1
+> p
+
+. (20) When p = ∞, the space L∞(Ω) consists of functions that are essentially bounded on Ω and whose norm is given by 
+
+∥f ∥L∞(Ω) = ess sup 
+
+> x∈Ω
+
+∣f (x)∣ = inf {C ≥ 0 ∣ ∣ f (x)∣ ≤ C for almost every x ∈ Ω} . (21) Moreover, the Sobolev space W k,p is defined as 
+
+W k,p (Ω) = {f ∈ Lp(Ω) ∣ Dαf ∈ Lp(Ω) for all α ∈ Nd 
+
+> 0
+
+with ∣α∣ ≤ k} . (22) We also define associated seminorms. For 1 ≤ p < ∞, we have 
+
+∣f ∣W m,p (Ω) = ⎛⎝ ∑
+
+> ∣α∣=m
+
+∥Dαf ∥pLp(Ω)
+
+⎞⎠
+
+> 1
+> p
+
+, for m = 0, . . . , k, (23) and for p = ∞, we have 
+
+∣f ∣W m, ∞(Ω) = max 
+
+> ∣α∣=m
+
+∥Dαf ∥L∞(Ω) , for m = 0, . . . , k. (24) Based on these seminorms, we can define the following norms for 1 ≤ p < ∞,
+
+∥f ∥W k,p (Ω) = (
+
+> k
+
+∑
+
+> m=0
+
+∣f ∣pW m,p (Ω))
+
+> 1
+> p
+
+, (25) and for p = ∞,
+
+∥f ∥W k, ∞(Ω) = max  
+
+> 0≤m≤k
+
+∣f ∣W m, ∞(Ω). (26) In particular, when p = 2, the Sobolev spaces Hk (Ω) = W k, 2(Ω) (with k ∈ N0) are Hilbert spaces with the corresponding norms ∥⋅∥Hk (Ω) = ∥⋅∥W k, 2(Ω) and seminorms ∣ ⋅ ∣Hm = ∣ ⋅ ∣W m, 2 for any integer m such that 
+
+0 ≤ m ≤ k.Additionally, the space of k-times continuously differentiable functions Ck (Ω) is endowed with the norm 
+
+∥f ∥Ck (Ω) = ∥f ∥W k, ∞(Ω).We will make frequent use of the following Banach algebra property. 
+
+Lemma 1. Let d ∈ N, k ∈ N0, and Ω ⊂ Rd. If f, g ∈ W k, ∞(Ω), then 
+
+∥f g ∥W k, ∞(Ω) ≤ 2k ∥f ∥W k, ∞(Ω) ∥g∥W k, ∞(Ω) . (27) 
+
+12 C Useful Definitions and Lemmas 
+
+We recall the definition of a star-shaped set, which is a necessary geometric requirement for the approximation of functions by polynomials in Sobolev spaces (see Lemma 2). 
+
+Definition 1. A set A ⊂ Rd is star-shaped with respect to every point in a subset B ⊂ A if 
+
+∀y ∈ B, ∀x ∈ A, [y, x ] ⊂ A, (28) 
+
+where [y, x ] = {( 1 − t)y + tx ∣ t ∈ [0, 1]} is the straight line in Rd connecting the point y to the point x.
+
+We recall the Bramble-Hilbert lemma for Sobolev spaces, as proved in [ 6], with similar statements appearing in [9] and [29]. 
+
+Lemma 2. Let Ω ⊂ Rd be an open and bounded set of diameter 0 < h < e−1/2d−3/2 which is star-shaped with respect to every point in an open ball B ⊂ Ω with diameter ρh . Then, for every f ∈ W s, ∞(Ω), there exists a polynomial ˆf of degree at most s − 1 such that for any k ∈ N0 with k < s, it holds that 
+
+∥f − ˆf ∥W k, ∞(Ω) ≤ π1/4√s(d√deh )s−k
+
+(s − k − 1)! ∣f ∣W s, ∞(Ω). (29) We recall the definition of the tanh function as 
+
+σ(x) ∶= tanh (x) = ex − e−x
+
+ex + e−x . (30) We will frequently use the following property of tanh functions under differentiation. 
+
+Lemma 3. Given m ∈ N, it holds that 
+
+∣σ(m)(x)∣ ≤ (2m)m+1 min {exp (−2x), exp (2x)} , (31) 
+
+for all x ∈ R.
+
+## D Required Building Blocks 
+
+In this section, we present the explicit constructions of the basic binary operations, exponentiation, and the hyperbolic tangent function, all of which are used in the approximation proof (Theorem 1). 
+
+D.1 Basic Binary Operations 
+
+In Figure 1, we provide the EML trees (with their associated parameters) to produce the basic binary operations of addition, subtraction, mutiplication, and division. The addition and subtraction blocks are used in the constructions of the multiplication and division blocks respectively. In all EML diagrams, we denote EML atoms by rectangles labeled EML θi (where i is an integer) and blocks by squares indicating the corresponding operation or function. In the first few examples, we explicitly write (one possible) value of the θi’s at the bottom of the figures. Additionally, the functions written above the arrows between EMLs represent the output of the EML from which the arrow originates. As observed in Figure 1, we note that the size and depth requirements of these binary operations are summarized in Table 3. The inputs x and y are strictly positive. 
+
+Operator N (⋅) Depth (⋅)
+
+x +θ y 3 2
+
+x −θ y 3 2
+
+x ×θ y 6 4
+
+x ÷θ y 6 4
+
+xnθ , mx nθ 2 2
+
+tanh θ (x), m tanh θ (x) 8 5Table 3: Size and depth of the operations in Appendix D. 
+
+D.2 Exponentiation 
+
+In our proof, we will also make frequent use of exponentiation to a constant power. We provide explicit constructions for EML trees that perform xn and mx n for constants m, n ∈ R in Figure 2. 
+
+13 (a) Addition (3) (b) Subtraction (3) 
+
+(c) Multiplication (6) 
+
+(d) Division (6) 
+
+Figure 1: The Basic Binary Operations 
+
+(a) Exponentiation to a constant n (2) 
+
+(b) Exponentiation to a constant n with prefactor m (2) 
+
+Figure 2: Exponentiating 14 Note that in Figure 2b, we construct mx n directly, which we use to represent the monomial terms of polynomials (in Appendix E). This is because it is more efficient to incorporate the coefficient within the exponentiation block itself, rather than introducing a separate multiplication block to combine a constant with the xn block. For both exponentiation blocks (2a and 2b), the size and depth of the associated EML trees are 2 (and appended to Table 3). 
+
+D.3 Hyperbolic Tangent 
+
+The hyperbolic tangent is constructed, using the exponential definition, by first getting e2x − 1 and e2x + 1 (via two separate EML blocks) and then diving them, as in Figure 3. The size of the tanh block is 8 and its depth is 
+
+5, which are appended to Table 3. We can similarly obtain m tanh x, which is useful for the construction of the approximate partitions of unity, by amending the division block to include the prefactor m. This is done by changing θ3 in the division block (Figure 1d) to be θ3 = {m, 1, 0, 0, 0, 1}.
+
+Figure 3: Hyperbolic Tangent (8) 
+
+## E Constructing Polynomials 
+
+The following two subsections detail how to construct univariate and multivariate polynomials using EML trees and provide upper bounds for the number of required EML blocks in each case. 
+
+E.1 Univariate Polynomials 
+
+A univariate polynomial of degree k, denoted by 
+
+p(x) =
+
+> k
+
+∑
+
+> i=0
+
+aixi = a0 + a1x + a2x2 + ⋯ + ak xk , (32) with x > 0 and with positive coefficients a0, a 1, . . . , a k > 0, can be (naively) constructed using EML blocks as in Figure 4, wherein we used two simple constituent blocks: addition (Figure 1a) and exponentiation to a constant with a prefactor (Figure 2b). We impose that x > 0 because our universal approximation theorem (Theorem 1) is on the the interval (0, 1]d, in order to circumvent the undefinedness of the natural logarithm for nonpositive inputs. The need for the positivity condition on the coefficients is because the exponentiation blocks are fed into an addition block; if a coefficient is negative, then the output of the exponentiation block is too (since x > 0), and so it creates a problem if it is fed into the logarithm of the addition block. The case with negative coefficients will be treated slightly differently below. The upper bound on the number of required EML blocks is obtained by noting that we used • k addition blocks (each requiring 3 EML atoms), and • k + 1 exponentiation with a prefactor blocks (each requiring 2 EML atoms). So, constructing an EML tree pθ such that pθ = p (as per the above procedure) requires N (Tθ ) = 3k + 2(k + 1) =
+
+5k + 2 and Depth (Tθ ) = 2k + 2, since the longest path starts with the x feeding into the a0 block and passes through all k addition blocks. Hence, we phrase the above conclusion as the lemma: 
+
+15 Figure 4: Univariate Polynomial ( 5s − 3)
+
+Lemma 4 (Construction of Univariate Polynomials with Positive Coefficients) . Given a univariate polynomial 
+
+p of degree k defined over x > 0 and with positive coefficients, there exists an EML tree pθ (following the explicit construction in Figure 4), such that pθ = p with N (pθ ) ≤ 5k + 2 and Depth (pθ ) ≤ 2k + 2.
+
+In the case where the polynomial contains negative coefficients, we perform the following decomposition (again with x > 0), 
+
+p(x) = p+(x) − p−(x) ∶= ∑
+
+> 0≤i≤kai>0
+
+aixi − ∑
+
+> 0≤i≤kai<0
+
+∣ai∣xi. (33) Correspondingly, all the intermediary operations to construct p+ and p− contain only positive numbers, that is they can be constructed via Lemma 4, and they output positive numbers, which can then be joined via the subtraction block to give p. Note that if the final aim of the EML tree is to represent p, then it doesn’t cause any issue if p(x) outputs a negative number. Therefore, the above decomposition leads to the following lemma: 
+
+Lemma 5 (Construction of Univariate Polynomial) . Given a univariate polynomial p of degree k (with both positive and negative coefficients) defined for x > 0, there exists an EML tree pθ , such that pθ = p with 
+
+N (pθ ) ≤ 10 k + 7 and Depth (pθ ) ≤ 2k + 4.
+
+E.2 Multivariate Polynomials 
+
+We recall that, for x = (x1, . . . , x d) ∈ Rd with xi > 0 and 1 ≤ i ≤ d, a multivariate polynomial p of total degree at most k is of the form 
+
+p(x) = ∑
+
+> ∣α∣≤k
+
+cαxα1 
+
+> 1
+
+xα2 
+
+> 2
+
+⋯xαd 
+
+> d
+
+, (34) where α = (α1, α 2, . . . , α d) is a multi-index with ∣α∣ = α1 + α2 + ⋯ + αd, and cα are the associated coefficients. Such a polynomial (of degree ≤ k) has (d+kk ) monomial terms. As in Section E.1, we first aim to construct an EML tree for the polynomial (34) with positive coefficients 
+
+cα. To do that, we (1) construct the monomials cαxα1 
+
+> 1
+
+, xα2 
+
+> 2
+
+, . . . , xαd 
+
+> d
+
+, (2) multiply these monomials together (separately for each α), (3) do steps (1) and (2) for every monomial for each α with ∣α∣ ≤ k, and (4) add them together. A breakdown of the required EML tree sizes and depths for each step is as follows: (1) For a certain α, each monomial, of which there are d, requires an exponentiation block (and the first has a prefactor), totaling 2d EML atoms; (2) Again for each α, we need to multiply the d monomials, requiring d − 1 multiplication blocks and, thus, 6(d − 1) EML atoms; thus, each term, considering both getting monomials and multiplying them requires 2d + 6(d − 1) = 8d − 6 EML atoms; (3) Since we have (d+kk ) terms in the polynomial, we do steps (1) and (2) (d+kk ) times, thus requiring 
+
+(8d − 6)( d+kk ) EML atoms; (4) We finally sum over all terms, requiring (d+kk ) − 1 addition blocks, each consisting of 3 EML atoms. 
+
+16 Thus, in total, constructing the polynomial p in (34) takes 
+
+(8d − 6)( d + kk ) + 3 (( d + kk ) − 1) = (8d − 3)( d + kk ) − 3 (35) EML atoms, and whose depth can be calculated (by drawing a schematic like Figure 4) to be 
+
+2 + 4(d − 1) + 2 (( d + kk ) − 1) = 4d + 2(d + kk ) − 4, (36) since the x’s feed into the first cαxα1 block (of depth 2), pass through d − 1 multiplication (each of depth 4), and then through (d+kk ) − 1 addition blocks (each of depth 2). The above justifies the following lemma: 
+
+Lemma 6 (Construction of Multivariate Polynomials with Positive Coefficients) . Given a d-dimensional multivariate polynomial p defined for positive input, with degree k, and with positive coefficients, there exists an EML tree pθ , such that pθ = p with 
+
+N (pθ ) ≤ (8d − 3)( d + kk ) − 3, and Depth (pθ ) ≤ 4d + 2(d + kk ) − 4. (37) For a multivariate polynomial with both positive and negative coefficients, we perform the same decomposition as in 33 and can thus conclude the following lemma: 
+
+Lemma 7 (Construction of Multivariate Polynomials) . Given a d-dimensional multivariate polynomial p defined for positive input and with degree k, there exists an EML tree pθ , such that pθ = p with 
+
+N (pθ ) ≤ 2(8d − 3)( d + kk ) − 3, and Depth (pθ ) ≤ 4d + 2(d + kk ) − 2. (38) 
+
+## F Approximating the partition of unity 
+
+In this section, we aim to construct an approximate partition of unity, similar to Section 4 of [ 6]. We do this because indicator functions are unsuitable to be represented by EML trees due to the fact that they contain a discontinuity and cannot be suitably represented by chaining elementary functions constructed from compositions of EML. For this reason, we construct smooth approximations of indicator functions on subsets of [0, 1]d via 
+
+tanh functions. When suitably shifted and parametrized, these functions output values close to 1 within the subset and close to 0 outside of it. 
+
+F.1 Properties of the approximate partition of unity 
+
+We now recall some of the properties of the partition of unity of [6]. For a point y ∈ R and a parameter α ∈ R (to be chosen later), we define the one-dimensional approximate indicator functions as 
+
+ρN 
+
+> 1
+
+(y) = 12 − 12 σ (α (y − 1
+
+N )) ,ρNm(y) = 12 σ (α (y − m − 1
+
+N )) − 12 σ (α (y − mN )) for 2 ≤ m ≤ N − 1,ρNN (y) = 12 σ (α (y − N − 1
+
+N )) + 12 .
+
+(39) We can clearly see that if α is large enough, these act as soft indicator functions over the intervals ( m−1 
+
+> N
+
+, mN )
+
+(depending on the subscript of ρ). To choose α, we note that since σ(x) → 1 as x → ∞ and its derivatives also saturate ( σ(m)(x) → 0 with 
+
+x → ∞), we can choose R > 0 large enough such that ∣σ(m)∣ is decreasing over [R, ∞) for all 1 ≤ m ≤ k.So, given ε > 0, we choose α, depending on N and ε, large enough such that 
+
+αN ≥ R, 1 − σ ( αN ) ≤ ε, αm ∣σ(m) ( αN )∣ ≤ ε for all 1 ≤ m ≤ k, (40) justified also by Lemma A.4 in [ 6]. Consequently, α can be chosen to satisfy the above conditions and has the explicit value 
+
+α = N max {R, ln ( (2k)k+1(N k )k
+
+ek ε )} , (41) 
+
+17 (see Lemma A.5 in [6] for justification). Importantly, for j = (ji)di=1 ∈ AN (where AN is the index set (8)), we define 
+
+ΦNj (x) =
+
+> d
+
+∏
+
+> i=1
+
+ρNji (xi), (42) which acts as our approximate partition of unity. We also define the set Vd as 
+
+Vd = {v ∈ Zd ∣ max  
+
+> 1≤i≤d
+
+∣vi∣ ≤ 1} , (43) which allows us to choose only the cubes directly surrounding a cube of interest. Lemmas 8 and 9 below prove that the set of functions {ΦNj }j∈AN acts as an approximate partition of unity in the sense that they satisfy the following two properties: for every j ∈ AN ,
+
+∑
+
+> v∈Vd
+
+ΦN,d j+v ≈ 1 and ∑
+
+> v∉Vd,j+v∈AN
+
+ΦN,d j+v ≈ 0. (44) We recall the below two lemmas from [ 6]. The first provides a quantitative bound for how close to 1 is the contribution of ΦNj and its direct neighbors on INj (constructed in (9)). 
+
+Lemma 8 (Lemma 4.1 of [6]) . If 0 < ε < 1/4, then 
+
+XXXXXXXXXXX
+
+∑
+
+> v∈Vd
+
+ΦNj+v − 1
+
+XXXXXXXXXXXW k, ∞(INj )
+
+≤ 2dk dε. (45) The second lemma guarantees that the contribution of the functions far away from the cube INj is small. 
+
+Lemma 9 (Lemma 4.2 of [6]) . Let k ∈ N0 and v ∈ Zd with vi ≥ 2 for all 1 ≤ i ≤ N . Then, it holds that 
+
+∥ΦNj+v ∥W k, ∞(INj ) ≤ max {1, (2k)2k αk } ε. (46) 
+
+F.2 Constructing the approximate partition of unity using EML trees 
+
+Next, we construct the ρNm functions for 2 ≤ m ≤ N − 1, according to the definition in (39) . All of the ρNm output values are larger than 0, so no issue arises from feeding their output into subsequent EML functions. However, an issue can arise in the intermediary steps of the construction, wherein a negative number could result from the 
+
+tanh functions. To circumvent this issue, we perform the following rearrangement of terms 
+
+ρNm(y) = 12 σ (α (y − m − 1
+
+N )) − 12 σ (α (y − mN )) 
+
+= 12
+
+⎛⎝
+
+eα(y− m−1 
+
+> N)
+
+eα(y− m−1  
+
+> N)
+
++ e−α(y− m−1  
+
+> N)
+
+− eα(y− mN )
+
+eα(y− mN ) + e−α(y− mN )
+
+⎞⎠´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶ 
+
+> positive
+
++ 12
+
+⎛⎝
+
+e−α(y− mN )
+
+eα(y− mN ) + e−α(y− mN ) − e−α(y− m−1 
+
+> N)
+
+eα(y− m−1  
+
+> N)
+
++ e−α(y− m−1  
+
+> N)
+
+.⎞⎠´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶ 
+
+> positive
+
+(47) As noted in the equation above, the first and second terms are positive, and thus we do not encounter any sign issues with this decomposition. This construction, represented in Figure 5, requires 12 EML blocks, 5 addition blocks (the last of which is chosen to have a 1/2 prefactor), 4 division block, and 2 subtraction blocks. This boils down to a size of 
+
+12 + 5 × 3 + 4 × 6 + 2 × 3 = 57 and a depth of 1 + 2 + 4 + 2 + 2 = 11 .Similarly, to construct ρN 
+
+> 1
+
+, we rearrange the function so that we subtract positive numbers as before 
+
+ρN 
+
+> 1
+
+(y) = 12 − 12 σ (α (y − 1
+
+N )) 
+
+= 12
+
+⎛⎝1 + e−α(1− 1 
+
+> N)
+
+eα(1− 1  
+
+> N)
+
++ e−α(1− 1 
+
+> N)
+
+⎞⎠´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶ 
+
+> positive
+
+− 12
+
+⎛⎝
+
+eα(1− 1 
+
+> N)
+
+eα(1− 1  
+
+> N)
+
++ e−α(1− 1 
+
+> N)
+
+⎞⎠´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶ 
+
+> positive
+
+, (48) 
+
+18 Figure 5: Construction of ρNm for 2 ≤ m ≤ N − 1
+
+and for ρNN , we rewrite it as 
+
+ρNN (y) = 12 σ (α (y − N − 1
+
+N )) + 12
+
+= 12
+
+⎛⎝1 + eα(y− N −1 
+
+> N)
+
+eα(y− N −1  
+
+> N)
+
++ e−α(y− N −1 
+
+> N)
+
+⎞⎠´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶ 
+
+> positive
+
+− 12
+
+e−α(y− N −1 
+
+> N)
+
+eα(y− N −1  
+
+> N)
+
++ e−α(y− N −1 
+
+> N)
+
+´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶ 
+
+> positive
+
+. (49) The size and depth of the EML blocks representing ρN 
+
+> 1
+
+and ρNN can be upper bounded, for simplicity, by those for ρNm for 2 ≤ m ≤ N − 1.Then, we construct ΦNj , using (42) by multiplying d instances of the one-dimensional partitions ρNji , which doesn’t cause any issues due to the positivity of the ρNm functions. This requires d − 1 multiplication blocks, and thus the EML tree corresponding to ΦNj has size 57 d + 6(d − 1) = 63 d − 6 and depth 11 + 4(d − 1) = 4d + 7,yielding the following lemma: 
+
+Lemma 10 (Construction of Approximate Partitions of Unity) . For N, d ∈ N and j ∈ AN , there exists an EML tree ΦNj,θ such that ΦNj,θ = ΦNj with 
+
+N (ΦNj,θ ) ≤ 63 d − 6, and Depth (ΦNj,θ ) ≤ 4d + 7. (50) 
+
+## G Proof of Theorem 1 
+
+Proof. We set out to perform the steps for the proof as described in the main text above. 
+
+Step 1. Approximation by Local Polynomials. For a given N ∈ N and j ∈ AN , we recall the definitions of INj
+
+and JNj from (9) . We calculate that the diameter of JNj is 3√dN . We notice that there exists a ball of diameter 
+
+3/N such that JNj is star-shaped with respect to every point in this ball (per Definition 1). Thus, for every 
+
+j ∈ AN , by the Bramble-Hilbert lemma (Lemma 2), there exists a polynomial pNj of degree at most s − 1 such 
+
+19 that, for all 0 ≤ k ≤ s − 1
+
+∥f − pNj ∥W k, ∞(JNj ) ≤ π1/4√s
+
+(s − k − 1)! ( 5d2
+
+N )
+
+> s−k
+
+∣f ∣W s, ∞([ 0,1]d)
+
+≤ max 
+
+> 0≤m≤k
+
+π1/4√s(5d2)s−m
+
+(s − m − 1)!
+
+∣f ∣W s, ∞([ 0,1]d)
+
+N s−k ∶= C(d, k, s, f )
+
+N s−k ,
+
+(51) choosing N > 5d2 (to obtain decay) and using 3√e ≤ 5.
+
+Remark 5. The reason why the polynomials are chosen to be good approximations on the overlapping cubes (not on the disjoint ones) becomes evident in the estimates (58) and (59) , allowing us to control the terms 
+
+∥f − pNi+v ∥L∞(INi ) and ∥f − pNi+v ∥W k, ∞(INi ) with i ∈ AN and v ∈ Vd, using the fact that INi ⊂ JNi+v and bounding the norms. 
+
+Step 2. Definition of the Global Polynomial. We then define the global piecewise polynomial over the entire domain [0, 1]d by 
+
+pN = ∑
+
+> j∈AN
+
+pNj χj , (52) where χj denotes the indicator function on INj . Since pN is composed using indicator functions (which are discontinuous), it cannot be adequately controlled in W k, ∞ spaces where k ≥ 1. This is why we introduce 
+
+˜pN = ∑
+
+> j∈AN
+
+pNj ΦNj , (53) as the global polynomial using the approximate partitions of unity and which we will ultimately represent using an EML tree. Similarly, we define ˜f N as 
+
+˜f N = ∑
+
+> j∈AN
+
+f ΦNj . (54) 
+
+Step 3. Approximation of f by ˜f N . We first prove that ˜f N is close to f . Considering an arbitrary i ∈ AN and any k ≥ 1, we employ the property 1, Lemmas 8 and 9, and the explicit value of α (from (41)) to get 
+
+∥f − ˜f N ∥W k, ∞(INi ) =
+
+XXXXXXXXXXXX
+
+f − ∑
+
+> j∈AN
+
+f ΦNj
+
+XXXXXXXXXXXXW k, ∞(INi )
+
+≤ 2k ∥f ∥W k, ∞(INi )
+
+XXXXXXXXXXX
+
+1 − ∑
+
+> v∈Vd
+
+ΦNi+v
+
+XXXXXXXXXXXW k, ∞(INi )
+
++ 2k ∥f ∥W k, ∞(INi )
+
+XXXXXXXXXXXXXXXXXX
+
+∑
+
+> j∈AN
+> j−i∉Vd
+
+ΦNj
+
+XXXXXXXXXXXXXXXXXXW k, ∞(INi )
+
+≤ 2k ∥f ∥W k, ∞(INi ) (2kd dε + N d(2k)2k αk ε)
+
+≤ 2k ∥f ∥W k, ∞(INi ) (2kd d + N d(2k)2k N k (k + 1)k max {Rk , ln k ( 2N k 2
+
+ε 1 
+
+> k+1
+
+e )}) ε
+
+≤ δ(2(k + 1)) 3k max {Rk , ln k ( 2N k 2
+
+ε 1 
+
+> k+1
+
+e )} C(d, k, s, f )
+
+N s−k ,
+
+(55) with ε chosen to satisfy 
+
+ε ≤ δC(d, k, s, f )
+
+2(k+1)ddN s+d ∥f ∥W k, ∞([ 0,1]d)
+
+. (56) Similarly, for k = 0, we have 
+
+∥f − ˜f N ∥L∞(INi ) ≤ ∥f ∥L∞(INi ) (dε + N dε) ≤ δ
+
+3
+
+C(d, k, s, f )
+
+N s−k . (57) 
+
+20 Step 4. Approximation of ˜f by the Global Polynomial ˜pN . We note that for k = 0, we employ properties of the Lp norm and Lemmas 8 and 9 to obtain 
+
+∥ ˜f N − ˜pN ∥L∞(INi ) =
+
+XXXXXXXXXXXX
+
+∑
+
+> j∈AN
+
+(f − pNj ) ΦNj
+
+XXXXXXXXXXXXL∞(INi )
+
+=
+
+XXXXXXXXXXX
+
+∑
+
+> v∈Vd
+
+(f − pNi+v ) ΦNi+v
+
+XXXXXXXXXXXL∞(INi )
+
++ ∑
+
+> j∈AN
+> j−i∉Vd
+
+∥f − pNj ∥L∞(INi ) ∥ΦNj ∥L∞(INi )
+
+≤ (max 
+
+> v∈Vd
+
+∥f − pNi+v ∥L∞(INi ))XXXXXXXXXXX
+
+∑
+
+> v∈Vd
+
+ΦNi+v
+
+XXXXXXXXXXXL∞(INi )
+
++ N dC(d, k, s, f )ε
+
+≤ C(d, k, s, f )
+
+N s−k (1 + dε ) + N dC(d, k, s, f )ε
+
+≤ (1 + δ
+
+3 ) C(d, k, s, f )
+
+N s−k ,
+
+(58) with suitably chosen ε.Whereas for 1 ≤ k < s, we have 
+
+∥ ˜f N − ˜pN ∥W k, ∞(INi ) =
+
+XXXXXXXXXXXX
+
+∑
+
+> j∈AN
+
+(f − pNj ) ΦNj
+
+XXXXXXXXXXXXW k, ∞(INi )
+
+≤
+
+XXXXXXXXXXX
+
+∑
+
+> v∈Vd
+
+(f − pNi+v ) ΦNi+v
+
+XXXXXXXXXXXW k, ∞(INi )
+
++ ∑
+
+> j∈AN
+> j−i∉Vd
+
+2k ∥f − pNj ∥L∞(INi ) ∥ΦNj ∥W k, ∞(INi ) .
+
+(59) To bound the first term, we invoke the general Leibniz rule to get 
+
+Dβ ⎛⎝ ∑
+
+> v∈Vd
+
+(f − pNi+v ) ΦNi+v
+
+⎞⎠ ≤ ∑
+
+> β′≤β
+
+( ββ′) ∑
+
+> v∈Vd
+
+∣Dβ′
+
+(f − pNi+v )∣ ∣ Dβ−β′
+
+ΦNi+v ∣ , (60) with x ∈ INi . Defining l = ∣β − β′∣ for β′ ≤ β, the following holds for every v ∈ Vd,
+
+∣Dβ′
+
+(f − pNi+v )∣ ≤ ∥f − pNi+v ∥W k−l, ∞(INi ) ≤ C(d, k − l, s, f )
+
+N s−k+l , (61) and, using Lemma 3 and the explicit value of α (in (41)), we have 
+
+∣Dβ−β′
+
+ΦNi+v ∣ ≤ αl(2l)2l = N l(2l)2l max {Rl, ln l ( (2k)k+1(N k )k
+
+ek ε )} . (62) Thus, the first term of (59) can be estimated as 
+
+XXXXXXXXXXX
+
+∑
+
+> v∈Vd
+
+(f − pNi+v ) ΦNi+v
+
+XXXXXXXXXXXW k, ∞(INi )
+
+≤ 2k 3d C(d, k, s, f )
+
+N s−k (2k)2k max {Rk , ln k ( (2N k 2)k+1
+
+ek ε )} ,
+
+which helps simplify (59) to 
+
+∥ ˜f N − ˜pN ∥W k, ∞(INi ) ≤ 2k 3d C(d, k, s, f )
+
+N s−k (2k)2k max {Rk , ln k ( (2N k 2)k+1
+
+ek ε )} 
+
++ N d2k C(d, k, s, f )( 2k)2k N k (k + 1)k ( 2N k 2
+
+e ) 
+
+> k/2
+
+√ε
+
+≤ 3d (1 + δ
+
+3 ) ( 2(k + 1)) 3k max {Rk , ln k ( 2N k 2
+
+ε 1 
+
+> k+1
+
+e )} C(d, k, s, f )
+
+N s−k ,
+
+(63) where we choose 
+
+ε ≤ δ2
+
+N 2s+2d+k kk , (64) and assume that 0 < δ < 5/6.
+
+Step 5. Constructing the EML Tree. In this step, our objective is to construct an EML tree ˜pNθ such that it is exactly equal to the approximate global polynomial, i.e. ˜pNθ = ˜pN , and find an upper bound on the size and depth of such trees. 
+
+21 Keep in mind that, in view of the theorem statement, our goal here is to establish an approximation result on 
+
+(0, 1]d. Accordingly, the EML tree constructed in this step is only defined on this domain, since zeros in the input may produce singularities through the logarithmic components appearing in the definition of the EML. We cannot directly appeal to Lemma 6 or even Lemma 7 in constructing the EML tree representing ˜pN because the individual polynomials pNj (for j ∈ AN ) could be negative, which then prevents us from feeding it into a subsequent multiplication block, whose first layer contains logarithms for both inputs. Thus, we appeal to a sign-based decomposition as follows: we rewrite ˜pN as 
+
+˜pN (x) = ∑
+
+> j∈AN
+
+pNj ΦNj = ∑
+
+> j∈AN
+
+(pNj, + − pNj, −) ΦNj = ∑
+
+> j∈AN
+
+pNj, +ΦNj − ∑
+
+> j∈AN
+
+pNj, −ΦNj , (65) where, similarly to (33), we define 
+
+pNj, +(x) = ∑
+
+> ∣α∣≤s−1
+> cα>0
+
+cαxα1 
+
+> 1
+
+xα2 
+
+> 2
+
+⋯xαd 
+
+> d
+
+, and pNj, −(x) = ∑
+
+> ∣α∣≤s−1
+> cα<0
+
+∣cα∣xα1 
+
+> 1
+
+xα2 
+
+> 2
+
+⋯xαd 
+
+> d
+
+. (66) for x ∈ (0, 1]d.Thus, for every j ∈ AN , we construct pNj, + and pNj, − through Lemma 6, obtaining the exact EML representations 
+
+pNj, +,θ and pNj, −,θ . And, for each ΦNj , we can construct an associated EML tree ΦNj,θ using Lemma 10. Each term 
+
+pNj, +,θ ΦNj,θ has size 
+
+N (pNj, +,θ ΦNj,θ ) = (8d − 3)( d + s − 1
+
+s − 1 ) − 3
+
+´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶  
+
+> for pNj, +,θ
+
++ (63 d − 6)´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶  
+
+> for ΦNj,θ
+
++ 6
+
+® 
+
+> for ×
+
+= (8d − 3)( d + s − 1
+
+s − 1 ) + 63 d − 3,
+
+(67) and similarly for N (pNj, −,θ ΦNj,θ ).We need ∣AN ∣ = N d such terms and N d − 1 addition blocks for each summation and a subtraction block to get 
+
+˜pNθ , thus yielding 
+
+N (˜pNθ ) ≤ 2N d (( 8d − 3)( d + s − 1
+
+s − 1 ) + 63 d − 3)´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶ 
+
+> individual terms
+
++ 2 × 3(N d − 1)´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶    
+
+> sum Ndterms
+
++ 3
+
+®  
+
+> for −block
+
+= 2N d (( 8d − 3)( d + s − 1
+
+s − 1 ) + 63 d) − 3.
+
+(68) The depth of such a tree can be found by noting that the longest path consists of passing through pN 
+
+> {1,..., 1},±,θ
+
+or 
+
+ΦN 
+
+> {1,..., 1},θ
+
+(depending on which is deeper), a multiplication block, N d − 1 addition blocks, and a subtraction block, giving the following Depth (˜pNθ ) ≤ 4d + max {2(d + s − 1
+
+s − 1 ) − 4, 7}´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶    
+
+> passing through pN
+> {1,..., 1},θ or ΦN
+> {1,..., 1},θ
+
++ 4
+
+® 
+
+> ×block
+
++ 2(N d − 1)´¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¸¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¹¶  
+
+> +blocks
+
++ 2
+
+® 
+
+> −block
+
+= 4d + max {2(d + s − 1
+
+s − 1 ) − 4, 7} + 2N d + 4,
+
+(69) validating the upper bounds provided in the statement of the theorem. Evidently, since ˜pNθ = ˜pN , then on (0, 1]d, we have that 
+
+∥˜pN − ˜pNθ ∥W k, ∞(( 0,1]d) = 0. (70) 
+
+Step 6. Conclusion. Finally, for k = 0, we can combine, via the triangle inequality, the previous estimates to obtain 
+
+∥f − ˜pNθ ∥L∞(( 0,1]d) ≤ (1 + δ
+
+3 ) C(d, 0, s, f )
+
+N s , (71) where we have chosen ε to satisfy 
+
+ε = δ2 min {1, √C(d, k, s, f )} 
+
+N 2s+2d+k kk 2(k+1)dd max {1, ∥f ∥1/2 
+
+> Wk, ∞([ 0,1]d)
+
+} . (72) 
+
+22 Additionally, for 1 ≤ k < s, (72) implies that 
+
+ε 1 
+
+> k+1
+
+≥ δ min {1, √C(d, k, s, f )} 
+
+N s+d+1k2d√d max {1, ∥f ∥1/2 
+
+> Wk, ∞([ 0,1]d)
+
+} . (73) Therefore, we obtain the bound 
+
+∥f − ˜pNθ ∥W k, ∞(( 0,1]d) ≤ 3d(1 + δ)( 2(k + 1)) 3k max {Rk , ln k (βN s+d+2)} C(d, k, s, f )
+
+N s−k , (74) where we define β to be 
+
+β =
+
+k32d√d max {1, ∥f ∥1/2 
+
+> Wk, ∞([ 0,1]d)
+
+}
+
+δ min {1, √C(d, k, s, f )} . (75) This concludes the proof of Theorem 1. 
+
+## H Proof of Corollary 1 
+
+Proof. Let η > 0. Choose γ ∈ (0, 1), to be specified later, and define Tγ ∶ [0, 1]d → (0, 1]d by 
+
+Tγ (x) ∶= (1 − γ)x + γ
+
+2 1, (76) where 1 = (1, . . . , 1). Crucially, we observe that 
+
+Tγ ([ 0, 1]d) = [ γ
+
+2 , 1 − γ
+
+2 ]
+
+> d
+
+⊂ (0, 1)d. (77) Moreover, 
+
+sup 
+
+> x∈[0,1]d
+
+∣Tγ (x) − x∣ = sup 
+
+> x∈[0,1]d
+
+∣−γx + γ
+
+2 1∣ ≤ Cdγ, (78) so that Tγ → Id uniformly as γ → 0. In particular, since f ∈ W s, ∞([ 0, 1]d) with s > k, for every multi-index 
+
+∣α∣ ≤ k, Dαf is Lipschitz. Hence, 
+
+∥Dαf − (Dαf ) ○ Tγ ∥L∞([ 0,1]d) ≤ ∥∇Dαf ∥L∞([ 0,1]d) ∥Tγ − Id ∥L∞([ 0,1]d) ≤ Cf,k γ. (79) We can choose γ > 0 sufficiently small to get 
+
+∥f − f ○ Tγ ∥W k, ∞([ 0,1]d) ≤ η
+
+2 . (80) By Theorem 1, there exists an EML θ tree pθ such that 
+
+∥f − pθ ∥W k, ∞(( 0,1]d) ≤ η
+
+2 . (81) We define the map pγ,θ as 
+
+pγ,θ (x) = pθ (Tγ (x)) , (82) which is well-defined on [0, 1]d. Since Tγ ([ 0, 1]d) ⊂ (0, 1)d, we have, for any g ∈ W k, ∞)[ 0, 1]d), that 
+
+∥g ○ Tγ ∥W k, ∞([ 0,1]d) ≤ ∥g∥W k, ∞(( 0,1]d), (83) and hence 
+
+∥f ○ Tγ − pθ ○ Tγ ∥W k, ∞([ 0,1]d) ≤ ∥f − pθ ∥W k, ∞(( 0,1]d) ≤ η
+
+2 . (84) Finally, combining the previous estimates, we obtain 
+
+∥f − pγ,θ ∥W k, ∞([ 0,1]d) = ∥f − pθ ○ Tγ ∥W k, ∞([ 0,1]d)
+
+≤ ∥f − f ○ Tγ ∥W k, ∞([ 0,1]d) + ∥f ○ Tγ − pθ ○ Tγ ∥W k, ∞([ 0,1]d)
+
+≤ η
+
+2 + η
+
+2 = η. 
+
+(85) Naively, to construct pγ,θ as an EML tree, we alter the inputs, since for each i ∈ {1, . . . , d }, we have to construct the map xi ↦ (1 − γ)xi + γ/2. One such map requires 2 EML atoms with appropriate parameters. We have to construct such blocks for all used instance of the input variables in the EML tree (i.e. where their multiplicative prefactor is not set to 0), since blocks in an EML tree are not reusable and so they cannot be fed into two distinct inputs. We now count all used appearances of the inputs in the EML tree pθ , in order to substitute xi by Tγ (xi). For each j ∈ AN , we have to construct pNj, +,θ , pNj, −,θ , and 2 of ΦNj,θ . Additionally, we know that for each 
+
+23 • pNj, ±,θ : there are d(d+s−1 
+
+> s−1
+
+) instances of the input variables in polynomial block, • ΦNj,θ : there are 12 used appearances of the inputs in each ρNji (xi) block (as seen in Figure 5), of which there are d in each ΦNj,θ .Thus, summing all these contributions together, we notice that we need 2N d (d(d+s−1 
+
+> s−1
+
+) + 12 d) substitutions of 
+
+xi ↦ Tγ , each requiring 2 EML blocks. This produces the upper bound on N (pγ,θ ) in (14). On the other hand, the depth of pγ,θ is only increased by 2 EML blocks relative to pθ .This concludes the proof of Corollary 1. 
+
+24

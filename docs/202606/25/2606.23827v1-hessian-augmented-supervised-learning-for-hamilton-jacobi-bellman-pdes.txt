@@ -1,0 +1,908 @@
+Title: Hessian-augmented Supervised Learning for Hamilton-Jacobi-Bellman PDEs
+
+URL Source: https://arxiv.org/pdf/2606.23827v1
+
+Published Time: Wed, 24 Jun 2026 00:05:34 GMT
+
+Number of Pages: 21
+
+Markdown Content:
+HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HAMILTON-JACOBI-BELLMAN PDES 
+
+MAT ´IAS G ´OMEZ-AEDO ∗, BEHZAD AZMI † , YUYANG HUANG ∗, DANTE KALISE ∗, AND 
+
+KARL KUNISCH ‡
+
+Abstract. A data-driven method is developed for approximating value functions in deterministic optimal control problems with nonlinear control-affine dynamics. The Pontryagin Maximum Princi-ple optimality system is solved from multiple initial conditions to generate training data consisting of values, gradients, and Hessians of the value function, where Hessian information is obtained from a matrix Riccati equation along optimal trajectories. These quantities augment a weighted least-squares regression over sparse polynomial bases on hyperbolic cross index sets, with gradients and Hessians contributing additional linear equations per sample and substantially reducing sample com-plexity compared to value-only regression. Feedback laws are recovered analytically from the learned value function. In high dimensions, a partial Hessian strategy controls the cost of data generation. The approach is validated on problems of increasing state dimension, where second-order data aug-mentation is shown to improve approximation accuracy and closed-loop performance, with up to an order-of-magnitude reduction in the number of training samples required relative to lower-order methods. 
+
+Key words. optimal control, Hamilton–Jacobi–Bellman PDEs, polynomial regression, super-vised learning, Sobolev training 
+
+MSC codes. 49L20, 49N35, 41A10, 49L12 
+
+1. Introduction. The synthesis of optimal feedback control laws is a fundamen-tal challenge in control engineering and applied mathematics, arising across domains including aerospace guidance, robotic motion planning, mathematical finance, and the stabilisation of PDE-governed systems. The standard approach begins by casting a dynamic optimisation problem min  
+
+> u(·)∈L2([0 ,∞); Rm)
+
+J (u; x) := 
+
+Z ∞
+
+> 0
+
+ℓ(y(s)) + β∥u(s)∥22 ds, β > 0,(1.1) where u(s) ∈ Rm is a time-dependent control signal and the state y(s) ∈ Rn satisfies the control-affine nonlinear dynamics 
+
+dds y(s) = f (y(s)) + g(y(s)) u(s),(1.2) with initial condition y(0) = x. The control objective is encoded in the state penalty 
+
+ℓ(y), and the dimensions ( n, m ) can be large: a quadrotor model involves up to n = 12 states, agent-based systems (swarm robotics, financial portfolios) reach hundreds, and fluid flow control via Navier–Stokes constitutes an infinite-dimensional state space. Our concern is with real-time, robust feedback laws of the form u = u(y(s)), which depend on the current state rather than on time and initial condition alone. By the 
+
+> ∗
+
+Department of Mathematics, Imperial College London, South Kensington Campus, SW7 2AZ London, UK (m.gomez-aedo22@imperial.ac.uk, yuyang.huang21@imperial.ac.uk, dkaliseb@imperial.ac.uk). 
+
+> †
+
+Department of Mathematics and Statistics, University of Konstanz, Germany (behzad.azmi@uni-konstanz.de). 
+
+> ‡
+
+RICAM and Institute of Mathematics and Scientific Computing, University of Graz, Austria (karl.kunisch@uni-graz.at). 1
+
+> arXiv:2606.23827v1 [math.OC] 22 Jun 2026
+
+2 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+dynamic programming principle (DPP), the optimal feedback map is given by 
+
+u(x) = − 12β g(x)⊤∇V (x),(1.3) where V : Rn → R is the value function (optimal cost-to-go), defined as 
+
+V (x) := inf  
+
+> u(·)
+
+J (u(·); x),(1.4) which solves the Hamilton–Jacobi–Bellman (HJB) equation min 
+
+> u∈Rm
+
+(f (x) + g(x)u)⊤∇V (x) + ℓ(x) + β∥u∥22 = 0 .(1.5) The feedback law (1.3) is globally optimal and compensates disturbances along trajectories without recomputing the control action. Its chief drawback is computa-tional: the HJB equation is a fully nonlinear, non-variational PDE posed over the 
+
+n-dimensional state space, and classical grid-based discretisations scale exponentially in n, limiting their scope to problems with n ≲ 5. Circumventing the curse of dimensionality has motivated a broad range of non-standard numerical strategies. Causality-free characteristics methods exploit the con-nection between optimal trajectories and HJB characteristics to recover feedback laws without state-space discretisation [25, 26, 34, 33], while Lax–Hopf formulas combined with convex optimisation enable pointwise value function evaluation in high dimen-sions [16]. Sparse polynomial approximations from Galerkin and policy-iteration schemes have been applied to HJB-based stabilization of semilinear parabolic sys-tems [24]. Al’brekht’s power-series method, reformulated via Kronecker-product ten-sor structure, yields scalable polynomial approximations of the HJB equation for polynomial control-affine systems, reaching state dimensions exceeding one thousand [13, 14]. Low-rank tensor decompositions exploit separable structure in the value function [17, 18], and separable neural-network representations have been recently pursued along similar lines [32]. Neural networks trained by residual minimisation over monotone finite-difference discretisations [21] and direct training over the feed-back map [27] offer complementary perspectives. Deep learning approaches, including physics-informed and Deep Galerkin methods [31], backward SDE formulations [23], and symplectic networks applied to the PMP system [28], have extended this to di-mensions exceeding one hundred. This paper adopts a derivative-augmented supervised learning framework in which a polynomial model ˜V (x) = Pqk=1 θkΦik (x) is fitted to a labelled dataset carrying values, gradients, and Hessians of V ,(1.6) D = (xj , V (xj ), ∇V (xj ), ∇2V (xj )) Nj=1 ,
+
+by minimising (1.7) min 
+
+> θ∈Rq
+
+1
+
+N
+
+> N
+
+X
+
+> j=1
+
+h ˜V (xj ) − V (xj ) 2 + γ1
+
+> n
+
+X
+
+> m=1
+
+∂xm
+
+˜V (xj ) − ∂xm V (xj ) 2
+
++ γ2
+
+X
+
+> 1≤m≤ℓ≤n
+
+∂2
+
+> xmxℓ
+
+˜V (xj ) − ∂2 
+
+> xmxℓ
+
+V (xj ) 2i
+
+,
+
+where γ1, γ 2 ≥ 0 weight gradient and Hessian contributions, and {Φik } is a polynomial basis over a finite multi-index set. For control-affine dynamics with quadratic control HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 3        
+
+> (i) N= 21, zeroth-order (ii) N= 7, first-order (iii) N= 4, second-order
+
+Fig. 1: Approximation of the Styblinski–Tang function fST (x, y ) = 12 (x4 −16 x2 +5 x+
+
+y4 − 16 y2 + 5 y) using zeroth-, first-, and second-order augmentation, at the minimum training set size achieving a prescribed accuracy on a validation set. cost, the feedback law is recovered analytically from (1.3). The dataset is generated by solving the first-order necessary optimality condi-tions of the Pontryagin Maximum Principle (PMP) [30] from a collection of initial conditions. Each PMP solve is a two-point boundary value problem (TPBVP) that can be treated independently of any spatial grid, avoiding the exponential scaling of state-space discretisation. When the PMP conditions are also sufficient, the value function can be evaluated by following optimal trajectories; the adjoint variable then coincides with ∇V , and ∇2V is recoverable from a matrix Riccati equation integrated alongside the same ODE system. Derivative-augmented approximation dates back to Hermite interpolation; its ex-tension to high-dimensional polynomial approximation from gradient measurements was studied in [2], and its use in neural network training is known as Sobolev training [15]. In the HJB setting, gradient-augmented regression was introduced in [4, 29] and subsequently extended to Hermite kernel surrogates [20], gradient-enhanced ten-sor train cross approximation [18], RKHS approximations driven by HJB verification conditions [19], and supervised learning from State-dependent Riccati Equation solves [3]. Hessian augmentation has appeared in the context of the Mortensen observer [6], where second-order data improves value function approximation. The present work systematically develops this direction for optimal control. The main motivation for incorporating Hessian data is reducing sample complex-ity. Gradient data contributes n equations per sample and Hessian data a further 
+
+n(n + 1) /2, giving a total equation count of M = N (1 + n + n(n + 1) /2) in (1.7), a multiplicative gain that can be decisive when each PMP data point requires solving a 2n-dimensional TPBVP. Figure 1 illustrates this concretely for polynomial regression of a standard test function: the minimum sample count achieving a prescribed accu-racy drops from N = 21 (values only) to N = 7 (gradients) to N = 4 (Hessians). The contributions of the paper are threefold. We extend the PMP-based data generation approach of [4] to second-order information via Riccati equations, and introduce a 
+
+partial Hessian strategy in which second-order data is included for a tunable fraction 
+
+ρ ∈ (0 , 1] of training points. We study the interaction between second-order augmen-tation and hyperbolic cross polynomial bases enriched with low-degree total-degree terms. Finally, we conduct a systematic benchmark across problems of increasing state dimension, measuring accuracy in discrete Sobolev norms, HJB residual, and closed-loop performance. 4 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+The paper is organised as follows. Section 2 formulates the optimal control prob-lem and derives the PMP-based data generation pipeline. Section 3 describes the regression framework, basis selection, partial Hessian formulation, and error metrics. Section 4 reports numerical experiments on the Van der Pol oscillator, a satellite at-titude control problem, and a PDE-constrained problem arising from the Allen–Cahn equation. 
+
+2. Optimal control, HJB equation, and PMP-based data generation. 
+
+This section establishes the analytical framework that underpins our data genera-tion pipeline. We reformulate the optimal control problem on a finite horizon and characterize the value function via the HJB equation. We then state the PMP and make precise the correspondence between the two approaches, which is the structural assumption for extracting value, gradient, and Hessian data from PMP solves. 
+
+2.1. Finite-horizon formulation and the value function. We consider the finite-horizon optimal control problem min  
+
+> u(·)∈U
+
+J(u; t, x) := 
+
+Z Tt
+
+ℓ(y(s)) + β∥u(s)∥2 ds, t ∈ [0 , T ), β > 0,(2.1) with U := L2([ t, T ]; Rm), subject to the control-affine dynamics (1.2) and initial condi-tion y(t) = x. We assume throughout that ℓ, f , and g are continuously differentiable. The value function V : [0 , T ] × Rn → R is defined as the infimum of the cost over admissible controls, (2.2) V (t, x) := inf 
+
+> u(·)∈U
+
+J(u; t, x) subject to (1.2) and y(t) = x ,
+
+encodes the optimal cost-to-go from every state x at every time t. The DPP [5, Chapter 1] implies that V is the unique viscosity solution of the HJB equation (2.3) 
+
+
+
+∂tV (t, x) + ∇xV (t, x)⊤f (x) − 14β ∥g(x)⊤∇xV (t, x)∥22 + ℓ(x) = 0 ,V (T, x) = 0 ,
+
+and the optimal feedback law is recovered from its spatial gradient as (2.4) u∗(t, x) = − 12β g(x)⊤∇xV (t, x).
+
+This feedback law is time-dependent, unlike the stationary policies targeted in Sec-tion 1. For T sufficiently large, however, V (0 , x) accurately approximates the infinite-horizon value V (x) in (1.4) [22], so the map x 7 → u∗(0 , x) provides the static feed-back law of the form (1.3) we seek. Direct numerical solution of (2.3) to obtain 
+
+V (0 , ·) is however intractable in high dimensions due to the exponential scaling of any state-space discretisation, which motivates the PMP-based data generation strategy developed next. 
+
+2.2. Pontryagin’s Maximum Principle and PMP-based data genera-tion. Our strategy is to generate labelled data for V (0 , ·) by solving the first-order optimality conditions of (2.1) via PMP, and to fit a global approximation ˜V ≈ V (0 , ·)from which the feedback law is recovered using (2.4). For the problem (2.1), define the PMP Hamiltonian (2.5) H(y, p, u) := ℓ(y) + β∥u∥22 + p⊤ f (y) + g(y)u.HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 5The PMP characterises optimal triples ( y∗(s), p∗(s), u∗(s)) via the canonical system 
+
+dds y∗(s) = ∇pH(y∗(s), p∗(s), u∗(s)) , − dds p∗(s) = ∇yH(y∗(s), p∗(s), u∗(s)) ,
+
+together with the pointwise optimality condition u∗(s) = argmin 
+
+> u
+
+H(y∗(s), p∗(s), u). Since the control enters the dynamics affinely and the control cost is quadratic, this yields explicitly (2.6) u∗(s) = − 12β g(y∗(s)) ⊤p∗(s),
+
+and the reduced Hamiltonian (2.7) H(y, p) := min  
+
+> u∈Rm
+
+H(y, p, u) = ℓ(y) + p⊤f (y) − 14β ∥g(y)⊤p∥22.
+
+Substituting (2.6)-(2.7) into the canonical equations gives the 2 n-dimensional TPBVP 
+
+
+
+dds y∗(s) = ∇pH(y∗(s), p∗(s)) , y∗(t) = x,
+
+− dds p∗(s) = ∇yH(y∗(s), p∗(s)) , p∗(T ) = 0 .
+
+(2.8) The dataset (1.6) is constructed by sampling initial conditions ( t, x) independently and solving (2.8), without enforcing the causal structure of the HJB equation. The PMP system (2.8) and the HJB equation (2.3) are linked by the method of characteristics [33]: the optimal state-adjoint system coincides with the character-istic equations of the HJB, and solving it from each initial condition x propagates information about V along the corresponding optimal trajectory. This connection is fundamental to all three levels of data extraction formalised below. 
+
+Proposition 2.1 (Zeroth- and first-order relations). Suppose V is a classical solution of (2.3) of class C1, and that the PMP system (2.8) admits a unique solution 
+
+(y∗, p∗, u∗) from initial condition y∗(t) = x. Then, for all s ∈ [t, T ]:
+
+(i) V (s, y∗(s)) = J(u∗; s, y∗(s)) , where u∗ is restricted to [s, T ],
+
+(ii) ∇xV (s, y∗(s)) = p∗(s).
+
+While Proposition 2.1 extracts values and gradients of V from the PMP solution, second-order information is accessible through the same trajectory via a matrix Riccati equation for ∇2
+
+> x
+
+V (s, y∗(s)). 
+
+Theorem 2.2 (Second-order relations [12, 11, 8]). Assume that V (s, ·) is twice Fr´ echet differentiable at y∗(s) for all s ∈ [t, T ], and that the reduced Hamiltonian 
+
+H defined in (2.7) is sufficiently smooth in a neighbourhood of {(y∗(s), p∗(s)) : s ∈
+
+[t, T ]}. Then R(s) := ∇2
+
+> x
+
+V (s, y∗(s)) satisfies the matrix Riccati equation 
+
+(2.9) 
+
+( ˙R(s) + Hpy [s] R(s) + R(s) Hyp [s] + R(s) Hpp [s] R(s) + Hyy [s] = 0 ,R(T ) = 0 ,
+
+where Hpy [s] := ∇2
+
+> py
+
+H(y∗(s), p∗(s)) , and similarly for Hyp [s], Hpp [s], Hyy [s].
+
+Identity (i) is the standard verification theorem; (ii) is the costate identification, rigor-ously established via the method of characteristics; the second-order Riccati identity (2.9) was first derived by Clarke and Vinter [12, 11] and further developed by Can-narsa, Frankowska, and collaborators [7, 8, 10, 9]. These references cover the problem 6 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+in greater generality, addressing the non-smooth case via Fr´ echet subdifferentials. Our formulation suffices for the smooth control problems considered in Section 4. 
+
+Remark 2.3 (Conjugate points). The Riccati equation (2.9) develops a finite-time singularity at conjugate points [9]. Geometrically, conjugate points mark the merging of distinct optimal trajectories and the loss of differentiability of V . In such cases, the Hessian data and the corresponding samples should be excluded from the training dataset. For the control problems considered in Section 4, the absence of conjugate points on the sampled trajectories is verified numerically by monitoring the condition number of R(t) throughout integration. 
+
+3. Second-order, data-driven approximation of the value function. This section describes the computational framework for approximating the value function from the augmented dataset (1.6) and recovering the associated feedback law. We detail the polynomial approximation architecture, the derivative-augmented regres-sion problem and its partial Hessian variant, and the error metrics used for assess-ment. For notational brevity, we fix t = 0 throughout and write V (x) := V (0 , x), 
+
+∇V (x) := ∇xV (0 , x), and ∇2V (x) := ∇2
+
+> x
+
+V (0 , x). 
+
+3.1. Data generation. A single solve of the PMP system (2.8) from initial condition xj , combined with the backward integration of the Riccati equation (2.9) along the resulting optimal trajectory, yields the triple ( V (xj ), ∇V (xj ), ∇2V (xj )) as detailed in Proposition 2.1 and Theorem 2.2. In practice, the TPBVP (2.8) is solved with a dedicated boundary value problem solver (e.g. bvp5c in Matlab ), and the Riccati equation (2.9) is integrated backward with a standard ODE solver (e.g. ode45 
+
+in Matlab ) over the same time grid. Hessian samples are discarded whenever the condition number of R(0) indicates proximity to a conjugate point. Repeating for N
+
+initial conditions {xj }Nj=1 sampled from a domain Ω ⊂ Rn assembles the augmented dataset (3.1) D = (xj , V (xj ), ∇V (xj ), ∇2V (xj )) Nj=1 .
+
+For each test, the initial conditions {xj }Nj=1 are sampled from an n-dimensional hy-perrectangle Ω ⊂ Rn using a scrambled Sobol sequence, distributing the points quasi-uniformly over Ω. The regression itself imposes no requirement on the sampling scheme. 
+
+3.2. Polynomial models for data-driven approximation. We approximate the value function ˜V : Rn → R on a bounded domain Ω ⊂ Rn by a linear combina-tion of multivariate polynomial basis functions. For Ω = ( −1, 1) n, let {ϕi}∞ 
+
+> i=0
+
+be a one-dimensional orthonormal Legendre basis 1 of L2(−1, 1). The tensor-product basis 
+
+{Φi}i∈Nn 
+
+> 0
+
+of L2(Ω) is (3.2) Φi(x) := 
+
+> n
+
+Y
+
+> j=1
+
+ϕij (xj ), i = ( i1, . . . , i n) ∈ Nn 
+
+> 0
+
+. 
+
+> 1The choice of Legendre polynomials throughout this paper is made for simplicity and is not essential: any polynomial basis, orthogonal or monomial, can be used in the regression framework. Orthonormal bases are preferable for the conditioning of the design matrix. HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES
+
+7Given a finite multi-index set I ⊂ Nn 
+
+> 0
+
+with |I| =: q < ∞, the approximation takes the form (3.3) ˜V (x) = X
+
+> i∈I
+
+θi Φi(x), θI := {θi}i∈I ∈ Rq ,
+
+from which the feedback law is recovered analytically via (2.4). The central design choice is the index set I: it must remain tractable as n grows while capturing the relevant structure of V . We consider two constructions. Total degree. For a given degree s, the multi-indices are those whose components sum to at most s:(3.4) ITD (s) = {i ∈ Nn 
+
+> 0
+
+: ∥i∥1 ≤ s}, |ITD (s)| =
+
+> s
+
+X
+
+> j=0
+
+n + j − 1
+
+j
+
+
+
+.
+
+Hyperbolic cross. The indices satisfy a product constraint, yielding sub-exponential cardinality [1]: (3.5) 
+
+IHC (s) = 
+
+n
+
+i ∈ Nn 
+
+> 0
+
+:
+
+> n
+
+Y
+
+> j=1
+
+(ij + 1) ≤ s + 1 
+
+o
+
+, |IHC (s)| ≤ min 2s34n, e 2s2+log 2 n .
+
+The hyperbolic cross is nested: increasing s adds multi-indices without removing existing ones. We adopt it as our primary index set. In practice, we enrich the hyperbolic cross with the total degree set at a low degree std :(3.6) I = IHC (s) ∪ ITD (std ).
+
+The hyperbolic cross at moderate s favours multi-indices concentrated in few dimen-sions but may miss low-order cross-terms involving several coordinates simultaneously. Such terms are essential when the value function contains genuine multivariate cou-pling of low individual degree. For instance, the monomial x1x2x3 is present in the total-degree basis with std = 3, but is excluded from the hyperbolic cross at any s < 7. Enrichment at std = 5–7 adds a polynomially-scaling number of terms via (3.4) with-out compromising the dimensional scaling of (3.5). The interaction between this enrichment and second-order augmentation is examined in Section 4. 
+
+Remark 3.1 (Domain rescaling). When Ω = Qnj=1 [−bj , b j ], each coordinate is rescaled a ˜ xj = xj /a j . Setting aj = bj maps Ω exactly onto ( −1, 1) n, but places sample points near ±1 where high-degree Legendre polynomials attain their largest values, potentially degrading the conditioning of the regression matrix. Since sample points are drawn from Ω, setting aj = bj (1 + μ) for a small margin μ > 0 maps all samples into [ −1/(1 + μ), 1/(1 + μ)] n, keeping them bounded away from ±1. 
+
+3.3. Regression with derivative-augmented data. Given the augmented dataset D from (3.1), we construct a weighted least-squares system incorporating zeroth-, first-, and second-order information. The coefficient vector θI ∈ Rq in (3.3) is determined by minimising a quadratic objective that penalises misfit in function values, gradients, and Hessians simultaneously. For each sample point xj , we introduce the abbreviations 
+
+V j := V (xj ), ∂xm V j := ∂xm V (xj ), ∂2 
+
+> xmxℓ
+
+V j := ∂2 
+
+> xmxℓ
+
+V (xj ).
+
+Since the Hessian is symmetric, we retain only the distinct second-order entries cor-responding to 1 ≤ m ≤ ℓ ≤ n. We fix an enumeration I = {i1, . . . , iq } and identify θI8 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+with the vector θ = ( θi1 , . . . θ iq )⊤ ∈ Rq . For the function values, we define V0 ∈ RN
+
+and A0 ∈ RN ×q by (3.7) V0 := 1√N
+
+ V j Nj=1 , A0 := 1√N
+
+ Φik (xj )N,q j,k =1 .
+
+For each coordinate direction m = 1 , . . . , n , the first-order blocks Vm ∈ RN and 
+
+Am ∈ RN ×q are (3.8) Vm := 1√N
+
+ ∂xm V j Nj=1 , Am := 1√N
+
+ ∂xm Φik (xj )N,q j,k =1 .
+
+Finally, for each pair 1 ≤ m ≤ ℓ ≤ n, the second-order blocks Vm,ℓ ∈ RN and 
+
+Am,ℓ ∈ RN ×q are (3.9) Vm,ℓ := 1√N
+
+ ∂2 
+
+> xmxℓ
+
+V j Nj=1 , Am,ℓ := 1√N
+
+ ∂2 
+
+> xmxℓ
+
+Φik (xj )N,q j,k =1 .
+
+The 1 /√N normalisation ensures the objective scales as an empirical mean, indepen-dently of N . Stacking these blocks with weights γ1, γ 2 ≥ 0, (3.10) ¯Aγ1,γ 2 := 
+
+
+
+A0
+
+√γ1 A1
+
+...
+
+√γ1 An
+
+√γ2 A1,1
+
+√γ2 A1,2
+
+...
+
+√γ2 An,n 
+
+
+
+, ¯Vγ1,γ 2 := 
+
+
+
+V0
+
+√γ1 V1
+
+...
+
+√γ1 Vn
+
+√γ2 V1,1
+
+√γ2 V1,2
+
+...
+
+√γ2 Vn,n 
+
+
+
+,
+
+where pairs ( m, ℓ ) follow the ordering of (3.9), the derivative-augmented regression problem reads (3.11) min 
+
+> θ∈Rq
+
+¯Aγ1,γ 2 θ − ¯Vγ1,γ 2
+
+> 22
+
+,
+
+with design matrix ¯Aγ1,γ 2 ∈ RM ×q and 
+
+M := N
+
+
+
+1 + n + n(n + 1) 2
+
+
+
+.
+
+Problem (3.11) is solved via QR factorisation. When the columns of ¯Aγ1,γ 2 are ill-conditioned, we consider the ℓ2-regularised formulation (3.12) min 
+
+> θ∈Rq
+
+¯Aγ1,γ 2 θ − ¯Vγ1,γ 2 
+
+> 22
+
++ λ∥θ∥22, λ > 0.
+
+Once θ∗ is obtained from either (3.11) or (3.12), the approximation ˜V is given by (3.3) and the feedback law is recovered via (2.4). 
+
+3.3.1. Partial use of second-order information. Each sample contributes 
+
+n(n + 1) /2 distinct second-order equations, so the second-order block dominates both the cost of data generation and the size of the regression system as n grows. We address this by subsampling the second-order equations: given a ratio ρ ∈ (0 , 1], we select a subset Jρ ⊂ { 1, . . . , N } with |J ρ| = ⌊ρN ⌋ and enforce Hessian equations only at those samples. The reduced stacked operators ¯A(ρ) 
+
+> γ1,γ 2
+
+, ¯V(ρ) 
+
+> γ1,γ 2
+
+are assembled HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 9analogously to (3.10), and problem (3.11) is solved with total equation count Mρ =
+
+N (1 + n) + ⌊ρN ⌋ n(n + 1) /2. Even moderate ρ < 1 yields a substantial reduction in both generation and regression costs. 
+
+Remark 3.2 (Directional second-order projections). An alternative strategy re-places the full Hessian by directional projections of the form v⊤∇2V (xj )v, with v
+
+sampled from the unit sphere, following the Sobolev training framework of [15]. This retains global curvature information at reduced cost per sample. We do not pursue this variant here, focusing instead on subsampling at the level of sample points. 
+
+3.4. Performance and error measurement. The generated dataset is split into a training set and an independent validation set. The training set is used to com-pute θ∗, while the validation set is used exclusively to assess approximation accuracy. When testing partial second-order formulations, the subsampling strategy is applied only during training; all validation errors are computed using the complete first- and second-order information, ensuring a consistent comparison across models. Let Ival denote the validation index set and let ˜V be the fitted approximation obtained from (3.11) or (3.12). Define the discrete Hℓ seminorm (3.13) |W |2 
+
+> ℓ, val
+
+:= X
+
+> j∈I val
+
+X
+
+> |α|=ℓ
+
+DαW (xj ) 2, ℓ = 0 , 1, 2,
+
+where the inner sum runs over all multi-indices α ∈ Nn 
+
+> 0
+
+with |α| = ℓ. The relative discrete Sobolev errors are (3.14) Err Hℓ ( ˜V ) := | ˜V − V |ℓ, val 
+
+|V |ℓ, val 
+
+, ℓ = 0 , 1, 2,
+
+providing complementary information: ℓ = 0 quantifies global value approximation, 
+
+ℓ = 1 reflects gradient accuracy and is directly related to feedback quality, and ℓ = 2 measures curvature consistency. We complement the Sobolev errors with two metrics that assess approximation quality more directly in terms of the control problem. The first is a PDE-based metric. For each validation point xj ∈ I val , the pointwise HJB residual is (3.15) r(xj ) := ∂tV (0 , xj ) + ℓ(xj ) + ∇ ˜V (xj )⊤f (xj ) − 14β ∥g(xj )⊤∇ ˜V (xj )∥22,
+
+where ∂tV (0 , xj ) is recovered by rearranging (2.3) and substituting the exact values and gradient data available from D. The advection and control terms in (3.15) are evaluated using the approximate gradient ∇ ˜V , so the residual measures the extent to which ˜V fails to satisfy the HJB equation. Writing ℓj := ℓ(xj ), f j := f (xj ), 
+
+gj := g(xj ), V jt := ∂tV (0 , xj ), and ∇V j := ∇V (xj ), the relative HJB residual is (3.16) HJB rel ( ˜V ) := 1
+
+|I val |
+
+X
+
+> j∈I val
+
+|r(xj )||V jt | + |ℓj | + |(∇V j )⊤f j | + 14β ∥(gj )⊤∇V j ∥22
+
+.
+
+The denominator normalises term by term using exact data from D, yielding a scale-invariant measure that is not corrupted by approximation error in ˜V .The second metric quantifies the control error directly. The pointwise relative discrepancy between the approximate feedback (2.4) applied to ˜V and the optimal 10 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+control is (3.17) ectrl (xj ) := ∥˜u(xj ) − u∗(xj )∥2
+
+∥u∗(xj )∥2
+
+.
+
+This quantity is uninformative near points where u∗(xj ) ≈ 0; in the numerical ex-periments we therefore report spatial statistics of ectrl restricted to the subset of the validation set where ∥u∗(xj )∥2 exceeds a prescribed threshold. 
+
+4. Numerical experiments. We first assess the proposed method on an an-alytical benchmark, where exact values, gradients, and Hessians are available in closed form, and then on three optimal control problems in dimensions n = 2, 6, and 19, with training datasets generated by the PMP–Riccati pipeline. Each experiment compares the zeroth-, first-, second-, and partial second-order formu-lations, and states the sample budget in each subsection. All experiments were performed in MATLAB R2025a on an ASUS laptop with a 24-core Intel Core i9-14900HX CPU (2.2 GHz base) and 64 GB of RAM, running Windows 11. The code reproducing the Hessian-augmented regression in all our tests is available at https://github.com/mgomezaedo/HJB-Hessian-Learning. 
+
+4.1. Analytical benchmark. To isolate the approximation properties of the regression framework from the PMP–Riccati data-generation approach, we consider the function (4.1) fAS (y) = 
+
+> n
+
+Y
+
+> j=1
+
+n/ 4
+
+n/ 4 + ( yj − aj )2 , aj = (−1) j
+
+j + 1 ,
+
+on [ −1, 1] n, previously used in [2] to benchmark gradient-augmented polynomial ap-proximation. We extend that comparison to second-order augmentation. We fix 
+
+n = 12. The basis is IHC (4), giving q = 3 ,482 Legendre polynomials, with the do-main extended to [ −1.15 , 1.15] 12 following Remark 3.1. Ridge regression is used with 
+
+λ = 10 −8 and γ1 = γ2 = 1; training points are drawn from a scrambled Sobol se-quence, and errors are averaged over 10 independent training sets on a fixed validation set of 500 points. Figure 2 illustrates the sample complexity gains from derivative augmentation. Each training point contributes 1, 13, or 91 equations to the zeroth-, first-, and second-order systems respectively. Second-order augmentation achieves L2 error below 7% at N = 50, a level first-order regression does not reach until N ≈ 350; zeroth-order regression remains above 80% throughout. Even ρ = 0 .3 consistently outperforms first-order regression across all metrics. The H2 error reveals a persistent gap: without explicit Hessian data, curvature accuracy does not improve with N . We report that enriching the basis to IHC (4) ∪ ITD (6) ( q = 18 ,948) further illustrates this: at N =700, second-order augmentation reaches 0 .74% L2 error, below the 1 .5% floor of the smaller basis, while first-order regression on the same basis stalls at 35% with an underdetermined system. We now turn to finite-horizon optimal control problems of the form (2.1), with datasets generated as described in Section 3.1. 
+
+4.2. 2-dimensional Van der Pol oscillator. We consider the finite-horizon optimal control problem associated with the two-dimensional Van der Pol oscillator, (4.2) min  
+
+> u∈L2([0 ,T ]; R)
+
+Z T
+
+> 0
+
+y21 (t) + y22 (t) + β u 2(t) dt, HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 11 
+
+Fig. 2: Relative L2, H1, and H2 errors for the approximation of the 12-dimensional test (4.1) as a function of N , using IHC (4) with q = 3 ,482. Zeroth-, first-, and second-order regressions are compared, with partial Hessian fractions ρ ∈ { 0.3, 0.5, 0.8, 1.0}.Curves are averaged over 10 independent training sets. Note that each panel reports a different error metric, identified by the subscript of Err, and that the ordinate scales differ accordingly across panels. subject to (4.3) 
+
+ ∂ty1(t) = y2(t), y1(0) = x1,∂ty2(t) = −y1(t) + y2(t) 1 − y21 (t) + u(t), y2(0) = x2.
+
+The associated adjoint variables p = ( p1, p 2) satisfy (4.4) 
+
+ ∂tp1(t) =  1 + 2 y1(t)y2(t)p2(t) − 2y1(t), p1(T ) = 0 ,∂tp2(t) = −p1(t) −  1 − y21 (t)p2(t) − 2y2(t), p2(T ) = 0 ,
+
+and the optimal control is u∗(t) = − 12β p2(t). The time-dependent coefficient matrices in the Riccati equation (2.9) are given by (4.5) 
+
+Hpy =
+
+ 0 1
+
+−2y1y2 − 1 1 − y21
+
+
+
+, Hyp =
+
+0 −2y1y2 − 11 1 − y21
+
+
+
+,
+
+Hpp =
+
+0 00 − 12β
+
+
+
+, Hyy =
+
+2 − 2y2p2 −2y1p2
+
+−2y1p2 2
+
+
+
+,
+
+with ∇2V (x) = R(0). To enable a direct comparison with Test 1 in [4], we fix T = 3 and β = 0 .1, and sample initial conditions uniformly from Ω = [ −3, 3] 2. The approximation space is built from the hyperbolic-cross Legendre basis IHC (4) ( q = 52), optionally enriched with total-degree terms ITD (std ) as in (3.6), yielding cardinalities up to q = 153. Basis functions are rescaled to [ −3.45 , 3.45] 2.Figure 3 illustrates qualitatively the effect of derivative augmentation at N = 25: zeroth-order regression produces a surface with pronounced oscillations, while second-order augmentation already yields a smooth, accurate reconstruction at the same sample count. Figure 4 reports validation errors as functions of N for the enriched basis IHC (4) ∪
+
+ITD (10) ( q = 78), averaged over 100 Monte Carlo realisations. Panel (a) uses standard least-squares; panel (b) adds ridge regularisation with λ = 10 −10 , which removes instabilities in the underdetermined regime without affecting asymptotic accuracy. 12 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH   
+
+> (i) Zeroth-order (ii) First-order (iii) Second-order
+
+Fig. 3: Polynomial approximation of the value function for the 2D Van der Pol prob-lem with N = 25 training samples (red dots) under zeroth-, first-, and second-order augmentation. Second-order augmentation achieves the lowest errors across all four metrics at small to moderate N , with the H2 gap persisting throughout regardless of sample size.  
+
+> (a) Least-squares regression
+> (b) Ridge regression ( λ= 10 −10 )
+
+Fig. 4: Relative validation errors as functions of N for the enriched basis IHC (4) ∪
+
+ITD (10) ( q = 78), averaged over 100 Monte Carlo realisations. Weights γ1 = γ2 = 1. Note that each panel reports a different error metric, identified by the subscript of Err, and that the ordinate scales differ accordingly across panels. Figure 5 examines closed-loop performance at N = 15, using the enriched basis 
+
+IHC (4) ∪ ITD (8) ( q = 61), ridge regularisation with λ = 10 −10 , and a single random training set. At this sample size, zeroth- and first-order feedbacks fail to stabilise the system for both initial conditions shown; second-order augmentation is the only formulation that produces trajectories closely tracking the PMP-optimal reference. HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 13 
+
+Fig. 5: Closed-loop trajectories for N = 15 training samples. Each row corresponds to an initial condition x0 ∈ { (2 , −1) , (2 , 1) }. Left: phase portrait. Centre: state norm 
+
+∥y(t)∥2. Right: control signal u(t), clipped to [ −25 , 25]. We next study how approximation quality depends jointly on basis dimension and derivative order. Fixing N , we vary std ∈ { 7, . . . , 16 } in IHC (4) ∪ ITD (std ), giving 
+
+q ∈ [56 , 153], and include IHC (4) ( q = 52) as a reference. Results are averaged over 100 Monte Carlo realisations and include partial Hessian formulations with ρ ∈ { 0.3, 0.5}.Figure 6 shows the expected U-shaped behaviour in q for each ( N, Order) pair: errors decrease as the basis grows richer, then increase as the system loses overdetermi-nation. The minimum shifts towards larger q with derivative order, since higher-order augmentation maintains a well-conditioned system on more expressive bases, yield-ing lower approximation floors. Partial Hessian formulations interpolate smoothly between first- and second-order curves, with ρ = 0 .3 already providing a visible im-provement over first-order regression across all metrics. A practical design question is the minimum N required to guarantee a prescribed tolerance τ on the relative control error. For each configuration ( N, I, Order) we per-form NMC = 100 independent Monte Carlo realisations. Each yields an approximate feedback law whose performance is summarised by the spatial 95th percentile of the pointwise control error (3.17) over the active domain Iact = {j ∈ I val : ∥u∗(xj )∥2 ≥
+
+0.1} (99 .4% of validation points): (4.6) P (i) := p 95 
+
+e(i)ctrl (xj ) j∈I act 
+
+
+
+, i = 1 , . . . , N MC .
+
+The design criterion requires both the mean and median of {P (i)}NMC  
+
+> i=1
+
+to lie below τ :(4.7) 1
+
+NMC 
+
+> NMC
+
+X
+
+> i=1
+
+P (i) ≤ τ and median 
+
+
+
+P (1) , . . . , P (NMC )
+
+≤ τ, 
+
+ensuring that a representative realisation meets the tolerance while preventing outliers from being concealed in the average. For each derivative order we search over bases 
+
+IHC (4) ∪ ITD (std ) with std ∈ { 7, . . . , 16 } and record the minimum N satisfying (4.7). 14 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+Fig. 6: Relative approximation errors as a function of basis cardinality q, for four values of N and three error metrics. The total number of equations M is indicated in each legend. Partial second-order formulations with ρ ∈ { 0.3, 0.5} are included. Each point is the mean over 100 Monte Carlo realisations; λ = 10 −10 , γ1 = γ2 = 1. Note that each column reports a different error metric, identified by the subscript of Err, and that the ordinate scales differ accordingly across panels. Table 1 reports the outcome: second-order augmentation consistently requires the fewest samples, with the ratio NO0 /N O2 growing from 3 .5 at τ = 10% to 11 .7 at 
+
+τ = 0 .1%. 
+
+τ NO2 NO1 NO0 NO1  
+
+> NO2
+> NO0
+> NO2
+
+Basis O2 Basis O1 Basis O0 10% 29 48 102 1.7 3.5 IHC (4) ∪ITD (8) IHC (4) ∪ITD (10) IHC (4) ∪ITD (8) 5% 38 61 138 1.6 3.6 IHC (4) ∪ITD (8) IHC (4) ∪ITD (10) IHC (4) ∪ITD (8) 1% 80 109 277 1.4 3.5 IHC (4) ∪ITD (14) IHC (4) ∪ITD (12) IHC (4) ∪ITD (12) 0.5% 87 134 372 1.5 4.3 IHC (4) ∪ITD (14) IHC (4) ∪ITD (12) IHC (4) ∪ITD (12) 0.1% 144 208 1689 1.4 11 .7 IHC (4) ∪ITD (14) IHC (4) ∪ITD (14) IHC (4) ∪ITD (14) 
+
+Table 1: Minimum number of training samples required by each derivative order to satisfy the control tolerance τ under criterion (4.7), with basis selected independently per order to minimise N . The ratios NO1 /N O2 and NO0 /N O2 quantify the data savings provided by second-order augmentation. Table 2 fixes N at the second-order minimum and reports the best performance HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 15 attainable by lower-order formulations at that same budget, with basis selected inde-pendently per order. For zeroth-order, bases with q ≤ N are preferred; when none exists in the family, the smallest available q is used and the entry is marked with an asterisk. Second-order augmentation is the only formulation satisfying (4.7) at every tolerance; the ratios Mk/q explain the mechanism: only second-order augmentation maintains a well-determined system on a sufficiently expressive basis. In a typical realisation the spatial p 95 is 2–4 times smaller than the mean reported here, so the design criterion is conservative.                                                                                                                                                                                                                 
+
+> τNOrder Basis qMM0
+> qM1
+> qM2
+> qMqp95 max 10% 29 Order 2 IHC (4) ∪ITD (8) 61 174 0.51.01.42.99.7×10 −21.2×10 1
+> Order 1 IHC (4) ∪ITD (8) 61 87 0.51.0—1.43.9×10 −14.0×10 1
+> Order 0 ∗IHC (4) 52 29 0.6——0.61.7×10 12.6×10 2
+> 5% 38 Order 2 IHC (4) ∪ITD (8) 61 228 0.61.21.93.74.8×10 −23.8×10 0
+> Order 1 IHC (4) ∪ITD (8) 61 114 0.61.2—1.92.0×10 −12.2×10 1
+> Order 0 ∗IHC (4) 52 38 0.7——0.78.6×10 02.2×10 2
+> 1% 80 Order 2 IHC (4) ∪ITD (14) 124 480 0.61.31.93.98.1×10 −35.3×10 −1
+> Order 1 IHC (4) ∪ITD (10) 78 240 1.02.1—3.12.2×10 −29.3×10 −1
+> Order 0 IHC (4) ∪ITD (8) 61 80 1.3——1.32.4×10 −12.1×10 1
+> 0.5% 87 Order 2 IHC (4) ∪ITD (14) 124 522 0.71.42.14.24.4×10 −32.2×10 −1
+> Order 1 IHC (4) ∪ITD (10) 78 261 1.12.2—3.32.4×10 −21.4×10 0
+> Order 0 IHC (4) ∪ITD (8) 61 87 1.4——1.41.7×10 −11.7×10 1
+> 0.1% 144 Order 2 IHC (4) ∪ITD (14) 124 864 1.22.33.57.09.9×10 −43.0×10 −2
+> Order 1 IHC (4) ∪ITD (12) 99 432 1.52.9—4.44.2×10 −31.4×10 −1
+> Order 0 IHC (4) ∪ITD (8) 61 144 2.4——2.44.6×10 −25.4×10 0
+
+Table 2: Best performance attainable by each derivative order at the minimum N
+
+required by second-order augmentation to satisfy (4.7). Basis selected independently per order to minimise p 95 of the mean control error. Asterisk: q > N . The ratios 
+
+Mk/q give equations per unknown at each derivative order; M/q is the overall overde-termination ratio. 
+
+Remark 4.1 (Computational cost). The offline stage, which includes solving the BVP (4.3)–(4.4) together with the Riccati equation (2.9) for each sampled initial condition, takes a median of 93 ms per sample on the hardware described above, so a full training set is generated in seconds to a few minutes for the regimes considered here. Online evaluation of ˜V , ∇ ˜V , and ∇2 ˜V requires only basis-function evaluations and dot products of length q, taking 0 .5–1 ms across the basis sizes considered. 
+
+4.3. 6-dimensional rigid body model of a satellite. We consider a six-state rigid body model of a satellite studied in [29]. Here, y = ( y1, . . . , y 6)⊤ ∈ R6
+
+is decomposed into attitude angles yr = ( y1, y 2, y 3)⊤ and angular velocity yω =(y4, y 5, y 6)⊤, with torque input u ∈ R3. The optimal control problem is (4.8) min  
+
+> u∈L2([0 ,T ]; R3)
+
+Z T
+
+> 0
+
+α1∥yr ∥22 + α2∥yω ∥22 + β∥u∥22 dt + α3∥y(T )∥22,
+
+subject to (4.9) 
+
+(
+
+∂tyr = E(yr )yω ,∂tyω = JS (yω )R(yr )h + JBu , y(0) = x,16 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+where α1, α 2, α 3, β > 0 and 
+
+E(yr ) := 
+
+
+
+1 sin y1 tan y2 cos y1 tan y2
+
+0 cos y1 − sin y1
+
+0 sin y1/ cos y2 cos y1/ cos y2
+
+ , S(yω ) := 
+
+
+
+0 y6 −y5
+
+−y6 0 y4
+
+y5 −y4 0
+
+ ,
+
+R(yr ) := 
+
+
+
+cos y2 cos y3 cos y2 sin y3 − sin y2
+
+sin y1 sin y2 cos y3 − cos y1 sin y3 sin y1 sin y2 sin y3 + cos y1 cos y3 cos y2 sin y1
+
+cos y1 sin y2 cos y3 + sin y1 sin y3 cos y1 sin y2 sin y3 − sin y1 cos y3 cos y2 cos y1
+
+,
+
+J := 
+
+ 
+
+> 12
+
+0 00 13 00 0 14
+
+ , h := 
+
+
+
+111
+
+ , B := 
+
+
+
+1 120 110 115 1 110 110 115 1
+
+ .
+
+The terminal cost yields the boundary condition p(T ) = 2 α3 y(T ), and the station-arity condition gives u∗(t) = − 12β B⊤J⊤(p4(t), p 5(t), p 6(t)) ⊤; the full adjoint system is omitted for brevity. We follow the parameter setting of [29]: α1 = 12 , α2 = 5, α3 = 12 , β = 14 ,
+
+T = 20. Initial conditions are sampled from Ω = [ −π/ 3, π/ 3] 3 × [−π/ 4, π/ 4] 3 using a scrambled Sobol sequence. The TPBVP (2.8) is solved with bvp5c (AbsTol = 10 −8,RelTol = 10 −7). Bases are of the enriched form (3.6) with μ = 0 .15, λ = 10 −8, and 
+
+γ1 = γ2 = 1. A fixed validation set of 500 points is used; errors are averaged over 50 Monte Carlo realisations. 
+
+Fig. 7: Relative L2, H1, H2 errors and HJB residual for the 6D satellite problem as a function of N , for bases IHC (4) ∪ ITD (5) ( q = 663, top row) and IHC (4) ∪ ITD (7) (q = 1 ,800, bottom row). Hessian fractions ρ ∈ { 0.3, 0.5, 0.8, 1.0} included for second-order regression. Curves averaged over 50 Monte Carlo realisations. Note that each panel reports a different error metric, identified by the subscript of Err (or the HJB residual), and that the ordinate scales differ accordingly across panels. Figure 7 illustrates two qualitatively distinct regimes. On the moderate basis ( q =663, top row), all formulations are feasible from small N ; second-order augmentation HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 17 reaches Err L2 ≈ 10 −2 near N = 60, while first-order regression requires N ≈ 100 to match the same accuracy. On the enriched basis ( q = 1 ,800, bottom row), the first-order system remains underdetermined ( M/q < 1) for N ≲ 250, keeping Err L2 above 10 −1 throughout that range; second-order augmentation, contributing 28 N equations, reaches a well-determined regime at N = 100 and achieves Err L2 = 3 .9 × 10 −3
+
+at N = 200. As in previous experiments, partial Hessian formulations interpolate smoothly between the first- and second-order curves, with ρ = 0 .3 already providing a visible improvement. To examine how far the basis dimension can be pushed with full second-order regression, we sweep IHC (4) ∪ ITD (s) for s ∈ { 5, . . . , 11 } (q from 663 to 12 ,406), restricting to N ≥ q/ 28 to maintain a determined system, and select for each N the basis minimising Err L2 averaged over 30 Monte Carlo realisations.                                                                                                                                                            
+
+> NBest basis qM/q Err L2Err H1Err H2HJB rel
+> 50 IHC (4) ∪ITD (5) 663 2.11.64 ×10 −21.06 ×10 −11.24 4.19 ×10 −2
+> 100 IHC (4) ∪ITD (6) 1,044 2.77.40 ×10 −32.79 ×10 −28.70 ×10 −29.06 ×10 −3
+> 200 IHC (4) ∪ITD (7) 1,800 3.13.90 ×10 −31.67 ×10 −24.82 ×10 −25.34 ×10 −3
+> 300 IHC (4) ∪ITD (7) 1,800 4.72.70 ×10 −31.24 ×10 −23.81 ×10 −23.80 ×10 −3
+> 400 IHC (4) ∪ITD (8) 3,051 3.72.15 ×10 −31.06 ×10 −23.49 ×10 −23.10 ×10 −3
+> 500 IHC (4) ∪ITD (9) 5,047 2.81.74 ×10 −31.00 ×10 −23.76 ×10 −22.96 ×10 −3
+> 700 IHC (4) ∪ITD (9) 5,047 3.91.32 ×10 −37.22 ×10 −32.79 ×10 −22.03 ×10 −3
+> 1000 IHC (4) ∪ITD (10) 8,044 3.59.10 ×10 −45.61 ×10 −32.47 ×10 −21.54 ×10 −3
+> 1500 IHC (4) ∪ITD (11) 12 ,406 3.46.31 ×10 −44.35 ×10 −32.17 ×10 −21.14 ×10 −3
+> 1800 IHC (4) ∪ITD (11) 12 ,406 4.15.07 ×10 −43.49 ×10 −31.81 ×10 −29.43 ×10 −4
+
+Table 3: Best basis of the form IHC (4) ∪ ITD (s) for each N , selected to minimise 
+
+Err L2 over s ∈ { 5, . . . , 11 }. The ratio M/q = 28 N/q measures the degree of overde-termination. All errors averaged over 30 Monte Carlo realisations. The optimal overdetermination ratio M/q lies consistently in the range 3–5, con-firming that second-order augmentation supports increasingly expressive bases as N
+
+grows. At the largest configuration ( N = 1 ,800, q = 12 ,406), lower-order regressions are not viable: the first-order system has M/q ≈ 1.02 and the zeroth-order system 
+
+M/q ≈ 0.15, both effectively rank-deficient at this basis size. 
+
+Remark 4.2. The Err H2 values in Table 3 remain an order of magnitude above the other metrics. This is expected: the Hessian block acts primarily as a regulariser that transfers second-order information to the coefficient vector θ, improving ˜V , ∇ ˜V ,and the feedback law (2.4); driving Err H2 to zero would overfit curvature at the expense of the metrics most relevant for control. At N = 70 with basis IHC (4) ( q = 537), the zeroth- and first-order systems are underdetermined ( M/q ≈ 0.13 and 0 .91 respectively), while partial second-order regression with ρ = 0 .5 yields M/q ≈ 2.3, sufficient to recover a stabilising feedback. Figure 8 shows closed-loop trajectories from two initial conditions inside Ω; both reach the origin well within the horizon T = 20. 
+
+4.4. 19-dimensional controlled Allen–Cahn equation. We consider a PDE-constrained optimal control problem for the Allen–Cahn equation on Γ = ( −1, 1): (4.10) min  
+
+> u∈L2([0 ,T ]; Rm)
+
+Z T
+
+> 0
+
+∥y(·, t )∥2 
+
+> L2(Γ)
+
++ β∥u(t)∥22 dt, 18 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+Fig. 8: Closed-loop trajectories for the 6D satellite using partial Hessian regression (ρ = 0 .5, N = 70, IHC (4), q = 537), from IC 1 = (0 .5, 0.2, −0.3, 0.1, −0.1, 0.1) (top) and IC 2 = ( −0.6, 0.2, −0.2, −0.1, 0.1, −0.2) (bottom). Solid lines: closed-loop feed-back from the regressed value function; dash-dot lines: open-loop optimum for horizon T (Pontryagin BVP). subject to (4.11) 
+
+
+
+∂ty − ν∂ 2
+
+> x
+
+y − y(1 − y2) = 
+
+> m
+
+X
+
+> i=1
+
+ui(t)1ωi (x) in Γ × (0 , T ),∂xy(±1, t ) = 0 in (0 , T ),y(x, 0) = ˜ y0(x) in Γ .
+
+We discretise in space on a uniform grid of M − 1 interior nodes with spacing ∆ x =2/M , denoting by ¯ y(t) ∈ RM −1 the nodal values. The discretised problem is (4.12) min  
+
+> u∈L2([0 ,T ]; Rm)
+
+Z T
+
+> 0
+
+¯y(t)⊤QM ¯y(t) + β∥u(t)∥22 dt, 
+
+subject to (4.13) 
+
+(
+
+∂t ¯y = AM ¯y − ¯y ⊙ ¯y ⊙ ¯y + BM u,
+
+¯yi(0) = ˜ y0(xi), i = 1 , . . . , M − 1,
+
+where x := (˜ y0(x1), . . . , ˜y0(xM −1)) ∈ Ω ⊂ RM −1 is the initial condition and 
+
+AM := ν
+
+∆x2
+
+ tridiag(1 , −2, 1) + e1e⊤ 
+
+> 1
+
++ eM −1e⊤ 
+
+> M−1
+
+ + IM −1,BM :=  1ω1 (¯ x) · · · 1ωm (¯ x), QM := ∆ x I M −1.
+
+The rank-one corrections in AM encode the Neumann boundary conditions. The PMP adjoint system is (4.14) 
+
+(
+
+∂tp = − AM − 3 diag(¯ y ⊙ ¯y)⊤p − 2QM ¯y, p(T ) = 0 ,HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 19 with optimal control u∗ = −(2 β)−1B⊤ 
+
+> M
+
+p. The Riccati coefficient matrices (2.9) are (4.15) 
+
+Hpy = AM − 3 diag(¯ y ⊙ ¯y), Hyp = AM − 3 diag(¯ y ⊙ ¯y),
+
+Hpp = − 12β BM B⊤ 
+
+> M
+
+, Hyy = −6 diag( p ⊙ ¯y) + 2∆ x I M −1.
+
+We set M = 20, giving n = 19, and fix m = 3, T = 4, ν = 0 .1, β = 0 .01, with actuator supports ω1 = ( −0.7, −0.4), ω2 = ( −0.2, 0.2), ω3 = (0 .4, 0.7). The value function is approximated on Ω = [ −1, 1] 19 using IHC (4) with q = 14 ,213 Legendre basis functions, ridge regularisation λ = 10 −10 , and weights γ1 = 1 .0, γ2 = 0 .3. Each sample now contributes 210 equations to the second-order system against 20 to the first-order one; the zeroth-order system, at one equation per sample, is severely underdetermined throughout and is omitted. Errors are averaged over 5 Monte Carlo realisations. 
+
+Fig. 9: Relative validation errors for the 19-dimensional Allen–Cahn system on Ω = [−1, 1] 19 as a function of N . First-order regression and second-order regression with 
+
+ρ ∈ { 0.5, 1.0} are compared, averaged over 5 Monte Carlo realisations. Basis IHC (4), 
+
+q = 14 ,213, λ = 10 −10 . Note that each panel reports a different error metric, identified by the subscript of Err, and that the ordinate scales differ accordingly across panels. Figure 9 shows that the n(n+1) /2 = 190 additional equations per sample provided by the Hessian block are decisive in this regime. At N = 200, first-order regression yields Err L2 = 8 .3 × 10 −1, nearly two orders of magnitude above the second-order result of 1 .0 × 10 −2; the second-order system is already well-determined ( M/q ≈
+
+3) while the first-order system remains underdetermined. As N grows, the first-order curves approach the second-order ones in Err L2 , Err H1 , and HJB rel , but require substantially larger budgets to do so. The partial Hessian configuration ρ = 0 .5matches the full second-order formulation to within 3% at N = 3000, halving the size of the second-order block at negligible accuracy cost. What distinguishes the n = 19 regime from lower dimensions is that second-order augmentation is no longer merely the most accurate option: at any computationally accessible training budget, it is the only formulation that brings the regression system into an overdetermined regime on a basis expressive enough to approximate V . The 
+
+n(n + 1) /2 amplification of equations per sample thus shifts from being an accuracy advantage to being a structural necessity against the curse of dimensionality. 
+
+Concluding remarks. We have proposed a data-driven methodology for value-function and feedback-law approximation in deterministic optimal control problems governed by Hamilton–Jacobi–Bellman equations. The approach exploits the link between the Pontryagin Maximum Principle and dynamic programming to generate augmented datasets containing values, gradients, and Hessians of the value function 20 G ´OMEZ-AEDO, AZMI, HUANG, KALISE, AND KUNISCH 
+
+along optimal trajectories, processed via sparse polynomial regression with hyperbolic cross bases and ridge regularisation. The numerical experiments highlight the distinctive role of second-order infor-mation. Beyond refining lower-order regression, Hessian augmentation populates ap-proximation spaces unreachable to lower-order formulations at a given training bud-get, with equation-count gains scaling as ∼ n/ 2 over first-order and ∼ n2/2 over zeroth-order data. This advantage sharpens with dimension: in the 19D Allen–Cahn setting, where lower-order systems remain underdetermined at moderate N , second-order augmentation was the only formulation producing a meaningful approximation. The most accurate results arose at moderate overdetermination of the second-order system, a balance that becomes increasingly accessible as n grows precisely because of the n(n + 1) /2 amplification factor. The method is causality-free and exposes every ingredient as a design variable: sampling, basis, weights, and regularisation. The dominant offline cost is dataset generation; online feedback evaluation is linear in q with no automatic differentiation required. Three natural extensions suggest themselves: a theoretical analysis of conver-gence rates and sample complexity for second-order augmented regression; adaptive strategies for the partial Hessian formulation by selecting samples by local geometry of the value function rather than uniformly; and extensions to stochastic and mean-field control problems, where second-order structure is intrinsic to the associated HJB equations. 
+
+Acknowledgments. This material is based upon work supported by the Air Force Office of Scientific Research under award number FA8655-26-1-B011. 
+
+REFERENCES [1] B. Adcock, S. Brugiapaglia, and C. G. Webster, Sparse Polynomial Approximation of High-Dimensional Functions , Comput. Sci. Eng., SIAM, Philadelphia, PA, 2022. [2] B. Adcock and Y. Sui, Compressive Hermite interpolation: Sparse, high-dimensional approx-imation from gradient-augmented measurements , Constr. Approx., 50(1):167–207, 2019. [3] G. Albi, S. Bicego, and D. Kalise, Gradient-augmented supervised learning of optimal feedback laws using state-dependent Riccati equations , IEEE Control Syst. Lett., 6:836–841, 2022. [4] B. Azmi, D. Kalise, and K. Kunisch, Optimal feedback law recovery by gradient-augmented sparse polynomial regression , J. Mach. Learn. Res., 22(48):1–32, 2021. [5] M. Bardi and I. Capuzzo-Dolcetta, Optimal Control and Viscosity Solutions of Hamilton– Jacobi–Bellman Equations , Systems Control Found. Appl., Birkh¨ auser, Boston, MA, 1997. [6] T. Breiten, K. Kunisch, and J. Schr¨ oder, Numerical realization of the Mortensen observer via a Hessian-augmented polynomial approximation of the value function , SIAM J. Sci. Comput., 47(1), 2025. [7] P. Cannarsa and H. Frankowska, From pointwise to local regularity for solutions of Hamilton– Jacobi equations , Calc. Var. Partial Differ. Equ., 49(3):1061–1074, 2014. [8] P. Cannarsa, H. Frankowska, and T. Scarinci, Second-order sensitivity relations and regularity of the value function for Mayer’s problem in optimal control , SIAM J. Control Optim., 53(6):3642–3672, 2015. [9] N. Caroff and H. Frankowska, Conjugate points and shocks in nonlinear optimal control ,Trans. Amer. Math. Soc., 348:3133–3153, 1996. [10] N. Caroff and H. Frankowska, Optimality and characteristics of Hamilton–Jacobi–Bellman equations , in Optim., Optim. Control Partial Differ. Equ., Internat. Ser. Numer. Math. 107, pp. 169–180, Birkh¨ auser, Basel, 1992. [11] F. H. Clarke and R. B. Vinter, Local optimality conditions and Lipschitzian solutions to the Hamilton–Jacobi equation , SIAM J. Control Optim., 21:856–870, 1983. [12] F. H. Clarke and R. B. Vinter, The relationship between the maximum principle and dynamic programming , SIAM J. Control Optim., 25(5):1291–1311, 1987. HESSIAN-AUGMENTED SUPERVISED LEARNING FOR HJB PDES 21 
+
+[13] N. A. Corbin and B. Kramer, Scalable computation of H∞ energy functions for polynomial control-affine systems , IEEE Trans. Autom. Control, 70(5):3088–3100, 2025. [14] N. A. Corbin and B. Kramer, Computing solutions to the polynomial-polynomial regulator problem , in Proc. 63rd IEEE Conf. Decis. Control , pp. 3073–3078, 2024. [15] W. M. Czarnecki, S. Osindero, M. Jaderberg, G. Swirszcz, and R. Pascanu, Sobolev training for neural networks , Adv. Neural Inf. Process. Syst., vol. 30, 2017. [16] J. Darbon and S. Osher, Algorithms for overcoming the curse of dimensionality for certain Hamilton–Jacobi equations arising in control theory and elsewhere , Res. Math. Sci., 3:19, 2016. [17] S. Dolgov, D. Kalise, and K. Kunisch, Tensor decomposition methods for high-dimensional Hamilton–Jacobi–Bellman equations , SIAM J. Sci. Comput., 43(3):A1625–A1650, 2021. [18] S. Dolgov, D. Kalise, and L. Saluzzi, Data-driven tensor train gradient cross approximation for Hamilton–Jacobi–Bellman equations , SIAM J. Sci. Comput., 45(5):A2153–A2184, 2023. [19] T. Ehring, B. Azmi, and B. Haasdonk, Recovery of the optimal control value function in reproducing kernel Hilbert spaces from verification conditions , arXiv:2512.07477, 2025. [20] T. Ehring and B. Haasdonk, Hermite kernel surrogates for the value function of high-dimensional nonlinear optimal control problems , Adv. Comput. Math., 50(3):36, 2024. [21] C. Esteve-Yag¨ ue, R. Tsai, and A. Massucco, Finite-difference least square methods for solving Hamilton–Jacobi equations using neural networks , arXiv:2406.10758, 2024. [22] L. Gr¨ une and A. Rantzer, On the infinite horizon performance of receding horizon controllers ,IEEE Trans. Autom. Control, 53(9):2100–2111, 2008. [23] J. Han, A. Jentzen, and W. E, Solving high-dimensional partial differential equations using deep learning , Proc. Natl. Acad. Sci. USA, 115(34):8505–8510, 2018. [24] D. Kalise and K. Kunisch, Polynomial approximation of high-dimensional Hamilton–Jacobi– Bellman equations and applications to feedback control of semilinear parabolic PDEs ,SIAM J. Sci. Comput., 40(2):A629–A652, 2018. [25] W. Kang and L. C. Wilcox, A causality free computational method for HJB equations with application to rigid body satellites , in AIAA Guid. Navig. Control Conf. , pp. 1–10, 2015. [26] W. Kang and L. C. Wilcox, Mitigating the curse of dimensionality: Sparse grid characteristics method for optimal feedback control and HJB equations , Comput. Optim. Appl., 68:289– 315, 2017. [27] K. Kunisch and D. Walter, Semiglobal optimal feedback stabilization of autonomous systems via deep neural network approximation , ESAIM Control Optim. Calc. Var., 27:16, 2021. [28] T. Meng, Z. Zhang, J. Darbon, and G. Karniadakis, SympOCnet: Solving optimal control problems with applications to high-dimensional multiagent path planning problems , SIAM J. Sci. Comput., 44(6):B1341–B1368, 2022. [29] T. Nakamura-Zimmerer, Q. Gong, and W. Kang, Adaptive deep learning for high-dimensional Hamilton–Jacobi–Bellman equations , SIAM J. Sci. Comput., 43(2):A1221–A1247, 2021. [30] L. S. Pontryagin, V. G. Boltyanskii, R. V. Gamkrelidze, and E. F. Mishchenko, The Mathe-matical Theory of Optimal Processes , Interscience, Wiley, New York, 1962. [31] J. Sirignano and K. Spiliopoulos, DGM: A deep learning algorithm for solving partial differ-ential equations , J. Comput. Phys., 375:1339–1364, 2018. [32] M. Sperl, L. Saluzzi, D. Kalise, and L. Gr¨ une, Separable approximations of optimal value functions and their representation by neural networks , arXiv:2502.08559, 2025. [33] N. N. Subbotina, The method of characteristics for Hamilton–Jacobi equations and applica-tions to dynamical optimization , J. Math. Sci., 135:2955–3091, 2006. [34] I. Yegorov and P. M. Dower, Perspectives on characteristics-based curse-of-dimensionality-free numerical approaches for solving Hamilton–Jacobi equations , Appl. Math. Optim., 81:1167–1218, 2021.

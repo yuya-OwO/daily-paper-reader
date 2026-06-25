@@ -1,0 +1,4556 @@
+Title: Toward a Systematic Understanding and Interactive Search of Lyapunov-Style Proofs in Optimization
+
+URL Source: https://arxiv.org/pdf/2606.26077v1
+
+Published Time: Thu, 25 Jun 2026 01:18:47 GMT
+
+Number of Pages: 43
+
+Markdown Content:
+# Toward a Systematic Understanding and Interactive Search of Lyapunov-Style Proofs in Optimization 
+
+## TaeHo Yoon *,1 , Jaewook J. Suh *,2 , Edward D. H. Nguyen 3, Bicheng Ying 4, Shiqian Ma 2
+
+Abstract Lyapunov-style convergence proofs, which establish a nonincreasing sequence to provide a quantitative convergence rate for an algorithm, are popular and often considered desirable in first-order optimization. However, existing approaches to finding such Lyapunov functions rely on hand-designed templates or prior insight on the proof structure, and do not certify that the resulting Lyapunov-style analysis provides the sharpest convergence bound. In this work, we introduce a systematic framework for converting a tight, analytic convergence proof of an optimization algorithm, often found via computer assistance, into an equivalent proof based on Lyapunov functions. We implement a concrete procedure that combines a performance estimation problem (PEP) toolbox with elementary linear algebra, and show that it captures a number of prior Lyapunov analyses within a single Jupyter notebook .Based on our implementation, a user can straightforwardly test our systematic and interactive procedure on their own optimization algorithm of interest to search for a tight Lyapunov-style proof via code , without the need to comprehend the implementation details. We extend the application of our framework and discover four novel analytic Lyapunov-style proofs, where notably, one of them identifies a new exact optimal proximal algorithm for strongly monotone inclusion problems. 
+
+# 1 Introduction 
+
+Convergence proofs for optimization algorithms are clever combinations of inequalities. Traditionally, the search for such proofs was a form of art, relying heavily on human ingenuity and intuition. Over the last decade, however, more systematic computer-assisted approaches toward convergence analysis have emerged and quickly gained popularity [20, 65, 61]. These works provided frameworks for numerically finding a tight combination of inequalities which yields an optimized convergence guarantee within the search space. This sparked the discovery of improved convergence guarantees for known algorithms [20, 61, 28, 29], as well as the development of novel algorithms with accelerated/optimal convergence rates [33, 19, 34, 42, 32, 77, 40, 50, 62, 31]. Our work is largely motivated by the history of how these computer-assisted proofs, the so-called performance estima-tion problem (PEP) style proofs as named in [65], have been processed within the literature. Several optimized algorithms found by these techniques, including the optimized gradient method (OGM) [33], OGM-G [34]—a numerically optimized algorithm for decreasing the gradient norm, the accelerated proximal point method (APPM) [32] or its equivalent fixed-point iteration form (optimal Halpern method; OHM) [42], were initially presented with convergence proofs establishing positive semidefiniteness of matrix certificates arising from semidefinite programming (SDP) formulation of PEP. The same applies to some tightened analyses of simpler algorithms such as gradient descent [20, 1, 2, 26] or proximal point method [28, 29]. While the aforementioned proofs reflect how these numerical certificates are typically obtained through computational methods, they are not necessarily the most easily comprehensible form for humans. Consequently, some of these proofs were later reworked into arguably more concise and human-interpretable forms [13, 48, 16, 39, 14, 67], often in the form of establishing a Lyapunov function , or potential function , a sequence of scalar quantities that is nonincreasing along the iterations of the algorithm. However, translating the tight, numerically obtained PEP-style proofs into equivalent Lyapunov-style proofs is not a trivial task, and has been carried out on a case-by-case basis based on experts’ intu-ition, rather than deductively from an overarching principle. In this work, we fill in this gap by providing a general characterization of such procedures. 
+
+Main contributions. This work presents the following contributions.     
+
+> ∗Equal contribution.
+> 1Department of Applied Mathematics and Statistics, Johns Hopkins University. Email: tyoon7@jh.edu .
+> 2Department of Computational Applied Mathematics and Operations Research, Rice University. Email: {jacksuh, sqma }@rice.edu .
+> 3Department of Electrical and Computer Engineering, Rice University. Email: en18@rice.edu .
+> 4Google Inc. Email: ybc@google.com .
+
+1
+
+> arXiv:2606.26077v1 [math.OC] 24 Jun 2026
+
+• First, we provide a systematic characterization of when a seemingly complex convergence proof can be translated into a concise Lyapunov-style proof, and in such cases, provide a procedure for constructing them (Section 3). This procedure is general and is applicable to multiple popular problem settings in first-order optimization, including the ones presented in Table 1. However, our framework is not confined to these problem classes and can be readily extended to other ones of interest. 
+
+• We recover a number of materially distinct Lyapunov analyses in the literature, each developed through at least one prior work, as a special case of our framework (Section 4). This demonstrates that our framework is capable of unifying a non-trivial process that has been performed by experts on a case-by-case basis. 
+
+• Using our proposed framework, we discover four previously unknown Lyapunov-style proofs (Section 5). In one of them, we introduce a novel algorithm, the dual optimal contractive Halpern method (Dual-OC-Halpern) , which is an exact minimax optimal algorithm for strongly monotone inclusion problems, or the equivalent contractive fixed-point problems. This demonstrates that our procedure is indeed a practical tool for conducting novel analysis with less manual effort. 
+
+• For all existing and new analyses that we cover, we provide the associated code implementation showing that our procedure can be streamlined into a single Jupyter notebook , from the numerical certificate computation to deriving and symbolically verifying the corresponding Lyapunov analysis. 
+
+Problem setting Algorithm Lyapunov proof Section 
+
+Smooth convex minimization GD [20] New §5.1 OGM1 [33] [13, 48] §4.2.2 OGM2 [33] [13, 48] §4.2.1 OGM-G [34] [39] §4.2.3 Bregman composite minimization BPGM [83, 30] New §5.2 Smooth minimax optimization FEG [40] [40] §4.3.1 Dual-FEG [76] [76] §4.3.2 Proximal monotone inclusion (↔ Nonexpansive fixed-point problem) APPM [32] / OHM [42] [14, 55] §4.1.1 Dual-OHM [76] [76] §4.1.2 PPM [28] New §5.3 Proximal strongly monotone (↔ Contractive fixed-point problem) OS-PPM / OC-Halpern [50] [50] §4.1.3 
+
+Dual-OC-Halpern (New) New §5.4 Table 1: Summary of algorithms covered by the framework proposed in this paper. For each algorithm, if it is classical, we cite the work providing its tight convergence proof, while if it is relatively recent, we cite the work that first introduced the algorithm and proved its convergence. The “Lyapunov proof” column lists the work that provided a Lyapunov-style proof with tight rate for each algorithm, and “New” indicates that we newly introduce them in our Section 5. 
+
+## 1.1 Prior work 
+
+Performance Estimation Problem (PEP). Performance Estimation Problem (PEP) is a computer-assisted frame-work for analyzing the quantitative convergence rate of optimization algorithms. The core idea was first introduced by [20] and subsequently refined into an established framework in [65] for smooth (strongly) convex minimization. It was then extended to a number of distinct settings including composite convex minimization [66], convex minimization under Bregman geometry [17], operator splitting [54] and linear operators [9]. PEP reformulates the problem of identifying the worst-case rate of a first-order algorithm into a tractable optimization problem—typically a semidefinite program (SDP)—that can be numerically solved by a solver, and the dual solution to this SDP encodes a proof of the form 
+
+(PerformanceMetric) − ν × (InitialCondition) = − X
+
+> i,j
+
+λi,j Ii,j − X
+
+> i
+
+∥vi∥2 ≤ 0. (PEP-style proof) Here, Ii,j ≥ 0 are nonnegative inequality terms characterizing the function/operator class of consideration, and ν, λ i,j ≥ 0and vi ∈ Rn are nonnegative scalars and vectors (proof certificates) corresponding to the dual variables. We refer to this 2form of proof as a PEP-style proof in this paper. We discuss this in more detail with examples of problem classes in Section 2. 
+
+Novel findings via PEP. PEP has been proved useful for discovering optimized analyses and algorithms over the last decade. The tight convergence rate and analysis of constant-step-size gradient descent [20] and the optimized gradient method (OGM) [20, 33], later shown to be an exact minimax optimal algorithm for smooth convex minimization [18], were the earliest such discoveries enabled by PEP. OGM improves upon Nesterov’s accelerated gradient method [46] ap-proximately by a factor of 2. Then, OGM-G [34] achieved the first algorithm that achieves an accelerated, up-to-constant optimal rate with respect to the gradient norm in smooth convex minimization: ∥∇ f (xk)∥2 = O  (f (x0) − f (x⋆)) /k 2,which further induces ∥∇ f (xk)∥2 = O  ∥x0 − x⋆∥2/k 4 by concatenation with OGM. Optimal methods for other setups, such as strongly convex minimization [62, ITEM], Bregman-relatively-smooth minimization [17], nonsmooth convex min-imization with bounded gradients [19] and composite optimization [31, OptISTA], were also developed through the PEP framework; in particular, the discovery of OptISTA leveraged the broader BnB-PEP formulation [12], utilizing nonconvex quadratically constrained quadratic programs (QCQP) and branch-and-bound techniques. Based on the numerical ob-servation from [12], subsequent works [25, 1, 2, 26] have presented the acceleration of gradient descent in smooth convex minimization by modifying the step-size schedule. Beyond convex minimization, [32] proposed the accelerated proximal point method (APPM), an accelerated proximal algorithm for maximally monotone inclusion problems. Independently, [42] proposed the optimal Halpern method (OHM), an exact optimal algorithm for nonexpansive fixed-point problems in Hilbert spaces. In fact, APPM and OHM are equivalent, as it was later established in [11, 55], and [50] have shown that they are exact optimal for their respective problem classes. [50] also introduced the equivalent algorithms, optimal strongly-monotone proximal point method (OS-PPM) for maximally μ-strongly-monotone inclusions and the optimized contractive Halpern (OC-Halpern) for contractive fixed-point problems, both of which are exact minimax optimal with matching lower bounds. Similar advances have been made in minimax optimization. For smooth convex-concave minimax optimization, the extra anchored gradient (EAG) [77] and anchored Popov’s scheme [68] have obtained accelerated O(∥x0 − x⋆∥2 /k 2) rates on the squared gradient/residual norm, which was extended to the setting with weakly comonotone saddle gradient operator by the fast extragradient (FEG) algorithm [40]. Multiple tighter refinements to the analyses of existing methods have also been developed, including the proximal point method (PPM) [28], extragradient [21], optimistic gradient method [22], Douglas–Rachford and Davis– Yin splitting [54, 47], the alternating direction method of multipliers (ADMM) [80], and primal–dual methods such as Chambolle–Pock/PDHG [9]. The PEP framework, and results driven by it, have additionally inspired a novel concept of duality operation between first-order algorithms [35]. The step-sizes defining the OGM-G algorithm was numerically observed to be a rearrangement of those of OGM [34], and [35] formalized and generalized this relationship by introducing the concept of H-duality. Similar approaches were also presented in [37, 36]. [76] extended H-duality to nonexpansive fixed-point problems (or the equivalent proximal monotone inclusion setting) and showed that the H-duals of OHM and FEG achieve the exact same last-iterate rate as their respective primal algorithms. For this particular setup, an infinite family of exact optimal algorithms was fully characterized in [79] and the H-duality between these optimal algorithms has been further explored in [75]. 
+
+Lyapunov analysis in optimization and computer assistance. Once an appropriate Lyapunov function encoding the intermediate progress of an algorithm is given, one can verify its nonincreasingness along the iterations to carry out the convergence analysis. Such a strategy has been extensively used in the first-order optimization literature, within prior work including but not limited to [46, 71, 5, 61, 13, 77, 40, 39, 16, 50, 35, 49, 76, 78, 31]. A central challenge in establishing a Lyapunov analysis is to identify a correct form to work with, as there is no universal strategy for it. To address this, several computer-assisted approaches for identifying Lyapunov functions or similar type of convergence argument have been developed, either based on the integral quadratic constraints (IQC) perspective [41, 63] or via general SDP formulation [63, 61, 69]. The ideas from this line of work have also been integrated into the software package AutoLyap [70]. To clarify, while alternative terminologies such as potential/energy functions are often used in the literature, sometimes with distinguished usage, we broadly use the terms “Lyapunov function” or “Lyapunov-style proof” to include any arguments that establish a nonincreasing quantity. These frameworks automate the search over a prescribed candidate family of Lyapunov functions, which is a quadratic function (ansatz) involving a chosen collection of vectors. A suitable Lyapunov function satisfying desirable properties exists within the family if and only if a corresponding semidefinite feasibility problem has a solution, as shown in [69], which enables numerical search with computer assistance. On the other hand, PEP-style proof is more general in the sense that it is not constrained to a specific proof template, and because the search space is larger, it may produce a tighter result, often strictly. In fact, without a good intuition on the candidate family of Lyapunov function, prior approaches may fail to identify the tight performance guarantee for a given algorithm. Indeed, for historical examples such as OGM, OGM-G and APPM, the PEP-style proofs were obtained 3first and their Lyapunov analyses appeared years later [13, 39, 48, 55]. Furthermore, there are remaining instances of PEP-style proofs for which no corresponding Lyapunov analysis exists, such as [28, 17, 29, 1, 27, 79]. To the best of our knowledge, the only prior work that attempted to relate PEP-style proofs to Lyapunov-style proofs is a short note from [23, Section 6]. We emphasize that the approach we take in this paper is distinct and complementary to those of [63, 61, 69, 70] that are based on predefined Lyapunov template. We focus on how a PEP-style proof can be transformed into a Lyapunov-style proof while maintaining the same proof certificates, and provide a systematic procedure for that conversion by identifying the basis vectors representing the incremental layers of the PEP-style proof. 
+
+Software implementations of PEP. Several software packages have made computer-assisted performance analysis of algorithms more accessible. PESTO [64] is a MATLAB toolbox for automatically computing tight worst-case performance guarantees through PEP, and PEPit [24] provides a generic open-source Python interface for modeling and solving PEP. For Lyapunov-style analysis, AutoLyap [70] supports automated search over prescribed Lyapunov templates. We use 
+
+PEPFlow [60] as the basis for implementing our proposed procedure which transforms a PEP-style proof into a Lyapunov-style proof. This is because PEPFlow provides a convenient tagging system for vectors corresponding to the algorithm iterates, function value or gradient/operator evaluated at those points, and the inner product terms among them. This feature is useful for maintaining an interpretable implementation where mathematical notations can be directly used in the code to access the vectors and matrices needed for linear algebraic manipulations in our procedure. 
+
+## 1.2 Notation and convention 
+
+Here we quickly list the notation that will be used throughout the paper. Rm×n denotes the space of all m × n matrices. 
+
+Sn is the space of all symmetric n × n matrices, and we denote the space of all symmetric positive semidefinite n × n
+
+matrices by Sn
+
+> +
+
+. The i-th standard basis vector, in any Euclidean space of dimension ≥ i, will be denoted by ei. Given a square matrix A, Sym( A) is its symmetrization: Sym( A) = 12 (A + AT). For a general m × n matrix, R(A) is its range (column space) and N (A) is its null space. We often use ⋆ as an index for denoting the optimum, and we will take the convention ⋆ = ∞ and often use it with other number indices for specifying the iterates; then we can conveniently state 
+
+⋆ > k for any k ∈ N. Finally, we will reserve the notation N for the last iterate or termination horizon of the algorithm where the performance measure is evaluated. 
+
+Organization. The rest of the paper is organized as follows. Section 2 sets up the preliminary technical concepts for the problem settings of interest for this work. Section 3 explains how a Lyapunov function Vk can be constructed from a PEP-style proof and how we characterize admissible Vk’s. Then, we present detailed steps for detecting a concise expression for Vk and carrying out the analytic proof from it. Section 4 presents existing Lyapunov-style analyses that can be recovered by our framework. Section 5 presents new Lyapunov-style analyses discovered using our framework: gradient descent, Bregman proximal gradient method for composite minimization, proximal point method for monotone inclusion, and Dual-OC-Halpern. For all algorithms covered in Sections 4 and 5, we provide the accompanying Jupyter notebook 
+
+implementation of the full procedure, which we open source through the codebase 
+
+https://github.com/pepflow-lib/PEPFlow/tree/main/examples_lyapunov 
+
+# 2 Problem settings and convergence proofs of consideration 
+
+In this section, we review how tight PEP-style proofs are written in the two settings considered in this work: smooth convex minimization and (strongly) monotone inclusion with proximal operations. While we additionally consider smooth convex-concave minimax optimization (via reformulation into Lipschitz-continuous monotone inclusion) and composite minimization under Bregman geometry in the paper, we defer the detailed descriptions for these settings to A.1 and Appendix A.2. 
+
+## 2.1 Smooth convex minimization 
+
+Suppose that we are interested in analyzing the convergence of a deterministic first-order algorithm for solving minimize 
+
+> x∈Rd
+
+f (x)where the objective function f : Rd → R is convex and L-smooth (i.e., f is differentiable and ∇f is L-Lipschitz continuous), where L > 0, and f has a minimizer x⋆ ∈ Rd. It is well known that f is convex and L-smooth if and only if the cocoercivity 
+
+4inequalities 
+
+f (y) − f (x) + ⟨∇ f (y), x − y⟩ + 12L ∥∇ f (x) − ∇ f (y)∥2 ≤ 0holds for all x, y ∈ Rd [45, Theorem 2.1.5]. Furthermore, when the algorithm is a fixed-step first-order method with update rule of the form 
+
+xk+1 = xk −
+
+> k
+
+X
+
+> j=0
+
+hk+1 ,j ∇f (xj )where hk+1 ,j ∈ R are pre-defined step-sizes for k = 0 , 1, . . . and j = 0 , . . . , k , then it has been proved [65] that its tight 1
+
+dimension-independent worst-case convergence rate of the form f (xN ) − f (x⋆) ≤ ν ∥x0 − x⋆∥2 can always be established by a proof of the form 
+
+f (xN ) − f (x⋆) − ν ∥x0 − x⋆∥2 = X
+
+> i,j ∈{ 0,...,N,⋆ }
+
+λi,j 
+
+
+
+f (xj ) − f (xi) + ⟨∇ f (xj ), x i − xj ⟩ + 12L ∥∇ f (xi) − ∇ f (xj )∥2
+
+
+
+− X
+
+> i∈J
+
+αi
+
+x0 x⋆ ∇f (x0) · · · ∇f (xN ) si
+
+> 2
+
+≤ 0.
+
+(1) Here λi,j ≥ 0 are weights associated with the cocoercivity inequalities between the iterates, characterizing the problem class, while αi ≥ 0 and si ∈ RN +3 are quantities representing the sum of squares terms, indexed with a finite set J . The quantities λi,j , αi and si are what determine a convergence proof, and we call them proof certificates .Following [65], we introduce an equivalent reformulation enabling the numerical search of proof certificates within the PEP framework via solving semidefinite programs. This will also allow us to design the procedure for Lyapunov-style conversion based on linear algebraic techniques, which will be explained in the next section. Let 
+
+P = x0 x⋆ ∇f (x0) · · · ∇f (xN ) ∈ Rd×(N +3) ,
+
+x0 = e1, x⋆ = e2, gi = ei+3 for i = 0 , . . . , N and inductively define x1, . . . , xN by 
+
+xi+1 = xi −
+
+> i
+
+X
+
+> j=0
+
+hi+1 ,j gj
+
+for i = 0 , . . . , N − 1, so that Px i = xi and Pg i = ∇f (xi) for all i ∈ { 0, . . . , N }. Then let G = PTP ∈ SN +3 + be the Gram matrix of the column vectors of P. Finally, let 
+
+f = f (x0) f (x1) · · · f (xN ) f (x⋆)T ∈ RN +2 .
+
+With this setup, we can rewrite (1) as 
+
+fN +1 − fN +2 − νTr( GD ) = X
+
+> i,j ∈{ 0,...,N,⋆ }
+
+λi,j (fj − fi + Tr( GC i,j )) − X
+
+> i∈J
+
+αiTr( GS i),
+
+where we let f⋆ := fN +2 = f (x⋆), Ci,j := Sym 
+
+
+
+gj (xi − xj )T
+
++ 12L (gi − gj )( gi − gj )T ∈ SN +3 encodes the inner product terms appearing in the cocoercivity inequality between xi and xj , D = ( x0 − x⋆)( x0 − x⋆)T ∈ SN +3 + represents the initial condition, and each Si = sisT 
+
+> i
+
+∈ SN +3 + is a rank 1 matrix corresponding to a single norm square term constituting (1). 
+
+## 2.2 Maximally monotone inclusion with proximal algorithms 
+
+A monotone inclusion is given by the form find 
+
+> x∈Rd
+
+0 ∈ 𝔸 (x)where 𝔸 : Rd ⇒ Rd is a multi-valued (set-valued) operator that is maximally μ-strongly monotone for μ ≥ 0, i.e., 
+
+⟨u − v, x − y⟩ − μ ∥x − y∥2 ≥ 0 for all x, y ∈ Rd, u ∈ 𝔸 (x) and v ∈ 𝔸 (y) and has a graph that cannot be enlarged                  
+
+> 1This means that there exists a convex and L-smooth function fdefined on Rdwith sufficiently large dsuch that running the algorithm on that function yields f(xN)−f(x⋆) = ν∥x0−x⋆∥2, i.e., the worst-case bound bound cannot be improved.
+
+5without violating monotonicity. When μ = 0, this reduces to the maximally monotone setting. For conciseness, we denote 
+
+𝔸 x = 𝔸 (x) for x ∈ Rd. We assume that 𝔸 has a zero, i.e., x⋆ ∈ Rd such that 0 ∈ 𝔸 x⋆. We consider the proximal algorithms that use the resolvent 𝕁 𝔸 = ( 𝕀 + 𝔸 )−1; more concretely, algorithms such that 
+
+xk = 𝕁 𝔸 (yk−1), yk = yk−1 +
+
+> k
+
+X
+
+> j=1
+
+hk,j ˜𝔸 xj (2) for k = 1 , 2, . . . , where x0 = y0 is the initial point, ˜ 𝔸 xj+1 = yj − xj+1 ∈ 𝔸 xj+1 , and hk,j are pre-determined step-sizes for k = 1 , 2, . . . and j = 1 , . . . , k .With the correspondence 𝕋 =
+
+
+
+1 + 11+2 μ
+
+
+
+𝕁 𝔸 − 11+2 μ 𝕀 , the problem class becomes equivalent to the class of fixed point problems [50]: find 
+
+> y∈Rd
+
+y = 𝕋 (y)where 𝕋 : Rd → Rd is 1 
+
+> γ
+
+-contractive , i.e., ∥𝕋 x − 𝕋 y∥ ≤ 1 
+
+> γ
+
+∥x − y∥ for all x, y ∈ Rd, where γ = 1 + 2 μ ≥ 1. (When γ = 1, we say 𝕋 is nonexpansive .) The zero of 𝔸 is a fixed point of 𝕋 , i.e., x⋆ = y⋆ satisfies y⋆ = 𝕋 y⋆. Furthermore, the algorithm class can be equivalently rewritten as 
+
+yk+1 = yk +
+
+> k
+
+X
+
+> j=0
+
+γγ + 1 hk+1 ,j +1 (yj − 𝕋 yj ).
+
+The inequalities characterizing the proximal monotone inclusion setting and the nonexpansive fixed point setting are equivalent: 
+
+˜𝔸 xi − ˜𝔸 xj , x i − xj − μ ∥xi − xj ∥2 ≥ 0 ⇐⇒ 1
+
+γ2 ∥yi−1 − yj−1∥2 − ∥ 𝕋 yi−1 − 𝕋 yj−1∥2 ≥ 0
+
+˜𝔸 xi, x i − x⋆ − μ ∥xi − x⋆∥2 ≥ 0 ⇐⇒ 1
+
+γ2 ∥yi−1 − y⋆∥2 − ∥ 𝕋 yi−1 − 𝕋 y⋆∥2 ≥ 0The performance metric is ˜𝔸 xN
+
+> 2
+
+, or equivalently up to a constant factor, ∥yN −1 − 𝕋 yN −1∥2.By [54], any tight proof is given by the form 
+
+˜𝔸 xN 
+
+> 2
+
+− ν ∥x0 − x⋆∥2 = − X
+
+> i,j ∈{ 1,...,N,⋆ }
+> i<j
+
+λi,j 
+
+ ˜𝔸 xi − ˜𝔸 xj , x i − xj − μ ∥xi − xj ∥2
+
+− X
+
+> i∈J
+
+αi
+
+x0 x⋆ ˜𝔸 x1 · · · ˜𝔸 xN
+
+ si 
+
+> 2
+
+.
+
+(3) Next, we present the similar PEP-style reformulation for this setting. Let gi = ˜𝔸 xi ∈ 𝔸 xi for i = 1 , . . . , N and set 
+
+g⋆ = 0 ∈ 𝔸 x⋆. Let 
+
+P = x0 x⋆ g1 · · · gN
+
+ ∈ Rd×(N +2) 
+
+and let x0 = y0 = e1, x⋆ = e2, gi = ei+2 for i = 1 , . . . , N and g⋆ = 0. Define yk, xk for k = 1 , 2, . . . by 
+
+yk = yk−1 +
+
+> k
+
+X
+
+> j=1
+
+hk,j gj , xk = yk−1 − gk,
+
+so that Px k = xk and Py k = yk for all k ≥ 0. With G = PTP, define 
+
+M(μ) 
+
+> i,j
+
+:= Sym  (gi − gj )( xi − xj )T − μ(xi − xj )( xi − xj )T,
+
+QN = gN gT 
+
+> N
+
+and D = ( x0 − x⋆)( x0 − x⋆)T. Then (3) can be rewritten as Tr( GQ N ) − νTr( GD ) = − X
+
+> i,j ∈{ 1,...,N,⋆ }
+> i<j
+
+λi,j Tr( GM (μ) 
+
+> i,j
+
+) − X
+
+> i∈J
+
+αiTr( GS i)where λi,j ≥ 0, αi ≥ 0, and Si = sisT 
+
+> i
+
+⪰ 0. 63 Theory for searching Lyapunov-style proofs 
+
+Given a PEP-style proof as provided in the previous section, our qualitative goal is to translate it into a simple Lyapunov-style proof. In this section, we first define what we consider as an admissible Lyapunov analysis, and based on that characterization, provide a concrete five-step procedure for identifying a Lyapunov structure (Fig. 1). Throughout the section, we focus on the case of non-strongly monotone inclusion problems—the setting described in Section 2.2 with 
+
+μ = 0—for simplicity, but the same idea easily extends to all the other settings. 
+
+Step High-level task Example outcome for APPM/OHM 
+
+1Define Vk as partial sums of nonpositive terms from the PEP-style proof 
+
+Vk = −
+
+> k
+
+X
+
+> j=1
+
+λj,j +1 ˜𝔸 xj − ˜𝔸 xj+1 , x j − xj+1 
+
+Vk = −
+
+> k
+
+X
+
+> j=1
+
+λj,j +1 Sym 
+
+
+
+(gj − gj+1 )( xj − xj+1 )T
+
+2 Check rank consistency, conciseness, and sufficiency rank( Vk ) = 2 for all k, |I \ I N −1| = |J \ J N −1| = 1 3 Find local basis candidate vectors xk+1 , y0 − xk+1 ∈ R (Vk )4 Express the Lyapunov skeleton using local basis vectors Vk = ak ˜𝔸 xk+1  
+
+> 2
+
++ bk ˜𝔸 xk+1 , y 0 − xk+1 + ck ∥y0 − xk+1 ∥2
+
+5 Solve symbolic equations to obtain closed-form coefficients 
+
+Vk − Vk+1 = λk+1 ,k +2 ˜𝔸 xk+1 − ˜𝔸 xk+2 , x k+1 − xk+2 
+
+=⇒ ak = 2( k + 1) 2
+
+N 2 , bk = − 2( k + 1) 
+
+N 2 , ck = 0 
+
+Vk = 2( k + 1) 2
+
+N 2 ˜𝔸 xk+1  
+
+> 2
+
+− 2( k + 1) 
+
+N 2 ˜𝔸 xk+1 , y 0 − xk+1 
+
+Figure 1: The proposed procedure for converting a PEP-style proof into a Lyapunov-style proof. In the rightmost column, we display the example outcomes from each step in the case of the APPM/OHM algorithm. Detailed explanation of all steps are provided throughout Section 3. 
+
+## 3.1 Construction of a Lyapunov function 
+
+Consider the proof format (3). Let I = {(i, j ) : i, j ∈ { 1, . . . , N, ⋆ }, i < j, λ i,j > 0} be the set of indices corresponding to inequalities that are “active” within the proof. Then any increasing sequence of subsets I0 ⊂ I 1 ⊂ · · · ⊂ I N −1 ⊂ I and 
+
+J0 ⊂ J 1 ⊂ · · · ⊂ J N −1 ⊂ J yields a Lyapunov function 
+
+Vk = − X
+
+> (i,j )∈I k
+
+λi,j ˜𝔸 xi − ˜𝔸 xj , x i − xj − X
+
+> i∈J k
+
+αi
+
+x0 x⋆ ˜𝔸 x1 · · · ˜𝔸 xN
+
+ si
+
+> 2
+
+= − X
+
+> (i,j )∈I k
+
+λi,j Tr( GM (0)  
+
+> i,j
+
+) − X
+
+> i∈J k
+
+αiTr( GS i).
+
+(4) Indeed, by definition of Vk and the fact that λi,j Tr( GM (0)  
+
+> i,j
+
+) ≥ 0 and αiTr( GS i) ≥ 0, we naturally have 0 ≥ V0 ≥ V1 ≥· · · ≥ VN −1. The final convergence proof will then follow from an additional last step: 
+
+˜𝔸 xN 
+
+> 2
+
+− ν ∥x0 − x⋆∥2
+
+= VN −1 − X 
+
+> (i,j )∈I\I N−1
+
+λi,j ˜𝔸 xi − ˜𝔸 xj , x i − xj − X 
+
+> i∈J \J N−1
+
+αi
+
+x0 x⋆ ˜𝔸 x1 · · · ˜𝔸 xN
+
+ si
+
+> 2
+
+≤ VN −1 ≤ 0.
+
+Thus, in principle, any PEP-style proof can become a Lyapunov-style proof. However, the resulting Lyapunov function may not be insightful or concise. Therefore, a more important question is to clarify when the choice of Ik and Jk will yield a “nice” Lyapunov function, which we address in the following Section 3.2. 7Remark. The length of the towers of indices Ik, Jk may vary; it typically follows the total number of iterations, and the final index is chosen to be N − 1 in the proximal monotone inclusion setting described above because the performance measure ˜𝔸 xN 
+
+> 2
+
+= 14 ∥yN −1 − 𝕋 yN −1∥2 is associated with yN −1, which can be viewed as the main iterate where the measure is evaluated. For other settings, such as smooth convex minimization, the performance measure is typically associated with xN , so the final index will be N . It is also possible to consider extensions where Lyapunov function indices do not necessarily follow the iteration indices, but we focus on the most natural cases where they are in agreement. 
+
+Comparison with [23]. We note that a similar approach of defining the Lyapunov function as a partial sum of nonpositive terms appearing in the PEP-style proof has been considered in [23, Section 6] for smooth (strongly) convex minimization setting. Their formulation aggregates all terms depending on the quantities observed before the k-th iteration, and provided Nesterov’s accelerated gradient (NAG) [46] as an example. We offer several layers of extension compared to their approach. First, we consider a number of distinct problem settings and materially demonstrate the broad applicability of this technique. Second, our definition of partial sums is not confined to the observations prior to a specific iteration number, which is a necessary generalization to handle algorithms with fixed horizon such as OGM-G [34], Dual-OHM [76] and Dual-OC-Halpern (Section 5.4). Third, we complement the partial sum construction with concrete linear algebraic criteria and implementable procedure for determining whether it can be simplified to produce a meaningful Lyapunov function, as detailed in the subsequent sections. 
+
+Example: APPM/OHM. As a representative example, consider the accelerated proximal point method of [32]: 
+
+xk+1 = 𝕁 𝔸 (yk), yk+1 = xk+1 + kk + 2 (xk+1 − xk) − kk + 2 (xk − yk−1) (APPM) with x0 = y0 and ˜ 𝔸 xk+1 := yk − xk+1 ∈ 𝔸 xk+1 . In the equivalent fixed-point form with 𝕋 = 2 𝕁 𝔸 − 𝕀 , this becomes the 
+
+optimal Halpern method [42, 50] 
+
+yk+1 = 1
+
+k + 2 y0 + k + 1 
+
+k + 2 𝕋 yk. (OHM) The PEP-style convergence proof for these equivalent algorithms [32, 42, 11, 55] takes the form 
+
+˜𝔸 xN 
+
+> 2
+
+− ∥y0 − y⋆∥2
+
+N 2 = − 
+
+> N−1
+
+X
+
+> j=1
+
+λj,j +1 ˜𝔸 xj − ˜𝔸 xj+1 , x j − xj+1 − λN,⋆ ˜𝔸 xN , x N − y⋆ − ˜𝔸 xN − 1
+
+N (y0 − y⋆)
+
+> 2
+
+where we specify λj,j +1 , λ N,⋆ > 0 later. In particular, I = {(j, j + 1) | j = 1 , . . . , N − 1} ∪ { (N, ⋆ )} and |J | = 1 with the corresponding unique square term being ˜𝔸 xN − 1 
+
+> N
+
+(y0 − y⋆) 2. A natural increasing set of inequality indices is to follow the chronological order and take: 
+
+Ik = {(j, j + 1) | j = 1 , . . . , k }, Jk = ∅
+
+for k = 1 , . . . , N − 1, while we take I0 = J0 = ∅. This gives V0 = 0, and 
+
+Vk = −
+
+> k
+
+X
+
+> j=1
+
+λj,j +1 ˜𝔸 xj − ˜𝔸 xj+1 , x j − xj+1 , k = 1 , . . . , N − 1. (5) By monotonicity of 𝔸 , we have 0 = V0 ≥ V1 ≥ · · · ≥ VN −1.
+
+## 3.2 Characterization of admissible Lyapunov functions 
+
+In this section, we propose a precise characterization of Lyapunov-style proofs that can be perceived as nice and concise to human readers. We start with the following simple proposition, translating the behavior of Vk into linear algebraic properties. Its simple proof is presented in Appendix B. 
+
+Proposition 1. Let 𝔸 : Rd ⇒ Rd be a maximally monotone operator. Let xk, yk be the iterates of an algorithm defined by (2) , and let Vk be the Lyapunov function defined by (4) . Then, Vk = Tr( GV k), where 
+
+Vk = − X
+
+> (i,j )∈I k
+
+λi,j M(0)  
+
+> i,j
+
+− X
+
+> i∈J k
+
+αiSi ∈ SN +2 .
+
+8Furthermore, let rk = rank( Vk) and R(Vk) be the range of Vk. Then, for any basis {vk, 1, . . . , vk,r k } of R(Vk), there exists Ak ∈ Srk such that 
+
+Vk = vk, 1 · · · vk,r k
+
+ Ak
+
+vk, 1 · · · vk,r k
+
+T , (6) 
+
+so Vk has the vector quadratic form expression 
+
+Vk =
+
+> rk
+
+X
+
+> p,q =1
+
+(Ak)p,q ⟨Pv k,p , Pv k,q ⟩ . (7) Given the above characterization, we set up the criteria for admissible Lyapunov functions as follows: 
+
+• Consistency and conciseness. This requires that the number of vectors needed to express Vk should not increase with k and stay virtually constant across k = 0 , . . . , N − 1. Concretely, we require that rk = r for all k = 1 , . . . , N − 2for some fixed r. Note that we allow exceptions at the indices k = 0 and k = N − 1, where Vk often gets simplified than they are at generic iteration numbers and the rank is reduced. We additionally require that r ≤ 4, as we find that this is the largest rank hit by the most complex Lyapunov analyses covered in this work. 
+
+• Sufficiency. Establishing the nonincreasingness property VN −1 ≤ · · · ≤ V0 should essentially complete all the heavy lifting, and the remaining last step needed to derive the final convergence rate should be minimal. We quantify this with the condition |I \ I N −1| ≤ 1 and |J \ J N −1| ≤ 1, i.e., the last step should use at most one problem-specific inequality and one norm-square nonnegativity argument, such as Young’s inequality. 
+
+• Locality. This requires that Vk should be expressible in terms of the local quantities, such as the terms involving the local iterates xk, y k or xk±1, y k±1. If necessary, one may introduce auxiliary sequences for the purpose of Lyapunov analysis, which we typically denote as zk. Additionally, Vk may involve some fixed iteration indices not depending on k (typically 0 , N or ⋆). In linear algebraic terms, there should be a basis {vk, 1, . . . , vk,r } of R(Vk) that is locally expressible, e.g., vk,j ∈ span {x0, xk, xN , x⋆, gk, gN } for j = 1 , . . . , r . However, we keep vk,j flexible rather than restricting them to a limited format, and provide a practical procedure for searching these local basis vectors. 
+
+Example: APPM/OHM continued. For the partial sums Vk in (5), the corresponding matrices Vk have rank 2 for generic k, regardless of N . Hence, Vk satisfies consistency and conciseness. Furthermore, it satisfies the sufficiency property because I \ I N −1 = {(N, ⋆ )} and J \ J N −1 = J are both singletons. Due to this property, the convergence proof is almost complete once VN −1 ≤ 0 is established; the remaining steps are as simple as 0 ≥ VN −1 ≥ VN −1 − λN,⋆ ˜𝔸 xN , x N − x⋆ − ˜𝔸 xN − 1
+
+N (y0 − x⋆)
+
+> 2
+
+= ˜𝔸 xN 
+
+> 2
+
+− 1
+
+N 2 ∥y0 − x⋆∥2 . (8) Finally, it turns out that 
+
+{gk+1 , y0 − xk+1 } ⊂ R (Vk)is a basis of R(Vk), which verifies the locality property. Then, by Proposition 1, 
+
+Vk = ak ˜𝔸 xk+1  
+
+> 2
+
++ bk ˜𝔸 xk+1 , y 0 − xk+1 + ck ∥y0 − xk+1 ∥2 (9) for some ak, b k, c k ∈ R.
+
+Remark. In the setting where the objective functions’ values are involved (such as convex minimization), Vk will additionally involve the term of the form f Tbk. In this case, we also require that bk is sparse and local, which can be checked straightforwardly without any linear algebraic tricks. 
+
+Cases with |J | > 1. The APPM/OHM example shown above has |J | = 1 so we can take Jk = ∅, which simplifies the analysis. However, when |J | > 1, i.e., if more than one norm square terms are involved, one needs a systematic decomposition of the positive semidefinite matrix certificate S = P 
+
+> i∈J
+
+αisisT 
+
+> i
+
+, which is not unique. In some cases, this can be done purely numerically, as in the case of gradient descent (presented in Section 5.1), while sometimes we use a known analytic decomposition from prior work, as in the case of proximal point method for monotone inclusion (presented in Section 5.3). We explain the details in those sections while we explore the corresponding examples. 93.3 Procedure for Lyapunov conversion and analytic proof discovery 
+
+Based on our characterization from the previous section, we propose the procedure that determines admissibility of a Lyapunov function proposed via Ik, Jk, and when that is the case, converts the PEP-style proof into the Lyapunov-style proof. Here, we emphasize that with fixed N , the search of proof certificates via PEP is numerical, and all steps below, except for the last one, can be performed numerically based on those certificates. In the last step, we assume that the analytic forms of the certificates are known, and use them to assemble the Lyapunov-style proof analytically. 1. The user proposes a candidate I0 ⊂ I 1 ⊂ · · · ⊂ I N −1 ⊂ I and J0 ⊂ J 1 ⊂ · · · ⊂ J N −1 ⊂ J .2. Compute Vk for k = 0 , . . . , N − 1 and verify rank consistency, conciseness and sufficiency. 3. To verify locality, we need to find a basis of R(Vk). We collect all numerical coordinate vectors corresponding to the algorithm-specific quantities. In case of APPM/OHM, an adequate choice is 
+
+T = {y0, . . . , yN −1, x⋆, x1, . . . , xN , g1, . . . , gN }, S = T ∪ { u − v | u, v ∈ T } . (10) For other algorithms, we still include into T all algorithm iterates, operator/gradient evaluated there, and the optimum (so all columns of P are included), but we may additionally include auxiliary vectors that are specially named, i.e., tagged . Then we construct the set S by augmenting T with all pairwise differences of vectors in it. 4. Check if S contains a basis of R(Vk). 4-1. When this is the case, given any basis {vk, 1, . . . , vk,r } ⊆ S of R(Vk), we can decompose Vk as in (6). Among all bases within S, choose one that yields the sparsest coefficient matrix Ak. Verify that it is expressed with respect to local information (locality), and if possible, choose the bases for each k so that it follows a consistent symbolic pattern. 4-2. Otherwise, count the maximum number of linearly independent vectors in S ∩ R (Vk). When this is r − 1, then we can numerically complete a basis of R(Vk), defining an auxiliary sequence zk needed to perform the Lyapunov analysis. We outline this procedure in Section 3.4. 4-3. When there are at most r−2 linearly independent vectors in S ∩R (Vk), then iteration locality cannot be verified with our current procedure; hence abort. This might be possible with more sophisticated linear algebraic tricks, but we do not pursue this extension for the current work. 5. This final step requires the analytic characterization of proof certificates λi,j , α i and si. We take the identity 
+
+Vk − Vk+1 = X
+
+> (i,j )∈I k+1 \I k
+
+λi,j ˜𝔸 xi − ˜𝔸 xj , x i − xj + X
+
+> i∈J k+1 \J k
+
+αi
+
+x0 x⋆ ˜𝔸 x1 · · · ˜𝔸 xN
+
+ si
+
+> 2
+
+where Vk and Vk+1 are expressed using the formula (7). This should be a formal identity, which holds for any values of x0 and ˜ 𝔸 xi. That is, once we plug in the algorithm’s update rule and express both sides in vector quadratic forms, coefficients of all inner product terms among x0, ˜ 𝔸 x1, . . . , ˜𝔸 xN from both sides should be equal. Viewing that as a system of equations and solving it for Lyapunov coefficients ( Ak)p,q , we can determine analytic expressions for Vk.Note that this verification can be performed symbolically , which establishes the Lyapunov analysis for any N and 0 ≤ k ≤ N − 1; therefore, at this point, the procedure has produced an analytic (not merely numerical) convergence result. 
+
+Remark. We note that Step 3 above where we construct a set of vectors S is a heuristic, and we have no general guarantee on how many candidate basis vectors S ∩ R (Vk) it will identify; this is why we specify in Step 4-3 that we cannot complete the procedure if we detect less than r − 1 of them. In other words, the outcome of Steps 3 and 4 depends on whether S provides a search space that is broad enough to reveal the structure of Vk. Nevertheless, in all 12 examples that we provide throughout Sections 4 and 5, these steps are executed successfully. 
+
+Example: APPM/OHM continued. For APPM/OHM, the Steps 1–4, performed numerically, easily identify the Lyapunov skeleton (9), and in fact ck = 0. Then in Step 5, we use the analytic formula λk+1 ,k +2 = 2( k+1)( k+2)   
+
+> N2
+
+and solve the equation 
+
+Vk − Vk+1 = ak ˜𝔸 xk+1  
+
+> 2
+
++ bk ˜𝔸 xk+1 , y 0 − xk+1 − ak+1 ˜𝔸 xk+2  
+
+> 2
+
+− bk+1 ˜𝔸 xk+2 , y 0 − xk+2 
+
+10 = 2( k + 1)( k + 2) 
+
+N 2 ˜𝔸 xk+1 − ˜𝔸 xk+2 , x k+1 − xk+2 
+
+for ak, b k, a k+1 and bk+1 . This reveals 
+
+ak = 2( k + 1) 2
+
+N 2 , bk = − 2( k + 1) 
+
+N 2 , ak+1 = 2( k + 2) 2
+
+N 2 , bk+1 = − 2( k + 2) 
+
+N 2
+
+and we conclude that APPM/OHM has the concise Lyapunov function 
+
+Vk = 2( k + 1) 2
+
+N 2 ˜𝔸 xk+1  
+
+> 2
+
+− 2( k + 1) 
+
+N 2 ˜𝔸 xk+1 , y 0 − xk+1 (11) for all k = 0 , 1, . . . , N − 1, and establishing this essentially completes the convergence proof. 
+
+## 3.4 Basis completion 
+
+Suppose we have found linearly independent basis candidate vectors vk, 1, . . . , vk,r −1 ∈ S ∩ R (Vk), where rank( Vk) = r.Then, take any wk,r satisfying R(Vk) = span {vk, 1, . . . , vk,r −1, wk,r }, so that we can write 
+
+Vk = vk, 1 · · · vk,r −1 wk,r 
+
+ ˜Ak
+
+vk, 1 · · · vk,r −1 wk,r 
+
+ T
+
+for some ˜Ak ∈ Sr , by Proposition 1. Then write ˜Ak =
+
+"
+
+B uuT ˜c
+
+#
+
+If ˜ c = 0, then u stays invariant up to a scalar multiple regardless of how wk,r is chosen, so it cannot be essentially simplified further. Otherwise, we can rewrite ˜Ak as ˜Ak =
+
+ I sign(˜ c)
+
+√|˜c| u0T p|˜c|
+
+" B − 1˜c uu T 00T sign(˜ c)
+
+#  I 0
+
+> sign(˜ c)
+
+√|˜c| uT p|˜c|
+
+ .
+
+Hence the coefficient matrix can be simplified with the basis change vk,r = sign(˜ c)
+
+√|˜c|
+
+vk, 1 · · · vk,r −1
+
+ u + p|˜c|wk,r :
+
+Vk =
+
+h
+
+vk, 1 · · · vk,r 
+
+i
+
+Ak
+
+h
+
+vk, 1 · · · vk,r 
+
+i T
+
+, Ak =
+
+"
+
+B − 1˜c uu T 00T sign(˜ c)
+
+#
+
+.
+
+In this way, we identify an auxiliary sequence vk,r = zk that represents Vk with maximally sparse coefficient matrix Ak,provided that vk, 1, . . . , vk,r −1 are fixed. 
+
+# 4 Recovering existing Lyapunov analyses via unified framework 
+
+In this section, we apply our framework to algorithms whose Lyapunov-style proofs exist in the literature, and show that we can rediscover their Lyapunov analysis from scratch. This demonstrates the broad applicability of our characterization and procedure of Section 3.3. The recovered Lyapunov functions are sometimes characterized in forms distinct from what prior work reported, providing original insights for novel extensions. For each algorithm, we provide an associated Jupyter notebook outlining the execution of our procedure. 
+
+## 4.1 Proximal monotone inclusion/Fixed-point problem 
+
+We consider the setting provided in Section 2.2, where we solve monotone inclusion problems with respect to maximally (strongly) monotone 𝔸 : Rd ⇒ Rd that has at least one zero. This includes the case of APPM/OHM, covered in the previous section as a representative example. We quickly state the final result for APPM/OHM and provide two additional examples: Dual-OHM [76] and OC-Halpern [50] algorithms. 11 4.1.1 Accelerated proximal point method & Optimal Halpern method Proposition 2. Let 𝔸 : Rd ⇒ Rd be maximally monotone. Let x⋆ satisfy 0 ∈ 𝔸 x⋆, set y⋆ = x⋆, and let x0 = y0 ∈ Rd be an initial point. Let xk, y k be iterates generated from (APPM) , or equivalently from (OHM) with 𝕋 = 2 𝕁 𝔸 − 𝕀 , and define 
+
+Vk by (11) . Then, for k = 1 , . . . , N − 2,
+
+Vk − Vk+1 = 2( k + 1)( k + 2) 
+
+N 2 ˜𝔸 xk+1 − ˜𝔸 xk+2 , x k+1 − xk+2 . (12) 
+
+Consequently, VN −1 ≤ · · · ≤ V1 ≤ 0, and this implies ˜𝔸 xN 
+
+> 2
+
+≤ 1  
+
+> N2
+
+∥y0 − y⋆∥2.Proof. The identity (12) is verified in examples lyapunov/appm/appm example lyap.ipynb within the provided codebase by establishing a symbolic matrix identity, which is generated through PEPFlow and then passed to the Python package 
+
+sympy for exact symbolic verification. Once this is established, we have VN −1 = 2 ˜𝔸 xN 
+
+> 2
+
+− 2 
+
+> N
+
+˜𝔸 xN , y 0 − xN ≤ 0, and we can directly verify that (8) holds with λN,⋆ = 2 
+
+> N
+
+as 0 ≥ VN −1 − 2
+
+N ˜𝔸 xN , x N − x⋆ − ˜𝔸 xN − 1
+
+N (y0 − x⋆)
+
+> 2
+
+= 2 ˜𝔸 xN 
+
+> 2
+
+− 2
+
+N ˜𝔸 xN , y 0 − xN − 2
+
+N ˜𝔸 xN , x N − x⋆ − ˜𝔸 xN − 1
+
+N (y0 − x⋆)
+
+> 2
+
+= ˜𝔸 xN 
+
+> 2
+
+− 1
+
+N 2 ∥y0 − x⋆∥2
+
+which proves the desired convergence guarantee. 
+
+Remark. Although it is not the central emphasis of this work, APPM/OHM is an exact optimal algorithm that matches the complexity lower bound even without any constant factor gap for this problem setup [50]. This Lyapunov function for OHM, to the best of our knowledge, first appeared in [14] and similar forms were used extensively in subsequent work on Halpern-type acceleration for minimax optimization [77, 40, 68, 55, 78]. 
+
+4.1.2 Dual optimal Halpern method 
+
+Next, consider a nonexpansive operator 𝕋 : Rd → Rd and the dual optimal Halpern method [76] 
+
+yk+1 = yk + N − k − 1
+
+N − k (𝕋 yk − 𝕋 yk−1) (Dual-OHM) where k = 0 , . . . , N − 1, and 𝕋 y−1 = y0. The corresponding algorithm for monotone inclusion uses the same update rule with 𝕋 = 2 𝕁 𝔸 − 𝕀 , and we let xk = 𝕁 𝔸 yk−1 and ˜ 𝔸 xk = yk−1 − xk ∈ 𝔸 xk for k = 1 , . . . , N . This algorithm was shown to converge with the rate ∥yN −1 − 𝕋 yN −1∥2 ≤ 4∥y0−y⋆∥2  
+
+> N2
+
+, and equivalently ˜𝔸 xN 
+
+> 2
+
+≤ ∥y0−y⋆∥2  
+
+> N2
+
+, achieving the same exact optimal last-iterate guarantee with APPM/OHM. The PEP-style proof of this convergence takes the form 
+
+˜𝔸 xN 
+
+> 2
+
+− ∥y0 − y⋆∥2
+
+N 2 = − 
+
+> N−1
+
+X
+
+> k=1
+
+λk,N ˜𝔸 xk − ˜𝔸 xN , x k − xN − λN,⋆ ˜𝔸 xN , x N − x⋆ − ˜𝔸 xN − 1
+
+N (y0 − y⋆)
+
+> 2
+
+where λk,N , λ N,⋆ ≥ 0 are specified later. Note that we have I = {(k, N ) | k = 1 , . . . , N − 1} ∪ { (N, ⋆ )} and |J | = 1. 
+
+Step 1. As a natural choice, take I0 = J0 = ∅ and for k = 1 , . . . , N − 1, 
+
+Ik = {(j, N ) | j = 1 , . . . , k }, Jk = ∅.
+
+Step 2. This choice satisfies sufficiency, as |I \ I N −1| = 1 = |J \ J N −1|. Numerical computation of Vk reveals that it has an almost constant rank of 4, with the exceptions of k = 1 and k = N − 1, where the rank becomes 2. 
+
+Step 3. We construct the set of special vectors S as 
+
+T = {y0, . . . , yN −1, y⋆, x1, . . . , xN , g1, . . . , gN , t0, . . . , tN −1}, S = T ∪ { u − v | u, v ∈ T } 
+
+where yi−1, xi, gi and ti−1 are respectively PEP context vectors representing the iterates yi−1, x i, ˜𝔸 xi and 𝕋 yi−1.12 Step 4. Numerically, we find that 
+
+{gN , y0 − xN , yk − yN −1, tk−1 − tN −1} ⊂ S ∩ R (Vk)is a basis of R(Vk) with majority of Lyapunov coefficients being zero. Combining Proposition 1 with the numerical patterns observed, we hypothesize that 
+
+Vk = ak ∥yk − 𝕋 yN −1∥2 + ⟨yk − 𝕋 yN −1, 𝕋 yk−1 − 𝕋 yN −1⟩ + bk ∥𝕋 yk−1 − 𝕋 yN −1∥2 + c ˜𝔸 xN 
+
+> 2
+
++ d ˜𝔸 xN , y 0 − xN
+
+where c, d ∈ R stays invariant over iterations. Since the last two terms are constants, we subtract them uniformly from all Vk and consider the shifted Lyapunov function 
+
+eVk = ak ∥yk − yN −1∥2 + ⟨yk − yN −1, 𝕋 yk−1 − 𝕋 yN −1⟩ + bk ∥𝕋 yk−1 − 𝕋 yN −1∥2 (13) with same consecutive differences 
+
+eVk − eVk+1 = λk+1 ,N ˜𝔸 xk+1 − ˜𝔸 xN , x k+1 − xN . (14) 
+
+Step 5. In the final step, we plug into (14) the Lyapunov function (13) and the formula λk+1 ,N = 2(N −k)( N −k−1) that interpolates the numerical values. Then, solving the resulting equation for ak, b k, a k+1 and bk+1 successfully yields a solution 2ak = − N − k + 1 2( N − k) , bk = − N − k − 12( N − k) , ak+1 = − N − k
+
+2( N − k − 1) , bk+1 = − N − k − 22( N − k − 1) .
+
+Based on the above procedure, we conclude with the following result: 
+
+Proposition 3. Let 𝔸 : Rd ⇒ Rd be maximally monotone. Let x⋆ satisfy 0 ∈ 𝔸 x⋆, set y⋆ = x⋆, and let x0 = y0 ∈ Rd be an initial point. Let xk, y k be iterates generated from (Dual-OHM) with 𝕋 = 2 𝕁 𝔸 − 𝕀 , and define 
+
+eVk = − N − k + 1 2( N − k) ∥yk − yN −1∥2 + ⟨yk − yN −1, 𝕋 yk−1 − 𝕋 yN −1⟩ − N − k − 12( N − k) ∥𝕋 yk−1 − 𝕋 yN −1∥2
+
+for k = 0 , . . . , N − 1. Then for k = 0 , . . . , N − 2,
+
+eVk − eVk+1 = 2(N − k)( N − k − 1) ˜𝔸 xk+1 − ˜𝔸 xN , x k+1 − xN . (15) 
+
+Consequently, eVN −1 ≤ · · · ≤ eV0, and this implies ˜𝔸 xN 
+
+> 2
+
+≤ 1  
+
+> N2
+
+∥y0 − y⋆∥2.Proof. The identity (15) is verified in examples lyapunov/dual-ohm/dual ohm example lyap.ipynb within the codebase. Once this is established, we have 0 = eVN −1 ≤ eV0 = − N + 1 2N ∥y0 − yN −1∥2 + ⟨y0 − yN −1, 𝕋 y−1 − 𝕋 yN −1⟩ − N − 12N ∥𝕋 y−1 − 𝕋 yN −1∥2
+
+= − N + 1 2N ∥y0 − yN −1∥2 + y0 − yN −1, y 0 − yN −1 + 2 ˜ 𝔸 xN − N − 12N y0 − yN −1 + 2 ˜ 𝔸 xN
+
+> 2
+
+= 2
+
+N ˜𝔸 xN , y 0 − yN −1 − 2( N − 1) 
+
+N ˜𝔸 xN
+
+> 2
+
+where we use 𝕋 y−1 = y0 and 𝕋 yN −1 = yN −1 − 2 ˜ 𝔸 xN . Then the proof is concluded by using xN = yN −1 − ˜𝔸 xN , the remaining monotonicity inequality and the square term as 0 ≤ 2
+
+N ˜𝔸 xN , y 0 − yN −1 − 2( N − 1) 
+
+N ˜𝔸 xN 
+
+> 2
+
++ 2
+
+N ˜𝔸 xN , x N − y⋆ + ˜𝔸 xN − 1
+
+N (y0 − y⋆)
+
+> 2
+
+= − ˜𝔸 xN 
+
+> 2
+
++ 1
+
+N 2 ∥y0 − y⋆∥2 .
+
+13 Distinction from prior work. Our Lyapunov analysis is different from that of [76], which defined zk as an auxiliary sequence satisfying z0 = 0 and 
+
+zk+1 = N − k − 1
+
+N − k zk − 1
+
+N − k (yk − 𝕋 yk)
+
+yk+1 = 𝕋 yk − zk+1 .
+
+Here, zk is integrated into the update rule, and this was essential to perform the convergence proof in [76]. Without rewriting Dual-OHM into the above form and proving that the two recurrences are equivalent, their Lyapunov analysis does not seem to work. On the other hand, we show that our Lyapunov function eVk is nonincreasing directly from the simpler, original update rule. This enables a smoother extension to the new algorithm Dual-OC-Halpern in Section 5.4. 
+
+4.1.3 Optimal strongly-monotone proximal point method & Optimal contractive Halpern 
+
+Now we assume that 𝔸 : Rd ⇒ Rd is maximally μ-strongly monotone. The optimal strongly-monotone proximal point method (OS-PPM) , or the equivalent optimal contractive Halpern algorithm [50] has the update rule 
+
+yk =
+
+
+
+1 − 1
+
+φk
+
+
+
+𝕋 yk−1 + 1
+
+φk
+
+y0 (OC-Halpern) where γ = 1 + 2 μ, 𝕋 =
+
+
+
+1 + 1
+
+> γ
+
+
+
+𝕁 𝔸 − 1 
+
+> γ
+
+𝕀 is the γ−1-contractive operator, and φk = Pki=0 γ2i. This algorithm achieves the exact optimal complexity with respect to the squared residual norm ˜𝔸 xN 
+
+> 2
+
+for this setting, and reduces to APPM/OHM in the case μ = 0. Let Γ N = PN −1 
+
+> i=0
+
+γi, βk = 1 
+
+> φk
+
+, xk = 𝕁 𝔸 yk−1, and ˜𝔸 xk = yk−1 − xk ∈ 𝔸 xk. Then we have 
+
+𝕋 yk−1 = xk − 1 
+
+> γ
+
+˜𝔸 xk.OS-PPM/OC-Halpern has the rate ˜𝔸 xN 
+
+> 2
+
+≤ Γ−2 
+
+> N
+
+∥y0 − x⋆∥2, whose PEP-style proof takes the form 
+
+˜𝔸 xN 
+
+> 2
+
+− 1Γ2
+
+> N
+
+∥y0 − x⋆∥2 = − 
+
+> N−1
+
+X
+
+> k=1
+
+λk,k +1 
+
+ ˜𝔸 xk − ˜𝔸 xk+1 , x k − xk+1 − μ ∥xk − xk+1 ∥2
+
+− λN,⋆ 
+
+ ˜𝔸 xN , x N − x⋆ − μ ∥xN − x⋆∥2
+
+− γ−N
+
+Γ2
+
+> N
+
+ΓN ˜𝔸 xN + ( xN − y0) − γN (xN − x⋆) 2 , (16) where λk,k +1 , λ N,⋆ ≥ 0 are specified later. As in APPM/OHM, we have I = {(k, k + 1) | k = 1 , . . . , N − 1} and |J | = 1. 
+
+Step 1. Take I0 = J0 = ∅ and Ik = {(j, j + 1) | j = 1 , . . . , k }, Jk = ∅ for k = 1 , . . . , N − 1. So V0 = 0, and 
+
+Vk = −
+
+> k
+
+X
+
+> j=1
+
+λj,j +1 
+
+ ˜𝔸 xj − ˜𝔸 xj+1 , x j − xj+1 − μ ∥xj − xj+1 ∥2
+
+, k = 1 , . . . , N − 1.
+
+Step 2. This choice satisfies sufficiency, with the remaining terms in the proof are terminal strong monotonicity inequality for the pair ( N, ⋆ ) and the single square term in (16). Numerically, V0 = 0, while Vk has rank 2 for k = 1 , . . . , N − 1. 
+
+Step 3. We construct the set of special vectors as 
+
+T = {y0, . . . , yN −1, x⋆, x1, . . . , xN , g1, . . . , gN }, S = T ∪ { u − v | u, v ∈ T } .
+
+Step 4. For k = 1 , . . . , N − 1, we identify {gk+1 , y0 − xk+1 } ⊂ S ∩ R (Vk) as a basis of R(Vk). Hence, by Proposition 1, 
+
+Vk = ak ˜𝔸 xk+1  
+
+> 2
+
++ bk ˜𝔸 xk+1 , y 0 − xk+1 + ck ∥y0 − xk+1 ∥2 , k = 0 , . . . , N − 1.
+
+14 Step 5. Substituting the above form into the identity 
+
+Vk − Vk+1 = λk+1 ,k +2 
+
+ ˜𝔸 xk+1 − ˜𝔸 xk+2 , x k+1 − xk+2 − μ ∥xk+1 − xk+2 ∥2
+
+(17) for k = 0 , . . . , N − 2, and using the analytic form λk,k +1 = 2(1+ γ)(1+ γ−N )Γ 2
+
+> N
+
+γ−2kφkφk−1 and the update relation 
+
+y0 − xk+2 = (1 − βk+1 )( y0 − xk+1 ) + 1 − βk+1 
+
+γ ˜𝔸 xk+1 + ˜ 𝔸 xk+2 ,
+
+we can symbolically verify that the following is a solution: 
+
+ak = (1 + γ)(1 − βk+1 )λk+1 ,k +2 
+
+2γ2 = (1 + γ)2
+
+(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+1) φ2
+
+> k
+
+ak+1 = (1 + γ)λk+1 ,k +2 
+
+2(1 − βk+1 ) = (1 + γ)2
+
+(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+2) φ2
+
+> k+1
+
+bk = −βk+1 λk+1 ,k +2 = − 2(1 + γ)(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+1) φk
+
+bk+1 = − βk+1 λk+1 ,k +2 
+
+1 − βk+1 
+
+= − 2(1 + γ)(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+2) φk+1 
+
+ck = −μβ k+1 λk+1 ,k +2 = − 2μ(1 + γ)(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+1) φk
+
+ck+1 = − μβ k+1 λk+1 ,k +2 
+
+1 − βk+1 
+
+= − 2μ(1 + γ)(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+2) φk+1 
+
+where we use the identities βk+1 = 1 
+
+> φk+1
+
+and 1 − βk+1 = 1 − 1 
+
+> φk+1
+
+= φk+1 −1 
+
+> φk+1
+
+= γ2φk 
+
+> φk+1
+
+, where the last equality follows from 
+
+φk+1 − 1 = 
+
+> k+1
+
+X
+
+> i=1
+
+γ2i = γ2
+
+> k
+
+X
+
+> i=0
+
+γ2i = γ2φk.
+
+Summarizing, we state the convergence result: 
+
+Proposition 4. Let 𝔸 : Rd ⇒ Rd be maximally μ-strongly monotone with μ ≥ 0, and let γ = 1+2 μ. Let x⋆ satisfy 0 ∈ 𝔸 x⋆,set y⋆ = x⋆, and let y0 ∈ Rd be an initial point. Let xk, y k be generated by (OC-Halpern) with 𝕋 =
+
+
+
+1 + 1
+
+> γ
+
+
+
+𝕁 𝔸 − 1 
+
+> γ
+
+𝕀 , with 
+
+xk = 𝕁 𝔸 yk−1 and ˜𝔸 xk = yk−1 − xk. Define Vk by 
+
+Vk = 1 + γ
+
+(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+1) φk
+
+
+
+(1 + γ)φk ˜𝔸 xk+1  
+
+> 2
+
+− 2 ˜𝔸 xk+1 , y 0 − xk+1 − 2μ ∥y0 − xk+1 ∥2
+
+. (18) 
+
+k = 0 , . . . , N − 1. Then V0 = 0 , and for k = 0 , . . . , N − 2, (17) holds with 
+
+λk+1 ,k +2 = 2(1 + γ)(1 + γ−N )Γ 2
+
+> N
+
+γ−2( k+1) φk+1 φk.
+
+Consequently, VN −1 ≤ · · · ≤ V0 = 0 , and this implies 
+
+˜𝔸 xN 
+
+> 2
+
+≤ 1Γ2
+
+> N
+
+∥y0 − x⋆∥2 .
+
+Proof. The identity (17) is verified in examples lyapunov/oc halpern/oc halpern example lyap.ipynb within the code-base. This immediately establishes VN −1 ≤ V0 = 0. Now, directly plugging in φN −1 = 1−γ2N 
+
+> 1−γ2
+
+, Γ N = 1−γN 
+
+> 1−γ
+
+and μ = γ−12
+
+into the expression (18) with k = N − 1, we obtain 
+
+VN −1 = (1 − γ)γ−N
+
+1 − γN
+
+ 1 − γ2N
+
+1 − γ ˜𝔸 xN 
+
+> 2
+
+− 2 ˜𝔸 xN , y 0 − xN − 2μ ∥y0 − xN ∥2
+
+
+
+= (1 + γ−N ) ˜𝔸 xN 
+
+> 2
+
+− 2(1 − γ)γ−2N
+
+1 − γN ˜𝔸 xN , y 0 − xN + (1 − γ)2γ−2N
+
+1 − γN ∥y0 − xN ∥2 .
+
+15 Then, let λN,⋆ = 2ΓN and consider the inequality 0 ≥ VN −1 − λN,⋆ 
+
+ ˜𝔸 xN , x N − x⋆ − μ ∥xN − x⋆∥2
+
+− γ−N
+
+Γ2
+
+> N
+
+ΓN ˜𝔸 xN + ( xN − y0) − γN (xN − x⋆) 2 .
+
+The proof is completed by showing that the right hand side simplifies to ˜𝔸 xN 
+
+> 2
+
+− 1Γ2
+
+> N
+
+∥y0 − x⋆∥2. We provide this verification via sympy within examples lyapunov/oc halpern/oc halpern example lyap.ipynb , and omit the tedious details here. 
+
+Remark. The original work [50] that introduced (OC-Halpern) also provided a Lyapunov-style proof. Our Lyapunov function in Proposition 4 is equivalent to their proof under rescaling and translation. 
+
+## 4.2 Smooth convex minimization 
+
+We consider the setting provided in Section 2.1, where we solve minimization problems with respect to convex and 
+
+L-smooth f : Rd → R with a minimizer x⋆.
+
+4.2.1 Optimized gradient method 
+
+One of the equivalent forms of the optimized gradient method [33, OGM2] is given as 
+
+yk+1 = xk − 1
+
+L ∇f (xk)
+
+zk+1 = zk − 2θk
+
+L ∇f (xk)
+
+xk+1 =
+
+
+
+1 − 1
+
+θk+1 
+
+
+
+yk+1 + 1
+
+θk+1 
+
+zk+1 ,
+
+(OGM2) for k = 0 , . . . , N − 1, initialized with z0 = x0, where θk is the sequence defined by the recurrence 
+
+θ−1 = 0 
+
+θk =1 + 
+
+q
+
+4θ2 
+
+> k−1
+
++ 1 2 , k = 0 , . . . , N − 1
+
+θN =1 + 
+
+q
+
+8θ2  
+
+> N−1
+
++ 1 2 .
+
+(19) OGM2 converges with the rate 
+
+f (xN ) − f (x⋆) ≤ L
+
+2θ2
+
+> N
+
+∥x0 − x⋆∥2 ,
+
+and the PEP-style proof of this convergence takes the form 
+
+f (xN ) − f (x⋆) − L
+
+2θ2
+
+> N
+
+∥x0 − x⋆∥2 =
+
+> N
+
+X
+
+> i=1
+
+λi−1,i 
+
+
+
+f (xi) − f (xi−1) + ⟨∇ f (xi), x i−1 − xi⟩ + 12L ∥∇ f (xi−1) − ∇ f (xi)∥2
+
+
+
++
+
+> N
+
+X
+
+> i=0
+
+λ⋆,i 
+
+
+
+f (xi) − f (x⋆) + ⟨∇ f (xi), x ⋆ − xi⟩ + 12L ∥∇ f (xi)∥2
+
+
+
+− L
+
+2θ2
+
+> N
+
+zN − x⋆ − θN
+
+L ∇f (xN )
+
+> 2
+
+,
+
+where λi−1,i , λ ⋆,i ≥ 0 are specified later. We have I = {(i, i + 1) | i = 0 , . . . , N − 1} ∪ { (⋆, i ) | i = 0 , . . . , N } and |J | = 1. 
+
+Step 1. Take I0 = {(⋆, 0) } and for k = 1 , . . . , N ,
+
+Ik = {(i, i + 1) | i = 0 , . . . , k − 1} ∪ { (⋆, i ) | i = 0 , . . . , k }.
+
+We set Jk = ∅ for k = 0 , . . . , N .16 Step 2. This choice is sufficient because IN = I and |J \ J N | = 1. Numerically, the quadratic part of the partial sum 
+
+Vk has rank 3 for k = 1 , . . . , N − 1, with V0 and VN being the only exceptions with rank 2. The function-value support is also sparse: Vk only involves f (xk) and f (x⋆). 
+
+Step 3. We construct the set of special vectors using the atomic vectors 
+
+T = {x0, . . . , xN , x⋆, g0, . . . , gN , z1, . . . , zN }, S = T ∪ { u − v | u, v ∈ T } ,
+
+where xi, gi, and zi represent xi, ∇f (xi), and zi, respectively. 
+
+Step 4. For k = 0 , . . . , N − 1, we find the basis vectors 
+
+{gk, x0 − x⋆, zk+1 − x⋆} ⊂ S ∩ R (Vk).
+
+Together with the sparse function-value support identified in Step 2, and using numerical observation, we hypothesize: 
+
+Vk = ak
+
+ f (xk) − f (x⋆) + bk ∥∇ f (xk)∥2 + c ∥zk+1 − x⋆∥2 − c ∥x0 − x⋆∥2
+
+where c ∈ R is constant over k = 0 , . . . , N − 1. Adding the constant term c ∥x0 − x⋆∥2 to each Vk, we consider the translated Lyapunov function 
+
+eVk = Vk + c ∥x0 − x⋆∥2 = ak
+
+ f (xk) − f (x⋆) + bk ∥∇ f (xk)∥2 + c ∥zk+1 − x⋆∥2
+
+for k = 0 , . . . , N − 1. 
+
+Step 5. We use the analytic form of the PEP certificates: 
+
+λi,i +1 = 2θ2
+
+> i
+
+θ2
+
+> N
+
+(i = 0 , . . . , N − 1) , λ⋆,i =
+
+
+
+λi,i +1 − λi−1,i = 2θi
+
+> θ2
+> N
+
+, i = 0 , . . . , N − 1,
+
+1 − λN −1,N = 1 
+
+> θN
+
+, i = N. 
+
+Here we use the recurrence θ2 
+
+> i
+
+− θi = θ2 
+
+> i−1
+
+for i = 1 , . . . , N − 1 and θ2 
+
+> N
+
+− θN = 2 θ2 
+
+> N−1
+
+, together with the convention 
+
+λ−1,0 = 0. Then, we solve the equation 
+
+eVk = eVk+1 − 2θ2
+
+> k
+
+θ2
+
+> N
+
+
+
+f (xk+1 ) − f (xk) + ⟨∇ f (xk+1 ), x k − xk+1 ⟩ + 12L ∥∇ f (xk) − ∇ f (xk+1 )∥2
+
+
+
+− 2θk+1 
+
+θ2
+
+> N
+
+
+
+f (xk+1 ) − f (x⋆) + ⟨∇ f (xk+1 ), x ⋆ − xk+1 ⟩ + 12L ∥∇ f (xk+1 )∥2
+
+ (20) for ak, b k, c, a k+1 , b k+1 . Enforcing the consistency of formulas in k, this uniquely yields 
+
+ak = 2θ2
+
+> k
+
+θ2
+
+> N
+
+, bk = − θ2
+
+> k
+
+Lθ 2
+
+> N
+
+, c = L
+
+2θ2
+
+> N
+
+.
+
+Finally, we obtain the analytic expression for eVN by simplifying 
+
+eVN = eVN −1 + 2θ2 
+
+> N−1
+
+θ2
+
+> N
+
+
+
+f (xN ) − f (xN −1) + ⟨∇ f (xN ), x N −1 − xN ⟩ + 12L ∥∇ f (xN −1) − ∇ f (xN )∥2
+
+
+
++ 1
+
+θN
+
+
+
+f (xN ) − f (x⋆) + ⟨∇ f (xN ), x ⋆ − xN ⟩ + 12L ∥∇ f (xN )∥2
+
+ (21) using θ2 
+
+> N
+
+− θN = 2 θ2 
+
+> N−1
+
+. This reveals 
+
+eVN = f (xN ) − f (x⋆) + L
+
+2θ2
+
+> N
+
+zN − x⋆ − θN
+
+L ∇f (xN )
+
+> 2
+
+.
+
+Putting these pieces together, we obtain the following final result: 17 Proposition 5. Let f : Rd → R be convex and L-smooth, let x⋆ be a minimizer of f , and let xk, y k, z k be generated by 
+
+(OGM2) with z0 = x0. Define 
+
+eVk = 2θ2
+
+> k
+
+θ2
+
+> N
+
+ f (xk) − f (x⋆) − θ2
+
+> k
+
+Lθ 2
+
+> N
+
+∥∇ f (xk)∥2 + L
+
+2θ2
+
+> N
+
+∥zk+1 − x⋆∥2
+
+for k = 0 , . . . , N − 1 and 
+
+eVN = f (xN ) − f (x⋆) + L
+
+2θ2
+
+> N
+
+zN − x⋆ − θN
+
+L ∇f (xN )
+
+> 2
+
+.
+
+Then, with 
+
+λi,i +1 = 2θ2
+
+> i
+
+θ2
+
+> N
+
+, λ⋆,i =
+
+
+
+> 2θi
+> θ2
+> N
+
+, i = 0 , . . . , N − 1, 
+
+> 1
+> θN
+
+, i = N, 
+
+the identities (20) for k = 0 , . . . , N − 2 and (21) hold. Furthermore, 
+
+eV0 − L
+
+2θ2
+
+> N
+
+∥x0 − x⋆∥2 = 2
+
+θ2
+
+> N
+
+
+
+f (x0) − f (x⋆) + ⟨∇ f (x0), x ⋆ − x0⟩ + 12L ∥∇ f (x0)∥2
+
+
+
+≤ 0.
+
+This establishes 
+
+f (xN ) − f (x⋆) ≤ eVN ≤ eV0 ≤ L
+
+2θ2
+
+> N
+
+∥x0 − x⋆∥2 .
+
+Proof. The symbolic verification of the identities (20) and (21) is provided in examples_lyapunov/ogm/ogm_example_ lyap.ipynb within the codebase. Finally, using θ0 = 1 and z1 = z0 − 2θ0 
+
+> L
+
+∇f (x0) = x0 − 2 
+
+> L
+
+∇f (x0), we have 
+
+eV0 − L
+
+2θ2
+
+> N
+
+∥x0 − x⋆∥2 = 2
+
+θ2
+
+> N
+
+f (x0) − f (x⋆) − 12L ∥∇ f (x0)∥2 + L
+
+4 x0 − 2
+
+L ∇f (x0) − x⋆
+
+> 2
+
+− L
+
+4 ∥x0 − x⋆∥2
+
+!
+
+= 2
+
+θ2
+
+> N
+
+
+
+f (x0) − f (x⋆) + ⟨∇ f (x0), x ⋆ − x0⟩ + 12L ∥∇ f (x0)∥2
+
+
+
+as desired, and the proof is complete. 
+
+Remark. The original proof of OGM in [33] was first presented in the PEP style, and was later reformulated into Lyapunov-style proofs equivalent to Proposition 5 in [13, 48]. 
+
+4.2.2 OGM without the prior knowledge of zk
+
+An alternative definition for OGM2 [33, OGM1] does not use the auxiliary iterate zk, and is given by the update rule 
+
+yk+1 = xk − 1
+
+L ∇f (xk)
+
+xk+1 = yk+1 + θk − 1
+
+θk+1 
+
+(yk+1 − yk) + θk
+
+θk+1 
+
+(yk+1 − xk).
+
+(OGM1) In this case, assuming that we do not have the knowledge of the equivalent reformulation OGM2 that seems essential for the Lyapunov analysis to work, can we still recover the same Lyapunov function? We show that this is possible, using our basis completion procedure of Section 3.4. Because OGM1 is equivalent to OGM2, it produces the same sequence of iterates xk; hence, up to Step 2, there is no difference with Section 4.2.1. The first distinction arises in the following step: 
+
+Step 3. We construct the set of special vectors as 
+
+T = {x0, . . . , xN , x⋆, g0, . . . , gN }, S = T ∪ { u − v | u, v ∈ T } ,
+
+where we lack the vectors zk.18 Step 4. Then, unlike in Section 4.2.1, we only find 
+
+{gk, x0 − x⋆} ⊂ S ∩ R (Vk)and fail to complete the basis (recall that rank( Vk) = 3). However, using the basis completion procedure, we numerically observe that there exist constants c, d ∈ R and vk ∈ d(x0 − x⋆) + span {∇ f (x0), . . . , ∇f (xk)} such that 
+
+Vk = ak(f (xk) − f (x⋆)) + bk ∥∇ f (xk)∥2 + c ∥x0 − x⋆∥2 + ∥vk∥2
+
+and vk+1 = vk − ηk∇f (xk+1 ) for some ηk > 0, for k = 0 , . . . , N − 2. This is seen from the numerical values of vk found for k = 0 , . . . , N − 1 in the case N = 5: 
+
+x0 x⋆ ∇f (x0) ∇f (x1) ∇f (x2) ∇f (x3) ∇f (x4) ∇f (x5)
+
+v0 0.136 −0.136 −0.273 0.0 0.0 0.0 0.0 0.0
+
+v1 0.136 −0.136 −0.273 −0.441 0.0 0.0 0.0 0.0
+
+v2 0.136 −0.136 −0.273 −0.441 −0.598 0.0 0.0 0.0
+
+v3 0.136 −0.136 −0.273 −0.441 −0.598 −0.750 0.0 0.0
+
+v4 0.136 −0.136 −0.273 −0.441 −0.598 −0.750 −0.898 0.0where the column labels indicate the PEP basis directions associated with the coefficients of vk within each column. Applying translation by the constant term −c ∥x0 − x⋆∥2, and re-running the previous procedure, we observe that 
+
+eVk = ak(f (xk) − f (x⋆)) + bk ∥∇ f (xk)∥2 + ∥vk∥2 (22) for k = 0 , . . . , N − 1, and vk+1 = vk − ηk∇f (xk+1 ) also holds for all k = 0 , . . . , N − 2, for some ηk ∈ R. By construction, this sequence must satisfy the identity (20). 
+
+Step 5. Using (20) with (22), we obtain the identity 
+
+ak(f (xk) − f (x⋆)) + bk ∥∇ f (xk)∥2 + ∥vk∥2 − ak+1 (f (xk+1 ) − f (x⋆)) − bk+1 ∥∇ f (xk+1 )∥2 − ∥ vk+1 ∥2
+
+= − 2θ2
+
+> k
+
+θ2
+
+> N
+
+
+
+f (xk+1 ) − f (xk) + ⟨∇ f (xk+1 ), x k − xk+1 ⟩ + 12L ∥∇ f (xk) − ∇ f (xk+1 )∥2
+
+
+
+− 2θk+1 
+
+θ2
+
+> N
+
+
+
+f (xk+1 ) − f (x⋆) + ⟨∇ f (xk+1 ), x ⋆ − xk+1 ⟩ + 12L ∥∇ f (xk+1 )∥2
+
+ (23) for k = 0 , . . . , N − 2, and we have the additional constraint vk+1 = vk − ηk∇f (xk+1 ). Comparing the coefficients of f (xk), 
+
+f (xk+1 ), and f (x⋆) in both sides gives 
+
+ak − 2θ2
+
+> k
+
+θ2
+
+> N
+
+= 0 , −ak+1 + 2θ2
+
+> k
+
+θ2
+
+> N
+
++ 2θk+1 
+
+θ2
+
+> N
+
+= 0 , −ak + ak+1 − 2θk+1 
+
+θ2
+
+> N
+
+= 0 ,
+
+which, using θ2 
+
+> k+1
+
+− θk+1 = θ2
+
+> k
+
+, implies 
+
+ak = 2θ2
+
+> k
+
+θ2
+
+> N
+
+, ak+1 = 2( θ2 
+
+> k
+
++ θk+1 )
+
+θ2
+
+> N
+
+= 2θ2
+
+> k+1
+
+θ2
+
+> N
+
+.
+
+Next, comparing the coefficient of ∥∇ f (xk)∥2 in both sides, we immediately obtain bk = − θ2
+
+> k
+> Lθ 2
+> N
+
+.It remains to determine ηk and vk. For consistency of the formula for bk across iterations, we set bk+1 = − θ2
+
+> k+1
+> Lθ 2
+> N
+
+. Then, substituting the expressions for ak, b k, a k+1 and bk+1 , together with the identity 
+
+∥vk∥2 − ∥ vk+1 ∥2 = 2 ηk ⟨vk, ∇f (xk+1 )⟩ − η2 
+
+> k
+
+∥∇ f (xk+1 )∥2
+
+into (23) and gathering all terms paired with ∇f (xk+1 ), we obtain 2ηkvk + 2θ2
+
+> k
+
+θ2
+
+> N
+
+(xk − xk+1 ) + 2θk+1 
+
+θ2
+
+> N
+
+(x⋆ − xk+1 ) − 2θ2
+
+> k
+
+Lθ 2
+
+> N
+
+∇f (xk) + 
+
+ 2θ2
+
+> k+1
+
+Lθ 2
+
+> N
+
+− η2
+
+> k
+
+
+
+∇f (xk+1 ) = 0 . (24) 19 Since the completed vector vk belongs to d(x0 − x⋆) + span {∇ f (x0), . . . , ∇f (xk)}, the coefficient of the new direction 
+
+∇f (xk+1 ) must vanish. Therefore, we obtain ηk =
+
+q 2 
+
+> Lθk+1
+> θN
+
+. Then, (24) reduces to 2ηkvk + 2θ2
+
+> k
+
+θ2
+
+> N
+
+(xk − xk+1 ) + 2θk+1 
+
+θ2
+
+> N
+
+(x⋆ − xk+1 ) − 2θ2
+
+> k
+
+Lθ 2
+
+> N
+
+∇f (xk) = 0 ,
+
+and hence 
+
+vk =
+
+s
+
+L
+
+2θ2
+
+> N
+
+
+
+θk+1 xk+1 − (θk+1 − 1) xk + θk+1 − 1
+
+L ∇f (xk) − x⋆
+
+
+
+.
+
+In the notation of Step 4, this identifies d =
+
+q L
+
+> 2θ2
+> N
+
+. We can then rewrite (22) to conclude that 
+
+eVk = 2θ2
+
+> k
+
+θ2
+
+> N
+
+(f (xk) − f (x⋆)) − θ2
+
+> k
+
+Lθ 2
+
+> N
+
+∥∇ f (xk)∥2 + L
+
+2θ2
+
+> N
+
+θk+1 xk+1 − (θk+1 − 1) xk + θk+1 − 1
+
+L ∇f (xk) − x⋆
+
+> 2
+
+defined for k = 0 , . . . , N − 1 is a Lyapunov function. In fact, rearranging (OGM2) yields 
+
+zk+1 = θk+1 xk+1 − (θk+1 − 1) xk + θk+1 − 1
+
+L ∇f (xk),
+
+so this coincides with the Lyapunov function found in Proposition 5. We include the Steps 1–4 above and the verification of eVk − eVk+1 ≥ 0 for k = 0 , . . . , N − 2 using only the OGM1 update rule in examples_lyapunov/ogm/ogm_example_lyap_ without_z.ipynb . One can then proceed in the same way for the last-step modification (identifying eVN ) and deriving the final convergence guarantee, which we omit here. 
+
+4.2.3 OGM-G 
+
+OGM-G [34] is an algorithm designed for efficiently reducing the gradient norm of smooth convex functions with respect to the initial function value condition. Define θk as in (19) (so it is the same sequence as in OGM), and define the reversed sequence ψi = θN −i for i = 0 , . . . , N + 1. In particular, ψN +1 = θ−1 = 0. The originally proposed form of OGM-G from [34] is given by 
+
+yk+1 = xk − 1
+
+L ∇f (xk)
+
+xk+1 = yk+1 + (ψk − 1)(2 ψk+1 − 1) 
+
+ψk(2 ψk − 1) (yk+1 − yk) + 2ψk+1 − 12ψk − 1 (yk+1 − xk)for k = 0 , . . . , N − 1. This is similar to how OGM1 was defined. We rewrite it into a form similar to OGM2, which is a straightforward reformulation that results in the unique form: set z0 = x0, z 1 = z0 − ψ0+1 2L ∇f (x0), and for k = 1 , . . . , N ,define 
+
+yk = xk−1 − 1
+
+L ∇f (xk−1),xk =
+
+ ψk+1 
+
+ψk
+
+4
+
+yk + 1 −
+
+ ψk+1 
+
+ψk
+
+4!
+
+zk,zk+1 = zk − ψk
+
+L ∇f (xk).
+
+(OGM-G) Note that ψN +1 = 0, so the second line implies xN = zN . OGM-G exhibits the rate 
+
+∥∇ f (xN )∥2 ≤ 2Lψ20
+
+ f (x0) − f (x⋆).
+
+The PEP-style proof of this convergence takes the form 1
+
+L ∥∇ f (xN )∥2 − 2
+
+ψ20
+
+ f (x0) − f (x⋆) = 
+
+> N−1
+
+X
+
+> i=0
+
+λi,i +1 
+
+
+
+f (xi+1 ) − f (xi) + ⟨∇ f (xi+1 ), x i − xi+1 ⟩ + 12L ∥∇ f (xi) − ∇ f (xi+1 )∥2
+
+
+
++ 
+
+> N−1
+
+X
+
+> i=0
+
+λN,i 
+
+
+
+f (xi) − f (xN ) + ⟨∇ f (xi), x N − xi⟩ + 12L ∥∇ f (xN ) − ∇ f (xi)∥2
+
+
+
+20 + λN,⋆ 
+
+
+
+f (x⋆) − f (xN ) + 12L ∥∇ f (xN )∥2
+
+
+
+where we specify λi,i +1 , λ N,j for i = 0 , . . . , N − 1 and j = 0 , . . . , N − 1, ⋆ later. In particular we have, I = {(i, i + 1) | i =0, . . . , N − 1} ∪ { (N, i ) | i = 0 , . . . , N − 1, ⋆ }, and because there are no norm square terms in the proof, J = ∅.
+
+Step 1. We set 
+
+I0 = {(N, 0) }, Ik = {(i, i + 1) | i = 0 , . . . , k − 1} ∪ { (N, i ) | i = 0 , . . . , min {k, N − 1}} 
+
+for k = 1 , . . . , N , and set Jk = ∅ for all k. In particular, I \ I N = {(N, ⋆ )}.
+
+Step 2. This choice is clearly sufficient. We numerically analyze the matrices Vk encoding the quadratic part of Vk, and observe that rank( Vk) = 4 for k = 1 , . . . , N − 2, with rank( V0) = 3 = rank( VN −1) and rank( VN ) = 1 being the exceptions. The function-value support f ⊙ bk is also sparse: it only involves f (x0), f (xk), and f (xN ). 
+
+Step 3. We construct the set of special vectors as 
+
+T = {x0, . . . , xN , x⋆, g0, . . . , gN , y1, . . . , yN , z1, . . . , zN +1 }, S = T ∪ { u − v | u, v ∈ T } ,
+
+where xi, gi, yi, and zi represent xi, ∇f (xi), yi, and zi, respectively. 
+
+Step 4. For i = 1 , . . . , N − 2, we find that 
+
+{gi, gN , xi+1 − yi+1 , zi+1 − zN +1 } ⊂ S ∩ R (Vi)is a basis of R(Vi). At i = 0 and i = N − 1, these four vectors become linearly dependent and the rank( Vi) drops to 3. With this information and numerical observations, we hypothesize a Lyapunov function of the form 
+
+Vi = ai
+
+ f (xi) − f (xN ) + bi
+
+ f (x0) − f (xN ) + ci ∥∇ f (xi)∥2 + di ∥∇ f (xN )∥2 + ei ⟨xi+1 − yi+1 , z i+1 − zN +1 ⟩ (25) for i = 0 , . . . , N − 1. We handle the final term VN separately below. 
+
+Step 5. We first specify the analytic forms of λ as λi,i +1 = 1
+
+> ψ2
+> i+1
+
+for i = 0 , . . . , N − 1, and 
+
+λN, 0 = 1
+
+ψ21
+
+− 2
+
+ψ20
+
+, λN,i = 1
+
+ψ2
+
+> i+1
+
+− 1
+
+ψ2
+
+> i
+
+(i = 1 , . . . , N − 1) , λN,⋆ = 2
+
+ψ20
+
+.
+
+We plug (25) into 0 = Vi+1 − Vi − 1
+
+ψ2
+
+> i+1
+
+
+
+f (xi+1 ) − f (xi) + ⟨∇ f (xi+1 ), x i − xi+1 ⟩ + 12L ∥∇ f (xi) − ∇ f (xi+1 )∥2
+
+
+
+−
+
+ 1
+
+ψ2
+
+> i+2
+
+− 1
+
+ψ2
+
+> i+1
+
+  
+
+f (xi+1 ) − f (xN ) + ⟨∇ f (xi+1 ), x N − xi+1 ⟩ + 12L ∥∇ f (xi+1 ) − ∇ f (xN )∥2
+
+ (26) for i = 0 , . . . , N − 2 to solve for the coefficients. Using the update rule (OGM-G) and the ψ-recurrence ψ20 − ψ0 = 2 ψ21
+
+and ψ2 
+
+> i
+
+− ψi = ψ2 
+
+> i+1
+
+for i = 1 , . . . , N , we obtain 
+
+ai = 1
+
+ψ2
+
+> i+1
+
+, bi ≡ − 2
+
+ψ20
+
+, ci = − 12Lψ 2
+
+> i+1
+
+, di = ψ20 − 2ψ2
+
+> i+1
+
+2Lψ 20 ψ2
+
+> i+1
+
+, ei = Lψ2
+
+> i+1
+
+(2 ψi+1 − 1) for i = 0 , . . . , N − 1. In particular, bi is constant across i, so we can remove it from (25) and consider the translated Lyapunov function 
+
+eVk = 1
+
+ψ2
+
+> k+1
+
+ f (xk) − f (xN ) − 12Lψ 2
+
+> k+1
+
+∥∇ f (xk)∥2 + ψ20 − 2ψ2
+
+> k+1
+
+2Lψ 20 ψ2
+
+> k+1
+
+∥∇ f (xN )∥2 + Lψ2
+
+> k+1
+
+(2 ψk+1 − 1) ⟨xk+1 − yk+1 , z k+1 − zN +1 ⟩
+
+(27) for k = 0 , . . . , N − 1. Finally, we can separately verify that 
+
+eVN = eVN −1 + 1
+
+ψ2
+
+> N
+
+
+
+f (xN ) − f (xN −1) + ⟨∇ f (xN ), x N −1 − xN ⟩ + 12L ∥∇ f (xN −1) − ∇ f (xN )∥2
+
+
+
+(28) simplifies to ψ20 −1
+
+> Lψ 20
+
+∥∇ f (xN )∥2. Summarizing the result, we obtain the following: 21 Proposition 6. Let f : Rd → R be convex and L-smooth, let x⋆ be a minimizer of f , and let xk, y k, z k be generated by 
+
+(OGM-G) . Define eVk as in (27) , and let eVN = ψ20 −1
+
+> Lψ 20
+
+∥∇ f (xN )∥2. Then, (26) for k = 0 , . . . , N − 2 and (28) hold, and 
+
+eV0 = 2
+
+ψ20
+
+(f (x0) − f (xN )) + 
+
+ 1
+
+ψ21
+
+− 2
+
+ψ20
+
+  
+
+f (x0) − f (xN ) + ⟨∇ f (x0), x N − x0⟩ + 12L ∥∇ f (x0) − ∇ f (xN )∥2
+
+
+
+≤ 2
+
+ψ20
+
+(f (x0) − f (xN )) .
+
+This establishes eVN ≤ · · · ≤ eV0 ≤ 2
+
+> ψ20
+
+(f (x0) − f (xN )) , and consequently, 
+
+1
+
+L ∥∇ f (xN )∥2 − 2
+
+ψ20
+
+ f (x0) − f (x⋆) = eVN − 2
+
+ψ20
+
+(f (x0) − f (xN )) + 2
+
+ψ20
+
+
+
+f (x⋆) − f (xN ) + 12L ∥∇ f (xN )∥2
+
+
+
+≤ 0.
+
+Proof. The symbolic verification of the displayed identities is provided in examples_lyapunov/ogm_g/ogm_g_example_ lyap.ipynb within the codebase. This immediately implies eVN ≤ · · · ≤ eV0 and eV0 ≤ 2
+
+> ψ20
+
+(f (x0) − f (xN )), and then we easily see that the following identity holds: 1
+
+L ∥∇ f (xN )∥2 − 2
+
+ψ20
+
+ f (x0) − f (x⋆) = eVN − 2
+
+ψ20
+
+(f (x0) − f (xN )) 
+
+| {z }
+
+> ≤0
+
++ 2
+
+ψ20
+
+
+
+f (x⋆) − f (xN ) + 12L ∥∇ f (xN )∥2
+
+| {z }
+
+> ≤0
+
+which shows that the right hand side is at most 0, completing the proof. 
+
+Remark. The original proof of OGM-G in [34] was presented in the PEP style. It was later reformulated into a simpler potential-function argument by [16], although their analysis did not explicitly establish a single nonincreasing quantity. To the best of our knowledge, the first Lyapunov-style proof in that sense, essentially equivalent to our Proposition 6, was given in [39]. 
+
+## 4.3 Smooth minimax optimization 
+
+Consider the setting of Section A.1, where we solve minimax optimization problem with respect to convex-concave and 
+
+L-smooth ϕ : Rdu × Rdv → R with a minimax optimum (saddle point) x⋆ = ( u⋆, v ⋆). This can be recast into the monotone inclusion problem with respect to monotone and L-Lipschitz operator by considering the saddle gradient operator 𝔸 
+
+defined by (48). 
+
+4.3.1 Fast extragradient 
+
+The fast extragradient (FEG) algorithm 2 with ρ = 0 [40] generates, for k = 0 , . . . , N − 1, 
+
+xk+ 12 = xk + 1
+
+k + 1 (x0 − xk) − kk + 1 1
+
+L 𝔸 xk
+
+xk+1 = xk + 1
+
+k + 1 (x0 − xk) − 1
+
+L 𝔸 xk+ 12 .
+
+(FEG) The first half-step gives x 12 = x0. FEG has the rate ∥𝔸 xN ∥2 ≤ 4L2  
+
+> N2
+
+∥x0 − x⋆∥2, whose PEP-style proof takes the form 
+
+∥𝔸 xN ∥2 − 4L2
+
+N 2 ∥x0 − x⋆∥2 = − 
+
+> N−1
+
+X
+
+> j=1
+
+λM
+
+> j,j +1
+
+M(xj , x j+1 ) − λM
+
+> N,⋆
+
+M(xN , x ⋆) − 
+
+> N−1
+
+X
+
+> j=0
+
+λL  
+
+> j+12,j +1
+
+L(xj+ 12 , x j+1 )
+
+− 2LN (x0 − x⋆) − 𝔸 xN
+
+> 2
+
+(29) where we write 
+
+M(x, y ) := ⟨x − y, 𝔸 x − 𝔸 y⟩ ≥ 0, L(x, y ) := L2 ∥x − y∥2 − ∥ 𝔸 x − 𝔸 y∥2 ≥ 0                       
+
+> 2In [40], the FEG algorithm was designed for structured nonconvex-nonconcave minimax optimization problems whose saddle gradient operator is L-Lipschitz and ρ-comonotone , i.e., ⟨𝔸 x−𝔸 y, x −y⟩ ≥ ρ∥𝔸 x−𝔸 y∥2for all x, y ∈Rdwith some ρ≤0. Here, we consider only its special case ρ= 0, where 𝔸 is monotone.
+
+22 for the monotonicity and Lipschitz inequalities. The nonnegative weights λM
+
+> j,j +1
+
+, λM
+
+> N,⋆
+
+, and λL   
+
+> j+12,j +1
+
+are specified later. In this case, the active monotonicity and Lipschitz inequalities and sum of squares terms are 
+
+IM = {(j, j + 1) | j = 1 , . . . , N − 1} ∪ { (N, ⋆ )}, IL =
+
+ 
+
+j + 12 , j + 1 
+
+
+
+j = 0 , . . . , N − 1
+
+
+
+, |J | = 1 .
+
+Step 1. Take IM 
+
+> 0
+
+= IL 
+
+> 0
+
+= J0 = ∅ and 
+
+IM 
+
+> k
+
+= {(j, j + 1) | j = 1 , . . . , k − 1}, IL 
+
+> k
+
+=
+
+ 
+
+j + 12 , j + 1 
+
+
+
+j = 0 , . . . , k − 1
+
+
+
+, Jk = ∅.
+
+With this choice, we have |I M \ I M 
+
+> N
+
+| = |J \ J N | = 1 and |I L \ I L 
+
+> k
+
+| = 0. 
+
+Step 2. This choice satisfies sufficiency, with the remaining terms in the proof being only the monotonicity inequality 
+
+M(xN , x ⋆) and the single square term in (29). Numerically, V0 = 0, while Vk has rank 2 for k = 1 , . . . , N .
+
+Step 3. We construct the set of special vectors as 
+
+T = {xj , xj+ 12 , gj , gj+ 12 | j = 0 , . . . , N − 1} ∪ { xN , x⋆, gN }, S = T ∪ { u − v | u, v ∈ T } ,
+
+where xt and gt respectively represent xt and 𝔸 xt for t = 0 , 12 , 1, . . . , N .
+
+Step 4. For k = 1 , . . . , N , we identify {gk, x0 − xk} ⊂ S ∩ R (Vk) as a basis of R(Vk). Hence, by Proposition 1, we search for a Lyapunov function of the form 
+
+Vk = ak ∥𝔸 xk∥2 + bk ⟨𝔸 xk, x 0 − xk⟩ + ck ∥x0 − xk∥2
+
+for k = 1 , . . . , N , while we quickly observe numerically that ck ≡ 0. 
+
+Step 5. We substitute the Lyapunov skeleton form into the identity 
+
+Vk − Vk+1 = λM
+
+> k,k +1
+
+M(xk, x k+1 ) + λL  
+
+> k+12,k +1
+
+L(xk+ 12 , x k+1 )for k = 1 , . . . , N − 1 and use the analytic forms λM 
+
+> k,k +1
+
+= 4Lk (k+1)   
+
+> N2
+
+and λL   
+
+> k+12,k +1
+
+= 2( k+1) 2  
+
+> N2
+
+, together with the update rule of FEG and the numerical observation ck = ck+1 = 0. Then, solving the identity for the coefficients, we obtain 
+
+ak = 2k2
+
+N 2 , bk = − 4Lk N 2 , ak+1 = 2( k + 1) 2
+
+N 2 , bk+1 = − 4L(k + 1) 
+
+N 2 ,
+
+i.e., the Lyapunov function is, for k = 0 , . . . , N ,
+
+Vk = 2k2
+
+N 2 ∥𝔸 xk∥2 − 4Lk N 2 ⟨𝔸 xk, x 0 − xk⟩ . (30) Summarizing the above outcome, we obtain the following result. 
+
+Proposition 7. Let 𝔸 : Rd → Rd be monotone and L-Lipschitz, and let 𝔸 x⋆ = 0 . Let xk be generated by (FEG) . Define 
+
+Vk by (30) for k = 0 , . . . , N . Then for k = 0 , . . . , N − 1,
+
+Vk − Vk+1 = 4Lk (k + 1) 
+
+N 2 M(xk, x k+1 ) + 2( k + 1) 2
+
+N 2 L(xk+ 12 , x k+1 ). (31) 
+
+Consequently, VN ≤ · · · ≤ V0 = 0 , and this implies 
+
+∥𝔸 xN ∥2 ≤ 4L2
+
+N 2 ∥x0 − x⋆∥2 .
+
+Proof. The identity (31) is verified symbolically in the associated FEG notebook fast_extragradient_example_lyap. ipynb within the codebase. Since M ≥ 0 and L ≥ 0 for any pair of iterates, this identity immediately establishes 
+
+VN ≤ · · · ≤ V0 = 0. Once this is established, it is straightforward to verify that 
+
+∥𝔸 xN ∥2 − 4L2
+
+N 2 ∥x0 − x⋆∥2 = VN − 4LN M(xN , x ⋆) − 𝔸 xN − 2LN (x0 − x⋆)
+
+> 2
+
+≤ VN ≤ V0 = 0 ,
+
+which compeletes the proof. 23 4.3.2 Dual fast extragradient 
+
+We next consider the H-dual algorithm of FEG, the dual fast extragradient (Dual-FEG) [76], which has a terminal horizon 
+
+N and the update rule 
+
+xk+ 12 = xk − 1
+
+L zk − 1
+
+L 𝔸 xk,xk+1 = xk+ 12 − N − k − 1
+
+N − k
+
+1
+
+L
+
+
+
+𝔸 xk+ 12 − 𝔸 xk
+
+
+
+,zk+1 = N − k − 1
+
+N − k zk − 1
+
+N − k 𝔸 xk+ 12
+
+(Dual-FEG) for k = 0 , . . . , N − 1, where z0 = 0. Dual-FEG has the rate ∥𝔸 xN ∥2 ≤ 4L2∥x0−x⋆∥2  
+
+> N2
+
+, whose PEP-style proof takes the form 
+
+∥𝔸 xN ∥2 − 4L2
+
+N 2 ∥x0 − x⋆∥2 = − 
+
+> N−2
+
+X
+
+> j=0
+
+λM   
+
+> j+12,N
+
+M(xj+ 12 , x N ) − λM
+
+> N,⋆
+
+M(xN , x ⋆)
+
+− 
+
+> N−2
+
+X
+
+> j=0
+
+λL 
+
+> j,j +12
+
+L(xj , x j+ 12 ) − λL  
+
+> N−1,N
+
+L(xN −1, x N ) − 𝔸 xN − 2LN (x0 − x⋆)
+
+> 2
+
+.
+
+(32) The nonnegative weights λM   
+
+> j+12,N
+
+, λM
+
+> N,⋆
+
+, λL 
+
+> j,j +12
+
+, and λL  
+
+> N−1,N
+
+are specified later. In this case, the active monotonicity and Lipschitz inequalities are 
+
+IM =
+
+ 
+
+j + 12 , N 
+
+
+
+j = 0 , . . . , N − 2
+
+
+
+∪ { (N, ⋆ )}, IL =
+
+ 
+
+j, j + 12
+
+
+
+j = 0 , . . . , N − 2
+
+
+
+∪ { (N − 1, N )}, |J | = 1 .
+
+Step 1. Take IM 
+
+> 0
+
+= IL 
+
+> 0
+
+= J0 = ∅ and, for k = 1 , . . . , N − 1, 
+
+IM 
+
+> k
+
+=
+
+ 
+
+j + 12 , N 
+
+
+
+j = 0 , . . . , k − 1
+
+
+
+, IL 
+
+> k
+
+=
+
+ 
+
+j, j + 12
+
+
+
+j = 0 , . . . , k − 1
+
+
+
+, Jk = ∅.
+
+At the terminal iteration, take 
+
+IM 
+
+> N
+
+= IM  
+
+> N−1
+
+∪ { (N, ⋆ )}, IL 
+
+> N
+
+= IL  
+
+> N−1
+
+∪ { (N − 1, N )}, JN = ∅.
+
+Step 2. This choice satisfies sufficiency, with the remaining term in the proof being the single square term in (32). Numerically, V0 = 0, while Vk has rank 4 for k = 1 , . . . , N − 1 and VN has rank 2. 
+
+Step 3. We construct the set of special vectors as 
+
+T = {xj , xj+ 12 , gj , gj+ 12 | j = 0 , . . . , N − 1} ∪ { xN , x⋆, gN , z1, . . . , zN }, S = T ∪ { u − v | u, v ∈ T } ,
+
+where xt and gt respectively represent xt and 𝔸 xt for t = 0 , 12 , . . . , N and zj represents zj for j = 1 , . . . , N .
+
+Step 4. We identify {x0 −xN , xk −xN , zk, gN } ⊂ S ∩R (Vk) as a basis of R(Vk) for k = 1 , . . . , N −1, and {x0 −x⋆, gN } ⊂ S ∩ R (VN ) as a basis of R(VN ). Hence, using Proposition 1 and excluding the coefficients that are numerically observed to be zero, we search for a Lyapunov function of the form 
+
+Vk = ak ⟨x0 − xN , 𝔸 xN ⟩ + bk ⟨xk − xN , z k⟩ + ck ⟨xk − xN , 𝔸 xN ⟩ + dk ∥zk∥2 + ek ⟨zk, 𝔸 xN ⟩
+
+for k = 1 , . . . , N − 1. 
+
+Step 5. Substituting the above form into the identity 
+
+Vk − Vk+1 = λM   
+
+> k+12,N
+
+M(xk+ 12 , x N ) + λL 
+
+> k,k +12
+
+L(xk, x k+ 12 )24 for k = 0 , . . . , N − 2, and using the analytic forms λM   
+
+> k+12,N
+
+= 4L   
+
+> (N−k−1)( N−k)
+
+and λL 
+
+> k,k +12
+
+= 2(N −k)2 , together with the update relation (Dual-FEG), we can symbolically verify the solution 
+
+ak = ak+1 = − 4LN , bk = ck = 4LN − k , bk+1 = ck+1 = 4LN − k − 1 , dk = dk+1 = −2, ek = ek+1 = −4.
+
+Thus the Lyapunov function is 
+
+Vk = − 4LN ⟨x0 − xN , 𝔸 xN ⟩ + 4LN − k ⟨xk − xN , z k⟩ + 4LN − k ⟨xk − xN , 𝔸 xN ⟩ − 2 ∥zk∥2 − 4 ⟨zk, 𝔸 xN ⟩ (33) for k = 0 , . . . , N − 1. Finally, we can separately verify that 
+
+VN = VN −1 − 4LN M(xN , x ⋆) − 2L(xN −1, x N )simplifies to 
+
+VN = 2 ∥𝔸 xN ∥2 − 4LN ⟨𝔸 xN , x 0 − x⋆⟩ . (34) Summarizing the above, we obtain the following result. 
+
+Proposition 8. Let 𝔸 : Rd → Rd be monotone and L-Lipschitz, and let 𝔸 x⋆ = 0 . Let xk, z k be generated by (Dual-FEG) .Define Vk by (33) for k = 0 , . . . , N − 1 and by (34) for k = N . Then V0 = 0 , and we have 
+
+Vk − Vk+1 = 4L
+
+(N − k − 1)( N − k) M(xk+ 12 , x N ) + 2(N − k)2 L(xk, x k+ 12 ). (35) 
+
+for k = 0 , . . . , N − 2 and 
+
+VN −1 − VN = 4LN M(xN , x ⋆) + 2 L(xN −1, x N ). (36) 
+
+Consequently, VN ≤ · · · ≤ V0 = 0 , and this implies 
+
+∥𝔸 xN ∥2 ≤ 4L2
+
+N 2 ∥x0 − x⋆∥2 .
+
+Proof. The identities (35) and (36) are verified symbolically in the associated notebook dual_feg_example_lyap.ipynb 
+
+within the codebase. Since M ≥ 0 and L ≥ 0, these identities immediately establish VN ≤ · · · ≤ V0 = 0, which implies 
+
+∥𝔸 xN ∥2 − 4L2
+
+N 2 ∥x0 − x⋆∥2 = VN − 𝔸 xN − 2LN (x0 − x⋆)
+
+> 2
+
+≤ VN ≤ V0 = 0 which is the desired convergence guarantee. 
+
+# 5 Discovering new analyses and algorithms via unified framework 
+
+In this section, we utilize our framework to discover previously unknown Lyapunov-style proofs: 1. We consider the smooth convex minimization problem and present the Lyapunov analysis corresponding to the tight convergence proof for the gradient descent (GD) algorithm from [20]. 2. We consider the composite minimization problem with a nonsmooth proximable term and a Bregman-relatively-smooth term, and present a tight Lyapunov-style proof for the Bregman proximal gradient method (BPGM) yielding the same rate as [83, 30]. 3. We consider the maximally monotone inclusion problem and present the Lyapunov-style proof corresponding to the tight convergence proof of the proximal point method (PPM) from [28]. The aforementioned results are new in the sense that the tight rates were previously known but had not been formally stated anywhere in the form of Lyapunov analysis, to the best of our knowledge. Our final result, on the other hand, discovers a novel algorithm dual optimal contractive Halpern (Dual-OC-Halpern) , equipped with a Lyapunov-style proof showing that it is another exact optimal algorithm for the equivalent settings of maximally μ-strongly monotone inclusion (with proximal operations) and γ-contractive fixed-point problems. 25 5.1 Gradient descent with constant step size 
+
+Let f : Rd → R be a convex, L-smooth function with a minimizer x⋆. Consider the standard gradient descent with step size 1 
+
+> L
+
+:
+
+xk+1 = xk − 1
+
+L ∇f (xk). (GD) The tight PEP-style convergence proof for GD takes the form 
+
+f (xN ) − f (x⋆) − L
+
+4N + 2 ∥x0 − x⋆∥2 =
+
+> N
+
+X
+
+> i=1
+
+λi−1,i 
+
+
+
+f (xi) − f (xi−1) + ⟨∇ f (xi), x i−1 − xi⟩ + 12L ∥∇ f (xi−1) − ∇ f (xi)∥2
+
+
+
++
+
+> N
+
+X
+
+> i=0
+
+λ⋆,i 
+
+
+
+f (xi) − f (x⋆) + ⟨∇ f (xi), x ⋆ − xi⟩ + 12L ∥∇ f (xi)∥2
+
+
+
+− x0 x⋆ ∇f (x0) · · · ∇f (xN ) SN
+
+x0 x⋆ ∇f (x0) · · · ∇f (xN )⊺
+
+where we specify λi−1,i , λ ⋆,i ≥ 0 and SN ⪰ 0 later. To run our procedure, we need a decomposition of the positive semidefinite matrix SN ∈ SN +3 + into rank-1 matrices. This can be done numerically by employing techniques from numerical linear algebra. We propose one concrete strategy here, which we call the reverse-basis LDL decomposition ,where we find a unit ( N + 3) × (N + 3) lower triangular matrix LN and a diagonal matrix D such that 
+
+x0 x⋆ ∇f (x0) · · · ∇f (xN ) SN
+
+x0 x⋆ ∇f (x0) · · · ∇f (xN )⊺
+
+= ∇f (xN ) · · · ∇f (x0) x⋆ x0
+
+ LN DL T
+
+> N
+
+∇f (xN ) · · · ∇f (x0) x⋆ x0
+
+⊺ .
+
+Note that in the right hand side, the order of the PEP basis vectors is reversed to ∇f (xN ) · · · ∇f (x0) x⋆ x0
+
+. This design lets the i-th term in the sum of squares decomposition depend only on the algorithm’s history up to i-th iteration. To make this point precise, we need to first note the two characteristics of LN and D in the case of GD: (i) SN has rank N + 1, and consequently, D has N + 1 nonzero diagonal entries and the remaining two are zeros, precisely the last two entries. Hence, we can write D = diag( αN , . . . , α 0, 0, 0). (ii) The first N + 1 columns of LN are of the form ∗ · · · ∗ c −cT, i.e., the sum of last two entries are zero. Hence, writing LN =
+
+
+
+| · · · | | |
+
+ℓN · · · ℓ0 ℓ−1 ℓ−2
+
+| · · · | | |
+
+, we can write 
+
+x0 x⋆ ∇f (x0) · · · ∇f (xN ) SN
+
+x0 x⋆ ∇f (x0) · · · ∇f (xN )⊺ =
+
+> N
+
+X
+
+> i=0
+
+αi ∥si∥2
+
+where si = ∇f (xN ) · · · ∇f (x0) x⋆ x0
+
+ ℓi ∈ span {x0 − x⋆, ∇f (x0), . . . , ∇f (xi)} since LN is lower triangular. We highlight again that the process of obtaining αi and si as above is purely numerical, and thus the steps 1–4 below are also performed numerically. 
+
+Step 1. We have I = {(i − 1, i ) | i = 1 , . . . , N } ∪ { (⋆, i ) | i = 0 , . . . , N } and J = {0, . . . , N }. Let us naturally define 
+
+Ik = {(i − 1, i ) | i = 1 , . . . , k } ∪ { (⋆, i ) | i = 0 , . . . , k }, Jk = {0, . . . , k }
+
+for k = 0 , . . . , N . To clarify, in particular, I0 = {(⋆, 0) } and J0 = {0}.
+
+Step 2. We have IN = I and JN = J , so sufficiency is immediate. The rank computation of Vk reveals the almost constant rank of 3, except when k = 0 and k = N . Finally, the function value term f ⊙ bk associated with the partial sum given by Step 1 is sparse, identifying the simple term ak(f (xk) − f (x⋆)). 
+
+Step 3. We construct the set of special vectors as 
+
+T = {x0, . . . , xN , x⋆, g0, . . . , gN }, S = T ∪ { u − v : u, v ∈ T } .
+
+26 Step 4. We numerically find that V0 = 0 and 
+
+{x0 − x⋆, gk, xk+1 − x⋆} ⊂ S ∩ R (Vk)for k = 1 , . . . , N − 1. Using Proposition 1 and numerical observations, we can hypothesize a Lyapunov function of the form 
+
+Vk = ak(f (xk) − f (x⋆)) + bk ∥∇ f (xk)∥2 + ck ∥xk+1 − x⋆∥2 − d ∥x0 − x⋆∥2
+
+where d ∈ R stays constant over iterations. At the last iteration N , we have a simpler form 
+
+VN = f (xN ) − f (x⋆) − d ∥x0 − x⋆∥2 .
+
+This suggests us to instead use a translated Lyapunov function 
+
+eVk = Vk + d ∥x0 − x⋆∥2 = ak(f (xk) − f (x⋆)) + bk ∥∇ f (xk)∥2 + ck ∥xk+1 − x⋆∥2 .
+
+Step 5. We have eVN = f (xN ) − f (x⋆) and eV0 = d ∥x0 − x⋆∥2, and eVN ≤ eV0 should be directly equivalent to the final bound f (xN ) − f (x⋆) ≤ L∥x0−x⋆∥2  
+
+> 4N+2
+
+because I \ I N = ∅ = J \ J N . Hence, we must have d = L  
+
+> 4N+2
+
+.The reverse-basis LDL decomposition with N = 5 with L = 1 yields the numerical LN with the following column vectors: ℓ5 ℓ4 ℓ3 ℓ2 ℓ1 ℓ0 ℓ−1 ℓ−2
+
+∇f (x5) 1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+
+∇f (x4) 0.167 1.0 0.0 0.0 0.0 0.0 0.0 0.0
+
+∇f (x3) 0.167 0.143 1.0 0.0 0.0 0.0 0.0 0.0
+
+∇f (x2) 0.167 0.143 0.125 1.0 0.0 0.0 0.0 0.0
+
+∇f (x1) 0.167 0.143 0.125 0.111 1.0 0.0 0.0 0.0
+
+∇f (x0) 0.167 0.143 0.125 0.111 0.1 1.0 0.0 0.0
+
+x∗ 0.167 0.143 0.125 0.111 0.1 0.091 1.0 0.0
+
+x0 −0.167 −0.143 −0.125 −0.111 −0.1 −0.091 0.604 1.0where the row labels indicate the PEP basis directions associated with the coefficients within each row. From this numerical data and the fact that xk − x⋆ = x0 − x⋆ − 1
+
+> L
+
+Pk−1 
+
+> j=0
+
+∇f (xj ) for each k = 1 , . . . , N , we can easily infer that 
+
+si = ∇f (xN ) · · · ∇f (x0) x⋆ x0
+
+ ℓi = 1 
+
+> L
+
+∇f (xi) − 12N +1 −i (xi − x⋆) for i = 0 , . . . , N . Now we use this information, together with the analytic form of proof certificates 
+
+λi−1,i = i
+
+2N + 1 − i , i = 1 , . . . , N, λ⋆,i =
+
+
+
+λ0,1 i = 0 
+
+λi,i +1 − λi−1,i i = 1 , . . . , N − 11 − λi−1,i i = N
+
+which can be obtained either via numerical inspection or from prior work [20], to solve the equation 
+
+eVk − eVk+1 = −λk,k +1 
+
+
+
+f (xk+1 ) − f (xk) + ⟨∇ f (xk+1 ), x k − xk+1 ⟩ + 12L ∥∇ f (xk) − ∇ f (xk+1 )∥2
+
+
+
+− λ⋆,k +1 
+
+
+
+f (xk+1 ) − f (x⋆) + ⟨∇ f (xk+1 ), x ⋆ − xk+1 ⟩ + 12L ∥∇ f (xk+1 )∥2
+
+
+
++ αk+1 
+
+1
+
+L ∇f (xk+1 ) − 12N − k (xk+1 − x⋆)
+
+> 2
+
+(37) for ak, b k, c k, a k+1 , b k+1 , c k+1 and αk+1 . This yields 
+
+ak = k + 1 2N − k , bk = − 12Lk + 1 2N − k , ck = L
+
+22N − 2k − 1(2 N − k)2 , αk = L
+
+22N − k + 1 2N − k (λk,k +1 + λk−1,k )holds for 0 ≤ k ≤ N − 1, and also for k = N for αk, with the convention λ−1,0 = 0 = λN,N +1 .Putting the above altogether, we conclude as follows: 
+
+Theorem 1. Let f : Rd → R be convex and L-smooth. Let x⋆ be a minimizer of f , and let x0 ∈ Rd be an initial point. Let xk be iterates generated from (GD) , and define 
+
+eVk = k + 1 2N − k
+
+
+
+f (xk) − f (x⋆) − 12L ∥∇ f (xk)∥2
+
+
+
++ L
+
+22N − 2k − 1(2 N − k)2 ∥xk+1 − x⋆∥2
+
+27 for k = 0 , . . . , N − 1, eV−1 = L  
+
+> 4N+2
+
+∥x0 − x⋆∥2 and eVN = f (xN ) − f (x⋆). Then, the identity (37) holds for k = 0 , . . . , N − 1,and eV0 ≤ eV−1. Consequently, eVN ≤ eV−1, and equivalently, f (xN ) − f (x⋆) ≤ L∥x0−x⋆∥2  
+
+> 4N+2
+
+.Proof. Once we prove the identity (37) for k = 0 , . . . , N − 1 and show that 
+
+eV0 − eV−1 = λ⋆, 0
+
+
+
+f (x0) − f (x⋆) + ⟨∇ f (x0), x ⋆ − x0⟩ + 12L ∥∇ f (x0)∥2
+
+
+
+− α0
+
+1
+
+L ∇f (x0) − 12N + 1 (x0 − x⋆)
+
+> 2
+
+,
+
+we establish the chain eVN ≤ · · · ≤ eV0 ≤ eV−1 and the proof is complete. Hence the key step is the algebraic verification, which we provide in examples lyapunov/gd/gd example lyap.ipynb .
+
+Remark. This convergence guarantee has been presented in [20] via a PEP-style proof, and [67] provided the same rate with a more elementary proof. However, neither work has formally presented their arguments in the form of Lyapunov analysis similar to Theorem 1. While the proof of [67] can be reassembled into a Lyapunov-style proof, it still produces a Lyapunov function Wk = k(f (xk) − f (x⋆)) + k(k+1) 2L ∥∇ f (xk)∥2 + L 
+
+> 2
+
+∥xk − x⋆∥2, different from our Theorem 1. 
+
+## 5.2 Bregman Proximal Gradient Method (BPGM) 
+
+Consider the setting of Appendix A.2, where we solve the composite convex minimization problem with respect to F = f +g
+
+where f is a relatively L-smooth term and g is a nonsmooth proximable term with respect to h, the Legendre-type convex function defining the Bregman distance Dh. We consider the Bregman proximal gradient method (BPGM) , defined by 
+
+xk+1 ∈ argmin 
+
+> y∈C
+
+{g(y) + ⟨∇ f (xk), y − xk⟩ + LD h(y, x k)} (BPGM) with the associated optimality condition 
+
+e∇g(xk+1 ) + ∇f (xk) = −L (∇h(xk+1 ) − ∇ h(xk)) . (38) BPGM has the convergence bound F (xN ) − F (x ) ≤ LN Dh(x , x 0) which holds for any x ∈ dom F ∩ dom h with finite 
+
+Dh(x , x 0), which is a special case of [30, Corollary 1]. Here, x is an arbitrary reference point and is not necessarily a minimizer of F . Define r = h − 1 
+
+> L
+
+f . For each convex function q ∈ { f, g, h, r }, define 
+
+Cq (x, y ) = q(y) − q(x) + 
+
+D e∇q(y), x − y
+
+E
+
+≤ 0,
+
+to be the nonpositive convexity inequality, where e∇q(y) denotes a selected subgradient when q is nonsmooth and e∇q(y) = 
+
+∇q(y) when q is smooth. The PEP-style proof of BPGM’s convergence rate takes the form 
+
+F (xN ) − F (x ) − LN Dh(x , x 0) =  
+
+> N−1
+
+X
+
+> i=1
+
+λfi,i +1 Cf (xi, x i+1 ) +  
+
+> N−1
+
+X
+
+> i=0
+
+λf,i Cf (x , x i)+ 
+
+> N−1
+
+X
+
+> i=1
+
+λgi,i +1 Cg (xi, x i+1 ) + 
+
+> N
+
+X
+
+> i=1
+
+λg,i Cg (x , x i)+ 
+
+> N−1
+
+X
+
+> i=1
+
+λri,i +1 Cr (xi, x i+1 ) + 
+
+> N
+
+X
+
+> i=1
+
+λri,i −1Cr (xi, x i−1) + λh,N Ch(x , x N ), (39) where the nonnegative weights are specified later. In this case, the active interpolation inequalities are 
+
+If = {(i, i + 1) | i = 1 , . . . , N − 1} ∪ { ( , i ) | i = 0 , . . . , N − 1}Ig = {(i, i + 1) | i = 1 , . . . , N − 1} ∪ { ( , i ) | i = 1 , . . . , N }Ir = {(i, i + 1) | i = 1 , . . . , N − 1} ∪ { (i, i − 1) | i = 1 , . . . , N }Ih = {( , N )}J = ∅.
+
+28 Step 1. Take If 
+
+> 0
+
+= Ig 
+
+> 0
+
+= Ir 
+
+> 0
+
+= Ih 
+
+> 0
+
+= J0 = ∅, and for k = 1 , . . . , N , take 
+
+Ifk = {(i, i + 1) | i = 1 , . . . , k − 1} ∪ { ( , i ) | i = 0 , . . . , k − 1}Igk = {(i, i + 1) | i = 1 , . . . , k − 1} ∪ { ( , i ) | i = 1 , . . . , k }Irk = {(i, i + 1) | i = 1 , . . . , k − 1} ∪ { (i, i − 1) | i = 1 , . . . , k }Ihk = ∅Jk = ∅.
+
+The only remaining term in the proof (39) is the terminal interpolation inequality Ch(x , x N ). 
+
+Step 2. This choice clearly satisfies sufficiency. Numerically, V0 = 0 and Vk has the constant rank 4 for k = 1 , . . . , N .
+
+Step 3. We construct the set of special vectors as 
+
+T = {xi | i = 0 , . . . , N, } ∪ 
+
+n
+
+ξfi , ξhi i = 0 , . . . , N 
+
+o
+
+∪ { ξgi | i = 1 , . . . , N } , S = T ∪ { u − w | u, w ∈ T } ,
+
+where ξgi represents e∇g(xi) for i = 1 , . . . , N , and ξfi and ξhi represent ∇f (xi) and ∇h(xi) for i = 0 , . . . , N .
+
+Step 4. Numerical observation based on the results of Step 3 reveals that all Vk contain the term − LN Dh(x , x 0). We add this term throughout and consider 
+
+eVk = Vk + LN Dh(x , x 0)for k = 0 , . . . , N . Applying Step 3 again to this adjusted sequence, we obtain {ξhk , xk − x } ⊂ S ∩ R ( eVk) with the corresponding coefficient matrix given by Proposition 1 being simply 
+
+ 0 L 
+
+> 2NL
+> 2N
+
+0
+
+
+
+, representing the single inner product term LN ⟨∇ h(xk), x k − x ⟩. Combining this with the function-value coordinate support, we find that 
+
+eVk = ak (F (xk) − F (x )) + bkDh(x , x k)is the Lyapunov skeleton for k = 0 , . . . , N .
+
+Step 5. Substituting the above form into the identity 
+
+eVk − eVk+1 = − kN Cf (xk, x k+1 ) − 1
+
+N Cf (x , x k)
+
+− kN Cg (xk, x k+1 ) − 1
+
+N Cg (x , x k+1 )
+
+− Lk N Cr (xk, x k+1 ) − L(k + 1) 
+
+N Cr (xk+1 , x k)(40) for k = 0 , . . . , N − 1, where the terms multiplied by k are omitted when k = 0, which follows from the analytic inequality weights given by 
+
+λfi,i +1 = iN , λf,i = 1
+
+N , λgi,i +1 = iN , λg,i = 1
+
+N ,λri,i +1 = Li N , λri,i −1 = Li N , λh,N = LN ,
+
+and using the condition (38), we can symbolically identify the solution ak = kN , ak+1 = k+1  
+
+> N
+
+, and bk = bk+1 = LN .Therefore, 
+
+eVk = kN (F (xk) − F (x )) + LN Dh(x , x k), k = 0 , . . . , N. (41) Summarizing the above, we obtain the following result. 29 Theorem 2. Let h be a Legendre-type convex function with C = int dom h̸ = ∅. Let g be closed, convex, and proper with 
+
+dom g ∩ C̸ = ∅, and let f be convex on its domain containing C, and differentiable on C. Suppose that r = h − 1 
+
+> L
+
+f is convex on C for some L > 0. Let x0 ∈ C and assume that the subproblems in (BPGM) admit selected minimizers in 
+
+C satisfying the optimality condition (38) . Let xk be the resulting iterates, and let x ∈ dom F ∩ dom h be any reference point satisfying Dh(x , x 0) < ∞. Then, the sequence eVk defined in (41) satisfies (40) for k = 0 , . . . , N − 1. Consequently, 
+
+eVN ≤ · · · ≤ eV0 = LN Dh(x , x 0), and this implies 
+
+F (xN ) − F (x ) ≤ LN Dh(x , x 0).
+
+Proof. The identity (40) follows by direct expansion using the optimality condition (38); the associated BPGM notebook 
+
+bpgm_example_lyap.ipynb provides a symbolic verification. Since Cq ≤ 0 for q ∈ { f, g, r }, the right-hand side of (40) is nonnegative, and therefore eVN ≤ · · · ≤ eV0 = LN Dh(x , x 0). Finally, because Dh(x , x N ) ≥ 0, 
+
+F (xN ) − F (x ) ≤ eVN ≤ LN Dh(x , x 0),
+
+which completes the proof. In the special case g ≡ 0, BPGM reduces to Bregman gradient descent (BGD). The same specialization gives the following Lyapunov analysis for BGD relative to an arbitrary comparison point. This recovers the rate in [43] and matches the lower-bound result established in [17]. 
+
+Corollary 1 (Bregman gradient descent) . Let f, h satisfy the conditions of Theorem 2. Let x0 ∈ C and let xk be generated by the Bregman gradient descent 
+
+xk+1 ∈ argmin 
+
+> y∈C
+
+{⟨∇ f (xk), y − xk⟩ + LD h(y, x k)} (BGD) 
+
+for k = 0 , . . . , N − 1, or equivalently via the relation 
+
+∇f (xk) + L (∇h(xk+1 ) − ∇ h(xk)) = 0 .
+
+Let x ∈ dom f ∩ dom h satisfy Dh(x , x 0) < ∞. Then the Lyapunov sequence 
+
+eVk = kN (f (xk) − f (x )) + LN Dh(x , x k)
+
+is nonincreasing for k = 0 , . . . , N , and consequently, 
+
+f (xN ) − f (x ) ≤ LN Dh(x , x 0).
+
+Proof. Set g ≡ 0 in Theorem 2. Then we have F = f and (BPGM) becomes (BGD). We obtain the conclusion by applying Theorem 2 with the same reference point x .Similarly, in the special case f ≡ 0, BPGM reduces to the Bregman proximal point method (BPPM) , a classical algorithm which dates back to [10], and the Theorem 2 immediately yields the following corollary for BPPM, recovering the rate obtained in [4]. 
+
+Corollary 2 (Bregman proximal point method) . Let g, h satisfy the conditions of Theorem 2. Let x0 ∈ C and let xk be generated by the Bregman proximal point method 
+
+xk+1 ∈ argmin 
+
+> y∈C
+
+{g(y) + LD h(y, x k)} (BPPM) 
+
+for k = 0 , . . . , N − 1. Let x ∈ dom g ∩ dom h satisfy Dh(x , x 0) < ∞. Then the Lyapunov sequence 
+
+eVk = kN (g(xk) − g(x )) + LN Dh(x , x k)
+
+is nonincreasing for k = 0 , . . . , N , and consequently, 
+
+g(xN ) − g(x ) ≤ LN Dh(x , x 0).
+
+30 Proof. Set f ≡ 0 in Theorem 2. Then F = g, r = h, and (BPGM) becomes (BPPM). We obtain the conclusion by applying Theorem 2 with the same reference point x .As a side observation, the following lemma proves tightness even after the comparison point in Corollary 2 is chosen to be the unique minimizer x⋆ of g. In particular, it also shows that the rate in Corollary 2, which allows an arbitrary comparison point, cannot be improved. It uses a lower bound construction that is closely related to the pathological limiting examples used in [17]. We present the proof of this result in Appendix C. 
+
+Lemma 1 (Tightness of the BPPM rate) . For any 0 < ε < 1, N ≥ 1, L > 0, and dimension d ≥ 1, there exist a proper closed convex function g : Rd → R, a Legendre-type function h : Rd → R, and an initial point x0 ∈ Rd such that the iterates of BPPM are uniquely defined and satisfy 
+
+g(xN ) − g(x⋆) ≥ (1 − ε) LN Dh(x⋆, x 0)
+
+where x⋆ is the unique minimizer of g. Therefore, the rate of BPPM from Corollary 2 cannot be improved further. 
+
+Remark. It is worth noting that, after specializing the comparison point to a minimizer, the tight sublinear convergence factor for BGD in Corollary 1 (also reported in [17]) and BPPM in Corollary 2 coincide, while this is not the case in the Euclidean setting, i.e., the tight convergence factors for GD and PPM differ [67]. Furthermore, perhaps interestingly, the single Lyapunov function in Theorem 2, when specialized to the cases of BGD and BPPM by letting g ≡ 0 or f ≡ 0, still yields the tight rates for each respective algorithm. 
+
+## 5.3 Proximal point method for monotone inclusion 
+
+Let 𝔸 : Rd ⇒ Rd be maximally monotone and let x⋆ satisfy 0 ∈ 𝔸 x⋆. We consider the standard proximal point method 
+
+xk+1 = 𝕁 𝔸 xk (PPM) with the resolvent 𝕁 𝔸 = ( 𝕀 + 𝔸 )−1. For k = 0 , . . . , N , let ˜ 𝔸 xk+1 := xk − xk+1 ∈ 𝔸 xk+1 . Let q = NN +1 and τN = qN  
+
+> N+1
+
+.The tight last-iterate residual norm guarantee is provided in [28] via PEP-style proof: 
+
+˜𝔸 xN +1  
+
+> 2
+
+− τN ∥x0 − x⋆∥2
+
+= −
+
+> N
+
+X
+
+> i=1
+
+λi,i +1 ˜𝔸 xi − ˜𝔸 xi+1 , x i − xi+1 −
+
+> N
+
+X
+
+> i=1
+
+λi,⋆ ˜𝔸 xi, x i − x⋆ − 2
+
+N + 1 ˜𝔸 xN +1 , x N +1 − x⋆ −
+
+> N
+
+X
+
+> i=1
+
+αi ∥si∥2 , (42) where 
+
+λi,i +1 = 2 
+
+ NN + 1 
+
+N −i iN + 1 , λi,⋆ = 2 
+
+ NN + 1 
+
+N −i N − i
+
+(N + 1) 2 , αi =
+
+ NN + 1 
+
+N −i iN ,
+
+and 
+
+si = NN + 1 (xi−1 − x⋆) − 2NN + 1 (xi − x⋆) + ( xi+1 − x⋆).
+
+Step 1. Here, the evaluated residual is ˜ 𝔸 xN +1 = xN − xN +1 , so the natural Lyapunov index runs from 0 to N (as opposed to 0 to N − 1 in the case of Section 4.1, where we evaluate ˜𝔸 xN
+
+> 2
+
+). We take I0 = J0 = ∅ and, for k = 1 , . . . , N ,
+
+Ik = {(j, j + 1) | j = 1 , . . . , k } ∪ { (j, ⋆ ) | j = 1 , . . . , k }, Jk = {1, . . . , k }.
+
+The only term left outside the Lyapunov analysis is the terminal monotonicity inequality for the pair ( N + 1 , ⋆ ). 
+
+Step 2. This choice trivially satisfies sufficiency. The numerical computation shows that Vk has an almost constant rank 3 for k = 1 , . . . , N − 2 and k = N , while the rank drops to 2 for k = N − 1. 
+
+Step 3. We construct the special-vector set from the PEP context vectors 
+
+T = {x0, x⋆, g1, . . . , gN +1 , x1, . . . , xN +1 }, S = T ∪ { u − v : u, v ∈ T } ,
+
+where gi represents ˜ 𝔸 xi for i = 1 , . . . , N + 1. 31 Step 4. For k = 1 , . . . , N − 2, the code identifies 
+
+{x0 − x⋆, gk+1 , xk − x⋆} ⊂ S ∩ R (Vk)and the coefficient matrix Ak from this basis, computed according to Proposition 1, is of the form 
+
+Ak =
+
+
+
+−τN 0 00 ∗ ∗
+
+0 ∗ ∗
+
+ .
+
+Indeed, letting eVk = Vk + τN ∥x0 − x⋆∥2 and re-running Steps 2–4 on it reveals the structure 
+
+eVk = ak ˜𝔸 xk+1  
+
+> 2
+
++ bk ˜𝔸 xk+1 , x k − x⋆ + ck ∥xk − x⋆∥2 (43) for k = 1 , . . . , N − 2, while eV0 = τN ∥x0 − x⋆∥2, eVN = ˜𝔸 xN +1  
+
+> 2
+
++ bN ˜𝔸 xN +1 , x N − x⋆ (so we can let a0 = b0 = 0, 
+
+c0 = τN and aN = 1, cN = 0). We hypothesize that (43) in fact holds for all k = 0 , . . . , N , while for k = N − 1, the rank drop occurs because b2  
+
+> N−1
+
+= 4 aN −1cN −1 and (43) collapses to a perfect square of a linear combination of ˜ 𝔸 xN and 
+
+xN −1 − x⋆.
+
+Step 5. To verify the hypothesis and determine the coefficients, we substitute xk+2 = xk+1 − ˜𝔸 xk+2 and (43) into 
+
+eVk − eVk+1 = λk+1 ,k +2 ˜𝔸 xk+1 − ˜𝔸 xk+2 , x k+1 − xk+2 + λk+1 ,⋆ ˜𝔸 xk+1 , x k+1 − x⋆ + αk+1 ∥sk+1 ∥2 (44) and solve the equation for ak, b k, c k, a k+1 , b k+1 and ck+1 . This reveals the unique solution 
+
+ak =
+
+ NN + 1 
+
+N −k k(N − 1) 
+
+N (N + 1) , bk = 2 
+
+ NN + 1 
+
+N −k kN (N + 1) , ck =
+
+ NN + 1 
+
+N −k N − kN (N + 1) 
+
+ak+1 =
+
+ NN + 1 
+
+N −k−1 (k + 1)( N − 1) 
+
+N (N + 1) , bk+1 = 2 
+
+ NN + 1 
+
+N −k−1 k + 1 
+
+N (N + 1) , ck+1 =
+
+ NN + 1 
+
+N −k−1 N − k − 1
+
+N (N + 1) that is consistent with respect to k. Summarizing, we conclude: 
+
+Theorem 3. Let 𝔸 : Rd ⇒ Rd be maximally monotone, let x⋆ satisfy 0 ∈ 𝔸 x⋆, and let {xk}N +1  
+
+> k=0
+
+be generated by (PPM) .Define 
+
+eVk =
+
+ NN + 1 
+
+N −k  k(N − 1) 
+
+N (N + 1) ˜𝔸 xk+1  
+
+> 2
+
++ 2kN (N + 1) ˜𝔸 xk+1 , x k − x⋆ + N − kN (N + 1) ∥xk − x⋆∥2
+
+
+
+.
+
+Then (44) holds for k = 0 , . . . , N − 1, which implies 
+
+eVN ≤ · · · ≤ eV0
+
+and consequently, 
+
+˜𝔸 xN +1  
+
+> 2
+
+≤ 1
+
+N + 1 
+
+ NN + 1 
+
+N
+
+∥x0 − x⋆∥2 = 1(1 + 1 /N )N (N + 1) ∥x0 − x⋆∥2 .
+
+Proof. The identity (44) is verified symbolically in examples_lyapunov/ppm_monotone/ppm_monotone_example_lyap. ipynb . It is obtained by expanding both sides in the independent vectors xk − x⋆, ˜ 𝔸 xk+1 , and ˜ 𝔸 xk+2 , using xk+1 =
+
+xk − ˜𝔸 xk+1 and xk+2 = xk+1 − ˜𝔸 xk+2 .Observe that when k = 0, we have eV0 = 1 
+
+> N+1
+
+ NN +1 
+
+N
+
+∥x0 − x⋆∥2, while when k = N , using xN − x⋆ = ( xN +1 − x⋆) + ˜𝔸 xN +1 , we have 
+
+eVN = N − 1
+
+N + 1 ˜𝔸 xN +1  
+
+> 2
+
++ 2
+
+N + 1 ˜𝔸 xN +1 , x N +1 − x⋆ + ˜ 𝔸 xN +1 
+
+= ˜𝔸 xN +1  
+
+> 2
+
++ 2
+
+N + 1 ˜𝔸 xN +1 , x N +1 − x⋆
+
+≥ ˜𝔸 xN +1 
+
+> 2
+
+by monotonicity of 𝔸 . Therefore, we conclude that ˜𝔸 xN +1  
+
+> 2
+
+≤ eVN ≤ eV0 as desired. 32 Remark. This convergence guarantee has been presented in the form of PEP-style proof without any specification of Lyapunov function in [28], which also provided a matching lower bound construction showing that the rate is tight. 
+
+## 5.4 Dual-OC-Halpern 
+
+Recall the setting of Section 4.1.3, where 𝔸 : Rd ⇒ Rd is a maximally μ-strongly monotone operator with a zero x⋆.Let γ = 1 + 2 μ. The OC-Halpern algorithm with 𝕋 =
+
+
+
+1 + 1
+
+> γ
+
+
+
+𝕁 𝔸 − 1 
+
+> γ
+
+𝕀 achieved the exact optimal residual guarantee 
+
+˜𝔸 xN 
+
+> 2
+
+≤ Γ−2 
+
+> N
+
+∥y0 − x⋆∥2 [50], which we recovered in Proposition 4. When μ = 0 ⇐⇒ γ = 1, OC-Halpern reduces to OHM, and in that setting, Dual-OHM shares the same exact optimal residual guarantee at the final iteration, as we recovered in Proposition 3. The two algorithms, OHM and Dual-OHM are in the so-called H-dual relationship—their step size matrices are anti-diagonal transposes of each other—and the correspondence between H-dual algorithms’ convergence guarantees is referred to as H-duality [35, 76]. In this section, we extend this observation to the case μ > 0 ⇐⇒ γ > 1by analyzing the novel algorithm dual optimal contractive Halpern :
+
+yk+1 = yk +
+
+
+
+1 − 1
+
+φN −k−1
+
+  𝕋 yk − 𝕋 yk−1
+
+ (Dual-OC-Halpern) for k = 0 , . . . , N − 2, where φk = Pki=0 γ2i and 𝕋 y−1 = y0. Specifically, we show that Dual-OC-Halpern exhibits the convergence guarantee ˜𝔸 xN 
+
+> 2
+
+≤ Γ−2 
+
+> N
+
+∥y0 − x⋆∥2, exactly the same as OC-Halpern (Theorem 4). 
+
+Remark. We do not formally show that Dual-OC-Halpern is the H-dual of OC-Halpern, or establish an H-duality theorem generalizing the correspondence between the two algorithms, as it is not the focus of the current work. As before, let Γ N = PN −1 
+
+> i=0
+
+γi, x k = 𝕁 𝔸 yk−1 and ˜ 𝔸 xk = yk−1 − xk ∈ 𝔸 xk. The PEP-style proof identified by the solver takes the form 
+
+˜𝔸 xN 
+
+> 2
+
+− 1Γ2
+
+> N
+
+∥y0 − x⋆∥2 = − 
+
+> N−1
+
+X
+
+> k=1
+
+λk,N 
+
+ ˜𝔸 xk − ˜𝔸 xN , x k − xN − μ ∥xk − xN ∥2
+
+− λN,⋆ 
+
+ ˜𝔸 xN , x N − x⋆ − μ ∥xN − x⋆∥2
+
+− γ−N
+
+Γ2
+
+> N
+
+ΓN ˜𝔸 xN + ( xN − y0) − γN (xN − x⋆) 2 ,
+
+where 
+
+λk,N = 2(1 + γ−N )1 + γγ2( N −k)
+
+φN −kφN −k−1
+
+= 4Γ2
+
+> N
+
+1
+
+λ(OC-Halpern)   
+
+> N−k,N −k+1
+
+, (45) exhibiting the similar relationship between the inequality multipliers used in the proofs of OHM and Dual-OHM. Fur-thermore, λN,⋆ = 2ΓN and the final square term is identical to the OC-Halpern case. We will not need these analytic expressions until the final stage, Step 5. As in Dual-OHM, we have I = {(k, N ) | k = 1 , . . . , N − 1} ∪ { (N, ⋆ )}, and |J | = 1. 
+
+Step 1. Take I0 = J0 = ∅, and for k = 1 , . . . , N − 1, 
+
+Ik = {(j, N ) | j = 1 , . . . , k }, Jk = ∅.
+
+Step 2. This choice clearly satisfies sufficiency. Numerically, we observe that V0 = 0 and the ranks of Vk are 2 , 4, . . . , 4, 2for k = 1 , . . . , N − 1 as in the case of Dual-OHM. 
+
+Step 3. We construct the same set of special vectors as Dual-OHM: 
+
+T = {y0, . . . , yN −1, x⋆, x1, . . . , xN , g1, . . . , gN , t0, . . . , tN −1}, S = T ∪ { u − v : u, v ∈ T } .
+
+33 Step 4. For k = 1 , . . . , N − 2, we numerically identify that 
+
+{gN , y0 − xN , yk − yN −1, tk−1 − tN −1} ⊂ S ∩ R (Vk)is a basis of R(Vk). The first two directions have coefficients that are constant over k, and do not yield inner-product terms with the last two vectors. Therefore, we hypothesize that by subtracting these constant terms involving ˜ 𝔸 xN and 
+
+y0 − xN , we have a translated lyapunov function of the form 
+
+eVk = ak ∥yk − yN −1∥2 + b ⟨yk − yN −1, 𝕋 yk−1 − 𝕋 yN −1⟩ + ck ∥𝕋 yk−1 − 𝕋 yN −1∥2 .
+
+Here, we enforce b ∈ R to be constant across iterations as numerical observation suggests. 
+
+Step 5. We solve the equation 
+
+eVk − eVk+1 = λk+1 ,N 
+
+ ˜𝔸 xk+1 − ˜𝔸 xN , x k+1 − xN − μ ∥xk+1 − xN ∥2
+
+(46) for the coefficients ak, c k, a k+1 , c k+1 and b, using the analytic formula (45) for λk+1 ,N . The solution that yields consistent expressions for ak, a k+1 and ck, c k+1 is unique: 
+
+ak = −CN
+
+φN −k
+
+φN −k − 1 , ak+1 = −CN
+
+φN −k−1
+
+φN −k−1 − 1 , b = 2 CN
+
+ck = −CN
+
+φN −k−1 − 1
+
+φN −k−1
+
+, ck+1 = −CN
+
+φN −k−2 − 1
+
+φN −k−2
+
+where CN = γ2(1+ γ−N )(1+ γ)2 . We summarize the result as follows. 
+
+Theorem 4. Let 𝔸 : Rd ⇒ Rd be maximally μ-strongly monotone with μ ≥ 0, and let γ = 1 + 2 μ. Let x⋆ satisfy 0 ∈ 𝔸 x⋆,set y⋆ = x⋆, and let y0 ∈ Rd be an initial point. Let φk = Pki=0 γ2i, ΓN = PN −1 
+
+> i=0
+
+γi, and CN = γ2(1+ γ−N )(1+ γ)2 . Let xk, y k be generated by (Dual-OC-Halpern) with 𝕋 =
+
+
+
+1 + 1
+
+> γ
+
+
+
+𝕁 𝔸 − 1 
+
+> γ
+
+𝕀 , with xk = 𝕁 𝔸 yk−1 and ˜𝔸 xk = yk−1 − xk. Define eVk by 
+
+eVk = CN
+
+
+
+− φN −k
+
+φN −k − 1 ∥yk − yN −1∥2 + 2 ⟨yk − yN −1, 𝕋 yk−1 − 𝕋 yN −1⟩ − φN −k−1 − 1
+
+φN −k−1
+
+∥𝕋 yk−1 − 𝕋 yN −1∥2
+
+
+
+(47) 
+
+for k = 0 , . . . , N − 1. Then eVN −1 = 0 , and for k = 0 , . . . , N − 2, (46) holds with λk,N defined as in (45) . Consequently, 
+
+eVN −1 ≤ · · · ≤ eV0, and 
+
+˜𝔸 xN 
+
+> 2
+
+≤ 1Γ2
+
+> N
+
+∥y0 − x⋆∥2 .
+
+Proof. The identity (46) is verified symbolically in dual oc halpern example lyap.ipynb . The verification follows by eliminating yk+1 using the update rule, and applying the identities φm − φm−1 = γ2m and φm − 1 = γ2φm−1 for m ≥ 0to check all terms algebraically cancel out. Then, strong monotonicity of 𝔸 immediately implies eVN −1 ≤ · · · ≤ eV0, and 
+
+eVN −1 = 0 follows directly from φ0 = 1. It remains to show that this implies the final bound on the squared residual norm. This is established once we verify the identity 
+
+˜𝔸 xN 
+
+> 2
+
+− 1Γ2
+
+> N
+
+∥y0 − x⋆∥2
+
+= eVN −1 − eV0 − 2ΓN
+
+ ˜𝔸 xN , x N − x⋆ − μ ∥xN − x⋆∥2
+
+− γ−N
+
+Γ2
+
+> N
+
+ΓN ˜𝔸 xN + ( xN − y0) − γN (xN − x⋆) 2 ,
+
+as the right hand side is a sum of nonpositive terms. This is symbolically verified within the same notebook. 
+
+# 6 Conclusion 
+
+We propose a principled approach toward searching for Lyapunov functions in optimization. This is achieved by combining the well-known framework leveraging computer assistance for identifying tight proof certificates with the novel procedure for decomposing them into layers via constructing partial sums and checking their admissibility. This suggests a new 34 viewpoint on Lyapunov analysis in general, as a stratification of the best possible proof that can be attempted within a specific search space. Whether an analogous treatment of Lyapunov analysis will be possible in other contexts, such as continuous-time optimization analysis [56, 57, 38, 73, 3, 15, 74, 59, 8, 44, 58], would be an interesting question for future work. There are several open avenues that are more closely relevant, within the scope of first-order optimization. Our framework currently does not cover the cases of algorithms with block structures, which do not progress linearly with the iteration numbers, such as accelerated algorithms without momentum, including those using long/silver step-size schedules [25, 1, 2, 26, 27, 7, 51, 82, 72, 81] and the recently discovered optimal fixed-point algorithms with similar fractal step-sizes [75]. We also do not capture the analyses where ergodic average of iterates are taken in the end, with the final convergence guarantee being established via Jensen’s inequality. We foresee that our work could be extended to handle such settings by adjusting the partial sum formulation or admissibility criteria. 
+
+# References 
+
+[1] Jason M. Altschuler and Pablo A. Parrilo. Acceleration by stepsize hedging: Multi-step descent and the silver stepsize schedule. Journal of The ACM , 72(2), 2025. [2] Jason M. Altschuler and Pablo A. Parrilo. Acceleration by stepsize hedging: Silver Stepsize Schedule for smooth convex optimization. Mathematical Programming , 213(1):1105–1118, 2025. [3] Hedy Attouch, Zaki Chbani, Juan Peypouquet, and Patrick Redont. Fast convergence of inertial dynamics and algorithms with asymptotic vanishing viscosity. Mathematical Programming , 168(1):123–175, 2018. [4] Alfred Auslender and Marc Teboulle. Interior Gradient and Proximal Methods for Convex and Conic Optimization. 
+
+SIAM Journal on Optimization , 16(3):697–725, 2006. [5] Nikhil Bansal and Anupam Gupta. Potential-function proofs for gradient methods. Theory of Computing , 15(4):1–32, 2019. [6] Heinz H. Bauschke, J´ erˆ ome Bolte, and Marc Teboulle. A descent lemma beyond Lipschitz gradient continuity: First-order methods revisited and applications. Mathematics of Operations Research , 42(2):330–348, 2017. [7] Jinho Bok and Jason M. Altschuler. Accelerating proximal gradient descent via silver stepsizes. Conference on Learning Theory , 2025. [8] Radu Ioan Bot ¸, Ern¨ o Robert Csetnek, and Dang-Khoa Nguyen. Fast optimistic gradient descent ascent (OGDA) method in continuous and discrete time. Foundations of Computational Mathematics , 2023. [9] Nizar Bousselmi, Julien M. Hendrickx, and Fran¸ cois Glineur. Interpolation conditions for linear operators and applications to performance estimation problems. SIAM Journal on Optimization , 34(3):3033–3063, September 2024. [10] Yair Censor and Stavros Zenios. On the proximal minimization algorithm with d-functions. Journal of Optimization Theory and Applications , 73:451–464, 05 1992. [11] Juan Pablo Contreras and Roberto Cominetti. Optimal error bounds for non-expansive fixed-point iterations in normed spaces. Mathematical Programming , 199(1):343–374, 2023. [12] Shuvomoy Das Gupta, Bart P. G. Van Parys, and Ernest K. Ryu. Branch-and-bound performance estimation programming: A unified methodology for constructing optimal optimization methods. Mathematical Programming ,2023. [13] Alexandre d’Aspremont, Damien Scieur, and Adrien Taylor. Acceleration methods. Foundations and Trends ® in Optimization , 5(1-2):1–245, 2021. [14] Jelena Diakonikolas. Halpern iteration for near-optimal and parameter-free monotone inclusion and strong solutions to variational inequalities. Conference on Learning Theory , 2020. [15] Jelena Diakonikolas and Michael I. Jordan. Generalized momentum-based methods: A Hamiltonian perspective. 
+
+SIAM Journal on Optimization , 31(1):915–944, 2021. [16] Jelena Diakonikolas and Puqian Wang. Potential function-based framework for making the gradients small in convex and min-max optimization. SIAM Journal on Optimization , 2022. 35 [17] Radu-Alexandru Dragomir, Adrien B. Taylor, Alexandre d’Aspremont, and J´ erˆ ome Bolte. Optimal complexity and certification of Bregman first-order methods. Mathematical Programming , 194(1):41–83, 2022. [18] Yoel Drori. The exact information-based complexity of smooth convex minimization. Journal of Complexity , 39:1–16, 2017. [19] Yoel Drori and Adrien B. Taylor. Efficient first-order methods for convex minimization: A constructive approach. 
+
+Mathematical Programming , 184(1–2):183–220, 2020. [20] Yoel Drori and Marc Teboulle. Performance of first-order methods for smooth convex minimization: A novel approach. 
+
+Mathematical Programming , 145(1):451–482, 2014. [21] Eduard Gorbunov, Nicolas Loizou, and Gauthier Gidel. Extragradient method: O(1 /K ) last-iterate convergence for monotone variational inequalities and connections with cocoercivity. International Conference on Artificial Intelli-gence and Statistics , 2022. [22] Eduard Gorbunov, Adrien Taylor, and Gauthier Gidel. Last-iterate convergence of optimistic gradient method for monotone variational inequalities. Neural Information Processing Systems , 2022. [23] Baptiste Goujaud, Aymeric Dieuleveut, and Adrien Taylor. On fundamental proof structures in first-order optimiza-tion. Conference on Decision and Control , 2023. [24] Baptiste Goujaud, C´ eline Moucer, Francois Glineur, Julien Hendrickx, Adrien Taylor, and Aymeric Dieuleveut. PEPit: Computer-assisted worst-case analyses of first-order optimization methods in Python. Mathematical Programming Computation , 16:337–367, 2024. [25] Benjamin Grimmer. Provably faster gradient descent via long steps. SIAM Journal on Optimization , 34(3):2588–2608, 2024. [26] Benjamin Grimmer, Kevin Shu, and Alex L. Wang. Accelerated objective gap and gradient norm convergence for gradient descent via long steps. INFORMS Journal on Optimization , 7(2):156–169, 2025. [27] Benjamin Grimmer, Kevin Shu, and Alex L. Wang. Composing optimized stepsize schedules for gradient descent. 
+
+Mathematics of Operations Research , 2025. [28] Guoyong Gu and Junfeng Yang. Tight sublinear convergence rate of the proximal point algorithm for maximal monotone inclusion problems. SIAM Journal on Optimization , 30(3):1905–1921, 2020. [29] Guoyong Gu and Junfeng Yang. Tight convergence rate in subgradient norm of the proximal point algorithm. 
+
+Optimization , pages 1–15, 2025. [30] David H. Gutman and Javier F. Pe˜ na. Perturbed Fenchel duality and first-order methods. Mathematical Programming ,198(1):443–469, 2023. [31] Uijeong Jang, Shuvomoy Das Gupta, and Ernest K. Ryu. Computer-assisted design of accelerated composite opti-mization methods: OptISTA. Mathematical Programming , 2025. [32] Donghwan Kim. Accelerated proximal point method for maximally monotone operators. Mathematical Programming ,190(1–2):57–87, 2021. [33] Donghwan Kim and Jeffrey A. Fessler. Optimized first-order methods for smooth convex minimization. Mathematical Programming , 159(1-2):81–107, 2016. [34] Donghwan Kim and Jeffrey A. Fessler. Optimizing the efficiency of first-order methods for decreasing the gradient of smooth convex functions. Journal of Optimization Theory and Applications , 188(1):192–219, 2021. [35] Jaeyeon Kim, Asuman E. Ozdaglar, Chanwoo Park, and Ernest K. Ryu. Time-reversed dissipation induces duality between minimizing gradient norm and function value. Neural Information Processing Systems , 2023. [36] Jungbin Kim and Insoon Yang. Convergence analysis of ODE models for accelerated first-order methods via positive semidefinite kernels. NeurIPS , 2023. [37] Jungbin Kim and Insoon Yang. Unifying Nesterov’s accelerated gradient methods for convex and strongly convex objective functions. International Conference on Machine Learning , 2023. 36 [38] Walid Krichene, Alexandre Bayen, and Peter L Bartlett. Accelerated mirror descent in continuous and discrete time. 
+
+Neural Information Processing Systems , 2015. [39] Jongmin Lee, Chanwoo Park, and Ernest K. Ryu. A geometric structure of acceleration and its role in making gradients small fast. Neural Information Processing Systems , 2021. [40] Sucheol Lee and Donghwan Kim. Fast extra gradient methods for smooth structured nonconvex-nonconcave minimax problems. Neural Information Processing Systems , 2021. [41] Laurent Lessard, Benjamin Recht, and Andrew Packard. Analysis and design of optimization algorithms via integral quadratic constraints. SIAM Journal on Optimization , 26(1):57–95, 2016. [42] Felix Lieder. On the convergence rate of the Halpern-iteration. Optimization Letters , 15(2):405–418, 2021. [43] Haihao Lu, Robert M. Freund, and Yurii Nesterov. Relatively smooth convex optimization by first-order methods, and applications. SIAM Journal on Optimization , 28(1):333–354, 2018. [44] C´ eline Moucer, Adrien Taylor, and Francis Bach. A systematic approach to Lyapunov analyses of continuous-time models in convex optimization. SIAM Journal on Optimization , 33(3):1558–1586, 2023. [45] Y. Nesterov. Introductory Lectures on Convex Optimization: A Basic Course . Springer, 2004. [46] Yurii Nesterov. A method of solving a convex programming problem with convergence rate O(1 /k 2). Doklady Akademii Nauk SSSR , 269(3):543–547, 1983. [47] Edward Duc Hien Nguyen, Jaewook J. Suh, Xin Jiang, and Shiqian Ma. Exact worst-case convergence rates for Douglas–Rachford and Davis–Yin splitting methods. arXiv:2506.23475 , 2025. [48] Chanwoo Park, Jisun Park, and Ernest K. Ryu. Factor-√2 acceleration of accelerated gradient methods. Applied Mathematics & Optimization , 88(3):77, 2023. [49] Chanwoo Park and Ernest K. Ryu. Optimal first-order algorithms as a function of inequalities. Journal of Machine Learning Research , 25(51):1–66, 2024. [50] Jisun Park and Ernest K. Ryu. Exact optimal accelerated complexity for fixed-point iterations. International Conference on Machine Learning , 2022. [51] Jiyoung Park, Abhishek Roy, Jonathan W. Siegel, and Anirban Bhattacharya. Acceleration via silver step-size on Riemannian manifolds with applications to Wasserstein space. Neural Information Processing Systems , 2025. [52] R. T. Rockafellar. Monotone operators associated with saddle-functions and minimax problems. In F. E. Browder, editor, Nonlinear Functional Analysis, Part 1 , volume 18 of Proceedings of Symposia in Pure Mathematics , pages 241–250. American Mathematical Society, 1970. [53] R. Tyrrell Rockafellar. Convex Analysis . Princeton University Press, 1970. [54] Ernest K. Ryu, Adrien B. Taylor, Carolina Bergeling, and Pontus Giselsson. Operator splitting performance estima-tion: Tight contraction factors and optimal parameter selection. SIAM Journal on Optimization , 30(3):2251–2271, 2020. [55] Ernest K. Ryu and Wotao Yin. Large-Scale Convex Optimization: Algorithms & Analyses via Monotone Operators .Cambridge University Press, Cambridge, 2022. [56] Weijie Su, Stephen Boyd, and Emmanuel J. Cand` es. A differential equation for modeling Nesterov’s accelerated gradient method: Theory and insights. Neural Information Processing Systems , 2014. [57] Weijie Su, Stephen Boyd, and Emmanuel J. Cand` es. A differential equation for modeling Nesterov’s accelerated gradient method: Theory and insights. Journal of Machine Learning Research , 17(153):1–43, 2016. [58] Jaewook J. Suh, Jisun Park, and Ernest K. Ryu. Continuous-time analysis of anchor acceleration. Neural Information Processing Systems , 2023. [59] Jaewook J. Suh, Gyumin Roh, and Ernest K. Ryu. Continuous-time analysis of AGM via conservation laws in dilated coordinate systems. International Conference on Machine Learning , 2022. 37 [60] Jaewook J. Suh, Bicheng Ying, Xin Jiang, and Edward Duc Hien Nguyen. PEPFlow: A python library for the workflow of performance estimation of optimization algorithms. In NeurIPS Workshop on GPU-accelerated and Scalable Optimization , 2025. [61] Adrien Taylor and Francis Bach. Stochastic first-order methods: Non-asymptotic and computer-aided analyses via potential functions. Conference on Learning Theory , 2019. [62] Adrien Taylor and Yoel Drori. An optimal gradient method for smooth strongly convex minimization. Mathematical Programming , 199(1):557–594, 2023. [63] Adrien Taylor, Bryan Van Scoy, and Laurent Lessard. Lyapunov functions for first-order methods: Tight automated convergence guarantees. International Conference on Machine Learning , 2018. [64] Adrien B. Taylor, Julien M. Hendrickx, and Francois Glineur. Performance estimation toolbox (PESTO): Automated worst-case analysis of first-order optimization methods. In Conference on Decision and Control , 2017. [65] Adrien B. Taylor, Julien M. Hendrickx, and Fran¸ cois Glineur. Smooth strongly convex interpolation and exact worst-case performance of first-order methods. Mathematical Programming , 161(1):307–345, 2017. [66] Adrien B Taylor, Julien M Hendrickx, and Fran¸ cois Glineur. Exact worst-case convergence rates of the proximal gradient method for composite convex minimization. Journal of Optimization Theory and Applications , 178(2):455– 476, 2018. [67] Marc Teboulle and Yakov Vaisbourd. An elementary approach to tight worst case complexity analysis of gradient based methods. Mathematical Programming , 201(1):63–96, September 2023. [68] Quoc Tran-Dinh and Yang Luo. Halpern-type accelerated and splitting algorithms for monotone inclusions. 
+
+arXiv:2110.08150 , 2021. [69] Manu Upadhyaya, Sebastian Banert, Adrien B. Taylor, and Pontus Giselsson. Automated tight Lyapunov analysis for first-order methods. Mathematical Programming , 209(1):133–170, 2025. [70] Manu Upadhyaya, Shuvomoy Das Gupta, Adrien B. Taylor, Sebastian Banert, and Pontus Giselsson. The AutoLyap software suite for computer-assisted Lyapunov analyses of first-order methods. arXiv:2506.24076 , 2026. [71] Bryan Van Scoy, Randy A. Freeman, and Kevin M. Lynch. The fastest known globally convergent first-order method for minimizing strongly convex functions. IEEE Control Systems Letters , 2(1):49–54, 2018. [72] Bofan Wang, Shiqian Ma, Junfeng Yang, and Danqing Zhou. Relaxed proximal point algorithm: Tight complexity bounds and acceleration without momentum. INFORMS Journal on Optimization , 8(2):141–162, 2026. [73] Andre Wibisono, Ashia C. Wilson, and Michael I. Jordan. A variational perspective on accelerated methods in optimization. Proceedings of the National Academy of Sciences , 113(47):E7351–E7358, 2016. [74] Ashia C. Wilson, Ben Recht, and Michael I. Jordan. A Lyapunov analysis of accelerated methods in optimization. 
+
+Journal of Machine Learning Research , 22(113):1–34, 2021. [75] TaeHo Yoon and Benjamin Grimmer. A theory of composition and duality of extremal optimal fixed-point algorithms. arXiv:2605.02231, 2026. [76] TaeHo Yoon, Jaeyeon Kim, Jaewook J Suh, and Ernest K. Ryu. Optimal acceleration for minimax and fixed-point problems is not unique. International Conference on Machine Learning , 2024. [77] TaeHo Yoon and Ernest K. Ryu. Accelerated algorithms for smooth convex-concave minimax problems with O(1 /k 2)rate on squared gradient norm. International Conference on Machine Learning , 2021. [78] TaeHo Yoon and Ernest K. Ryu. Accelerated minimax algorithms flock together. SIAM Journal on Optimization ,35(1):180–209, 2025. [79] TaeHo Yoon, Ernest K. Ryu, and Benjamin Grimmer. H-invariance theory: A complete characterization of minimax optimal fixed-point algorithms. arXiv:2511.14915 , 2025. [80] Moslem Zamani, Hadi Abbaszadehpeivasti, and Etienne de Klerk. The exact worst-case convergence rate of the alternating direction method of multipliers. Mathematical Programming , 208(1):243–276, 2024. 38 [81] Zehao Zhang and Rujun Jiang. Accelerated gradient descent by concatenation of stepsize schedules. arXiv:2410.12395 ,2026. [82] Zihan Zhang, Jason Lee, Simon Du, and Yuxin Chen. Anytime acceleration of gradient descent. Conference on Learning Theory , 2025. [83] Yi Zhou, Yingbin Liang, and Lixin Shen. A simple convergence analysis of Bregman proximal gradient algorithm. 
+
+Computational Optimization and Applications , 73(3):903–912, 2019. 
+
+# A Problem Settings Omitted in Section 2 
+
+## A.1 Smooth convex-concave minimax optimization via Lipschitz monotone operators 
+
+Finally, consider an unconstrained smooth convex-concave minimax optimization problem minimize 
+
+> u∈Rdu
+
+maximize 
+
+> v∈Rdv
+
+ϕ(u, v ),
+
+where ϕ is convex in u when v is fixed, concave in v when u is fixed, differentiable, and has L-Lipschitz continuous gradient. Writing x = ( u, v ) ∈ Rdu × Rdv , the associated saddle-gradient operator is 
+
+𝔸 (x) = 
+
+ ∇uϕ(u, v )
+
+−∇ v ϕ(u, v )
+
+
+
+. (48) Convexity-concavity implies that 𝔸 is monotone [52], while the Lipschitz continuity of ∇ϕ implies that 𝔸 is L-Lipschitz. Furthermore, the goal of minimax optimization is to find x⋆ = ( u⋆, v ⋆) satisfying 
+
+ϕ(u⋆, v ) ≤ ϕ(u⋆, v ⋆) ≤ ϕ(u, v ⋆)for all ( u, v ) ∈ Rdu × Rdv , and this condition is equivalent to 𝔸 (x⋆) = 0 as ϕ is convex-concave. Therefore, we can recast the problem (with slight generalization) into the monotone inclusion find 
+
+> x∈Rd
+
+0 = 𝔸 x
+
+where d = du + dv and 𝔸 : Rd → Rd is monotone and L-Lipschitz. We consider the explicit , or forward algorithms with update rule 
+
+xk+1 = xk −
+
+> k
+
+X
+
+> j=0
+
+hk+1 ,j 𝔸 xj
+
+for k = 0 , 1, . . . and j = 0 , . . . , k . The inequalities that we use in this problem class are the pairwise inequalities 
+
+⟨𝔸 xi − 𝔸 xj , x i − xj ⟩ ≥ 0, L2 ∥xi − xj ∥2 − ∥ 𝔸 xi − 𝔸 xj ∥2 ≥ 0where xi, x j are either the algorithm’s iterates or the minimax optimum x⋆. Here, let us note that unlike the settings introduced earlier, we do not have an interpolation theorem showing that a finite set of tuples ( xi, g i) pairwise satisfying 
+
+⟨gi − gj , x i − xj ⟩ ≥ 0 and L2 ∥xi − xj ∥2 −∥ gi − gj ∥2 ≥ 0 can be realized by a monotone and L-Lipschitz operator 𝔸 : Rd →
+
+Rd, i.e., 𝔸 xi = gi for all i in that finite index set. In fact, there is a simple three-point counterexample where this fails [54, Proposition 3]. Therefore, the formulation below based on the pairwise monotonicity and Lipschitzness inequalities should be interpreted as optimizing over the class of proof using only those inequalities, together with sum-of-squares inequalities, which is not necessarily the tightest worst-case guarantee with a matching lower-bound construction. For i ∈ { 0, . . . , N, ⋆ }, let gi = 𝔸 xi (in particular, g⋆ = 0). Let P = x0 x⋆ g0 · · · gN
+
+ ∈ Rd×(N +3) and let 
+
+x0 = e1, x⋆ = e2, gi = ei+3 for i = 0 , . . . , N and g⋆ = 0, so that Pg i = gi = 𝔸 xi for i ∈ { 0, . . . , N, ⋆ }. Define xk as follows for k = 1 , . . . , N so that Px k = xk:
+
+xk+1 = xk −
+
+> k
+
+X
+
+> j=0
+
+hk+1 ,j gj .
+
+Let G = PTP and define 
+
+Mi,j := Sym  (gi − gj )( xi − xj )T , Li,j := L2(xi − xj )( xi − xj )T − (gi − gj )( gi − gj )T
+
+39 for i, j ∈ { 0, . . . , N, ⋆ }, so that Tr( GM i,j ) and Tr( GL i,j ) are respectively the monotonicity and Lipschitzness inequality terms. We measure the performance of the algorithm in terms of the squared operator (residual) norm, so we are interested in the guarantee of the form ∥𝔸 xN ∥2 ≤ ν ∥x0 − x⋆∥2. A PEP-style proof for this is given by the identity Tr( Gg N gT 
+
+> N
+
+) − νTr  G(x0 − x⋆)( x0 − x⋆)T
+
+= − X
+
+> i,j ∈{ 0,...,N,⋆ }
+> i<j
+
+λM 
+
+> i,j
+
+Tr( GM i,j ) − X
+
+> i,j ∈{ 0,...,N,⋆ }
+> i<j
+
+λL 
+
+> i,j
+
+Tr( GL i,j ) − X
+
+> ℓ∈J
+
+αℓTr( GS ℓ)with nonnegative coefficients λM 
+
+> i,j
+
+, λ L 
+
+> i,j
+
+and αℓ.
+
+## A.2 Composite minimization with Bregman relative smoothness 
+
+Let h : Rd → R ∪ { +∞} be a proper, closed and convex function of Legendre type [53, Section 26], satisfying: C =int dom h̸ = ∅, h is differentiable and strictly convex on C and lim i→∞ ∥∇ h(yi)∥ = + ∞ whenever yi ∈ C, y i → y ∈ ∂C .For such h, the Bregman distance 
+
+Dh(x, y ) = h(x) − h(y) − ⟨∇ h(y), x − y⟩ .
+
+is well defined on dom h × C. We consider the composite minimization problem over this Bregman domain minimize  
+
+> x∈C
+
+F (x) = f (x) + g(x).
+
+We assume that g is proper, closed and convex with dom g ∩ C̸ = ∅, which will be the proximable term for which the proximal operation can be computed. We assume that f is convex, C ⊂ dom f , f differentiable on C, and that f is relatively L-smooth with respect to h on C [6, 43], i.e., for any x, y ∈ C,
+
+f (x) − f (y) − ⟨∇ f (y), x − y⟩ − LD h(x, y ) ≤ 0.
+
+The relative smoothness condition is equivalent to the function 
+
+r := h − 1
+
+L f
+
+being convex on C [43]. For this problem class, we focus on the PEP formulation for the Bregman proximal-gradient method (BPGM) rather than handling the general algorithm classes as in the previously introduced settings. Starting from x0 ∈ C, we consider BPGM with standard step-size 1 /L , whose update rule is given by 
+
+xk+1 ∈ argmin 
+
+> y∈C
+
+{g(y) + ⟨∇ f (xk), y − xk⟩ + LD h(y, x k)} . (BPGM) Here, we assume that each subproblem defining the BPGM update admits a selected minimizer xk+1 ∈ C; standard sufficient conditions for this are discussed in [6, Lemma 2]. Rewriting the first-order optimality condition for the BPGM update, there exists e∇g(xk+1 ) ∈ ∂g (xk+1 ) satisfying 
+
+e∇g(xk+1 ) = −∇ f (xk) − L (∇h(xk+1 ) − ∇ h(xk)) . (49) The PEP formulation for this setting features basic convexity inequalities. Let xN +1 := x , where x ∈ dom F ∩ dom h
+
+satisfies Dh(x , x 0) < ∞ and is the arbitrary reference point appearing in the convergence guarantee. For q = f, h, r ,define the corresponding value vectors f , h, r by 
+
+q = q(x0) · · · q(xN ) q(x )T ∈ RN +2 ,
+
+with entries qi = q(xi) for i = 0 , . . . , N +1. For the nonsmooth term, the BPGM optimality conditions provide subgradients at the output points x1, . . . , x N . Thus, let 
+
+g = g(x1) · · · g(xN ) g(x )T ∈ RN +1 ,
+
+with entries denoted by gi = g(xi) for i = 1 , . . . , N + 1. For g, we only use convexity inequalities whose subgradient is taken at one of the BPGM output points: 
+
+Cg (xi, x j ) := g(xj ) − g(xi) + 
+
+D e∇g(xj ), x i − xj
+
+E
+
+≤ 0, i = 1 , . . . , N + 1 , j = 1 , . . . , N. 
+
+40 For q ∈ { f, h }, we use 
+
+Cq (xi, x j ) := q(xj ) − q(xi) + ⟨∇ q(xj ), x i − xj ⟩ ≤ 0, i = 0 , . . . , N + 1 , j = 0 , . . . , N. 
+
+For r, whose convexity is imposed on C, we use the iterate-index inequalities 
+
+Cr (xi, x j ) := r(xj ) − r(xi) + ⟨∇ r(xj ), x i − xj ⟩ ≤ 0, i, j = 0 , . . . , N. 
+
+Since r = h − 1 
+
+> L
+
+f , the corresponding function value coordinates satisfy ri = hi − 1 
+
+> L
+
+fi for i = 0 , . . . , N + 1. Let 
+
+P =
+
+h
+
+x0, . . . , x N , x , ∇f (x0), . . . , ∇f (xN ), ∇h(x0), . . . , ∇h(xN )
+
+i
+
+∈ Rd×(3 N +4) .
+
+Using standard basis vectors in R3N +4 , define the point coordinates 
+
+xi = ei+1 , i = 0 , . . . , N + 1 ,
+
+and the gradient coordinates 
+
+ξfi = eN +3+ i, ξhi = e2N +4+ i, i = 0 , . . . , N. 
+
+For r = h − 1 
+
+> L
+
+f and for the selected subgradients of g given by (49), set 
+
+ξri = ξhi − 1
+
+L ξfi , i = 0 , . . . , N, 
+
+and 
+
+ξgi = −ξfi−1 − L
+
+
+
+ξhi − ξhi−1
+
+
+
+, i = 1 , . . . , N. 
+
+Then Px i = xi for i = 0 , . . . , N + 1, Pξgi = e∇g(xi) for i = 1 , . . . , N , and Pξqi = ∇q(xi) for q ∈ { f, h, r } and i = 0 , . . . , N .With G = PTP ∈ S3N +4 + , define 
+
+Cqi,j := Sym  ξqj (xi − xj )T ∈ S3N +4 ,
+
+whenever the coordinate vector ξqj has been defined. The initial Bregman distance is represented by the scalar coordinate 
+
+d := hN +1 − h0 − Tr  GC hN +1 ,0
+
+ .
+
+Consequently, a PEP-style proof of the rate F (xN ) − F (x ) ≤ νD h(x , x 0) has the form 
+
+fN + gN − fN +1 − gN +1 − νd = 
+
+> N+1
+
+X
+
+> i=1
+> N
+
+X
+
+> j=1
+
+λgi,j 
+
+ gj − gi + Tr  GC gi,j 
+
+ 
+
++ X 
+
+> q∈{ f,h }
+> N+1
+
+X
+
+> i=0
+> N
+
+X
+
+> j=0
+
+λqi,j 
+
+ qj − qi + Tr  GC qi,j 
+
+ 
+
++
+
+> N
+
+X
+
+> i=0
+> N
+
+X
+
+> j=0
+
+λri,j 
+
+ rj − ri + Tr  GC ri,j 
+
+ − X
+
+> i∈J
+
+αiTr( GS i).
+
+The coefficients λgi,j , λqi,j , and αi are nonnegative, and Si = sisT 
+
+> i
+
+∈ S3N +4 + . The BPGM example in Section 5.2 is obtained by selecting the active interpolation inequalities in this template. 
+
+# B Proof of Proposition 1 
+
+Proof. The identity Vk = Tr( GV k) follows directly from (4) and the definition of Vk. Because G = PTP, once we show the decomposition Vk = BkAkBT 
+
+> k
+
+with Bk = vk, 1 · · · vk,r k
+
+ ∈ R(N +2) ×rk , it follows that 
+
+Vk = Tr( PTPB kAkBT 
+
+> k
+
+) = Tr( BT 
+
+> k
+
+PTPB kAk) = 
+
+> rk
+
+X
+
+> p,q =1
+
+(Ak)p,q 
+
+ BT 
+
+> k
+
+PTPB k
+
+ 
+
+> p,q
+
+=
+
+> rk
+
+X
+
+> p,q =1
+
+(Ak)p,q ⟨Pv k,p , Pv k,q ⟩ .
+
+which gives (7). 41 It remains to prove that Vk = BkAkBT 
+
+> k
+
+for some Ak ∈ Srk . If rk = 0, then Vk = 0 and the claim is trivial. Otherwise, because the columns of Bk form a basis of R(Vk), the matrix Πk := Bk(BT 
+
+> k
+
+Bk)−1BT 
+
+> k
+
+∈ SN +2 is the orthogonal projection matrix onto R(Vk). This implies that ΠkVk = Vk, and because Vk is symmetric, we also have Vk = VkΠk. Therefore, 
+
+Vk = ΠkVkΠk = Bk (BT 
+
+> k
+
+Bk)−1BT 
+
+> k
+
+VkBk(BT 
+
+> k
+
+Bk)−1
+
+| {z }
+
+> := Ak
+
+BT 
+
+> k
+
+= BkAkBT
+
+> k
+
+where Ak ∈ Rrk ×rk is clearly symmetric. 
+
+# C Tightness of the BPPM rate 
+
+Proof of Lemma 1. We first construct a one-dimensional instance. Fix a parameter 0 < δ < 12 , to be chosen sufficiently small at the end. Define the smoothed absolute value 
+
+sδ (x) := 
+
+
+
+x2
+
+2δ + δ
+
+2 , |x| ≤ δ, 
+
+|x|, |x| > δ. 
+
+Define ehδ : R → R by 
+
+ehδ (x) := 
+
+
+
+N
+
+2 sδ (x + 1) − N + 2 2 x − N
+
+2 , x < − 12 ,sδ (x), |x| ≤ 12 ,N
+
+2 sδ (x − 1) + N + 2 2 x − N
+
+2 , x > 12 .
+
+A direct differentiation gives 
+
+eh′ 
+
+> δ
+
+(x) = 
+
+
+
+−(N + 1) , x ≤ − 1 − δ, 
+
+− N + 2 2 + N
+
+2δ (x + 1) , −1 − δ ≤ x ≤ − 1 + δ, 
+
+−1, −1 + δ ≤ x ≤ − δ, xδ , |x| ≤ δ, 
+
+1, δ ≤ x ≤ 1 − δ, N + 2 2 + N
+
+2δ (x − 1) , 1 − δ ≤ x ≤ 1 + δ, N + 1 , x ≥ 1 + δ. 
+
+(50) Thus ehδ is continuously differentiable and convex. Set 
+
+hδ (x) = 1
+
+L
+
+ehδ (x) + δ
+
+2 x2
+
+
+
+. (51) The function hδ is δ/L -strongly convex, its derivative is strictly increasing, and h′ 
+
+> δ
+
+(x) → ±∞ as x → ±∞ . Hence hδ is a Legendre function, and every BPPM subproblem has a unique minimizer. Now choose the function and initial point as 
+
+g(x) = |x|, x0 = −1 − δ. 
+
+Then x⋆ = 0 is a minimizer of g. We first show by induction that, for 0 ≤ k ≤ N ,
+
+xk ∈ [−1 − δ, −1 + δ], Lh ′ 
+
+> δ
+
+(xk) = −(N + 1 − k) − δ(1 + δ). (52) The claim is true for k = 0 by the choice x0 = −1 − δ and (50). Suppose it holds for some k < N . The optimality condition of the BPPM update (BPPM) gives 0 ∈ ∂g (xk+1 ) + L h′ 
+
+> δ
+
+(xk+1 ) − h′ 
+
+> δ
+
+(xk),
+
+42 or equivalently 
+
+Lh ′ 
+
+> δ
+
+(xk+1 ) ∈ − ∂g (xk+1 ) + Lh ′ 
+
+> δ
+
+(xk). (53) Since −∂g (xk+1 ) ⊂ [−1, 1], the induction hypothesis implies 
+
+Lh ′ 
+
+> δ
+
+(xk+1 ) ≤ 1 + Lh ′ 
+
+> δ
+
+(xk) = −(N − k) − δ(1 + δ) < 0.
+
+As Lh ′ 
+
+> δ
+
+is strictly increasing and Lh ′ 
+
+> δ
+
+(0) = 0, this shows that xk+1 < 0. Therefore ∂g (xk+1 ) = {− 1}, and (53) reduces to 
+
+Lh ′ 
+
+> δ
+
+(xk+1 ) = 1 + Lh ′ 
+
+> δ
+
+(xk) = −(N − k) − δ(1 + δ).
+
+Moreover, 
+
+Lh ′ 
+
+> δ
+
+(−1 − δ) = −(N + 1) − δ(1 + δ), Lh ′ 
+
+> δ
+
+(−1 + δ) = −1 − δ(1 − δ).
+
+Since 0 ≤ k ≤ N − 1, 
+
+Lh ′ 
+
+> δ
+
+(−1 − δ) < −(N − k) − δ(1 + δ) ≤ Lh ′ 
+
+> δ
+
+(−1 + δ).
+
+As Lh ′ 
+
+> δ
+
+is increasing, this implies xk+1 ∈ [−1 − δ, −1 + δ]. Together with the identity for Lh ′ 
+
+> δ
+
+(xk+1 ) above, this proves (52) with k replaced by k + 1 and completes the induction. On the interval [ −1 − δ, −1 + δ], (51) and (50) give 
+
+Lh ′ 
+
+> δ
+
+(x) = − N + 2 2 + N
+
+2δ (x + 1) + δx. (54) Substituting x = xk in (54) and comparing with (52) gives   N 
+
+> 2δ
+
++ δ (xk + 1 + δ) = k, and hence 
+
+xk = −1 − δ + 2δN + 2 δ2 k, 0 ≤ k ≤ N. (55) Because xN < 0, 
+
+g(xN ) − g(x⋆) = 1 + δ − 2δN N + 2 δ2 . (56) For the initial Bregman distance, note that ehδ (0) = δ 
+
+> 2
+
+, ehδ (x0) = 1 + ( N + 1) δ, and eh′ 
+
+> δ
+
+(x0) = −(N + 1), hence Dehδ (0 , x 0) = 
+
+N + δ 
+
+> 2
+
+. The quadratic term in (51) yields 
+
+Dhδ (x⋆, x 0) = 1
+
+L
+
+
+
+N + δ
+
+2 + δ
+
+2 (1 + δ)2
+
+
+
+= 1
+
+L
+
+
+
+N + δ + δ2 + δ3
+
+2
+
+
+
+. (57) Combining (56) and (57), 
+
+N  g(xN ) − g(x⋆)
+
+LD hδ (x⋆, x 0) =
+
+N
+
+
+
+1 + δ − 2δN N + 2 δ2
+
+
+
+N + δ + δ2 + δ3
+
+2
+
+−→ 1 as δ ↓ 0.
+
+Thus, for the prescribed ε, one can choose 0 < δ < 12 sufficiently small so that 
+
+g(xN ) − g(x⋆) ≥ (1 − ε) LN Dhδ (x⋆, x 0).
+
+This proves the claim for dimension d = 1. For an arbitrary dimension d > 1, define, for z = ( z1, . . . , z d), 
+
+bg(z) = g(z1) + 12
+
+> d
+
+X
+
+> j=2
+
+z2 
+
+> j
+
+, bh(z) = hδ (z1) + 12L
+
+> d
+
+X
+
+> j=2
+
+z2 
+
+> j
+
+,
+
+and take z0 = ( x0, 0, . . . , 0). Then bg is proper, closed, and convex, bh is Legendre, the unique minimizer is z⋆ = 0, and the BPPM iterates satisfy zk = ( xk, 0, . . . , 0). Moreover, Dbh(z⋆, z 0) = Dhδ (x⋆, x 0), so the same lower bound holds in dimension d.43

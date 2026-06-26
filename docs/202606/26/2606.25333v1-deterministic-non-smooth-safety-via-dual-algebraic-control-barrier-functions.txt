@@ -1,0 +1,1154 @@
+Title: Deterministic Non-Smooth Safety via Dual-Algebraic Control Barrier Functions
+
+URL Source: https://arxiv.org/pdf/2606.25333v1
+
+Published Time: Thu, 25 Jun 2026 00:29:35 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+> M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 1
+
+# Deterministic Non-Smooth Safety via Dual-Algebraic Control Barrier Functions 
+
+Mohammadreza Kamaldar 
+
+Abstract —This paper presents a dual-algebraic framework for control barrier functions (CBFs) that guarantees deterministic execution using exclusively elementary arithmetic. We develop this deterministic approach to solve a fundamental bottleneck in safety-critical control: pointwise minima naturally compose intersecting safe sets, but generate non-smooth boundaries where standard Lie derivatives fail. Existing mathematical workarounds inject approximation bias, probabilistic non-determinism, or combinatorial execution delays that strictly impede hard real-time hardware certification. By embedding the system state and vector field into the dual-number ring, our method extracts both the composite barrier value and its exact directional derivative in a single evaluation. The standard floating-point minimum deterministically isolates a single vertex of the Clarke generalized gradient for the quadratic-program solver. We prove this selected vertex constitutes a valid Clarke subgradient and the result-ing simultaneous-enforcement safety filter guarantees forward invariance. The arithmetic overhead remains a fixed constant factor, strictly independent of state dimension or constraint count. We extend this framework to arbitrary min /max Boolean compositions and systems of higher relative degree, validating the computational scaling on three physical examples. 
+
+Index Terms —Control barrier functions, non-smooth analysis, dual numbers, Clarke subdifferential, safety-critical control, forward invariance. 
+
+I. I NTRODUCTION 
+
+Safety-critical autonomous systems must guarantee that the state remains within a prescribed safe region at all times. The reachability and set-invariance literature provides foun-dational tools for characterizing safe sets and synthesizing controllers that enforce state constraints, including Hamilton-Jacobi reachability for hybrid systems [1], viability theory [2], and set-invariance methods [3]. Control barrier functions (CBFs), introduced in [4], [5] and rooted in earlier barrier-certificate [6], barrier-Lyapunov [7], and constructive-safety [8] formulations, embed forward invariance of a safe set into a real-time quadratic program (QP) [9] by means of a pointwise affine inequality. CBF-based quadratic programs have been deployed for adaptive cruise control [10], bipedal locomotion [11], multi-robot coordination [12], and robot manipulation [13], and have been extended to high relative degree [14]– [16], input-to-state safety [17], robustness [18], temporal-logic tasks [19], and sampled-data implementation [20]. When the barrier function h is continuously differentiable, this inequality 
+
+Manuscript received June 5, 2026. (Corresponding author: Mohammadreza Kamaldar.) Mohammadreza Kamaldar is with the Department of Mechanical, Aerospace, and Biomedical Engineering, University of South Alabama, Mo-bile, AL 36688 USA (e-mail: mkamaldar@southalabama.edu). 
+
+involves the Lie derivative Lf h(x) ≜ ∇h(x) · f (x) along the system vector field, which is well defined at every point. In practice, however, the safe region is most often described as the intersection of p smooth constraint sets, and the natural composite barrier is the pointwise minimum 
+
+h(x) ≜ min  
+
+> i∈{ 1,...,p }
+
+hi(x),
+
+where each hi is continuously differentiable. Although h is locally Lipschitz, it fails to be differentiable at every state where two or more constraints attain the minimum, and the classical gradient ∇h(x) is undefined at such points. The standard CBF formulation cannot therefore be applied directly along trajectories that cross the non-smooth locus. Engineers historically circumvent this analytical failure using smooth approximations, stochastic relaxations, or ex-plicit geometric solvers, though each injects severe practical penalties. Smooth surrogates replace the exact minimum with a differentiable function, such as the log-sum-exp equation 
+
+hτ (x) ≜ −τ ln Ppi=1 e−hi(x)/τ , which converges to h(x) as 
+
+τ → 0+ [5]. Tuning the parameter τ forces a harsh tradeoff: small values trigger numerical ill-conditioning, while large values warp the true boundary inward and invite safety vi-olations. Stochastic methods average the generalized gradient over a perturbation distribution [21] or recast the dynamics as stochastic differential equations [22]. Both methods introduce non-determinism into the control signal and downgrade the absolute safety guarantee to a mere probabilistic likelihood. Exact solvers confront the geometry directly but introduce new computational or feasibility bottlenecks. Enforcing all com-ponent constraints simultaneously at every control cycle [23] avoids active-set identification but severely over-constrains the quadratic program, frequently triggering artificial infeasibility. Alternatively, mixed-integer quadratic programs (MIQPs) that dynamically isolate active constraints [24] suffer combinatorial delays. Constructing the rigorous Clarke generalized gradient 
+
+∂h (x) [25] provides the exact directional derivatives but requires computing the convex hull of the active gradients. This geometric construction demands O(p⌊n/ 2⌋) operations via standard algorithms [26], imposing an execution time that fluctuates with the local boundary geometry and strictly violates the bounded-time requirements of safety standards such as DO-178C. Dual-algebraic evaluation elegantly bypasses these limita-tions. Evaluating the composite barrier within the dual-number ring D ≜ R[ϵ]/(ϵ2) extracts the value h(x) and the exact Lie derivative Lf h(x) simultaneously in a single forward pass. While dual-number arithmetic is standard in algorithmic differentiation [27], its application as a deterministic engine This work has been submitted to the IEEE for possible publication.  
+
+> arXiv:2606.25333v1 [math.OC] 24 Jun 2026 2M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS
+
+for non-smooth safety-critical control is novel. When the dual-extended evaluation reaches a pointwise min of dual scalars, the standard floating-point comparison examines only the real parts, natively implementing a lexicographic order on D. At every state, including states on the non-smooth locus, this comparison deterministically routes a single active constraint and returns its exact Lie derivative. We prove this selected gradient is a vertex of the Clarke generalized gradient at x,and that simultaneous enforcement of the constraints in a small neighborhood of the active set yields forward invariance of the safe set. This paper develops the dual-algebraic evaluation of acomposite barrier h ≜ min i∈{ 1,...,p } hi and proves that a single evaluation returns both the value h(x) and a vertex of the Clarke subdifferential at every x ∈ D , including non-smooth points (Theorem 2). Enforcing this single vertex does not by itself guarantee safety; we prove instead that a quadratic program enforcing all δ-active constraints simultaneously, with the dual-derived Lie derivatives, renders the safe set forward invariant (Theorem 3). The framework extends to barriers formed by finite pointwise min and max compositions, for which the evaluation again returns a valid Clarke subgradient (Theorem 4). Using truncated polynomial duals R[ϵ]/(ϵr+1 ),it extends to systems of arbitrary relative degree, for which a single seeded dual evaluation produces the iterated Lie derivatives Ljf h, j ∈ { 1, . . . , r } (Theorem 5). Finally, the dual evaluation increases the operation count of evaluating h by a fixed constant factor, independent of the state dimension n,the constraint count p, and the active-set cardinality |A (x)|
+
+(Proposition 2), which yields the deterministic worst-case execution time required for hard real-time certification. The remainder of the paper is organized as follows. Sec-tion II fixes the notation and reviews CBFs and the Clarke subdifferential. Section III states the problem and the design objectives precisely. Section IV develops the dual-number algebra. Section V contains the main results on vertex selection and forward invariance. Section VI extends the framework to compositions and to higher relative degree. Section VII presents the QP-based safety filter and the complexity analysis. Section VIII illustrates the framework with three examples. Section IX compares the approach with existing methods and discusses its embedded realization, and Section X concludes and identifies future directions. II. N OTATION AND PRELIMINARIES 
+
+Let N ≜ {0, 1, 2, . . . } and Z+ ≜ N \ { 0}. Let R denote the set of real numbers, and let ∥ · ∥ be a norm on Rn. For a vector x ∈ Rn, x(i) isolates its i-th component. For a matrix 
+
+A ∈ Rn×m, col j (A) ∈ Rn extracts its j-th column. For all 
+
+i ∈ { 1, . . . , n }, let ei ≜ col i(In).For a finite set S ⊂ Rn, co S denotes its closed convex hull, 
+
+bd S its topological boundary, and |S| its cardinality. A continuous function α : ( −b, a ) → R, where a, b > 0,belongs to the extended class-K, denoted Ke, if it is increasing and satisfies α(0) = 0 .The scalar j-th derivative of a single-variable function 
+
+ϕ : R → R evaluated at a ∈ R is denoted ϕ(j)(a). For a continuously differentiable multivariable function h : Rn → R,the first derivative at x ∈ Rn is the gradient row vector 
+
+∇h(x) ≜
+
+h ∂h ∂x (1) (x) . . . ∂h ∂x (n) (x)i
+
+∈ R1×n.
+
+For a k-times continuously differentiable function h : Rn →
+
+R, the symbol Dkh(x) denotes the symmetric k-th order derivative tensor at x, with components 
+
+(Dkh(x)) i1,...,i k ≜ ∂kh∂x (i1) · · · ∂x (ik )
+
+(x),
+
+where i1, . . . , i k ∈ {1, . . . , n }. The bracket notation 
+
+Dkh(x)[ v]k denotes the contraction of this tensor against k
+
+copies of v ∈ Rn,
+
+Dkh(x)[ v]k ≜
+
+> n
+
+X
+
+> i1=1
+
+· · · 
+
+> n
+
+X 
+
+> ik=1
+
+∂kh∂x (i1) · · · ∂x (ik )
+
+(x) v(i1) · · · v(ik ).
+
+For k = 1, this reduces to the directional derivative 
+
+D1h(x)[ v]1 = ∇h(x) v.If h : Rn → R is continuously differentiable and f : Rn →
+
+Rn, G : Rn → Rn×m are continuous, then the Lie derivatives of h along f and G are the respective spatial projections 
+
+Lf h(x) ≜ ∇h(x) f (x) ∈ R,LGh(x) ≜ ∇h(x) G(x) ∈ R1×m.
+
+The iterated Lie derivative follows L0 
+
+> f
+
+h ≜ h and Ljf h ≜
+
+Lf (Lj−1 
+
+> f
+
+h), where j ∈ Z+.The dual-number ring D ≜ R[ϵ]/(ϵ2) is formalized in Sec-tion IV. Throughout this paper, ℜ(z) and D(z) extract the real and dual parts of z ∈ D, respectively, and ˜ϕ : D → D evaluates the exact dual extension of a smooth function ϕ : R → R.We consider the control-affine system 
+
+˙x = f (x) + G(x)u, (1) where x ∈ D is the state, u ∈ Rm is the control input, f : D → 
+
+Rn is locally Lipschitz, and G : D → Rn×m is continuous. 
+
+A. Control Barrier Functions 
+
+Definition 1. Let h : D → R be continuous. The safe set 
+
+associated with h is 
+
+C ≜ {x ∈ D : h(x) ≥ 0},
+
+and the boundary of C is bd C ≜ {x ∈ D : h(x) = 0 }.
+
+Definition 2. Let h : D → R be continuously differentiable. Then, h is a control barrier function (CBF) for (1) on C if there exists α ∈ K e such that, for all x ∈ C ,
+
+sup 
+
+> u∈Rm
+
+
+
+Lf h(x) + LGh(x)u + α(h(x)) 
+
+
+
+≥ 0.
+
+The following result is from [4, Thm. 2]. 
+
+Fact 1. Let h : D → R be continuously differentiable and a CBF for (1) on C. If u : C → Rm is a locally Lipschitz controller satisfying, for all x ∈ C ,
+
+Lf h(x) + LGh(x)u(x) + α(h(x)) ≥ 0,
+
+then C is forward invariant with respect to the closed-loop system ˙x = f (x) + G(x)u(x).M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 3
+
+B. Clarke Subdifferential 
+
+Along trajectories that reach the non-smooth locus of h,the closed-loop vector field is discontinuous, and solutions are understood in the sense of Filippov [28], [29]. The generalized gradient below provides the corresponding first-order object [25]. 
+
+Definition 3. Let D ⊂ Rn be an open set, and let h : D → R
+
+be locally Lipschitz continuous. Let Ωh ⊂ D denote the set of Lebesgue measure zero where the gradient ∇h is undefined. For all x ∈ D , the Clarke generalized gradient of h at x is 
+
+∂h (x) ≜ co 
+
+n
+
+v ∈ Rn : there exists {xi}∞ 
+
+> i=0
+
+⊂ D \ Ωh
+
+such that lim  
+
+> i→∞
+
+xi = x
+
+and lim  
+
+> i→∞
+
+∇h(xi) = v
+
+o
+
+.
+
+The following result, due to [25, Prop. 2.3.12], specializes the Clarke subdifferential to the pointwise minimum of finitely many smooth functions. 
+
+Lemma 1. Let h1, . . . , h p : D → R be continuously differen-tiable, and let h(x) ≜ min i∈{ 1,...,p } hi(x). For all x ∈ D , the 
+
+active set is defined as 
+
+A(x) ≜ i ∈ { 1, . . . , p } : hi(x) = h(x) . (2) Then, for all x ∈ D ,
+
+∂h (x) ⊆ co {∇ hi(x) : i ∈ A (x)}. (3) Furthermore, equality holds in (3) provided that each hi is regular in the sense of [25, Def. 2.3.4]. The right-hand side of (3) is the polytope generated by the active gradients {∇ hi(x)}i∈A (x); its vertices form a subset of these generators, with every generator a vertex provided they are affinely independent. The main results of this paper use the fact that the dual-algebraic evaluation deterministically returns one such generator. 
+
+Definition 4. Let h : D → R be locally Lipschitz. The function h satisfies the non-smooth CBF condition on C if there exists α ∈ K e such that, for all x ∈ C ,
+
+sup 
+
+> u∈Rm
+
+inf 
+
+> ζ∈∂h (x)
+
+
+
+ζ (f (x) + G(x)u) + α(h(x)) 
+
+
+
+≥ 0. (4) 
+
+Remark 1. If h(x) = min i hi(x) and the regularity condition holds, then (4) is equivalent to the requirement that, for all 
+
+i ∈ A (x),
+
+sup 
+
+> u∈Rm
+
+
+
+Lf hi(x) + LGhi(x) u + α(h(x)) 
+
+
+
+≥ 0.
+
+The simultaneous enforcement formulation in Section VII realizes this stronger condition. ⋄
+
+III. P ROBLEM FORMULATION 
+
+Consider the control-affine system (1) with safe set C =
+
+{x ∈ D : h(x) ≥ 0} generated by the composite barrier 
+
+h(x) = min  
+
+> i∈{ 1,...,p }
+
+hi(x), (5) where each hi : D → R is continuously differentiable. As noted in Section I, h is locally Lipschitz but non-differentiable on the locus where two or more constraints attain the mini-mum. Thus, ∇h is undefined on that locus and Fact 1 does not apply directly. Let Ch denote the number of elementary arithmetic oper-ations required to evaluate h in R. We seek a state-feedback safety filter u∗ : C → Rm and a gradient-extraction procedure satisfying, for all x ∈ C , three objectives: (P1) Forward invariance. The set C is forward invariant with respect to the closed-loop system ˙x = f (x)+ G(x) u∗(x).(P2) Exactness. The gradient information supplied to the filter is an exact element of the Clarke subdifferential ∂h (x),not a smooth surrogate or a stochastic estimate. (P3) Deterministic bounded cost. The filter data are produced by a fixed straight-line program whose operation count is O(Ch), independent of the constraint count p, the state dimension n, the active-set cardinality |A (x)|, and the local geometry of bd C. In particular, the procedure performs no convex-hull construction, no integer search, and no smoothing-parameter selection. Objective (P1) is the safety requirement; (P2) rules out the bias of smooth approximations and the non-determinism of stochastic methods; and (P3) rules out the state-dependent ex-ecution times of convex-hull and mixed-integer formulations, which is the property required for hard real-time certification. The remainder of the paper constructs a procedure that meets (P1)–(P3) simultaneously: the dual-algebraic evaluation sup-plies an exact vertex of ∂h (x) at O(Ch) cost, settling (P2) and (P3) (Sections IV–V); simultaneous enforcement of the 
+
+δ-active constraints then yields (P1) (Theorem 3). IV. D UAL -N UMBER ALGEBRA 
+
+This section develops the dual-number ring, the dual ex-tension of a smooth function, and the directional-derivative identity that drives the rest of the paper. 
+
+A. The Dual-Number Ring 
+
+Definition 5. The dual-number ring is the quotient D ≜
+
+R[ϵ]/(ϵ2). Each element z ∈ D has a unique representation 
+
+z = a + bϵ , where a, b ∈ R and ϵ̸ = 0 satisfies ϵ2 = 0 . The 
+
+real and dual parts of z are denoted 
+
+ℜ(z) ≜ a, D(z) ≜ b. 
+
+Definition 6. For z1 = a1 + b1ϵ and z2 = a2 + b2ϵ in D,
+
+z1 + z2 ≜ (a1 + a2) + ( b1 + b2)ϵ, z1 · z2 ≜ a1a2 + ( a1b2 + a2b1)ϵ. 
+
+The constant r ∈ R is identified with r + 0 ϵ ∈ D.
+
+Proposition 1. The triple (D, +, ·) is a commutative ring with identity 1. An element z = a+bϵ is a unit if and only if a̸ = 0 ,in which case 
+
+z−1 = 1 
+
+> a
+
+− ba2 ϵ. 
+
+The ideal (ϵ) = {bϵ : b ∈ R} is the unique maximal ideal of 
+
+D.4 M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 
+
+Proof. Associativity, commutativity, and distributivity are in-herited from R[ϵ]. The expression for z−1 is verified by direct computation using ϵ2 = 0 . A nonzero element bϵ is nilpotent and therefore not a unit, which confirms that (ϵ) is the unique maximal ideal. 
+
+B. Dual Extension of Smooth Functions 
+
+Definition 7. Let ϕ : R → R be continuously differentiable. The dual extension of ϕ is the function ˜ϕ : D → D defined by 
+
+˜ϕ(a + bϵ ) ≜ ϕ(a) + ϕ′(a) b ϵ. (6) This analytic definition directly embeds the algebraic struc-ture of the dual ring. Applying the extension formula (6) to the elementary real functions ϕ(x) = x + r, ϕ(x) = rx ,
+
+ϕ(x) = x2, and ϕ(x) = x−1 exactly reproduces the dual arithmetic operations and the unit inverse formalized in Def-inition 6 and Proposition 1. The following lemma guarantees that this mapping remains closed under function composition. 
+
+Lemma 2. Let ϕ, ψ : R → R be continuously differentiable, and let ˜ϕ, ˜ψ denote their dual extensions. Then ]ϕ ◦ ψ = ˜ϕ ◦ ˜ψ.
+
+Proof. Let z = a + bϵ ∈ D. Then, 
+
+˜ψ(z) = ψ(a) + ψ′(a) b ϵ. (7) Substituting (7) into ˜ϕ and using ϵ2 = 0 ,
+
+˜ϕ( ˜ψ(z)) = ϕ(ψ(a)) + ϕ′(ψ(a)) ψ′(a) b ϵ, 
+
+= ( ϕ ◦ ψ)( a) + ( ϕ ◦ ψ)′(a) b ϵ 
+
+= ]ϕ ◦ ψ(z),
+
+where the second equality follows from the classical chain rule applied to the dual part. 
+
+Remark 2. Lemma 2 extends componentwise to vector-valued maps. If η : Rn → Rk is continuously differentiable, its dual extension is 
+
+˜η(x + vϵ ) ≜ η(x) + η′(x) v ϵ ∈ Dk, (8) where v ∈ Rn. The multivariate chain rule guarantees that compositions of dual-extended maps remain dual extensions; in particular, the dual evaluation of each straight-line program that computes η over R becomes a straight-line program that computes ˜η over D when every elementary operation is replaced by its dual counterpart. ⋄
+
+The following theorem makes the connection to Lie deriva-tives explicit and is the foundation for the rest of the paper. 
+
+Theorem 1. Let h : D → R be continuously differentiable, and let v : D → Rn be continuous. Define the dual lift of x
+
+along v as 
+
+xD,v ≜ x + v(x) ϵ ∈ Dn. (9) Then, ˜h xD,v 
+
+ = h(x) + Lv h(x) ϵ. (10) 
+
+Proof. Specializing (8) to η = h and to the dual lift (9) yields 
+
+˜h(x + v(x)ϵ) = h(x) + ∇h(x) v(x) ϵ, 
+
+and the definition of the Lie derivative confirms (10). 
+
+Remark 3. For the control-affine system (1), the full dual lift along the closed-loop vector field is xD,f +Gu ≜ x + ( f (x) + 
+
+G(x)u) ϵ, and Theorem 1 implies 
+
+˜h xD,f +Gu 
+
+ = h(x) +   Lf h(x) + LGh(x) u  ϵ. 
+
+Since the CBF inequality is affine in u, however, it is prefer-able in practice to evaluate ˜h at the m + 1 seeds, namely, xD,f 
+
+and xD,col j (G) for j ∈ { 1, . . . , m }, and then to recover the linear function of u from the dual parts. ⋄
+
+V. M AIN RESULTS : V ERTEX SELECTION AND FORWARD 
+
+INVARIANCE 
+
+This section contains the main theoretical contributions. We define the dual-algebraic evaluation of a pointwise minimum, prove that it selects a vertex of the Clarke subdifferential, and establish forward invariance of the safe set under the resulting simultaneous-enforcement safety filter. 
+
+A. Lexicographic Comparison on D
+
+Definition 8. Let z1 = a1 + b1ϵ ∈ D and z2 = a2 + b2ϵ ∈
+
+D. We write z1 ⪯L z2 if and only if one of the following conditions hold: 
+
+i) a1 < a 2.ii ) a1 = a2 and b1 ≤ b2.The lexicographic minimum on D is denoted 
+
+lex -min( z1, z 2) ≜
+
+(
+
+z1, z1 ⪯L z2,z2, otherwise. The real-part minimum on D is 
+
+min ℜ(z1, z 2) ≜
+
+(
+
+z1, ℜ(z1) ≤ ℜ (z2),z2, otherwise. (11) The two operations agree whenever ℜ(z1)̸ = ℜ(z2). At a real-part tie, min ℜ resolves the tie by the order of the operands (i.e., left-to-right precedence under the inclusive inequality), whereas lex -min resolves it by the dual parts. Equation (11) is precisely what is realized by a standard IEEE-754 floating-point comparison of dual numbers stored as pairs (a, b ): the comparison instruction examines a only, and the result is deterministic at every state. For this reason, min ℜ is the default in the remainder of the paper. The variant lex -min is included for completeness and is used in some implementations where deterministic tie-breaking by the dual part is desirable. 
+
+Definition 9. Let h1, . . . , h p : D → R be continuously dif-ferentiable and let h(x) ≜ min i∈{ 1,...,p } hi(x). The dual-algebraic evaluation of h at the lifted state xD,v is 
+
+˜h xD,v 
+
+ ≜ min ℜ
+
+˜h1
+
+ xD,v 
+
+, . . . , ˜hp
+
+ xD,v 
+
+
+
+, (12) where min ℜ is applied left-to-right as a binary operation. M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 5
+
+B. Vertex Selection 
+
+The following lemma is the core algebraic identity. It shows that the dual-algebraic evaluation simultaneously returns the value h(x) and the Lie derivative of one active constraint, deterministically selected by the order of the operands. For all x ∈ D , define 
+
+i∗(x) ≜ min A(x). (13) 
+
+Lemma 3. Let x ∈ D, v : D → Rn be continuous, 
+
+h1, . . . , h p : D → R be continuously differentiable, and define 
+
+h(x) ≜ min i∈{ 1,...,p } hi(x). Then, 
+
+˜h xD,v 
+
+ = h(x) + Lv hi∗(x)(x) ϵ. (14) 
+
+Proof. Theorem 1 implies that, for all i ∈ { 1, . . . , p },
+
+˜hi
+
+ xD,v 
+
+ = hi(x) + Lv hi(x) ϵ. (15) Using Definition 8, the left-to-right reduction in (12) yields, by induction on p, the operand ˜h¯i∗ (xD,v ) with 
+
+¯i∗ = min 
+
+
+
+i ∈ { 1, . . . , p } : hi(x) = min  
+
+> j∈{ 1,...,p }
+
+hj (x)
+
+
+
+.
+
+By (2) and (13), ¯i∗ = i∗(x). Substituting i = i∗(x) in (15) and using hi∗(x)(x) = h(x) yields (14). The next theorem is the first main result. It establishes that the gradient extracted by the dual-algebraic evaluation is a vertex of the Clarke subdifferential and is therefore an admissible subgradient at every x ∈ D .
+
+Theorem 2. Let x ∈ D, v : D → Rn be continuous, 
+
+h1, . . . , h p : D → R be continuously differentiable, and define 
+
+h(x) ≜ min i∈{ 1,...,p } hi(x). Then, the dual-algebraic evalua-tion (12) satisfies 
+
+ℜ ˜h xD,v 
+
+ = h(x), (16) and the corresponding gradient ∇hi∗(x)(x) is a generator of the polytope co {∇ hi(x) : i ∈ A (x)}. In particular, 
+
+∇hi∗(x)(x) ∈ ∂h (x). (17) If the active gradients {∇ hi(x)}i∈A (x) are affinely indepen-dent, then this generator is a vertex (i.e., extreme point) of the polytope. Moreover, the map x 7 → i∗(x) is a deterministic function of the real-part values h1(x), . . . , h p(x) alone. 
+
+Proof. Lemma 3 combined with the active-set equality 
+
+hi∗(x)(x) = h(x) directly yields (16). Since the selected index i∗(x) belongs to the active set 
+
+A(x), [25, Prop. 2.3.12] guarantees the existence of a sequence 
+
+{yn}∞ 
+
+> n=0
+
+⊂ D \ Ωh converging to x satisfying, for all n ∈ N,
+
+h(yn) = hi∗(x)(yn). The classical gradient along this sequence equals ∇hi∗(x)(yn) and converges to ∇hi∗(x)(x). By the definition of the Clarke subdifferential, this limit belongs to 
+
+∂h (x), verifying (17). Moreover, ∇hi∗(x)(x) is one of the finitely many generators of co {∇ hi(x) : i ∈ A (x)}; when these generators are affinely independent, each is an extreme point, thus ∇hi∗(x)(x) is then a vertex of the polytope. Equation (13) isolates the selection index i∗(x) using exclu-sively the real-valued constraint magnitudes h1(x), . . . , h p(x),establishing the deterministic map. 
+
+Remark 4. Theorem 2 formalizes the central feature of the dual-algebraic approach: the evaluation does not approximate the Clarke generalized gradient and does not enumerate the polytope ∂h (x), but instead returns exactly one generator of this polytope at O(1) overhead per dual operation. Methods that compute the full Clarke subdifferential incur O(p⌊n/ 2⌋)
+
+convex-hull cost [26] to recover the entire polytope. ⋄
+
+C. Forward Invariance via Simultaneous Enforcement 
+
+The vertex selected by the dual-algebraic evaluation is admissible as a Clarke subgradient, but enforcing the CBF inequality at this vertex alone is, in general, insufficient for forward invariance of C. The following counterexample makes this explicit. 
+
+Example 1. Consider a single-integrator ˙x = u on R2 with 
+
+u ∈ R2, and let 
+
+h1(x) = x(1) , h2(x) = x(2) , h(x) = min {h1(x), h 2(x)}.
+
+Note that, for x = (0 , 0) ∈ bd C, A(x) = {1, 2} and 
+
+i∗(x) = 1 . The dual-algebraic evaluation returns the vertex 
+
+∇h1(0) = [1 0] , and the single-vertex CBF inequality at u
+
+reduces to u(1) ≥ − α(0) = 0 . The component u(2) is uncon-strained, so the nominal choice u = (0 , −1) trivially satisfies the inequality. Under this control, however, ˙x(2) = −1, and, for all t > 0, h(x(t)) = −t < 0, which violates C at t = 0 +.Figure 1 illustrates the geometry.                                                        
+
+> C
+> {h2<0}
+> x(1)
+> x(2)
+> h1= 0
+> h2= 0
+> x0= 0
+> ∇h1
+> ∇h2
+> selected: ∇hi∗=∇h1
+> ˙x=un= (0 ,−1)
+> exits Cfor t > 0
+> Fig. 1. Failure of single-vertex enforcement at the corner x0= (0 ,0) of the safe set C={x:h1(x)≥0, h 2(x)≥0}. The dual-algebraic evaluation selects i∗(x0) = 1 and returns the vertex ∇h1(0) = [1 ,0] (green). The single-vertex CBF inequality ∇h1(0) ·u≥0enforces u(1) ≥0but leaves
+> u(2) unconstrained, so the nominal un= (0 ,−1) is admissible and drives x
+> into the unsafe region {h2<0}(red).
+
+The conclusion is that a Clarke subgradient suffices for a 
+
+descent direction in nonsmooth optimization but does not, on its own, certify forward invariance: at a non-smooth boundary point of C, all active constraints must be enforced simultane-ously, not just one vertex of the active polytope. ⋄
+
+We now formulate the QP that simultaneously enforces all 
+
+δ-active constraints with Lie derivatives obtained from the dual-algebraic evaluation, and establish forward invariance. 6 M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 
+
+Definition 10. For δ ≥ 0 and x ∈ D , the δ-active set is 
+
+Aδ (x) ≜ {i ∈ { 1, . . . , p } : hi(x) ≤ h(x) + δ}.
+
+Note that A0(x) = A(x). The set Aδ (x) can be read off from the dual-algebraic evaluation by inspecting the real parts of ˜h1(xD,v ), . . . , ˜hp(xD,v ) at no additional cost. 
+
+Assumption 1. For all x ∈ C and for all i ∈ A(x) ∩{i : hi(x) = 0 }, the row vector LGhi(x) ∈ R1×m is nonzero, and there exists u ∈ Rm such that, for all i ∈ A (x),
+
+Lf hi(x) + LGhi(x) u + α(hi(x)) ≥ 0.
+
+Assumption 1 is the standard joint controllability-feasibility hypothesis for non-smooth CBFs and is equivalent to non-emptiness of the multi-constraint QP feasible set on bd C
+
+[23]. It is implied, for example, by transversality of the active gradients together with controllability of each smooth constraint. 
+
+Theorem 3. Let h1, . . . , h p : D → R be continuously dif-ferentiable, and define h(x) ≜ min i∈{ 1,...,p } hi(x). Suppose Assumption 1 holds, and let α ∈ K e. Let δ > 0, and let 
+
+u∗ : C → Rm be locally Lipschitz such that, for all x ∈ C and all i ∈ A δ (x),
+
+Lf hi(x) + LGhi(x) u∗(x) + α(hi(x)) ≥ 0, (18) where the Lie derivatives are obtained from the dual-algebraic evaluation, 
+
+Lf hi(x) = D ˜hi(xD,f ),Lcol j (G)hi(x) = D ˜hi(xD,col j (G)).
+
+Then, C is forward invariant with respect to the closed-loop system ˙x = f (x) + G(x) u∗(x).
+
+Proof. Let x : [0 , ∞) → Rn denote the maximal solution of 
+
+˙x = f (x) + G(x) u∗(x) from the initial condition x(0) ∈C. Assume, for contradiction, that the trajectory escapes C in finite time, which implies 
+
+¯t ≜ inf { t > 0 : h(x(t)) < 0 } (19) exists. Continuity of h ◦ x together with h(x(0)) ≥ 0 implies that ¯t ∈ (0 , ∞), h(x(¯ t)) = 0 , and, for all t ∈ [0 , ¯t], h(x(t)) ≥
+
+0.By the definition (19), there exists a sequence {sj }∞ 
+
+> j=0
+
+such that as j → ∞ , sj ↓ 0, and, for all j ∈ N, h(x(¯ t + sj )) < 0.For each j ∈ N, the strict inequality is witnessed by some index ij ∈ { 1, . . . , p } with hij (x(¯ t + sj )) < 0. Since the index set is finite, the pigeonhole principle yields that there exists i† ∈ { 1, . . . , p } and a subsequence {¯sj }∞ 
+
+> j=0
+
+such that as j → ∞ , ¯sj ↓ 0, and, for all j ∈ N,
+
+hi†
+
+ x(¯ t + ¯ sj ) < 0. (20) Continuity of hi† ◦ x at ¯t gives hi† (x(¯ t)) ≤ 0. Since, in addition, hi† (x(¯ t)) ≥ h(x(¯ t)) = 0 by definition of the pointwise minimum, it follows that 
+
+hi† (x(¯ t)) = 0 , i† ∈ A (x(¯ t)) ⊆ A δ (x(¯ t)) .
+
+Continuity of (hi† ◦ x) − (h ◦ x) at ¯t, combined with the strict inequality 0 < δ , yields that there exists η > 0 such that, for all t ∈ [¯ t, ¯t + η],
+
+hi† (x(t)) − h(x(t)) < δ, 
+
+which implies that, for all t ∈ [¯ t, ¯t + η], i† ∈ A δ (x(t)) . Thus, (18) implies that, for all t ∈ [¯ t, ¯t + η],
+
+ddt hi† (x(t)) ≥ − α hi† (x(t)) . (21) Since α ∈ K e with α(0) = 0 , the comparison equation ddt W =
+
+−α(W ) with W (¯ t) = 0 has unique solution W ≡ 0. Applying the comparison lemma [30, Lem. 3.4] to (21) with hi† (x(¯ t)) = 0 = W (¯ t) yields that, for all t ∈ [¯ t, ¯t + η],hi† (x(t)) ≥ W (t) = 0 ,
+
+which, for all ¯sj ∈ (0 , η ), contradicts (20). Hence no such escape time ¯t exists, and C is forward invariant with respect to the closed-loop system. 
+
+Remark 5. Theorem 3 exposes the central computational difficulty of non-smooth safety: certifying forward invari-ance at a non-smooth boundary point requires simultaneous enforcement of every δ-active constraint, not just one. Ex-isting approaches confront this requirement combinatorially, by constructing the convex hull of the active gradients [23] or by solving a mixed-integer QP whose binary variables enumerate the active set; both incur execution times that depend on the local geometry of bd C. The dual-algebraic evaluation circumvents this bottleneck: by lifting the state along f and along each column col j (G) and evaluating ˜hi
+
+on the unmodified straight-line program of hi, the hardware extracts both the barrier value hi(x) and its Lie derivatives in a single forward pass, supplying the safety-filter QP (18) with the exact gradient information needed at every state. As will be stated in Proposition 2, the worst-case execution time is a constant multiple of the cost of evaluating h in R, independent of |A (x)| and of bd C. ⋄
+
+Remark 6. In implementation, the parameter δ > 0 in (18) provides a margin within which constraints are jointly enforced. Smaller δ reduces the average number of active constraints in the QP, at the cost of requiring more responsive constraint switching as the trajectory approaches the non-smooth locus; in the limit δ → 0+, only the constraints exactly attaining h(x) are enforced, recovering the strict A(x)-based formulation. ⋄
+
+VI. E XTENSIONS 
+
+This section extends the dual-algebraic framework in two directions: barrier functions formed by arbitrary finite compo-sitions of pointwise min and max operations, and systems of relative degree greater than one. 
+
+A. Compositions of Pointwise min and max 
+
+Practical safety specifications often combine convex con-straints via both unions and intersections, that is, by Boolean compositions of barrier functions [23], [31]. We define the M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 7
+
+class of finite composite functions Fp mapping R×. . . ×R to R
+
+inductively. For every index i ∈ { 1, . . . , p }, the coordinate pro-jection πi(y) ≜ y(i) belongs to Fp. If Φ1, Φ2 ∈ F p, then their pointwise minimum min(Φ 1, Φ2) and maximum max(Φ 1, Φ2)
+
+also belong to Fp. This generates barrier functions of the form 
+
+h(x) ≜ Φ( h1(x), . . . , h p(x)) ,
+
+where Φ ∈ F p.The maximum of dual numbers is defined, symmetrically to (11), by 
+
+max ℜ(z1, z 2) ≜
+
+(
+
+z1, ℜ(z1) ≥ ℜ (z2),z2, otherwise. For each composite function Φ ∈ F p, we define its dual-algebraic evaluation ΦD : Dp → D by structural recursion. If Φ = πi, then, for all z ∈ Dp, ΦD(z) ≜ z(i). If 
+
+Φ = min(Φ 1, Φ2), then ΦD(z) ≜ min ℜ(Φ 1,D(z), Φ2,D(z)) . If 
+
+Φ = max(Φ 1, Φ2), then ΦD(z) ≜ max ℜ(Φ 1,D(z), Φ2,D(z)) .The following theorem generalizes Theorem 2 to these exact compositions. 
+
+Theorem 4. Let x ∈ D , let v : D → Rn be continuous, and let h1, . . . , h p : D → R be continuously differentiable. Let 
+
+Φ ∈ F p, and define h(x) ≜ Φ( h1(x), . . . , h p(x)) . Then, the dual-algebraic evaluation ΦD satisfies 
+
+ΦD
+
+ ˜h1(xD,v ), . . . , ˜hp(xD,v ) = h(x) + Lv hi∗(x)(x) ϵ, (22) where the index i∗(x) ∈ { 1, . . . , p } is determined by the path through the recursive structure of ΦD that, at every min ℜ node, retains the operand with the smaller real part (breaking ties by left-to-right precedence), and at every max ℜ node retains the operand with the larger real part. Moreover, 
+
+∇hi∗(x)(x) ∈ ∂h (x). (23) 
+
+Proof. We argue by structural induction on the function class 
+
+Fp.For the base case, consider the case where there exists i ∈{1, . . . , p } such that Φ = πi. It thus follows that the projection isolates a single smooth coordinate. Therefore, Theorem 1 with 
+
+i∗(x) = i and Theorem 2 confirm (22) and (23). For the inductive step, consider the case where Φ =min(Φ 1, Φ2), and where the result already holds for Φ1 and 
+
+Φ2. Define the intermediate dual scalars 
+
+¯z1 ≜ Φ1,D
+
+ ˜h1(xD,v ), . . . , ˜hp(xD,v )
+
+= Φ 1
+
+ h1(x), . . . , h p(x) + Lv hi∗,1(x)(x) ϵ, (24) 
+
+¯z2 ≜ Φ2,D
+
+ ˜h1(xD,v ), . . . , ˜hp(xD,v )
+
+= Φ 2
+
+ h1(x), . . . , h p(x) + Lv hi∗,2(x)(x) ϵ, (25) where (24) and (25) apply the inductive hypothesis, extracting the selected indices i∗,1(x) and i∗,2(x) from their respective subtrees. Evaluating min ℜ(¯ z1, ¯z2) according to (11) selects ¯z1
+
+for the case where Φ1 ≤ Φ2 and ¯z2 otherwise, resolving ties left-to-right. This deterministic comparison yields 
+
+ΦD
+
+ {˜hj (xD,v )}pj=1 
+
+ = h(x) + Lv hi∗(x)(x) ϵ, 
+
+where i∗(x) = i∗,1(x) for the case where Φ1 ≤ Φ2, and 
+
+i∗(x) = i∗,2(x) otherwise. The symmetric logic holds identical for Φ = max(Φ 1, Φ2).To show (23), note that the index i∗(x) produced by the recursion is active, that is, hi∗(x)(x) = h(x), with the selected branch agreeing with h at x. The Clarke calculus for finite pointwise minima and maxima [25, Prop. 2.3.12, Thm. 2.3.10] represents ∂h (x) as the convex hull of the gradients of the active branches; the gradient ∇hi∗(x)(x) of the selected active branch is one such generator and therefore lies in ∂h (x), which confirms (23). 
+
+Remark 7. Theorem 4 shows that the dual evaluation traces the recursive structure of Φ exactly once. This depth-first traversal extracts a valid Clarke subgradient without additional computation. Let Ch denote the cost of evaluating the com-posite function h over R. The dual evaluation requires O(Ch)
+
+operations, which ties the execution time to the algebraic com-plexity of the barrier and avoids the combinatorial enumeration of active faces required by convex-hull methods. ⋄
+
+B. Higher Relative Degree via Truncated Polynomial Duals 
+
+If the system has relative degree r > 1, then the control input does not appear in the first r − 1 time derivatives of the safety margin; the safety condition instead involves the iterated Lie derivatives Ljf h for j ∈ { 1, . . . , r }. We extend the dual-number ring so that this entire sequence is produced by a single evaluation of h.
+
+Definition 11. For any relative degree r ∈ Z+, the truncated polynomial dual ring of order r is the quotient structure 
+
+D(r) ≜ R[ϵ]/(ϵr+1 ).
+
+Every element z ∈ D(r) is uniquely represented by the polynomial z = Prj=0 aj ϵj with aj ∈ R, subject to the strict nilpotent condition ϵr+1 = 0 , while ϵj̸ = 0 for all j ≤ r.The structure D(r) is a local ring whose unique maximal ideal is generated by ϵ, and arithmetic follows polynomial multiplication modulo ϵr+1 . The dual-number ring of Defi-nition 5 is the case D(1) = D. The dual extension of a Cr
+
+function ϕ : R → R to D(r) is defined for z = Prk=0 akϵk by the truncated Taylor expansion 
+
+˜ϕ(z) ≜
+
+> r
+
+X
+
+> j=0
+
+ϕ(j)(a0)
+
+j! (z − a0)j (mod ϵr+1 ), (26) where (z − a0)j is evaluated within D(r). The composition rule of Lemma 2 extends to D(r) for all r ≥ 1 by induction on the operational syntax tree. The following theorem shows that seeding this higher-order arithmetic with the Taylor jet of the flow returns the complete sequence of iterated Lie derivatives. 
+
+Theorem 5. Let h : D → R be r-times continuously differen-tiable, and let the system vector field f : D → Rn be (r − 1) -times continuously differentiable. Define the kinematic state iterates as 
+
+f [0] (x) ≜ x, f [j](x) ≜ ∇f [j−1] (x) f (x), (27) 8 M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 
+
+where j ∈ { 1, . . . , r }. Define the order-r dual flow seed vector 
+
+xD(r),f ≜
+
+> r
+
+X
+
+> j=0
+
+1
+
+j! f [j](x) ϵj ∈ Dn
+
+> (r)
+
+. (28) Then, the iterated Lie series is given by 
+
+˜h xD(r),f 
+
+ =
+
+> r
+
+X
+
+> j=0
+
+1
+
+j! Ljf h(x) ϵj . (29) Specifically, for all j ∈ { 0, . . . , r }, Ljf h(x) = cj j!, where cj
+
+is the scalar coefficient of ϵj in the exact evaluated polynomial 
+
+˜h xD(r),f 
+
+.
+
+Proof. For all t ≥ 0, let φt : D → D denote the flow satisfying  
+
+> ddt
+
+φt(x) = f (φt(x)) with φ0(x) = x. Since f is (r − 1) -times continuously differentiable, the map t 7 → φt(x) is r-times continuously differentiable, and differentiating the flow identifies its time derivatives with the spatial iterates of (27): 
+
+dj
+
+dtj φt(x)
+
+> t=0
+
+= f [j](x), j ∈ { 0, . . . , r }. (30) Let Pr (t) ≜ Prj=0 1 
+
+> j!
+
+f [j](x) tj denote the order-r Taylor polynomial of the trajectory at t = 0 . The dual seed (28) is this polynomial evaluated at the nilpotent variable: 
+
+xD(r),f = Pr (ϵ). (31) Because h ∈ Cr and t 7 → φt(x) ∈ Cr , the composition h ◦
+
+φt is r-times continuously differentiable, and the chain rule gives dj 
+
+> dtj
+
+h(φt(x)) |t=0 = Ljf h(x) for j ∈ { 0, . . . , r }. Taylor’s theorem then yields, as t → 0,
+
+h(φt(x)) = 
+
+> r
+
+X
+
+> j=0
+
+1
+
+j! Ljf h(x) tj + o(tr ). (32) The dual extension (26) evaluates ˜h as the order-r multi-variable Taylor expansion of h reduced modulo ϵr+1 . Since 
+
+Pr (ϵ)−x = Prj=1 1 
+
+> j!
+
+f [j](x) ϵj has no constant term, its powers above order r vanish in D(r), and 
+
+˜h Pr (ϵ) =
+
+> r
+
+X
+
+> k=0
+
+1
+
+k! Dkh(x)Pr (ϵ)−xk (mod ϵr+1 ). (33) The right-hand side of (33) is the order-r truncation of the Taylor expansion of h ◦ φt with t replaced by ϵ; matching it term by term with (32), in which the remainder o(tr ) maps to a multiple of ϵr+1 = 0 , the coefficient of ϵj equals 1 
+
+> j!
+
+Ljf h(x)
+
+for each j ∈ { 0, . . . , r }, which is (29). 
+
+Remark 8. For a system of relative degree r, the exponential CBF (ECBF) construction [14] and, more generally, the high-order CBF constructions [15], [16] cascade the envelopes 
+
+ψ0(x) ≜ h(x), ψk(x) ≜ ˙ψk−1(x) + αk(ψk−1(x)) ,
+
+for k ∈ {1, . . . , r } with αk ∈ Ke, and the actionable condition ψr (x, u ) ≥ 0 is affine in u through the single coupling term LGLr−1 
+
+> f
+
+h(x). Theorem 5 supplies the drift terms Lf h(x), . . . , L rf h(x) from the single seed xD(r),f . The coupling term is then obtained at first order by lifting the intermediate quantity Lr−1 
+
+> f
+
+h along each input column, namely 
+
+Lcol j (G)Lr−1 
+
+> f
+
+h(x) = D  ^Lr−1 
+
+> f
+
+h(xD,col j (G)); in the relative-degree-one case this reduces to the control seeds of Remark 3. When h is a pointwise minimum, the lexicographic routing of Theorem 2 is applied at the outer reduction, deterministically selecting one active constraint at every tier. ⋄
+
+VII. QP-B ASED SAFETY FILTER AND COMPLEXITY 
+
+This section presents the QP-based safety filter that im-plements the dual-algebraic forward-invariance result, and quantifies its computational cost. Figure 2 summarizes the data flow from the measured state to the safety-filter output.                                         
+
+> state x∈ D
+> xD,f xD,col 1(G)xD,col m(G)
+> ˜hi
+>  xD,f
+> ˜hi
+>  xD,col 1(G)
+> ˜hi
+>  xD,col m(G)
+> 
+> · · ·
+> · · ·
+> min ℜreduction over i∈ { 1, . . . , p }
+> ℜ=h(x)D=Lvhi∗(x)
+> QP (35)
+> u∗(x)
+> Fig. 2. Dual-algebraic safety filter pipeline. The state xis lifted along f
+> and along each column col j(G)of the input matrix (blue); the dual-extended barriers ˜hiare evaluated on every seed for every i∈ { 1, . . . , p }(orange); the
+> min ℜreduction (green) extracts h(x)in the real part and the Lie derivative of the selected constraint hi∗in the dual part; both feed the safety-filter QP (35) (red), whose output is u∗(x). By Proposition 2, the cost is O(Ch)per seed, independent of |A (x)|and of the local geometry of bd C.
+
+A. Safety-Filter QP 
+
+Given a nominal controller un : D → Rm and a margin 
+
+δ > 0, the dual-algebraic safety filter solves 
+
+u∗(x) = arg min 
+
+> u∈Rm
+
+∥u − un(x)∥2 (34) such that, for all i ∈ A δ (x),
+
+D ˜hi(xD,f ) +
+
+> m
+
+X
+
+> j=1
+
+D ˜hi(xD,col j (G)) u(j) + α(hi(x)) ≥ 0.
+
+(35) By Lemma 3, the dual parts in (35) equal Lf hi(x) and 
+
+Lcol j (G)hi(x), respectively. By Theorem 3, the safe set C is forward invariant with respect to the closed-loop system with all locally Lipschitz control u∗ satisfying (34) subject to (35). 
+
+Remark 9. When the trajectory is bounded away from the non-smooth locus, the active set reduces to a singleton, 
+
+Aδ (x) = {i∗(x)} for sufficiently small δ > 0, and (35) reduces to a single-constraint QP. The unique constraint is M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 9
+
+the one identified by the lexicographic selection of Lemma 3, and the QP admits the closed-form solution 
+
+u∗ = un − min 
+
+
+
+0, a + b u n
+
+∥b∥2
+
+
+
+bT,
+
+with 
+
+a ≜ D ˜hi∗ (xD,f ) + α(h(x)) ,b ≜
+
+h
+
+D
+
+˜hi∗ (xD,col 1(G))
+
+
+
+· · · D
+
+˜hi∗
+
+ xD,col m(G)
+
+i 
+
+.
+
+# ⋄
+
+B. Computational Complexity 
+
+Proposition 2. Let Ch be the number of elementary arithmetic operations (i.e., additions, multiplications, and comparisons) required to evaluate the composite barrier h(x) over R. For any continuous vector field v : D → Rn, the dual extension 
+
+˜h(xD,v ) is evaluated in at most 4Ch real operations, an overhead of at most 3Ch, independent of the state dimension 
+
+n, the constraint count p, the active-set cardinality |A (x)|, and the direction v.
+
+Proof. The dual evaluation traverses the straight-line program of h once, replacing each real operation by its dual counterpart, and we tally the cost of each. Dual addition (a1 + b1ϵ) + (a2 + b2ϵ) = ( a1 + a2) + ( b1 + b2)ϵ uses two real additions, a factor of two over the scalar baseline. Dual multiplication 
+
+(a1 + b1ϵ)( a2 + b2ϵ) = a1a2 + ( a1b2 + a2b1)ϵ uses three real multiplications and one real addition, a factor of four. The reduction min ℜ(z1, z 2) uses one real comparison and one conditional copy of a two-field record, a factor of two. The largest per-operation factor is four, so the dual evaluation uses at most 4Ch real operations. None of these counts depends on 
+
+n, p, |A (x)|, or v.
+
+Remark 10. By contrast, computing the full Clarke subd-ifferential ∂h (x) requires O(p) gradient evaluations followed by an O(|A (x)|⌊n/ 2⌋) convex-hull computation; mixed-integer formulations [24] require solving an MIQP with O(p) binary variables and worst-case time O(2 p); enforcing all constraints globally [23] artificially restricts the feasible control space and scales the continuous QP size; smooth approximations require selecting the surrogate parameter τ , with the resulting tradeoff between bias and conditioning. The dual-algebraic evaluation avoids all of these costs while preserving exactness and determinism. ⋄
+
+VIII. E XAMPLES 
+
+This section illustrates the framework on three examples of increasing scope. The mobile robot of Example 2 exercises vertex selection of Theorem 2 and forward invariance of Theorem 3 on a polytope, and resolves at the same geometry the failure exhibited by the counterexample of Example 1. The multi-agent problem of Example 3 scales the construction to p =  N
+
+> 2
+
+ constraints and the joint QP to R2N , exposing the O(p) versus combinatorial cost of Proposition 2. The double integrator of Example 4 operates at relative degree two, combining the truncated-dual extraction of Theorem 5 with vertex selection and simultaneous enforcement at a non-smooth point. In every example the safety filter solves (34)– (35) with the Lie derivatives obtained from the dual-algebraic evaluation, and all numerical data needed to reproduce the figures are stated in full. 
+
+Example 2. Consider a mobile robot with single-integrator dynamics on R2,
+
+˙x = u. (36) The safe set is the closed rectangle [0 , ℓ 1] × [0 , ℓ 2], encoded by 
+
+h(x) = min  
+
+> i∈{ 1,..., 4}
+
+hi(x),
+
+where h1(x) = x(1) , h2(x) = ℓ1 − x(1) , h3(x) = x(2) ,
+
+h4(x) = ℓ2 − x(2) , with constant gradients ∇h1 = [1 0] ,
+
+∇h2 = [ −1 0] , ∇h3 = [0 1] , ∇h4 = [0 − 1] . The system has f ≡ 0 and G ≡ I2; thus col 1(G) = e1 and col 2(G) = e2.At the corner x = (0 , 0) , the active set is A(x) = {1, 3}
+
+and the Clarke subdifferential is ∂h (x) = co {[1 0] , [0 1] }.The dual seeds for the control columns are xD,e 1 = x + e1ϵ
+
+and xD,e 2 = x + e2ϵ. Setting ℓ1 = ℓ2 = 1 and evaluating the dual extension of each hi at xD,e 1 yields 
+
+˜h1(xD,e 1 ) = 0 + 1 · ϵ, ˜h2(xD,e 1 ) = 1 − 1 · ϵ, 
+
+˜h3(xD,e 1 ) = 0 + 0 · ϵ, ˜h4(xD,e 1 ) = 1 + 0 · ϵ. 
+
+The real parts (0 , 1, 0, 1) have minimum 0, attained by indices 
+
+1 and 3. The left-to-right reduction min ℜ retains index 1,yielding ˜h(xD,e 1 ) = 0 + 1 · ϵ and hence Le1 hi∗ (x) = 1 , that is, 
+
+∇h1(x) · e1 = 1 . By Theorem 2, the gradient ∇h1(x) = [1 0] 
+
+is a vertex of ∂h (0) , as expected. As Example 1 cautions, the single-vertex enforcement here would leave u(2) unconstrained and admit u = (0 , −1) , which immediately violates h3. The simultaneous QP (35) with δ = 0 enforces both 
+
+u(1) + α(0) ≥ 0, u(2) + α(0) ≥ 0,
+
+and thereby renders C forward invariant for all locally Lips-chitz nominal controllers, as stated in Theorem 3. At an interior point such as x = (0 .1, 0.5) , the active set is 
+
+A(x) = {1}, the dual evaluation uniquely returns ˜h(xD,e 1 ) = 0.1 + 1 · ϵ, and the smooth single-constraint CBF behavior is recovered. 
+
+Numerical simulation. We integrate (36) on C = [0 1] 2 under the dual-algebraic safety filter (35) from x(0) = (0 .5, 0.5) 
+
+over T = 20 s with explicit Euler at step ∆t = 10 −3 s.The class-Ke function is α(h) = 5 h, the δ-active margin is 
+
+δ = 5 × 10 −2, and the nominal controller is the proportional law un(x, t ) = 0 .5 xref (t) − x, where the reference xref (t)
+
+steps every 5 s through the waypoint sequence (−0.5, −0.5) ,
+
+(1 .5, −0.5) , (1 .5, 1.5) , (−0.5, 1.5) . Each waypoint lies outside 
+
+C, so the safety filter must engage along every edge and at every corner. Figure 3 shows the closed-loop trajectory: the robot crosses the interior toward the bottom-left corner, then slides coun-terclockwise along the perimeter, transiently activating two constraints at every corner. The minimum of h(x(t)) over the run is −1.1 × 10 −17 , at the level of double-precision floating-point error, consistent with the forward invariance of 10 M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 
+
+Theorem 3. Figure 4 plots the four constraint values hi(x(t)) 
+
+and the δ-active cardinality |A δ (x(t)) |. The cardinality equals two at every corner sojourn, exactly the non-smooth events at which single-vertex enforcement fails (See Example 1), and equals one on the smooth edges of bd C. ⋄0 1
+
+x(1)                               
+
+> 01
+> x(2)
+> C
+> trajectory
+> x(0) waypoints
+> Fig. 3. Closed-loop trajectory of Example 2. The nominal controller tracks four waypoints ×placed outside C= [0 ,1] 2; the dual-algebraic safety filter (35) renders Cforward invariant. The trajectory slides along each edge of C
+> (i.e., smooth active set) and crosses each corner (i.e., non-smooth active set, two simultaneously tight constraints). 00.5 1
+> hi(x(t))
+> h1h2h3h4/
+> 0510 15 20
+> t(s)
+> 012
+> jA/ (x)j
+> Fig. 4. Constraint values and active-set cardinality for Example 2. Top: the four barriers hi(x(t)) , each nonnegative throughout, with the dotted line at the margin δ. Bottom: the δ-active cardinality |A δ(x(t)) |, which equals two at the four corner crossings, namely, t≈0,5,10 ,15 s , and one along the edges.
+
+Example 3. Consider N planar agents with single-integrator dynamics 
+
+˙xi = ui,
+
+where xi ∈ R2 and ui ∈ R2 are, respectively, the posi-tion and control input of agent i ∈ { 1, . . . , N }. Let x =[xT1 · · · xT 
+
+> N
+
+]T ∈ R2N . The pairwise collision-avoidance constraint between agents i and j is 
+
+hi,j (x) ≜ ∥xi − xj ∥2 − d2min ,
+
+where dmin > 0. The composite barrier is 
+
+h(x) = min  
+
+> 1≤i<j ≤N
+
+hi,j (x),
+
+and is non-smooth at all states where two or more inter-agent distance constraints are simultaneously tight. For example, if 
+
+∥x1 − x2∥ = ∥x1 − x3∥ = dmin with x2̸ = x3, then A(x) = 
+
+{(1 , 2) , (1 , 3) }.The stacked control matrix is G = I2N , and thus, for all k ∈{1, . . . , 2N }, col k(G) = ek. For each pair, the Lie derivatives are 
+
+Lf hi,j (x) = 0 ,
+
+∇xi hi,j (x) = 2( xi − xj )T, ∇xj hi,j (x) = −2( xi − xj )T,
+
+and are extracted by the dual-algebraic evaluation without symbolic differentiation. With N agents and p =  N
+
+> 2
+
+ pairwise constraints, the dual evaluation of the composite barrier re-quires O(p) = O(N 2) dual operations and O(p) comparisons. At a multiple-way collision event, this is substantially less than the O(pN ) cost of computing the full Clarke subdifferential of the composite barrier in R2N . Theorem 3 guarantees that the joint safe set is forward invariant under the simultaneous QP (35). 
+
+Numerical simulation. We simulate N = 3 agents with 
+
+dmin = 0 .7 performing an antipodal position swap: the agents start at the vertices of an equilateral triangle of circumradius 
+
+2.2 and are assigned goals at the antipodal vertices. For each agent i ∈ { 1, 2, 3}, the nominal controller is ui, n = xi, goal −
+
+xi, where xi, goal is the antipodal position of xi. The class-Ke
+
+function is α(h) = 5 h, the margin is δ = 5 × 10 −2, and the dynamics are integrated by explicit Euler over T = 20 s at step 
+
+∆t = 10 −3 s. The joint safety filter (35) solves a single QP in 
+
+R6 at each step. Figure 5 shows the agent trajectories and the three inter-agent distances. All agents reach their goals, and the minimum inter-agent distance over the run is 0.70 = dmin :the symmetric three-way conflict at the center is resolved by a coordinated rotation that holds every pair exactly on the safety boundary. ⋄
+
+Example 4. Consider a planar double integrator with state 
+
+x = [ qT vT]T ∈ R4, where q ∈ R2 is position and v ∈ R2 is velocity, and acceleration control u ∈ R2,
+
+˙q = v, ˙v = u. (37) This has the form (1) with 
+
+f (x) = 
+
+v
+
+0
+
+
+
+, G =
+
+ 0
+
+I2
+
+
+
+,
+
+where m = 2 . For all i ∈ { 1, . . . , p }, the safe set is the complement of p disk-shaped obstacles centered at oi ∈ R2
+
+with radius ri > 0,
+
+h(x) = min  
+
+> i∈{ 1,...,p }
+
+hi(x), hi(x) = ∥q − oi∥2 − r2 
+
+> i
+
+, (38) which is non-smooth at every state equidistant, in the hi sense, from two or more obstacles. Differentiating hi along (37), 
+
+Lf hi(x) = 2( q − oi)Tv, LGhi(x) = 0 ,L2 
+
+> f
+
+hi(x) = 2 ∥v∥2, LGLf hi(x) = 2( q − oi)T. (39) M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 11 -2 -1 0 1 2
+
+x(1) 
+
+> -2 -1 012
+> x(2)
+
+circles: start, squares: goal 0 5 10 15 20 
+
+t (s) 
+
+024                    
+
+> kxi ! xj k kx1!x2kkx1!x3kkx2!x3k
+> dmin
+> Fig. 5. Closed-loop simulation of Example 3 with N= 3 agents. Top: trajectories from start ◦to goal □; shaded disks have radius dmin /2, so disjoint disks certify separation. Bottom: the three inter-agent distances remain above dmin at all times; the simultaneous dip near t≈1 s is the multi-way conflict at the center, resolved by the joint dual-algebraic QP.
+
+Since LGhi = 0 while LGLf hi̸ = 0 , each hi has relative degree two with respect to u. In contrast to a polytopic barrier, the second drift derivative L2 
+
+> f
+
+hi = 2 ∥v∥2 is generically 
+
+nonzero , so the order-two seed of Theorem 5 is genuinely re-quired: with f [2] (x) = 0 for (37), the seed xD(2) ,f = x+f (x) ϵ
+
+produces 
+
+˜hi
+
+ xD(2) ,f 
+
+ = hi(x) + 2( q − oi)Tv ϵ + ∥v∥2ϵ2,
+
+from which Lf hi and L2 
+
+> f
+
+hi = 2 ∥v∥2 are recovered as 1! and 
+
+2! times the coefficients of ϵ and ϵ2, in a single forward eval-uation, with the lexicographic routing of Theorem 2 applied at the outer min . The control coupling LGLf hi in (39) is recovered, per Remark 8, by a first-order dual evaluation of 
+
+Lf hi along each column of G.The exponential-CBF condition (See Remark 8) for each 
+
+δ-active constraint, with linear α1(s) = c1s and α2(s) = c2s,is 
+
+2( q − oi)T u + 2 ∥v∥2 + ( c1 + c2) 2( q − oi)Tv + c1c2 hi(x) ≥ 0.
+
+(40) At a non-smooth state lying between two obstacles i and j,both constraints are active and (40) imposes two inequalities on u, with coefficient vectors 2( q − oi)T and 2( q − oj )T.Because these point along the two distinct obstacle bearings, they are linearly independent, so the simultaneous QP is fea-sible: the two-dimensional input has exactly enough authority to satisfy both relative-degree-two constraints at once. This is the feature a scalar input lacks, and it is the relative-degree analogue of the simultaneous enforcement certified by Theorem 3. 
+
+Numerical simulation. We take p = 2 obstacles at o1 =(0 , 1) and o2 = (0 , −1) with r1 = r2 = 0 .95 , leaving a narrow gap at the origin. The robot starts at q(0) = ( −3, −1) with 
+
+v(0) = 0 and is commanded to qgoal = (3 , −0.2) by the nom-inal proportional-derivative law un = 1 .5 ( qgoal − q) − 2.5 v.The ECBF gains are c1 = c2 = 4 , the margin is δ = 0 .15 ,and (37) is integrated by explicit Euler over T = 14 s at step 
+
+∆t = 10 −3 s. Figure 6 shows the robot threading the gap, and Figure 7 reports h(x(t)) and |A δ (x(t)) |. The composite barrier remains nonnegative, with minimum value 0.05 inside the gap, and the active set is a singleton on approach but grows to two for the 1.46 s during which the robot passes between the obstacles. Over that interval the filter enforces both relative-degree-two constraints simultaneously through its two-dimensional input, combining the truncated-dual extrac-tion of Theorem 5, the vertex selection of Theorem 2, and the simultaneous enforcement of Theorem 3 in a single non-smooth event. ⋄-3 -2 -1 0 1 2 3         
+
+> x(1)
+> -2 -1 012
+> x(2)
+> obstacles trajectory start goal
+> Fig. 6. Closed-loop trajectory of Example 4. The double integrator (blue) is commanded toward a goal □. The nominal straight-line command drives the robot toward the obstacles (red). The relative-degree-two ECBF filter, acting on the two-dimensional acceleration, steers the robot safely through the gap. 048
+> h(x(t))
+> 0246810 12 14
+
+t (s)            
+
+> 012
+> jA / (x(t)) j
+> Fig. 7. Composite barrier and active-set cardinality for Example 4. Top:
+> h(x(t)) = min ihi(x(t)) ≥0throughout, dipping to 0.05 inside the gap. Bottom: |A δ(x(t)) |equals two during the gap traversal, the non-smooth event at which two relative-degree-two constraints are enforced simultaneously. 12 M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS
+
+IX. D ISCUSSION 
+
+A. Comparison with Existing Approaches 
+
+Table I compares the dual-algebraic approach with existing methods for non-smooth CBFs. The dual-algebraic approach is the only method that simultaneously achieves O(Ch) worst-case time, deterministic computation, and exact subgradient extraction. Smooth approximations achieve linear time but introduce approximation error. MIQP and Clarke-hull methods are exact and deterministic but exhibit state-dependent compu-tation times; stochastic methods break determinism altogether.                                        
+
+> TABLE I COMPARISON OF METHODS FOR NON -SMOOTH CBF S EVALUATED AT A STATE x. H ERE pDENOTES THE NUMBER OF SMOOTH CONSTRAINT FUNCTIONS hiCOMPOSING h= min ihi,nIS THE STATE DIMENSION ,Ch
+> IS THE COST OF EVALUATING hIN R,AND |A (x)|IS THE CARDINALITY OF THE ACTIVE SET AT x.Method Worst-case time Det. Exact Smooth approx. [5] O(Ch)Yes No Stochastic CBF [22] O(Ch)No No Mixed-integer QP [24] O(2 p)Yes Yes Clarke-hull enum. [26] O(p· |A (x)|⌊n/ 2⌋)Yes Yes
+> Dual-algebraic (ours) O(Ch)Yes Yes
+
+B. Implementation Considerations 
+
+The dual-algebraic evaluation is implemented by storing each dual number as a pair (a, b ) ∈ R2 and overloading the elementary arithmetic operations to follow Definition 6. Languages with operator overloading (e.g., C++, Julia, Python) admit a transparent implementation; in C-only embedded en-vironments, the dual-extended arithmetic can be inlined man-ually with no dynamic memory allocation, which is precisely the structural property required by safety standards such as DO-178C and ISO 26262. The composite-min evaluation (12) reduces to p − 1 floating-point comparisons in addition to the 
+
+p dual evaluations of the individual hi. When implemented in floating point, the comparison ℜ(z1) ≤ ℜ(z2) is the only branch in the procedure; near a real-part tie it may be sensitive to numerical noise, in which case the dual-part tie-break lex -min of Definition 8 restores determinism, at the cost of a comparison no longer realized natively by the hardware floating-point comparator. X. C ONCLUSIONS AND FUTURE WORK 
+
+This paper presented a dual-algebraic framework for non-smooth control barrier functions defined as pointwise minima of smooth constraints, and showed that it meets the three objectives of Section III. Embedding the state and an arbitrary vector field into the dual-number ring D produces the value of the composite barrier and an exact Lie derivative from a single forward evaluation; the standard floating-point comparison, applied as min ℜ, is a deterministic lexicographic selector that routes one vertex of the Clarke subdifferential to the QP at every state, including non-smooth points, which settles objectives (P2) and (P3) (Theorem 2, Proposition 2). Simulta-neous enforcement of the δ-active constraints then renders the safe set forward invariant, settling (P1) (Theorem 3), whereas enforcing the selected vertex alone does not (Example 1). The framework is closed under finite compositions of point-wise min and max (Theorem 4) and, through the truncated polynomial duals R[ϵ]/(ϵr+1 ), extends to systems of arbitrary relative degree (Theorem 5). The arithmetic overhead is a fixed constant factor of Ch, independent of p, n, |A (x)|,and the geometry of bd C, which is the property required for hard real-time certification on embedded hardware. The three examples confirm the construction across relative degrees one and two and across polytopic, multi-agent, and nonlinear obstacle geometries. Several directions extend this work. The continuous-time guarantee of Theorem 3 carries to digital implementations once inter-sample drift is accounted for; a discrete-time dual-algebraic CBF inequality, in the spirit of [20], would certify safety directly at the sample rate. Because the dual evaluation is exact and constant-cost regardless of how many constraints are simultaneously active, it pairs naturally with structure-exploiting QP solvers in cluttered environments, where the gradient extraction is no longer the bottleneck. Finally, the in-finitesimal direction that carries the Lie derivative can equally carry a parameter sensitivity: seeding the dual part along a parameter-estimate direction would couple the framework with adaptive control barrier functions, allowing the safety certificate and the parameter update to share a single forward evaluation. Each of these directions preserves the defining feature of the present approach, that the safety-critical gra-dient information is produced exactly, deterministically, and in bounded time by elementary arithmetic alone. REFERENCES [1] J. Lygeros, C. Tomlin, and S. Sastry, “Controllers for reachability specifications for hybrid systems,” Automatica , vol. 35, no. 3, pp. 349– 370, 1999. [2] J.-P. Aubin, Viability Theory . Springer Science & Business Media, 2009. [3] F. Blanchini, “Set invariance in control,” Automatica , vol. 35, no. 11, pp. 1747–1767, 1999. [4] A. D. Ames, X. Xu, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs for safety critical systems,” IEEE Transactions on Automatic Control , vol. 62, no. 8, pp. 3861–3876, 2017. [5] A. D. Ames, S. Coogan, M. Egerstedt, G. Notomista, K. Sreenath, and P. Tabuada, “Control barrier functions: Theory and applications,” in Proc. European Control Conference (ECC) , 2019, pp. 3420–3431. [6] S. Prajna, A. Jadbabaie, and G. J. Pappas, “A framework for worst-case and stochastic safety verification using barrier certificates,” IEEE Transactions on Automatic Control , vol. 52, no. 8, pp. 1415–1428, 2007. [7] K. P. Tee, S. S. Ge, and E. H. Tay, “Barrier Lyapunov functions for the control of output-constrained nonlinear systems,” Automatica , vol. 45, no. 4, pp. 918–927, 2009. [8] P. Wieland and F. Allg¨ ower, “Constructive safety using control barrier functions,” in Proc. IFAC Symposium on Nonlinear Control Systems (NOLCOS) , vol. 40, no. 12, 2007, pp. 462–467. [9] S. Boyd and L. Vandenberghe, Convex Optimization . Cambridge University Press, 2004. [10] A. D. Ames, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs with application to adaptive cruise control,” in Proc. IEEE Conference on Decision and Control (CDC) , 2014, pp. 6271–6278. [11] S.-C. Hsu, X. Xu, and A. D. Ames, “Control barrier function based quadratic programs with application to bipedal robotic walking,” in Proc. American Control Conference (ACC) , 2015, pp. 4542–4548. [12] L. Wang, A. D. Ames, and M. Egerstedt, “Safety barrier certificates for collisions-free multirobot systems,” IEEE Transactions on Robotics ,vol. 33, no. 3, pp. 661–674, 2017. M. KAMALDAR: DETERMINISTIC NON-SMOOTH SAFETY VIA DUAL-ALGEBRAIC CONTROL BARRIER FUNCTIONS 13 
+
+[13] M. Rauscher, M. Kimmel, and S. Hirche, “Constrained robot control using control barrier functions,” in Proc. IEEE/RSJ International Con-ference on Intelligent Robots and Systems (IROS) , 2016, pp. 279–285. [14] Q. Nguyen and K. Sreenath, “Exponential control barrier functions for enforcing high relative-degree safety-critical constraints,” in Proc. American Control Conference (ACC) , 2016, pp. 322–328. [15] W. Xiao and C. Belta, “Control barrier functions for systems with high relative degree,” in Proc. IEEE Conference on Decision and Control (CDC) , 2019, pp. 474–479. [16] ——, “High-order control barrier functions,” IEEE Transactions on Automatic Control , vol. 67, no. 7, pp. 3655–3662, 2022. [17] S. Kolathaya and A. D. Ames, “Input-to-state safety with control barrier functions,” IEEE Control Systems Letters , vol. 3, no. 1, pp. 108–113, 2019. [18] X. Xu, P. Tabuada, J. W. Grizzle, and A. D. Ames, “Robustness of control barrier functions for safety critical control,” IFAC-PapersOnLine ,vol. 48, no. 27, pp. 54–61, 2015. [19] L. Lindemann and D. V. Dimarogonas, “Control barrier functions for signal temporal logic tasks,” IEEE Control Systems Letters , vol. 3, no. 1, pp. 96–101, 2019. [20] J. Breeden, K. Garg, and D. Panagou, “Control barrier functions in sampled-data systems,” IEEE Control Systems Letters , vol. 6, pp. 367– 372, 2022. [21] J. C. Duchi, P. L. Bartlett, and M. J. Wainwright, “Randomized smooth-ing for stochastic optimization,” SIAM Journal on Optimization , vol. 22, no. 2, pp. 674–701, 2012. [22] M. Vahs and J. Tumova, “Non-smooth control barrier functions for stochastic dynamical systems,” in Proc. European Control Conference ,2024. [23] P. Glotfelter, J. Cort´ es, and M. Egerstedt, “Nonsmooth barrier functions with applications to multi-robot systems,” IEEE Control Systems Letters ,vol. 1, no. 2, pp. 310–315, 2017. [24] Y. Chen, H. Peng, and J. W. Grizzle, “Obstacle avoidance for low-speed autonomous vehicles with barrier function,” IEEE Transactions on Control Systems Technology , vol. 26, no. 1, pp. 194–206, 2018. [25] F. H. Clarke, Optimization and Nonsmooth Analysis , ser. Classics in Applied Mathematics. SIAM, 1990. [26] C. B. Barber, D. P. Dobkin, and H. Huhdanpaa, “The quickhull algorithm for convex hulls,” ACM Transactions on Mathematical Software , vol. 22, no. 4, pp. 469–483, 1996. [27] A. Griewank and A. Walther, Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation , 2nd ed. SIAM, 2008. [28] A. F. Filippov, Differential Equations with Discontinuous Righthand Sides . Kluwer Academic Publishers, 1988. [29] J. Cort´ es, “Discontinuous dynamical systems,” IEEE Control Systems Magazine , vol. 28, no. 3, pp. 36–73, 2008. [30] H. K. Khalil, Nonlinear Systems , 3rd ed. Prentice Hall, 2002. [31] P. Glotfelter, I. Buckley, and M. Egerstedt, “Hybrid nonsmooth barrier functions with applications to provably safe and composable collision avoidance for robotic systems,” IEEE Robotics and Automation Letters ,vol. 4, no. 2, pp. 1303–1310, 2019.

@@ -1,0 +1,805 @@
+Title: ExTra: Exploratory Trajectory Optimization for Language Model Reinforcement Learning
+
+URL Source: https://arxiv.org/pdf/2606.24994v1
+
+Published Time: Thu, 25 Jun 2026 00:09:45 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# ExTra : Exploratory Trajectory Optimization for Language Model Reinforcement Learning 
+
+Wenyang Hu *1,2, Junxiang Jia 2, Zhen Shu 2, Daniel Dahlmeier 2,See-Kiong Ng 1, Bryan Kian Hsiang Low 11National University of Singapore, 2SAP 
+
+Abstract 
+
+Reinforcement Learning with Verifiable Re-wards (RLVR) for language-model reason-ing can fail at both extremes of task diffi-culty: easy prompts often produce all-correct, low-diversity rollout groups with little gra-dient signal, while hard prompts can pro-duce all-incorrect groups with no positive re-ward. We introduce ExTra (Exploratory Trajec-tory Optimization), a GRPO-compatible frame-work that extracts exploration signals from the model’s own rollouts. ExTra combines two mechanisms: (i) a novelty reward that adds embedding-based diversity bonuses after GRPO normalization, rewarding diverse cor-rect solutions; and (ii) entropy-guided prefix regeneration, which scores partial trajectories using entropy signals and continues exploration from promising intermediate steps. Across six mathematical reasoning benchmarks, ExTra 
+
+improves Qwen3-1.7B over GRPO by about +5 
+
+points on pass@1 and +7 points on pass@16, showing that trajectory-level exploration sig-nals can improve both single-sample accuracy and inference-time coverage. Code is available at: https://github.com/allen4747/extra. 
+
+1 Introduction 
+
+Reinforcement learning has become a central post-training paradigm for improving LLM reason-ing capabilities (Ouyang et al., 2022; DeepSeek-AI, 2025). Group Relative Policy Optimization (GRPO) (Shao et al., 2024) is a widely adopted variant that removes the learned value network by normalizing rewards within a sampled group of trajectories. This design is effective, but it also ex-poses a structural weakness at the extremes of task difficulty, where group-level rewards often become homogeneous. 
+
+Two failure modes of GRPO. When a problem is easy , the model generates nearly-uniform cor-rect responses; the within-group reward variance 
+
+> *Correpondence to: wenyang.hu@u.nus.edu
+
+collapses to near zero, producing negligible gradi-ents. The policy then over-optimizes for a narrow set of reasoning patterns, suppressing trajectory di-versity. This diversity collapse directly degrades pass@ k for k > 1, a metric that governs inference-time scaling via majority voting or best-of-N sam-pling (Brown et al., 2024). When a problem is 
+
+hard , the group may contain no correct responses; all advantages vanish and the policy receives no gradient at all. Together, these failure modes ensure that a substantial fraction of every training batch is either harmful or wasted, directly limiting sample efficiency. The recent efforts (Yu et al., 2025; Shrivastava et al., 2026) (e.g., DAPO) propose mitigations such as difficulty-based data filtering and over-sampling, which (1) discard problems with empirical pass rates outside a target window and (2) keep sam-pling until the group accuracy is neither 0 nor 1. However, this comes at a steep cost: hard prob-lems, which carry the densest learning signal for frontier reasoning, are discarded entirely, and easy problems, which are retained, still erode diver-sity over time. More fundamentally, resampling from scratch resets exploration to the beginning of the reasoning chain, ignoring trajectories that the model has already produced, which may already encode useful intermediate structure that informs the solution space. 
+
+Exploiting latent signals in trajectories. This observation points toward a different perspective. Rather than discarding existing trajectories or re-sampling blindly, we ask: is there signal already embedded in the model’s own generation process that can guide exploration more efficiently? During every rollout, the model produces two kinds of sig-nal that previous approaches ignored: the diversity 
+
+of previous trajectories, which could distinguish reasoning strategies that are genuinely novel from those that merely paraphrase; and the structure 
+
+1
+
+> arXiv:2606.24994v1 [cs.LG] 23 Jun 2026
+
+of failed trajectories, which encodes how well the intermediate states progressed. We exploit both signals through two complementary mechanisms. With an embedding-based novelty reward that encourages correct solutions that are semantically novel relative to those already seen for the same prompt. We design novelty to be gated on cor-rectness: only correct-and-novel solutions are re-warded, so the policy is never incentivized to pro-duce diverse failures at the expense of task perfor-mance. This restores the gradient signal on easy problems while preserving the stability of task re-ward optimization. For hard problems, rather than resampling from scratch and exploring the full trajectory space, we novelly propose to regenerate from a promising intermediate reasoning step, effectively continuing exploration from a step already deep in the search space. We identify the most promising reasoning step and use it as a prefix for future generations. Through an embedded signal in the LLM’s own generation process, Mean Token Entropy (MTE), the prefix selection requires no supervision and enables guided sampling. It is a validated empirical choice by our experiments in Sec. 5.6. Both mechanisms treat generated trajectories as a source of exploratory signal: novelty rewards op-timize for diversity across trajectories on easy prob-lems, while entropy-guided regeneration optimizes for structure within trajectories on hard problems. Together, they form ExTra (Ex ploratory Tra jectory Optimization), our novel algorithm that improves LLM reinforcement learning by explicitly optimiz-ing trajectories to be both diverse and structurally promising, operating entirely within the standard GRPO loop without sacrificing sample efficiency, additional reward models, or supervision beyond the binary correctness signal. We provide theoretical analysis to further sup-port how regeneration helps efficient exploration in RLVR. Our Sec. 4.4 elaborates that an infor-mative proxy helps reduce the exploration space and guides exploration. Our empirical analysis validates that there exists such an effective proxy, MTE, which requires no supervision and heavy computation. Extensive evaluation on six mathematical reason-ing benchmarks (MATH-500, AMC23, Minerva, OlympiadBench, AIME24, and AIME25) shows that ExTra improves Qwen3-1.7B over GRPO by about +5 on pass@1 and +7 on pass@16. Our ablations and analyses show that the gains come from both improved solution quality and broader coverage of reasoning trajectories. 
+
+2 Related Work 
+
+RL for LLM Reasoning. PPO (Schulman et al., 2017) was first applied to align LLMs via RLHF (Ouyang et al., 2022) and later adapted for chain-of-thought mathematical reasoning (Wei et al., 2022). GRPO (Shao et al., 2024) replaces the value network with within-group reward normaliza-tion; DeepSeek-R1 (DeepSeek-AI, 2025) showed that pure GRPO-style RL can elicit strong reason-ing from scratch. DAPO (Yu et al., 2025) improves data efficiency by filtering on empirical pass rates, but discards hard problems entirely. ExTra retains the full data distribution and instead modifies the advantage computation and rollout strategy to ex-tract signal from both difficulty extremes. 
+
+Intrinsic Motivation and Exploration Bonuses. 
+
+Intrinsic rewards are a classical tool for en-couraging exploration in sparse-reward environ-ments (Pathak et al., 2017; Burda et al., 2019). ICM (Pathak et al., 2017) rewards prediction error in a learned feature space; RND (Burda et al., 2019) uses the error of a fixed random network as a nov-elty proxy. Adapting these ideas to LLM sequence generation requires a novelty measure that operates in the high-dimensional space of natural language reasoning paths. (Dai et al., 2025) proposes using a novelty reward derived from multi-head critics trained on the policy model. In contrast, ExTra 
+
+uses cosine distance between sentence embeddings, which requires no additional training. 
+
+Process Supervision and Intermediate Rewards. 
+
+Process reward models (PRMs) provide step-level supervision for reasoning (Lightman et al., 2023); Math-Shepherd (Wang et al., 2024) automates this via Monte Carlo rollouts from each step. PRMs are powerful but require either human annotation or a separately-trained reward model, adding significant cost. ExTra’s entropy heuristic serves the same role—identifying high-quality intermediate states— while being computed at zero marginal cost from generation logits. 
+
+Search and Guided Reasoning. Tree-of-Thought (Yao et al., 2023) applies a systematic tree search over reasoning steps at inference time . ExTra differs in two respects: it operates at training time , enriching the replay buffer with trajectories continuing from promising prefixes; 2Figure 1: Overview of ExTra . Top: On easy problems, a novelty reward is added to GRPO’s normalized advantage, steering the policy toward diverse correct reasoning strategies. Bottom: On hard problems, all rollout prefixes are scored by Mean Token Entropy; The lowest-entropy prefix is re-queued as a guided prompt for the next batch, encouraging exploration from a promising intermediate reasoning step. 
+
+and it uses a single lightweight selection step rather than a full tree expansion, making it compatible with standard RL pipelines. 
+
+3 Background 
+
+Let x ∈ X denote a prompt and y ∈ Y a response sampled from policy πθ. In RLVR, the reward 
+
+R(x, y) is usually binary, indicating whether the final answer can be verified as correct. The training objective is 
+
+max  
+
+> θ
+
+Ex∼D , y∼πθ (·| x)
+
+R(x, y).
+
+Policy-gradient methods optimize this objective through an advantage A(x, y), which measures how much better a sampled response is than the policy’s expected response for the same prompt. The policy-gradient theorem (Sutton et al., 1999) gives 
+
+∇θ ER(x, y) ∝ EA(x, y) ∇θ log πθ(y|x).
+
+Thus, positive-advantage responses are reinforced, negative-advantage responses are suppressed, and near-zero advantages produce little update. PPO (Schulman et al., 2017) typically esti-mates advantages with a learned value network. GRPO (Shao et al., 2024) removes this network by sampling a group of G responses {yi}Gi=1 from the old policy πθold for the same prompt x and standardizing their rewards: 
+
+ˆAi = ri − μr
+
+σr
+
+,
+
+where ri = R(x, yi), and μr and σr are the group mean and standard deviation. When σr = 0 , we use the standard zero-advantage convention. The policy is then updated with a clipped surrogate objective regularized by KL divergence to a ref-erence policy πref ; the full expression appears in Appendix B. 
+
+4 ExTra: Exploratory Trajectory Optimization 
+
+Fig. 1 illustrates the full ExTra framework. The two mechanisms are modular. Novelty rewards are applied at every training step, while prefix re-generation is triggered only for prompts whose within-group pass rate falls below 1/G (quantified as hard). 
+
+4.1 Novelty-Driven Intrinsic Rewards 
+
+For each prompt x, we maintain a rollout mem-ory Φ( x) containing sentence embeddings of previ-ously generated responses and sibling responses from the same rollout group, computed by a lightweight embedding model h(·). The intrin-sic reward for a new response y with embedding 
+
+z = h(y) is: 
+
+rint (y) = 1[R(x,y)>0] ·
+
+
+
+1 − max  
+
+> z′∈Φ( x)
+
+cos( z, z′)
+
+
+
+.
+
+(1) The correctness gate 1[R> 0] is essential: novelty is rewarded only among correct solutions. An incor-rect response receives no bonus, even if it differs 3from all previous responses, so ExTra does not incentivize diverse failures. 
+
+Post-normalization application. Where to ap-ply the novelty reward matters. Directly adding novelty to the raw reward before GRPO normal-ization couples exploration to the group mean and variance, so the contribution of the binary task re-ward is shrunk or distorted. This is supported by our analysis in Appx D.1. We therefore propose to add novelty after group normalization: 
+
+ˆAfinal  
+
+> i
+
+= ˆAGRPO  
+
+> i
+
++ γ r (i)int , (2) where ˆAGRPO  
+
+> i
+
+= ( ri − μr)/σ r when σr > 0 and 
+
+0 otherwise. The coefficient γ has a direct inter-pretation: it is the additional normalized advantage assigned to a maximally novel correct response relative to a minimally novel one. Our theoretical analysis in App. E.3 shows that each unit of novelty reward corresponds to discov-ering a previously uncovered correct mode in Φ( x),justifying treating rint as a coverage signal rather than a generic diversity penalty. 
+
+4.2 Mean Token Entropy as an Intermediate-State Heuristic 
+
+When a rollout group contains no correct response, neither GRPO nor the correctness-gated novelty reward provides a positive signal. To recover use-ful information from such hard prompts, we need an unsupervised way to identify partial reasoning trajectories that are more likely to lead to a correct completion. We define the Mean Token Entropy (MTE) of a partial trajectory y≤t as 
+
+Hmean (y≤t) = 1
+
+t
+
+> t
+
+X
+
+> s=1
+
+H πθ(·| x, y<s ), (3) where H(π) = − P 
+
+> v∈V
+
+π(v) log π(v) is the per-step vocabulary entropy. MTE measures the model’s average internal uncertainty while produc-ing a prefix. Our hypothesis is that a coherent reasoning chain, even if incomplete, tends to be generated with lower uncertainty than a drifting or inconsistent chain. MTE is available at no ad-ditional forward-pass cost because it is computed from rollout logits. Before using MTE operationally, we validate it in a controlled Monte Carlo study. Section 5.6 shows that MTE ( ρwithin = −0.229 , p = 0 .002 )is the strongest within-problem predictor of pre-fix value across 600 prefixes from hard problems, outperforming 20 alternative metrics, including sev-eral that use the ground-truth answer. This confirms our design choice. 
+
+4.3 Entropy-Guided Prefix Regeneration 
+
+For each hard prompt, we extract discrete inter-mediate reasoning steps from all G rollouts and compute MTE for every prefix. Individual prefix scores can be noisy, so we smooth them by seman-tic similarity: 
+
+˜Hj = X
+
+> k
+
+wjk Hk, w jk = exp  cos( ej , e k)/τ P 
+
+> l
+
+exp  cos( ej , e l)/τ  ,
+
+where Hj ≡ H mean (pj ) is the raw MTE of prefix 
+
+pj , ej = h(pj ) is its embedding, and τ is a smooth-ing parameter. The smoothed score lets semanti-cally similar prefixes share information. We select 
+
+p∗ = arg min j ˜Hj , enqueue the guided prompt 
+
+[x, p∗], and inject it into a later training batch. New suffixes are then sampled as y>t ∼ πθ(·| x, p∗).The fixed prefix is treated as context: verification is applied to the concatenated trajectory (p∗, y>t ),while the policy-gradient loss is computed only on newly generated suffix tokens. This focuses ex-ploration on an intermediate state that the model already reached with relatively low uncertainty, in-creasing the chance of obtaining a rewarded contin-uation. The full procedure is given in Algorithm 1 (Appendix A). 
+
+Interaction with novelty. Regeneration is most useful when the rollout pool contains multiple plau-sible reasoning paths. The novelty reward helps maintain this pool; entropy-guided regeneration then selects among diverse candidates instead of repeatedly amplifying a single low-entropy pattern. The ablations in Section 5.7 test this interaction directly. 
+
+4.4 Why Regeneration Helps: A Search-Space Analysis 
+
+Regeneration admits a simple local justification on hard prompts. Let Y∗(x) ⊆ V L denote the correct trajectories of length L over vocabulary V.Fixing the first t tokens shrinks the reachable tra-jectory space from VL to VL−t; the gain depends on whether the surviving slice contains correct tra-jectories at higher density than the original. We compare two sampling strategies for the same pol-icy πθ: scratch sampling , which generates a full 4Table 1: Qwen3-1.7B mathematical reasoning results. pass@1 measures single-sample accuracy; pass@16 measures inference-time coverage across 16 samples. Best results are bolded and second-best results are underlined.                                                                                           
+
+> AIME24 AIME25 AMC23 MATH-500 Minerva Olymp. Avg Method @1 @16 @1 @16 @1 @16 @1 @16 @1 @16 @1 @16 @1 @16
+> GRPO 23.5 46.7 22.7 53.3 71.9 92.5 82.6 93.2 32.8 48.2 49.1 64.5 47.1 66.4 DAPO 26.9 53.3 29.0 43.3 72.5 92.5 76.5 88.4 29.0 46.3 43.1 57.9 46.2 63.6 ExTra-R 26.9 46.7 22.3 43.3 72.5 95.0 83.7 92.6 34.2 50.7 48.4 62.8 48.0 65.2 ExTra-N 31.7 63.3 27.7 50.0 74.7 97.5 86.0 94.8 34.8 50.7 52.1 67.1 51.1 70.6
+> ExTra (full) 31.5 66.7 30.4 63.3 76.4 95.0 86.3 95.8 35.2 51.5 52.1 67.1 52.0 73.2
+
+trajectory y ∼ πθ(·| x) with success probability p0;and regeneration from prefix p, which samples only the suffix y>t ∼ πθ(·| x, p) with conditional success probability q(p). The two are linked via the law of total probability: p0 = Ep∼πθ (·| x)[q(p)] . To show how regeneration helps, we provide a search-space analysis (proof appears in App. E): 
+
+Proposition 1 (Regeneration efficiency) . With p0
+
+and q(·) as above, p0 = Ep∼πθ (·| x)[q(p)] , so at least one length-t prefix satisfies q(p) ≥ p0. For any selected p∗ with q(p∗) > p 0, K independent regenerated attempts yield Pregen (K) = 1 − (1 −
+
+q(p∗)) K > 1 − (1 − p0)K = Pscratch (K) for every 
+
+K ≥ 1, and the expected attempts until the first correct trajectory drop from 1/p 0 to 1/q (p∗).Implication. Scratch sampling marginalizes over all length-t prefixes weighted by their generation probability; regeneration replaces this mixture with a single conditional slice. Because p0 is the prefix-weighted average of q(p), an above-average pre-fix ( q(p) > p 0) is guaranteed to exist, and con-centrating the budget on it strictly raises the per-attempt success rate while exploring an exponen-tially smaller space. The benefit therefore reduces to one empirical question: can we identify an above-average prefix without ground-truth super-vision? Sec. 5.6 answers this in the affirmative for MTE, which beats many alternatives including su-pervised ones and identifies above-average prefixes. This is exactly the condition required by Prop. 1. 
+
+5 Experiments 
+
+In this section, we evaluate whether ExTra im-proves RLVR training along three axes: (i) fi-nal reasoning accuracy, measured by pass@1 ; (ii) 
+
+inference-time coverage, measured by pass@16 ;and (iii) exploration efficiency, measured by diver-sity and rollout cost. 
+
+Training setup. We train Qwen3-1.7B (Yang et al., 2025) and Nemontron-1.5B on MATH-DAPO (Yu et al., 2025). Unless otherwise stated, all methods use group size G = 6 , batch size 512 ,learning rate 3 × 10 −6, and train for 250 steps. Full training details, decoding parameters, and imple-mentation details are given in App. B. 
+
+Evaluation. We evaluate on six mathematical reasoning benchmarks: MATH-500, AMC23, Min-erva, OlympiadBench, AIME24, and AIME25. We report pass@1, the expected accuracy of a single sampled response, and pass@16, the fraction of problems for which at least one of 16 sampled re-sponses is correct. pass@16 is central to our setting because it captures whether additional sampling ex-poses correct trajectories that pass@1 may miss; the diversity analysis below tests whether these gains correspond to broader trajectory coverage rather than only higher single-sample accuracy. 
+
+Baselines and variants. We compare against standard GRPO (Shao et al., 2024) and DAPO (Yu et al., 2025). To isolate the two mechanisms in 
+
+ExTra , we also evaluate two ablations: ExTra-R, which uses entropy-guided prefix regeneration only, and ExTra-N , which uses the correctness-gated novelty reward only. ExTra denotes the full method. 
+
+5.1 Main Results 
+
+Tab. 1 reports Qwen3-1.7B results for models trained by all five methods across the six bench-marks. It shows ExTra achieves the highest pass@1 performance, lifting the average pass@1 from 47.1% to 52.0% ( +4.9 ) on six benchmarks. The improvement is consistent on every benchmark but heavily skewed toward the hardest benchmarks: 
+
++8.0 on AIME24 and +7.7 on AIME25. The pass@16 results show an even clearer explo-ration benefit. Because pass@16 measures whether any of 16 sampled solutions is correct, it is sensi-tive to the breadth of the policy’s correct-solution support as well as to single-sample accuracy. Ex-
+
+5Tra improves average pass@16 from 66.4% to 73.2% ( +6.8 points), with particularly large gains on AIME24 ( +20.0 ) and AIME25 ( +10.0 ). To-gether with the diversity analysis in Sec. 5.4, this suggests that ExTra does not merely sharpen one preferred reasoning path; it broadens the set of cor-rect trajectories reachable at inference time. 
+
+5.2 Mechanism Decomposition 
+
+The bottom rows of Table 1 isolate the contribu-tion of each mechanism. Relative to GRPO, the regeneration-only variant ( ExTra-R ) improves av-erage pass@1 by +0.9 points but reduces average pass@16 by -1.2 points. This pattern is consistent with the role of regeneration: conditioning on se-lected prefixes can improve solution quality, but by itself it can also narrow the set of explored trajecto-ries. 
+
+ExTra-N , which uses only the correctness-gated novelty reward, achieves consistently higher per-formance on both average pass@1 ( +4.0 ) and pass@16 ( +4.2 ). This confirms that rewarding correct-but-novel trajectories directly counteracts the diversity collapse induced by homogeneous cor-rect groups. The full method combines the strengths of both components. Its average pass@16 gain over GRPO is +6.8 , exceeding the sum suggested by the indi-vidual deltas ( −1.2 + 4 .2 = +3 .0). This super-additive effect matches the intended interaction: novelty expands the pool of plausible reasoning paths, and regeneration then selects low-entropy prefixes from that richer pool. Without novelty, regeneration can repeatedly amplify similar pre-fixes; with novelty, it can exploit a broader set of candidate states. 
+
+5.3 Transfer Across Base Models 
+
+To test whether the gains are specific to Qwen3-1.7B, we repeat the main comparison on Nemotron-1.5B. Table 2 shows that ExTra again achieves the best average pass@1 and pass@16. The absolute gains are smaller than on Qwen3-1.7B, but the di-rection is consistent: average pass@1 increases from 57.9% to 58.9%, and average pass@16 in-creases from 77.2% to 79.8%. The strongest gains again appear on harder benchmarks, including +4.4 
+
+pass@1 and +6.6 pass@16 on AIME24. 
+
+5.4 Diversity and Training Dynamics 
+
+The pass@16 gains suggest that ExTra improves inference-time coverage. We verify this directly by 0 50 100 150 200 250      
+
+> Training step
+> 0.25
+> 0.30
+> 0.35
+> 0.40
+> 0.45
+> 0.50
+> Policy entropy
+> (a) Policy Entropy over Training
+> GRPO
+> ExTra (full)
+> 050 100 150 200 250
+> Training step
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> Novelty reward (mean)
+> Novelty reward
+> becomes effective
+> (b) Novelty Reward Signal in ExTra
+> ExTra (full)
+
+Figure 2: Training dynamics of policy entropy and nov-elty reward. ExTra sustains an active novelty signal while avoiding the entropy collapse associated with ho-mogeneous rollouts. 
+
+measuring diversity among trajectories generated for the same problem. Table 3 reports three com-plementary metrics averaged across the six bench-marks: Distinct-4 (↑), the fraction of unique 4-grams across responses; Self-BLEU (↓), the mean pairwise BLEU-4 between responses (Zhu et al., 2018); and LogDet (↑), the determinantal point pro-cess log-volume log det( I + αK ), where K is the cosine-similarity kernel of MiniLM-L6 trajectory embeddings. 
+
+ExTra achieves the best Self-BLEU and LogDet, indicating that its responses are less redundant and occupy a broader semantic region. DAPO has slightly higher Distinct-4 (0.59 vs. 0.58), but this metric mainly captures surface-level lexical varia-tion. The stronger semantic measures favor ExTra ,matching the pass@16 results and supporting the claim that ExTra improves trajectory coverage and diversity. Figure 2 provides a complementary training-time view for diversity. ExTra maintains a non-trivial novelty signal throughout the training steps while avoiding the entropy collapse observed un-der plain GRPO. The final pass@16 improvements therefore do not appear to be a transient early-training effect; they reflect a sustained change in the policy’s exploration behavior. 
+
+5.5 Sample Efficiency 
+
+A central goal of ExTra is to improve exploration without the large rollout overhead of dynamic re-sampling. We therefore compare methods by the 
+
+cumulative number of generated prompt instances ,counted before multiplying by the group size G.Each prompt instance produces G responses, and we count it whether or not it contributes to an up-date. GRPO and ExTra remain close to one prompt batch per training step, whereas DAPO resamples groups whose rewards collapse to a single value; in our run, DAPO requires an average of 3.05 genera-6Table 2: Nemontron-1.5B mathematical reasoning results. pass@1 measures single-sample accuracy; pass@16 measures inference-time coverage across 16 samples. Best results are bolded and second-best results are underlined. 
+
+AIME24 AIME25 AMC23 MATH-500 Minerva Olymp. Avg Method @1 @16 @1 @16 @1 @16 @1 @16 @1 @16 @1 @16 @1 @16 
+
+GRPO 47.9 76.7 39.8 70.0 89.2 97.5 85.9 95.6 26.1 46.0 58.3 77.7 57.9 77.2 DAPO 44.4 76.7 39.0 70.0 87.5 97.5 86.2 96.0 26.9 46.3 57.9 74.0 57.0 76.8 
+
+ExTra 52.3 83.3 43.1 70.0 85.0 100 86.5 96.6 26.8 49.3 59.6 79.7 58.9 79.8 
+
+Table 3: Diversity comparison using different diversity measures averaged across six benchmarks. 
+
+Method Distinct-4 ( ↑) Self BLEU ( ↓) LogDet ( ↑)GRPO 0.54 82.84 4.29 DAPO 0.59 81.63 4.47 
+
+ExTra 0.58 80.6 4.98 
+
+tion batches per step. Fig. 3 plots average pass@16 against this prompt budget at step 250. ExTra reaches 73 .2% average pass@16 using 136 k generated prompt instances. DAPO uses 392 k prompt instances but reaches only 63 .6% , while GRPO reaches 66 .4% with 128 kprompt instances. Thus, ExTra improves over GRPO at a similar rollout cost and outperforms DAPO on both accuracy and sample efficiency. 0 100 200 300 400 500 
+
+> Cumulative generated prompts (thousands)
+> 60
+> 62
+> 64
+> 66
+> 68
+> 70
+> 72
+> 74
+> 76
+> pass@16 (AIME24, %)  ExTra
+> pass@16 = 73.2
+> GRPO
+> pass@16 = 66.4
+> DAPO
+> pass@16 = 63.6
+> Sample Efficiency
+
+Figure 3: Sample effi-ciency comparison at train-ing phase, measured by the cumulative number of prompts sampled. pass@1 pass@4 pass@16 
+
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> Success Rate (%)
+> 40
+> 53
+> 63
+> 41
+> 56
+> 63
+> 42
+> 60
+> 72
+> Resampling Pass@k by Prefix Selection
+> Random
+> Raw Entropy
+> Smoothed Entropy
+
+Figure 4: Selecting low-entropy prefixes improves pass@ k over random se-lection, and smoothed en-tropy further improves it. 
+
+5.6 Validating Mean Token Entropy as a Prefix Heuristic 
+
+The validity of entropy-guided regeneration hinges on whether MTE reliably identifies prefixes likely to lead to correct completions. We test this directly in a controlled Monte Carlo study before using the heuristic inside the training loop. 
+
+Setup. We extract 600 prefixes from level 4–5 MATH-500 problems. For each prefix, we sam-ple K = 16 continuations and use the empirical pass rate as an estimate of the prefix’s Monte Carlo 
+
+Table 4: Spearman correlation ( ρ) between prefix met-rics and Monte Carlo pass rate over 600 prefixes from 22 problems. Within-problem correlation controls for problem-level difficulty and matches the setting in which regeneration selects prefixes. Full table in App. C.2. 
+
+Metric Within ρ Pooled ρ
+
+Unsupervised 
+
+Mean Token Entropy −0.229 −0.141 
+
+Layer Consistency −0.079 −0.047 
+
+Unconditional Perplexity +0 .000 −0.012 
+
+Ground-truth aware 
+
+Conditional PPL to GT −0.058 +0 .023 
+
+GT Log-Probability +0 .058 −0.023 
+
+Semantic Similarity to GT −0.011 +0 .100 
+
+value. We then evaluate 21 candidate prefix met-rics, including unsupervised signals such as en-tropy, perplexity, and layer consistency, as well as ground-truth-aware signals such as conditional perplexity to the gold answer and semantic sim-ilarity to the gold solution. We rank metrics by Spearman correlation with the Monte Carlo value. The primary statistic is within-problem correlation, because regeneration selects among prefixes be-longing to the same prompt. Full protocol details appear in Appx. C.1. 
+
+Results. Table 4 reports a representative subset of the metrics. MTE is the strongest predictor, achieving ρwithin = −0.229 (p = 0 .002 ). The absolute correlation is moderate, reflecting the in-herent noisiness of Monte Carlo prefix evaluation, but its magnitude is more than twice as large as the strongest ground-truth-aware metric in the full appendix table. This is notable because several of those baselines use the gold answer, whereas MTE is label-free, requires no reward model, and is computed from logits already produced during rollout. These findings support the empirical condition required by Proposition 1: when MTE selects above-average prefixes, regeneration can increase 7Table 5: Sensitivity to the intrinsic-reward coefficient                         
+
+> γ.Macro-averaged pass@1 / pass@16 over the six benchmarks.
+> γAvg pass@1 Avg pass@16
+> 0.0(= ExTra -R) 48.0 65.2
+> 0.548.2 68.2
+> 1.0(default) 52.0 73.2
+> 5.041.6 60.9
+> Table 6: Novelty-signal ablation. Macro-averaged pass@1 and pass@16.
+> Novelty signal Avg pass@1 Avg pass@16
+> Policy surprise 49.4 67.9 N-gram count 51.0 68.2 Embedding (default) 52.0 73.2
+
+the conditional success probability relative to sam-pling from scratch. Figure 4 confirms this opera-tionally: low-entropy selection improves over ran-dom prefix selection, and embedding-smoothed entropy closes much of the gap to oracle selection. 
+
+5.7 Ablation Studies 
+
+We conduct two additional ablations to test whether the novelty reward is robust to its coefficient and whether the form of the novelty signal matters. 
+
+Sensitivity to the novelty coefficient. Table 5 sweeps the intrinsic-reward coefficient γ while keeping the regeneration mechanism fixed. Set-ting γ = 0 recovers ExTra-R. Moderate novelty pressure improves both pass@1 and pass@16, with the default γ = 1 .0 giving the best macro-average result. A much larger value, γ = 5 .0, substantially hurts performance, suggesting that novelty should complement rather than dominate the extrinsic cor-rectness reward. 
+
+Choice of novelty signal. Table 6 compares three novelty signals on top of entropy-guided regen-eration: policy surprise, 4-gram novelty, and the default embedding-based novelty. Embedding nov-elty performs best, especially on pass@16. Com-pared with 4-gram novelty, it is only + 1.0 pp better on pass@1 but + 5.0 pp better on pass@16. This gap suggests that lexical novelty is not enough: surface-level variation can produce paraphrased solutions that remain close in reasoning space, whereas embedding novelty better captures seman-tically distinct solution paths. 
+
+6 Discussion 
+
+Trajectory-level signals matter. ExTra is moti-vated by a simple observation: GRPO often dis-cards useful trajectory-level information when re-wards collapse to all-correct or all-incorrect groups. Rather than filtering these cases away, ExTra ex-tracts signal from them. Correctness-gated novelty separates diverse correct solutions on easy prompts, while entropy-guided regeneration reuses promis-ing partial solutions on hard prompts. This makes exploration an explicit part of the RL objective rather than only a data selection problem. 
+
+The design avoids degenerate exploration. 
+
+Novelty does not encourage arbitrary behavior be-cause the intrinsic bonus is applied only to cor-rect responses. Regeneration alone can narrow the search, but the full method mitigates this by pair-ing regeneration with novelty: novelty broadens the prefix pool, and regeneration focuses sampling within that broader pool. The ablations support this interaction. 
+
+ExTra improves reasoning coverage. Overall, the results suggest that ExTra improves not only final-answer accuracy but also the coverage of cor-rect reasoning trajectories. Its main significance is therefore conceptual as well as empirical: gener-ated rollouts should be treated as sources of explo-ration signal, not merely as samples to be scored by a binary reward. 
+
+7 Conclusion 
+
+ExTra is an RLVR training framework that im-proves exploration in GRPO-style optimization. It addresses two common failure modes: diversity collapse on easy prompts and gradient starvation on hard prompts. It combines a correctness-gated novelty reward with entropy-guided prefix regen-eration, allowing the model to use signals already present in its own rollouts. Experiments on math-ematical reasoning benchmarks show that ExTra 
+
+improves both pass@1 accuracy and pass@ k cover-age over standard baselines, suggesting that RLVR can benefit from treating generated trajectories as sources of exploration signal. 
+
+References  
+
+> Bradley Brown, Jordan Juravsky, Ryan Ehrlich, Ronald Clark, Quoc V Le, Christopher Ré, and Azalia Mirho-seini. 2024. Large language monkeys: Scaling infer-ence compute with repeated sampling. arXiv preprint arXiv:2407.21787 .
+
+8Yuri Burda, Harrison Edwards, Amos Storkey, and Oleg Klimov. 2019. Exploration by random network dis-tillation. In International Conference on Learning Representations (ICLR) .Runpeng Dai, Linfeng Song, Haolin Liu, Zhenwen Liang, Dian Yu, Haitao Mi, Zhaopeng Tu, Rui Liu, Tong Zheng, Hongtu Zhu, and 1 others. 2025. Cde: Curiosity-driven exploration for efficient reinforce-ment learning in large language models. arXiv preprint arXiv:2509.09675 .DeepSeek-AI. 2025. DeepSeek-R1: Incentivizing rea-soning capability in LLMs via reinforcement learning. 
+
+arXiv preprint arXiv:2501.12948 .Hunter Lightman, Vineet Kosaraju, Yuri Burda, Harri-son Edwards, Bowen Baker, Teddy Lee, Jan Leike, John Schulman, Ilya Sutskever, and Karl Cobbe. 2023. Let’s verify step by step. arXiv preprint arXiv:2305.20050 .Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex Ray, and 1 others. 2022. Training language models to follow in-structions with human feedback. Advances in Neural Information Processing Systems , 35:27730–27744. Deepak Pathak, Pulkit Agrawal, Alexei A. Efros, and Trevor Darrell. 2017. Curiosity-driven exploration by self-supervised prediction. In Proceedings of the 34th International Conference on Machine Learning (ICML) , pages 2778–2787. PMLR. John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. 2017. Proxi-mal policy optimization algorithms. arXiv preprint arXiv:1707.06347 .Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li, Yang Wu, and 1 others. 2024. Deepseekmath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300 .Vaishnavi Shrivastava, Ahmed Hassan Awadallah, Vid-hisha Balachandran, Shivam Garg, Harkirat Behl, and Dimitris Papailiopoulos. 2026. Sample more to think less: Group filtered policy optimization for concise reasoning. In Proc. ICLR .Richard S Sutton, David McAllester, Satinder Singh, and Yishay Mansour. 1999. Policy gradient methods for reinforcement learning with function approxima-tion. In Proc. NeurIPS , volume 12. Peiyi Wang, Lei Li, Zhihong Shao, Run Xu, Damai Dai, Yifei Li, Deli Chen, Yu Wu, and Zhifang Sui. 2024. Math-shepherd: Verify and reinforce LLMs step-by-step without human annotations. arXiv preprint arXiv:2312.08935 .Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Brian Ichter, Fei Xia, Ed Chi, Quoc V. Le, and Denny Zhou. 2022. Chain-of-thought prompting elicits reasoning in large language models. Advances in Neural Information Processing Systems , 35:24824– 24837. An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, and 1 others. 2025. Qwen3 technical report. arXiv preprint arXiv:2505.09388 .Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Thomas L. Griffiths, Yuan Cao, and Karthik Narasimhan. 2023. Tree of thoughts: Deliberate problem solving with large language models. Ad-vances in Neural Information Processing Systems ,36. Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian Fan, Gaohong Liu, Lingjun Liu, and 1 others. 2025. Dapo: An open-source llm reinforcement learning system at scale. arXiv preprint arXiv:2503.14476 .Yaoming Zhu, Sidi Lu, Lei Zheng, Jiaxian Guo, Weinan Zhang, Jun Wang, and Yong Yu. 2018. Texygen: A benchmarking platform for text generation models. In The 41st international ACM SIGIR conference on research & development in information retrieval ,pages 1097–1100. 
+
+9A Full ExTra Algorithm 
+
+Algorithm 1 gives the full training procedure for ExTra . The algorithm has two additions to standard GRPO: a post-normalization novelty bonus for correct trajectories and a prefix-regeneration queue for hard prompts. 
+
+B Implementation and Experimental Details 
+
+B.1 GRPO Objective 
+
+For completeness, we write the GRPO objective used in our implementation. For each prompt x, a group of G responses {yi}Gi=1 is sampled from the old policy πθold . The policy is updated by maximizing 
+
+JGRPO (θ) = E
+
+"
+
+1
+
+G
+
+> G
+
+X
+
+> i=1
+
+min 
+
+
+
+ρi(θ) ˆAi, clip  ρi(θ), 1 − ϵ, 1 + ϵ ˆAi
+
+
+
+− β DKL (πθ∥πref )
+
+#
+
+,
+
+where ρi(θ) = πθ(yi|x)/π θold (yi|x) is the importance ratio, ϵ is the clipping parameter, and β controls the KL penalty. 
+
+B.2 Training Configuration 
+
+We follow the configuration described in Section 5.1; full hyperparameters are listed in Table 7. The novelty bonus is added after GRPO group normalization, as described in Eq. 2. This preserves the reward normalization used by GRPO and prevents the novelty score from changing the group mean or variance. 
+
+B.3 Novelty Memory and Embedding Details 
+
+For each prompt, the correct-response memory stores embeddings of recent verified-correct responses. Embeddings are normalized before cosine similarity is computed. In our runs, the relevant cosine similarities are empirically nonnegative; the theoretical analysis states this as an assumption, so the intrinsic bonus lies in [0 , 1] . Unless otherwise stated, the memory keeps the G = 6 most recent correct responses per prompt, matching Tab. 7. 
+
+B.4 Guided Prompts and Loss Masking 
+
+Prefix regeneration constructs a guided prompt by concatenating the original problem statement with the selected prefix. The regenerated sample consists only of the newly generated suffix. For reward computation, we verify the full concatenated trajectory consisting of the fixed prefix and the generated suffix. For the policy update, the fixed prefix is treated as context and the GRPO loss is applied only to the suffix tokens generated by the current policy. This masking avoids training the model to imitate cached prefixes while still allowing the prefix to guide exploration toward useful intermediate states. 
+
+B.5 Prefix Queue and Memory 
+
+Regeneration is disabled during the first Twarm = 30 steps. After warmup, only all-incorrect groups are eligible for prefix regeneration. For each eligible prompt, we cache extracted prefixes with their MTE values and embeddings, retaining at most 128 prefixes per prompt. Entropy smoothing is performed within the same prompt over the current prefixes and the cached prefix memory. Guided prompts are placed in a FIFO queue with maximum size 4,096 and replace the tail of a later training batch. 
+
+B.6 Evaluation Configuration 
+
+Evaluation uses temperature 0.7, top-p = 0 .9, and n = 16 samples per problem. We use a maximum generation budget of 31,744 tokens per response to avoid truncating long reasoning chains. pass@1 is estimated as the mean single-sample accuracy over the sampled responses. pass@16 is the fraction of problems for which at least one of the 16 sampled solutions is correct. We use the same answer-extraction and verification pipeline for all methods. 10 Table 7: Hyperparameters used in the main experiments.                                
+
+> Hyperparameter Value
+> Model and Data
+> Base models Qwen3-1.7B; Nemotron-1.5B Training dataset MATH-DAPO Evaluation datasets MATH-500, AMC23, Minerva, OlympiadBench, AIME24, AIME25 Max prompt length 2,000 tokens Max response length 4,096 tokens during training
+> GRPO Training
+> Group size G6Batch size 512 Learning rate 3×10 −6
+> Training steps 250 KL penalty β0.0 Entropy coefficient 0.0
+> Novelty Reward
+> Novelty coefficient γ1.0 Correct-response memory size per prompt 6Embedding model all-MiniLM-L6-v2
+> Prefix Regeneration
+> Warmup steps 30 Smoothing temperature τ0.1 Max prefixes per prompt 128 Max queue size 4,096
+> Evaluation
+> Sampling temperature 0.7 Top-p0.9 Samples per problem 16 Max generation tokens 31,744 Reported metrics pass@1, pass@16
+> Infrastructure
+> GPUs NVIDIA H100
+
+C Prefix-Value Evaluation Details 
+
+C.1 Monte Carlo Prefix Evaluation Protocol 
+
+Section 5.6 evaluates whether Mean Token Entropy (MTE) can identify promising intermediate reasoning states. The experiment estimates the value of a prefix by sampling continuations from it and measuring the resulting pass rate. • Problem selection: 22 MATH-500 problems at difficulty levels 4–5 where Qwen3-1.7B produces at least one correct and one incorrect full trajectory. • Initial trajectories: 32 full trajectories per problem, sampled at temperature 1.0. • Prefix extraction: Each trajectory is truncated at 20%, 40%, 60%, and 80% of its reasoning-step count. • Continuations: For each prefix, we sample K = 16 continuations using temperature 0.7 and top-
+
+p = 0 .9.• Total data: After parsing, filtering, and per-problem balancing, 600 evaluated prefix–value pairs, corresponding to 9,600 sampled continuations in total. • Correlation: We report within-problem Spearman correlation, averaged using Fisher z-transformation, and pooled Spearman correlation over all 600 prefixes. Within-problem correlation is the primary statistic because regeneration selects among prefixes be-longing to the same prompt. Pooled correlation is reported only as a secondary diagnostic because it is confounded by problem-level difficulty. 11 C.2 Full Prefix Metric Correlation Table 
+
+Table 8 reports all 21 evaluated prefix metrics. Metrics are grouped by whether they require access to the ground-truth answer. MTE is the strongest within-problem predictor even though it is unsupervised and computed from rollout logits. 
+
+Table 8: Spearman correlation between prefix metrics and Monte Carlo estimated pass rate over 600 prefixes from 22 problems.                                                 
+
+> Metric Within ρPooled ρ
+> Unsupervised Metrics
+> Prefix Token Entropy (Mean) −0.229 −0.141
+> Prefix Token Entropy (Std) −0.143 −0.140
+> Layer Consistency (Mid vs. Last) −0.079 −0.047
+> Logit Lens Answer Prob −0.049 −0.055
+> Unconditional Perplexity <0.001 −0.012
+> Ground-Truth-Aware Metrics
+> Self-Consistency PPL Gap +0 .098 −0.086
+> GT Log-Probability (Min) −0.083 +0 .036
+> Mutual Information (Prefix; GT) +0 .073 −0.004
+> GT Entropy Reduction +0 .073 −0.004
+> Top-KGT Token Overlap −0.065 +0 .074
+> GT Tokens in Top-10 Fraction +0 .061 −0.067
+> GT Log-Probability (Mean) +0 .058 −0.023
+> GT Answer Prob (Geomean) +0 .058 −0.023
+> PMI (Prefix, GT) +0 .058 +0 .045
+> Normalized GT Log-Probability −0.058 −0.013
+> GT Log-Probability (Sum) +0 .058 +0 .167
+> Relative Perplexity +0 .058 −0.029
+> Conditional PPL to GT −0.058 +0 .023
+> Prefix-GT Hidden State Alignment +0 .044 −0.007
+> PPL to Own Projected Answer +0 .022 −0.034
+> Semantic Similarity to GT −0.011 +0 .100
+
+D Additional Analysis 
+
+D.1 Post-Normalization Novelty Application 
+
+A key design choice in ExTra is to add the novelty reward after GRPO’s group-wise normalization rather than adding it to the raw reward before normalization. Throughout this section, we assume the empirical regime observed in our experiments: cosine similarities used in Eq. 1 lie in [0 , 1] , and therefore the correctness-gated novelty bonus bi lies in [0 , 1] . Let Ri ∈ { 0, 1} be the verifiable reward. If novelty is added before normalization, the advantage becomes 
+
+ˆApre  
+
+> i
+
+= (Ri + γb i) − 1
+
+> G
+
+P 
+
+> j
+
+(Rj + γb j )Std j (Rj + γb j ) .
+
+This couples novelty to the normalization statistics. A shared novelty offset is removed by mean subtrac-tion, while variation in bi changes the denominator and can shrink or distort the relative contribution of the binary task reward. Post-normalization application avoids this coupling: 
+
+ˆApost  
+
+> i
+
+= Ri − μR
+
+σR
+
++ γb i,
+
+with the zero-variance convention used for the GRPO term. The standard reward normalization is preserved, and γ has a stable interpretation: it is the additional advantage, in normalized units, assigned to a maximally novel correct solution relative to a minimally novel one. Since novelty does not enter the group mean or variance, it supplements the task reward instead of changing how the task reward is standardized. 12 D.2 Computational Overhead 
+
+ExTra adds computation in two places: prefix extraction for regeneration and response embedding for semantic novelty. Table 9 reports wall-clock overhead per step over 100 training steps.                   
+
+> Table 9: Per-step wall-clock overhead relative to GRPO, reported as mean ±standard deviation over 100 training steps. The exploration phase is unique to ExTra and includes prefix memory updates and novelty computation.
+> Method Additional overhead
+> GRPO 0 s +Regeneration 126 .9±10 .4s+Regeneration+Embedding novelty 327 .8±16 .1s+Regeneration+N-gram novelty 164 .1±21 .1s
+
+Embedding novelty gives the best pass@16 performance, but it is also the most expensive option. N-gram novelty roughly halves the overhead, but as shown in Table 6, it loses substantial inference-time coverage. We therefore use embedding novelty as the default and treat lexical novelty as a lower-cost alternative when throughput is the primary constraint. 
+
+D.3 Scope and Composition with Other Methods 
+
+Our experiments focus on mathematical reasoning with 1–2B-scale models. The entropy heuristic is likely to transfer best to domains where correct intermediate reasoning reduces token-level uncertainty. Code generation may share this property, while factual QA may be more challenging because fluent but incorrect chains can still have low entropy. 
+
+ExTra is orthogonal to batch-filtering methods such as DAPO. DAPO changes which groups contribute to the gradient update; ExTra changes how trajectories are rewarded and regenerated within the batch. A natural extension is to combine the two: filtering can remove low-value updates, while ExTra can broaden the solution distribution inside the retained groups. 
+
+E Theoretical Details 
+
+This section gives local arguments supporting the design of ExTra . The claims are intentionally modest: they do not prove convergence of LLM RL, but they isolate why the proposed mechanisms are useful under binary rewards and group-relative normalization. 
+
+E.1 Homogeneous GRPO Degeneracy Lemma A.1. Fix a prompt x and a GRPO group {yi}Gi=1 with scalar rewards ri = c for every i. Let 
+
+Lgrp (θ) = 1
+
+G
+
+> G
+
+X
+
+> i=1
+
+min 
+
+
+
+ρi(θ) ˆAi, clip( ρi(θ), 1 − ϵ, 1 + ϵ) ˆAi
+
+
+
+be the reward-driven part of the clipped GRPO surrogate. Standard GRPO sets ˆAi = 0 when σr = 0 to avoid division by zero; we adopt this zero-variance convention. Under it, ˆAi = 0 for all i, and therefore 
+
+Lgrp (θ) = 0 and ∇θLgrp (θ) = 0 for every θ. If a KL penalty is used, only that separate regularizer remains. 
+
+Proof. Since all rewards equal c, their group mean is μr = c and every centered reward is zero. The zero-variance convention sets all standardized advantages to zero. Substituting ˆAi = 0 into the surrogate, both ρi(θ) ˆAi = 0 and clip( ρi(θ), 1 − ϵ, 1 + ϵ) ˆAi = 0 , so every minimum evaluates to zero. Hence the reward-driven surrogate is constant in θ and has zero gradient. □
+
+E.2 Sign Correctness of Post-Normalization Novelty 
+
+With binary rewards Ri ∈ { 0, 1}, novelty bonus bi ∈ [0 , 1] , and correctness gate bi = 0 whenever Ri = 0 ,
+
+ExTra uses ˆAfinal  
+
+> i
+
+= ˆAGRPO  
+
+> i
+
++ γb i, γ ≥ 0.
+
+13 This construction has three useful properties. First, in any mixed group, standardization preserves the strict ordering between correct and incorrect responses, and the correctness gate ensures that incorrect responses receive no novelty bonus. Therefore a correct response cannot be ranked below an incorrect one because of novelty. Second, in an all-correct group, the GRPO advantage is zero by Lemma A.1, so the novelty term becomes the only source of within-group advantage. Third, in an all-incorrect group, both the GRPO advantage and the gated novelty bonus are zero, so ExTra does not reward diverse failures. This is a sanity check on the construction rather than a formal diversity guarantee; the diversity effect is evaluated empirically in Sec. 5.4 and Sec. 5.7. 
+
+E.3 Novelty as Correct-Mode Coverage Proposition A.2. Fix a prompt x. Suppose correct trajectories partition into latent semantic modes 
+
+C1, . . . , CM , and suppose Φ( x) contains one representative embedding for each already discovered correct mode and no representatives of undiscovered modes. Assume ideal separation under cosine similarity: two correct trajectories in the same mode have similarity 1, while trajectories in different modes have similarity 0. Let 
+
+C(Φ) = |{ m : Φ( x) contains a representative from Cm}| 
+
+be the number of covered correct modes, and let Φ+ be the memory after adding a newly sampled trajectory y if it is correct. Here rraw int denotes the pre-normalization intrinsic reward of Eq. 1, distinct from the post-normalization advantage contribution γ r (i)int used in the algorithm. With max ∅ = 0 ,
+
+rraw int (x, y; Φ) = 1[R(x,y)>0] 
+
+
+
+1 − max  
+
+> z′∈Φ( x)
+
+cos( h(y), z′)
+
+
+
+= C(Φ +) − C(Φ) .
+
+Proof. If y is incorrect, the correctness gate makes the intrinsic reward zero and the number of covered correct modes does not change. If y is correct and belongs to an already covered mode, the maximum cosine similarity to the stored representative of that mode is 1, so the intrinsic reward is zero and coverage does not increase. If y is correct and belongs to an uncovered mode, all stored representatives are from different modes and have cosine similarity 0; the intrinsic reward is 1, and adding y increases the coverage count by exactly one. □
+
+E.4 Regeneration Efficiency Proof of Proposition 1 (restated). We first restate the claim for a fixed policy: with p0 the scratch-sampling success probability and q(p) the conditional success probability of the suffix given prefix 
+
+p, at least one length-t prefix in the policy support satisfies q(p) ≥ p0; for any p∗ with q(p∗) > p 0,
+
+Pregen (K) > P scratch (K) for every K ≥ 1, and the expected number of attempts to obtain a correct trajectory falls from 1/p 0 to 1/q (p∗).By the law of total probability, conditioning on the length-t prefix of a scratch rollout gives 
+
+p0 = X
+
+> p∈V t
+
+Pr 
+
+> πθ
+
+[y≤t = p | x]q(p) = Ep∼πθ (·| x)[q(p)] .
+
+Thus p0 is the prefix-weighted mean of q(·). Therefore at least one prefix satisfies q(p) ≥ p0, with strict inequality unless q(·) is constant over the support. Now fix a selected prefix p∗ with q(p∗) > p 0. For any strategy with per-attempt success probability p,the probability that all K independent attempts fail is (1 − p)K , so the probability of at least one success is 1 − (1 − p)K . Substituting p = p0 and p = q(p∗) gives 
+
+Pregen (K) = 1 − (1 − q(p∗)) K > 1 − (1 − p0)K = Pscratch (K)
+
+for every K ≥ 1. The expected waiting time until the first success in an independent Bernoulli sequence with success probability p > 0 is 1/p , so regeneration reduces the expected number of attempts from 
+
+1/p 0 to 1/q (p∗). Finally, fixing the first t tokens reduces the reachable trajectory space from VL to 
+
+VL−t because only the suffix remains to be sampled. This last statement is a combinatorial search-space comparison; the probability of success is governed by the conditional success rate q(p∗). □
+
+14 Algorithm 1 ExTra : Exploratory Trajectory Optimization 
+
+Require: Policy πθ, prompt set D, embedding model h, correct-response memory Mr, prefix memory 
+
+Mp, guided-prompt queue Q, novelty weight γ, smoothing temperature τ , warmup length Twarm  
+
+> 1:
+
+for training step t = 1 , 2, . . . do  
+
+> 2:
+
+Sample prompts X ∼ D  
+
+> 3:
+
+if Q is not empty then  
+
+> 4:
+
+Replace the tail of X with guided prompts dequeued from Q 
+
+> 5:
+
+end if  
+
+> 6:
+
+Generate G responses per prompt using πθ 
+
+> 7:
+
+Compute extrinsic rewards Rext and token-level entropies  
+
+> 8:
+
+Embed all responses with h 
+
+> 9:
+
+for each prompt x with responses {yi}Gi=1 do  
+
+> 10:
+
+Let zi = h(yi) 
+
+> 11:
+
+Let Ci(x) be the set of embeddings in Mr(x) plus correct sibling-response embeddings from the current group, excluding zi 
+
+> 12:
+
+Compute correctness-gated novelty using cosine similarity: 
+
+r(i)int = 1[R(i)ext >0] 
+
+
+
+1 − max  
+
+> z′∈C i(x)
+
+cos( zi, z ′)
+
+
+
+, max ∅ = 0  
+
+> 13:
+
+Update Mr(x) with the current correct-response embeddings, keeping the most recent memory entries  
+
+> 14:
+
+end for  
+
+> 15:
+
+Compute GRPO advantages ˆAGRPO  
+
+> i
+
+= ( R(i)ext −μgroup )/σ group , setting them to zero when σgroup =0 
+
+> 16:
+
+Add novelty after normalization: ˆAi = ˆAGRPO  
+
+> i
+
++ γr (i)int  
+
+> 17:
+
+Update πθ with the clipped GRPO objective using ˆAi 
+
+> 18:
+
+if t > T warm then  
+
+> 19:
+
+for each prompt x with group pass rate 0 do  
+
+> 20:
+
+Extract reasoning prefixes {pj } from the generated responses  
+
+> 21:
+
+Compute each prefix’s Mean Token Entropy Hj and embedding ej 
+
+> 22:
+
+Store (pj , Hj , e j ) in Mp(x), keeping at most the configured prefix-memory budget  
+
+> 23:
+
+Smooth entropy scores over the current and cached prefixes by embedding similarity as in Eq. 4.3  
+
+> 24:
+
+Select p∗ = arg min j ˜Hj 
+
+> 25:
+
+Enqueue the guided prompt [x, p ∗] into Q 
+
+> 26:
+
+end for  
+
+> 27:
+
+end if  
+
+> 28:
+
+end for  
+
+> 29:
+
+return updated policy πθ
+
+15

@@ -1,0 +1,809 @@
+Title: Conflict-Aware Switching for CBF-CLF-Based Multi-Goal Navigation
+
+URL Source: https://arxiv.org/pdf/2606.21577v1
+
+Published Time: Tue, 23 Jun 2026 01:07:07 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Conflict-Aware Switching for CBF-CLF-Based Multi-Goal Navigation 
+
+Rohan Walia and Kevin Leahy 
+
+Abstract — Quadratic programs (QPs) using Control Barrier Functions (CBFs) and Control Lyapunov Functions (CLFs) are widely used for safe control in reach-and-avoid navigation. However, the inherently conflicting nature of CBF and CLF constraints can lead to performance degradation, including slowdowns and deadlocks. This issue is exacerbated in multi-goal scenarios, where multiple nominal control objectives must be satisfied under shared safety constraints. Existing approaches for preemptive safety are often computationally expensive or overly conservative, while methods that relax or switch between nominal objectives are not well-suited for sequential goal-to-goal navigation. To address these limitations, we propose a conflict-aware switching strategy that detects high-conflict conditions and switches between available nominal control objectives to reduce constraint conflict. We apply this approach to multi-agent, multi-goal reach-and-avoid scenarios under CBF-CLF-QP control. Compared to a baseline sequential goal traversal strategy, our method reduces both completion time and timeout rates, demonstrating improved performance in satisfying all nominal control objectives while respecting safety constraints. 
+
+I. I NTRODUCTION 
+
+Safe navigation tasks, such as reach-and-avoid scenarios and waypoint navigation in crowded environments, require balancing a nominal control objective against safety con-straints. Control Barrier Functions (CBFs) and Control Lya-punov Functions (CLFs) have emerged as a widely adopted framework in the controls and robotics community, providing formal guarantees for safety constraint satisfaction while preserving progress toward nominal control objectives. By design, CBFs offer a minimally invasive corrective action when implemented via quadratic programs (QPs) [1]. How-ever, the feasible set of control inputs decreases as the degree of conflict between nominal and safety constraints increases. To an extent, this problem is solved by relaxing the nominal control objective locally to prioritize safety [1]. Still, operating under conflicting control constraints can significantly degrade system performance, manifesting in the form of slowdowns, and eventually deadlocks. Slowdowns that are not accounted for by motion planning [2] or explicit recovery behavior modeling may lead to unpre-dictable delays and failure of mission-critical tasks. Forward propagation of the system model could help detect and avoid slowdowns by predicting proximity to high-conflict regions. For example, [3] integrates a discrete CBF constraint into a Model Predictive Control (MPC) framework, achieving “predictive safety” by preemptively avoiding unsafe regions.           
+
+> R. Walia and K. Leahy are with the Robotics Engineering De-partment, Worcester Polytechnic Institute, Worcester, MA 01609, USA.
+
+{rwalia,kleahy }@wpi.edu . This work was supported by funding from Amazon Robotics. 
+
+However, such approaches can become computationally ex-pensive. Alternatively, the geometric interaction between CBF and CLF constraints along system trajectories can be exploited for computationally efficient preemptive deadlock avoidance, without requiring forward propagation of the system model. Such techniques leverage the property that CBF-CLF QPs are inherently prone to asymptotically stable undesired equi-libria [4], [5], commonly known as deadlocks. As shown in [4], one solution is to eliminate all undesired equilibria entirely. However, [6] demonstrates that this can be overly conservative. Altering the system trajectory to avoid every known deadlock may degrade performance by diverting the system from its nominal control objective, particularly when many deadlocks are never encountered in practice. In the presence of multiple nominal control objectives (e.g., goal-to-goal navigation in warehouse robotics appli-cations), temporarily conflicted regions can be avoided by switching to an alternative objective located in a less con-strained region. In [7], Lee et al. propose an optimization strategy that maximizes feasibility under a given set of predetermined hard and soft constraints. Constraints are prioritized according to feasibility, with the least feasible “soft” constraints temporarily relaxed to ensure that the remaining constraints can be satisfied at each timestep. How-ever, this strategy enforces the simultaneous satisfaction of the most feasible constraints at any given time, which differs fundamentally from the sequential nature of goal-to-goal navigation. Additionally, this strategy does not guarantee that once disregarded “soft” constraints will be satisfied eventually. Event-triggered scheduling allows switching between nominal control objectives one at a time. In [8], Tabuada et al. use a feedback controller that switches to an alter-native control objective based on a thresholded input error. However, this approach relies on predetermined execution times for each control task, and primarily supports switching between only two nominal control objectives. Although it can be extended to accommodate more objectives, it requires at least one constraint to take precedence over others. These limitations highlight the need for a priority-agnostic switching strategy that favors conflict reduction in the pres-ence of multiple nominal control objectives. In this work, we formulate a switching strategy for multi-agent-multi-goal reach-and-avoid scenarios implemented through CLF-CBF QPs. By adopting this strategy, we empirically demonstrate reduction in timeouts and average completion time for sat-isfying all control objectives for each agent. Our specific contributions include: 
+
+> arXiv:2606.21577v1 [cs.RO] 19 Jun 2026
+
+1) Identifying a heuristic that captures degree of conflict for a given pair of safety and nominal control objective constraints; and 2) Integration of this strategy for multi-agent-multi-goal reach-and-avoid scenarios; and 3) Empirically demonstrating improvement in performance of multi-agent-multi-goal reach-and-avoid scenarios us-ing switching by virtue of timeout percentage and completion time. II. P ROBLEM FORMULATION 
+
+We use the following notation throughout the paper. R and 
+
+R+ represent the set of real and non-negative real numbers respectively. x denotes a vector. A function ϕ : R → R
+
+is an extended class-K∞ function if ϕ(0) = 0 and ϕ is strictly increasing on the interval (−∞ , ∞). The interior and boundary of a closed set S are denoted as Int( S) and 
+
+∂S respectively. ∇V represents the gradient of a function 
+
+V with respect to state x. The r-th order Lie derivative of a continuously differentiable function V : Rn 7 → R
+
+along a vector field f : Rn 7 → Rn at a point x ∈ Rn
+
+is denoted by Lrf V (x) ≜ ∂r V∂x r f (x), where r is omitted if 
+
+r = 1 . 1n ∈ Rn denotes a vector of ones, and In ∈ Rn×n
+
+denotes an identity matrix. For vector v ∈ Rn, we define the orthogonal projection matrix onto the subspace perpendicular to v as Pv = ∥v∥2In − vv T ∈ Rn×n. g denotes a goal location. 
+
+A. CBF-CLF QPs 
+
+Consider a control-affine system of the form: 
+
+˙x = f (x) + g(x)u, (1) where x ∈ Rn is the state, u ∈ U ⊆ Rm is the control input, and functions f : Rn 7 → Rn and g : Rn 7 → Rn×m are the known, locally Lipschitz drift vector and control matrix respectively. Let h : Rn 7 → R be a continuously differentiable function. A safe set C ⊂ Rn is defined as the zero super-level set of h such that 
+
+C = {x ∈ Rn | h(x) ≥ 0}, (2a) 
+
+∂C = {x ∈ Rn | h(x) = 0 }. (2b) 
+
+Definition 1 (Forward Invariance) . Set C is said to be 
+
+forward invariant with respect to system (1) if for every 
+
+x0 ∈ C , x(t) ∈ C ∀ t ≥ 0 where x(0) = x0.
+
+Definition 2 (Control Barrier Function) . Given a set C
+
+defined by (2) for a continuously differentiable function 
+
+h : Rn 7 → R with 0 a regular value, h is a Control Barrier Function (CBF) for system (1) with respect to C
+
+if there exists a locally Lipschitz function ϕ ∈ K ∞ such that, ∀x ∈ Rn,
+
+sup 
+
+> u∈U
+
+Lf h(x) + Lg h(x)u ≥ − ϕ (h(x)) . (3) 
+
+Definition 3 (Control Lyapunov Function) . for (1), apositive-definite function V is defined as a Control Lyapunov Function if it satisfies: 
+
+inf  
+
+> u∈U
+
+Lf V (x) + Lg V (x)u ≤ − γ(V (x), (4) where γ is a class K function. 
+
+Theorem 1 ([1], Thm. 2) . Given a set C as defined in (2) for a continuously differentiable function h : Rn 7 → R, any locally Lipschitz continuous controller u that satisfies (3) will render C forward invariant. Reach-and-avoid problems can be implemented for a CLF and CBF by solving for the optimum control input u(x) that respects the CLF and CBF constraints through the following quadratic program: 
+
+u(x) = argmin  
+
+> (u,δ )∈Rm+1
+> 12
+
+uT u + p δ 2
+
+s.t. Lf V (x) + Lg V (x)u ≤ − α V (x) + δLf h(x) + Lg h(x)u ≥ − ϕ h(x)
+
+δ ≥ 0.
+
+(5) Here δ is a slack variable which relaxes the CLF constraint (nominal control objective) to prioritize the safety constraint imposed by the CBF, and p is a slack penalty that penalizes excessive relaxation. 
+
+B. Multi-objective control 
+
+Consider a set of k distinct goals implemented through a set of k equal-priority control objectives, defined as: 
+
+G(t) = {gi ∈ Rn | i ∈ { 1, . . . , k }} ,
+
+V(t) = {Vi : X → R≥0 | i ∈ { 1, . . . , k }} , (6) where G(t) and V(t) are the set of remaining goals and CLF constraints at time t, respectively, and X = Rn represents the state space. Each CLF Vi ∈ V (t) is constructed with respect to its corresponding goal gi ∈ G(t), such that 
+
+Vi(x) = 0 ⇐⇒ x = gi. For a multi-obstacle setting, we define a set of obstacles O = {o1, . . . , o r } where 
+
+oj ∈ Rn, and a corresponding set of CBF functions H =
+
+{hj : X → R, j ∈ { 1, . . . , r }} , where each hj encodes a safety constraint with respect to obstacle oj . For goal-to-goal navigation, it is not feasible to satisfy all nominal control objectives simultaneously. Therefore, we satisfy the 
+
+engaged nominal constraint V ∗ ∈ V (t) and enforce safety with respect to all obstacles simultaneously through a QP of the form: 
+
+u(x) = argmin  
+
+> (u,δ )∈Rm+1
+> 12
+
+uT u + pδ 2
+
+s.t. Lf hj + Lg hj u ≥ − ϕ(hj ), ∀hj ∈ H 
+
+Lf V ∗ + Lg V ∗ u ≤ − α(V ∗) + δδ ≥ 0
+
+(7) A trivial switching condition simply satisfies the engaged nominal constraint V ∗ as: 
+
+∥x − g∗∥2 ≤ ϵg (8) for some common goal satisfaction threshold ϵg ∈ R+. A trivial switching policy π : X × 2V → gnext simply selects the next goal gnext in a conflict-agnostic manner as: 
+
+πseq (x, V(t)) = argmin 
+
+> i∈I (t)
+
+i (9) where I(t) = {i : Vi ∈ V (t)} is the set indices of the remaining nominal objectives. Once goal gi is reached, goal set G and constraint set V are updated as: 
+
+G(t+) = G(t) \ { gi}V(t+) = V(t) \ { Vi}. (10) This process is repeated until the following terminal state is achieved: G = ∅V = ∅. (11) 
+
+C. Conflict-aware switching 
+
+Existence of multiple goals motivates switching to an alternative nominal control objective that is more compatible with a given safety constraint. In order to do that, we need to identify when a given pair of CBF-CLF constraints are most incompatible. Consider the Lagrangian of QP (7): 
+
+L(u, δ ) = J (u, δ ) + λ1C1(u, δ ) + λ2C2(u) (12) where 
+
+J (u, δ ) = 12 uT u + pδ 2 (13) 
+
+C1(u, δ ) = Lf V ∗ + Lg V ∗ u + α(V ∗) − δ (14) 
+
+C2(u) = − (Lf h + Lg h u + ϕ(h)) . (15) From the KKT conditions for (12) [4]: 
+
+∂L
+
+∂u = ∂J
+
+∂u + λ1
+
+∂C1
+
+∂u + λ2
+
+∂C2
+
+∂u = 0 (16) where: ∂C1
+
+∂u = Lg V ∗, ∂C2
+
+∂u = −Lg h. (17) At a deadlock ( u = 0), C1 and C2 oppose each other. Therefore, their gradients would be anti-parallel: 
+
+∂C1
+
+∂u = − ∂C2
+
+∂u (18) 
+
+=⇒ Lg V ∗ = −(−Lg h) (19) 
+
+=⇒ (∇V − ∇ h)g = 0 (20) From (20), the following holds true for non-zero values of 
+
+Lg V and Lg h:
+
+Lg V ∗ = Lg h =⇒ ∇ V ∗ = ∇h. (21) 
+
+Remark 1. Condition (21) is sufficient but not necessary for detecting deadlocks. For control-affine system (1), a necessary condition for deadlock detection is established in Theorem 1, Eq. (6) of [4] as: 
+
+f (x) = λ1G∇V − λ2G∇h, (22) where G = gg T . However, λ1G∇V and λ2G∇h vanish when the relative degree between the system dynamics and the CLF or CBF is greater than one [9], [10]. Thus, deadlock detection becomes impossible. Following (21) and Remark 1, we define a conflict as follows: 
+
+Definition 4 (Constraint Conflict) . The conflict between constraints C1 and C2 at state x is the proximity of their gradients ∇V and ∇h to the following condition: 
+
+∇V = ∇h (23) That is, conflict is high when ∇V and ∇h point in same direction, forcing C1 and C2 to demand opposing corrections. A conflict heuristic which measures the proximity to this condition can be defined as follows: 
+
+Definition 5 (Conflict Heuristic) . A conflict heuristic 
+
+Φ( x, V, h ) : X × V × H → R is a function that:  
+
+> •
+
+Attains its maximum value C when the constraint gradients are aligned, i.e., ∇V = ∇h, corresponding to maximum conflict (deadlock)  
+
+> •
+
+Returns a strictly smaller value otherwise, decreasing monotonically as the constraint gradients diverge from alignment To this end, we define our main problem as follows: 
+
+Problem 1. Given k distinct equal-priority goals G(0) = 
+
+{g1, . . . , gk}, corresponding control objectives V(0) =
+
+{V1, . . . , V k}, and a control barrier function h ∈ H (t), find a heuristic function ϕ : X × V × H → R such that: 
+
+V∗(t) = π(x, V(t)) h = argmin 
+
+> Vi∈V (t)
+
+ϕ(x, V i, h ), (24) where V∗(t) is the set of least-conflicted constraints at time 
+
+t, and: 
+
+i∗ = argmin 
+
+> i∈I (t)
+
+V∗(t), (25) where i∗ is the index of least-conflicted, minimum-valued nominal constraint objective at time t.III. M ETHODOLOGY 
+
+In this section, we discuss the limitations of an existing alignment-based heuristic that measures conflict between a nominal control objective and a safety constraint. We then formalize the notion of a consistent conflict heuristic and show that any such heuristic guarantees finding the least-conflicted set of goals per (24). Finally, we present a new alignment-based heuristic that satisfies this consistency criterion. 
+
+A. Alignment-based conflict heuristic 
+
+In [4], Reis et al. prove that for CBF-CLF QPs of the form (5), asymptotically stable equilibria exist within the interior and on the boundary of the safe set. The interior equilibria are desired, as they drive the system towards completion of the nominal control objective (in this case, ensuring 
+
+V ≈ 0). Boundary equilibria occur where both CLF and CBF constraints are active. Since this represents a deadlock, boundary equilibria are undesired. Following (22), Reis et al. define a collinearity metric D : X × SO (n) → R≥0 to track proximity to a deadlock using (eq 24, [4]) as: 
+
+D(x, Q ) = 12 ∇V (x, Q )T G(Pf + PG∇h)G∇V (x, Q ) (26) where Pf and PG∇h represent scaled orthogonal projections. Here Q ∈ SO (n) is a rotation state for the Lyapunov function V , designed to eliminate boundary equilibria by reshaping the original Lyapunov function V . As mentioned earlier, eliminating all undesired equilibria has been shown to be an overly conservative approach [6]. To use (26) as a conflict heuristic without modifying the original CLF constraint, we set Q = In to obtain: 
+
+D(x) = 12 ∇V (x)T G(Pf + PG∇h)G∇V (x). (27) To demonstrate the need for this heuristic, consider a 2D single integrator driftless dynamics model ( f (x) = 0 in (1)) with identity control matrix g. Then, (27) becomes 
+
+D(x) = 12 ∇V (x)T P∇h∇V (x). (28) Expanding scaled orthogonal projection P∇h:
+
+D(x) = 12 ∇V (x)T
+
+ ∇h(x)∇h(x)T
+
+∥∇ h(x)∥2
+
+
+
+∇V (x). (29) This heuristic helps identify when ∇h and ∇V are collinear. However, due to its positive semi-definite nature, it does not differentiate between the best case ( ∇h and ∇V are antiparallel) and worst case ( ∇h and ∇V are parallel). This is shown in Fig. 1.             
+
+> Fig. 1: Inconsistent alignment-based heuristic. An agent is tasked with reaching goals 1 and 2, switching goals based on a thresholded value of Das defined in (29). Trajectories and the corresponding plot of Dare color-coded by the engaged goal. The purple and blue annotations highlight when the system encounters the obstacle and reaches goal g2, respectively. Notice that Dfails to distinguish between a head-on obstacle approach and an obstacle-free goal approach, as both produce near-zero Dvalues. This inconsistency motivates the need for a consistent alignment-based heuristic ϕθ
+> (31).
+
+To find the least conflicted goal, a heuristic ϕ needs to rank all available nominal constraints by establishing partial order on set V(t) for a given control barrier function h at state x. This requires the heuristic to be consistent in the following sense: 
+
+Definition 6 (Consistent Conflict heuristic) . Given sets X ,
+
+V as defined in (6) and H as defined in (7), a function ϕ :
+
+X × V × H → R is a consistent conflict heuristic if, for any 
+
+V1, V 2 ∈ V and h ∈ H ,
+
+ϕ(x, V 1, h ) ≤ ϕ(x, V 2, h ) (30) iff (V1, h ) is no more conflicted than (V2, h ) at x.If a consistent heuristic is available, the following theorem guarantees finding the least-conflicted goal at time t:
+
+Theorem 2 (Optimal and Complete Goal-Selection Policy) .
+
+Let V(t) be a non-empty finite set of control objectives and let ϕ : X × V × H → R be a consistent conflict heuristic. Then the policy 
+
+π(x, V(t)) h = argmin 
+
+> Vi∈V (t)
+
+ϕ(x, V i, h )
+
+selects the least-conflicted objective with respect to h ∈ H 
+
+at x ∈ X .
+
+Proof. Since V(t) is non-empty and finite, and ϕ maps into 
+
+R, the minimum value of ϕ over V(t) is attained by at least one element. Since ϕ is a consistent conflict heuristic, by (30), the minimizer of ϕ corresponds to an objective that is no more conflicted than any other Vi ∈ V (t). Hence π selects a least-conflicted objective if one exists. 
+
+B. Cosine-Similarity based heuristic 
+
+We now introduce an alternative alignment-based heuristic 
+
+ϕθ : X ×V ×H → [−1, 1] that measures conflict by checking the cosine similarity between ∇V and ∇h as: 
+
+ϕθ (x, V (x), h (x)) = ∇V (x)T ∇h(x)
+
+∥∇ V (x)∥∥∇ h(x)∥ . (31) As shown in Fig. 2, this heuristic is able to differentiate between the best and worst case scenarios, thus imposing a partial order on the constraint set V(t). A higher value of 
+
+ϕθ would correspond to a higher degree of conflict between the engaged CLF and CBF, indicating that a slowdown (and potentially, a deadlock) is imminent. Relying on directional information alone is too conserva-tive, as a conflict can be detected from anywhere in the state space. To localize conflict detection, we use Guassian scaling to ensure a smooth decay of conflict values away from the safety boundary: 
+
+ϕ′ 
+
+> θ
+
+(x, V (x), h (x)) = f (h(x), σ ) ϕθ (x, V (x), h (x)) ,
+
+where f (h(x), σ ) = 1
+
+σ√2π exp 
+
+
+
+− h(x)2
+
+2σ2
+
+
+
+.
+
+(32) Here, σ dictates the proximity of activation of the conflict with respect to the safety boundary imposed by h. This makes ϕ′ 
+
+> θ
+
+locally consistent :
+
+Proposition 1 (Local Consistency of ϕ′ 
+
+> θ
+
+). The scaled heuris-tic ϕ′ 
+
+> θ
+
+is consistent in a neighborhood Xh ⊆ X of the safety boundary ∂S = {x ∈ X : h(x) = 0 }. That is, for any 
+
+V1, V 2 ∈ V , h ∈ H :
+
+ϕ′ 
+
+> θ
+
+(x, V 1, h ) ≤ ϕ′ 
+
+> θ
+
+(x, V 2, h ) ⇐⇒ ϕθ (x, V 1, h ) ≤ ϕθ (x, V 2, h )
+
+(33) Fig. 2: Consistent alignment-based heuristic. Trajectories and the corresponding plot of ϕθ are color-coded by the engaged goal. For the engaged goal 1 (blue curve), ϕθ ≈ 1 when conflict is maximal; the obstacle lies in the line-of-sight between the system and goal 1. For the engaged goal 2 (green curve), ϕθ ≈ − 1 when conflict is minimal; the obstacle lies directly the system while it approaches goal 2. 
+
+for all x ∈ X h = {x ∈ X : f (h(x), σ ) ≥ ϵ} for some threshold ϵ > 0 determined by σ.
+
+Proof. Since f (h(x), σ ) > 0 for all x ∈ X h, multiplication by f (h(x), σ ) preserves the ordering of ϕθ within Xh for consistent heuristic condition (30). Hence, consistency fol-lows directly from Definition 6. Outside Xh, the ordering is no longer meaningful since ϕ′ 
+
+> θ
+
+→ 0 for all Vi ∈ V .Based on this heuristic, we define a policy πθ that selects the least conflicted objectives for a given V(t) and h as: 
+
+V∗(t) = πθ (x, V(t)) h = argmin 
+
+> Vi∈V (t)
+
+ϕ′ 
+
+> θ
+
+(x, V i, h (x)) (34) where V∗ is the set of CLF values associated with the least equally-conflicted goals at current time t. If |V ∗(t)| > 1,a unique CLF V ∗ is selected from V∗(t) via policy (25). To trigger switching while avoiding Zeno behavior [11], we establish the following switching condition: 
+
+(t − tsw  
+
+> i
+
+≥ τ ) ∧ (ϕ′ 
+
+> θ
+
+(x, V ∗, h ) ≥ ϵθ ) (35) where tsw i is the last switch time, τ is the dwell-time threshold, and ϵθ is the threshold for cosine-similarity angle between ∇V and ∇h, as determined by (32). IV. E XPERIMENTAL RESULTS 
+
+We evaluate the proposed conflict-aware switching policy (34) against the baseline sequential policy (9) by measuring the total completion time (iterations) required to reach all goals. Performance is compared across three scenarios of increasing complexity: 1) Stationary obstacle: A single agent navigating to two goals in the presence of a stationary conflict-inducing obstacle. We vary the obstacle size to evaluate perfor-mance of our strategy against the baseline. 2) Patrolling obstacle: A single agent operating under unicycle dynamics navigating to two goals guarded by a moving obstacle. 3) Monte Carlo: Multiple agents tasked with reaching their assigned goals while avoiding each other. We vary the numbers of goals and agents to evaluate scalability. 
+
+A. Scenario 1: Stationary Obstacle 
+
+Consider a 2D driftless single-integrator of the form: 
+
+˙x = 0 .01 
+
+1 00 1
+
+
+
+u (36) The following CLF enforces a nominal control objective for goal xg :
+
+V (x, xg) = ∥x − xg∥2. (37) while safety constraint is enforced by a CBF of the form: 
+
+h(x) = ∥x − xobs ∥2 − r2
+
+> safe
+
+. (38) Here h(x) models a circular obstacle of radius rsafe centered at xobs . The environment configuration is shown in Fig. 4.         
+
+> (a) No switching (b) Switching
+> Fig. 4: Stationary obstacle scenario: A system is tasked with reaching goals G={g1,g2}. An obstacle induces a conflict with respect to the system’s starting position at g1. See simulation parameters in Table I.
+
+The agent initially approaches goal 1, where the obstacle induces a conflict. Baseline switching policy πseq forces the agent to navigate around the obstacle. To increase conflict, we gradualy inflate the obstacle size gradually by increasing 
+
+rsafe . As shown in Fig. 5, πseq is faster for a very small obstacle size since switching to goal 2 would result in a longer overall trajectory. However, the total completion time increases linearly with the obstacle size due to the slowdown induced near the obstacle, as the agent is forced to accommodate conflicting nominal and conflicting con-straints. Conversely, completion time decreases with ϕ′
+
+> theta
+
+as obstacle size increases: a larger rsaf e value increases the activation neighborhood (see Prop. 1) for triggering an earlier switch for larger values of h.No switching Switching           
+
+> Fig. 3: Patrolling scenario with unicycle dynamics. A single agent must reach goals 1 (blue) and 2 (green) in sequence while avoiding a moving obstacle “patrolling” the goals. No switching (top): The agent waits if the obstacle occupies a goal and proceeds once it is clear.
+> Switching (bottom): The agent detects conflicts and redirects dynamically to avoid delays. Simulation parameters are given in Table II.
+> 0.10.15 0.20.25 0.30.35
+> 2280
+> 2300
+> 2320
+> 2340
+> Obstacle Size Iterations
+> πseq
+> π′
+> θ
+> Fig. 5: Comparison of No-Switching and Barrier-Switch as func-tions of obstacle size. See Table I for a list of simulation parameters.
+
+B. Patrolling Obstacle 
+
+Consider a unicycle model with state x = [ x, y, v, θ ]T ∈
+
+R4, where x, y denote the planar position, v the linear velocity, and θ is the heading angle. The control input is 
+
+u = [a, ω ]T ∈ R2, where a and ω denote the linear acceleration and angular velocity, respectively. The control-affine dynamics for the agent and obstacle are given by: 
+
+˙x = f (x) + g(x)u (39) where the drift and control matrix are: 
+
+f (x) = 
+
+
+
+v cos θv sin θ
+
+00
+
+ , g(x) = 
+
+
+
+0 00 01 00 1
+
+ (40) To measure nominal control objectives, we use the first order CLF as in (38). However, due to a relative order of 2 with respect to the dynamics [9], we use a proportional controller adapted from [12] to enforce nominal control objectives. Given the agent state x = ( x, y, v, θ ) and a goal position 
+
+g ∈ R2, the controller first computes the position error and desired heading angle: 
+
+epos = [ ex, e y ]T = g − [x, y ]T , (41) 
+
+θd = arctan 2( ey , e x). (42) The heading error is wrapped to [−π, π ] to ensure the shortest rotational path is taken: 
+
+θe = ([( θd − θ) + π] mod 2 π) − π. (43) The desired speed is set proportionally to distance to the goal 
+
+d = ∥e∥, and clipped to a maximum of 2.0 m/s: 
+
+vd = min ( Kp · d, 2.0) . (44) Linear acceleration a and angular velocity ω are then calcu-lated as: 
+
+unom =
+
+aω
+
+
+
+=
+
+Kp 00 Kθ
+
+  vd − vθe
+
+
+
+(45) with proportional gains Kp = 1 .0 and Kθ = 0 .5.Since the first order control barrier function in (38) has a relative degree of 2 with respect to the unicycle model [10], safety is enforced by respecting second order CBF constraints of the form: 
+
+Lg Lf h u ≥ − k · ζ1 ζ2
+
+ "Lf hh
+
+#
+
+− L2 
+
+> f
+
+h (46) where ζ1 = 1 .0 and ζ2 = 0 .75 . k = 10 .0 is a linear gain. The optimal control input for the agent is given by: 
+
+uagent  
+
+> opt
+
+(x) = argmin 
+
+> (u,ρ )∈Rm+1
+
+12 (u − unom )T (u − unom ) + 2 sρ 2
+
+s.t. (46) holds for h
+
+− umax ≤ u ≤ umax ,ρ ≥ 0.
+
+(47) where unom is calculated based on the currently selected goal. Here ρ is a slack variable which relaxes the nominal control objective to prioritize safety, and s = 50 .0 is the slack penalty value. The obstacle does not observe any safety constraints, and keeps switching between both goals by following πseq indefinitely. Therefore, the control input for the obstacle is calculated from (45) based on its selected goal. To force the obstacle to spend more time near goals, we enforce more restrictive control bounds and a tighter goal completion threshold for the obstacle as compared to the agent (see Table II). Fig. 3 shows a moving obstacle guarding two goals. The obstacle imposes a safety constraint on the agent. When the agent is operating under πseq , it ends up waiting for the obstacle to clear the goal at both goal locations. In comparison, ϕ′ 
+
+> θ
+
+allows the agent to switch to the alternate goal, and achieve a lower total completion time. This shows the compatibility of (32) with high-order control constraints, where (26) would fail. 
+
+C. Multi-Agent-Multi-Goal Navigation 
+
+To study the scalability of a switching-based reach-and-avoid approach, we consider a multi-agent-multi-goal sce-nario where a set of r robots R = {x1, . . . , x r } navigate to k
+
+goals G = {g1, . . . , gk} while avoiding each other, as shown in Algorithm 1. Each robots starts with an initial set of goal assignments Gi. The objective of this scenario is for each agent to reach the terminal state Vi = ∅. A safety constraint 
+
+hij ∈ H i imposes safety for agent j with respect to agent 
+
+i, where Hi is the set of all safety constraints observed by agent i. When agent i completes all its objectives ( Gi = ∅), it remains at it’s last-satisfied goal, and it’s corresponding safety constraint is removed from consideration for switching for all remaining agents. We increase the conflict by increasing the number of agents and goals within a fixed simulation space in R2, from 6 agents with 3 goals assigned to each agent, to 19 agents with 14 goals. Agent/goal locations and goal assignments are randomized over 500 monte-carlo runs for each case. We limit the iterations to 10,000. As shown in Fig. 7, π′ 
+
+> θ
+
+-based switching is able to achieve a much lower average comple-tion time across all 500 runs when considering timed-out experiments, whereas πseq leads to higher completion times with increasing agents/goals. This trend is also observed in Fig. 6, where the timeout percentage plateaus with π′ 
+
+> θ
+
+-based switching, and increases monotonically for ≈ 33 .4% . This indicates the ability of a consistent-heuristic based switching policy to perform better without fine-tuning for each spatial configuration. Completion times reported without timeouts 
+
+Algorithm 1 Mult-agent-multi-goal switching 
+
+Require: R = {x1, . . . , x r }, V , h, π
+
+Require: G = {G 1, . . . , Gr }, Gi = {gi, 1, . . . , gi,k } ∀ ai ∈R
+
+Ensure: G = ∅ 
+
+> 1:
+
+for xi ∈ R do  
+
+> 2:
+
+Vi(0) ← { Vi, 1, . . . , V i,k } 
+
+> 3:
+
+Hi(0) ← { hij : xj ∈ R \ { xi}}  
+
+> 4:
+
+tsw  
+
+> i
+
+← − τ 
+
+> 5:
+
+V ∗ 
+
+> i
+
+← πclf (xi, Vi(0))  
+
+> 6:
+
+while G̸ = ∅ do  
+
+> 7:
+
+for xi ∈ R do  
+
+> 8:
+
+if Vi(t) = ∅ then ▷ all goals completed  
+
+> 9:
+
+Hj (t) ← H j (t) \ { hji }, ∀aj ∈ R \ { ai} 
+
+> 10:
+
+ui ← 0 
+
+> 11:
+
+else  
+
+> 12:
+
+for gi,k ∈ G i do ▷ check goal completion  
+
+> 13:
+
+if ∥xi − gi,k ∥2 ≤ ϵg then  
+
+> 14:
+
+Vi(t) ← V i(t) \ { Vi,k } 
+
+> 15:
+
+Gi(t) ← G i(t) \ { gi,k } 
+
+> 16:
+
+if Hi(t)̸ = ∅ then ▷ if other agents are active  
+
+> 17:
+
+imin = argmin h∈H i(t) π′ 
+
+> θ
+
+(x, V(t)) h 
+
+> 18:
+
+else  
+
+> 19:
+
+imin = πclf (x, V(t))  
+
+> 20:
+
+if g∗
+
+> i
+
+̸ = gimin then  
+
+> 21:
+
+if (t − tsw  
+
+> i
+
+≥ τ ) then  
+
+> 22:
+
+g∗ 
+
+> i
+
+= gimin  
+
+> 23:
+
+V ∗ 
+
+> i
+
+= Vimin  
+
+> 24:
+
+tsw  
+
+> i
+
+← t 
+
+> 25:
+
+ui ← u∗(xi, V ∗ 
+
+> i
+
+, Hi(0)) ▷ solve QP (7) indicate scenarios where a sequential goal-switching strategy occasionally performs better due to particular spatial config-urations. V. C ONCLUSION 
+
+In this work, we highlighted the need for adopting an op-timal and complete switching strategy for multi-goal reach-and-avoid problems using CLF-CBF QPs to increase per-formance with respect to completion time for satisfying all goals. We established the conditions under which a heuristic and corresponding switching policy can be used to detect and switch to the lower-conflicted goal, whenever one is avail-able. We identified a consistent alignment-based heuristic. Using this heuristic, we demonstrated that a switching policy can reduce completion time as conflict increases under three multi-goal navigation scenarios of increasing complexity: single agent avoiding a stationary obstacle, a single agent avoiding a moving obstacle, and a multi-agent-multi-goal navigation scenario. REFERENCES [1] A. D. Ames, S. Coogan, M. Egerstedt, G. Notomista, K. Sreenath, and P. Tabuada, “Control barrier functions: Theory and applications,” in 2019 18th European Control Conference (ECC) , Jun. 2019, p. 3420–3431. 6 Agents 3 Goals 
+
+9 Agents 6 Goals 
+
+12 Agents 7 Goals 
+
+15 Agents 10 Goals 
+
+19 Agents 14 Goals 
+
+10 
+
+20 
+
+30 
+
+40 
+
+50 
+
+Scenario 
+
+> Timeout (%)
+
+πseq 
+
+π′
+
+> θ
+
+Fig. 6: Timeout percentage across scenarios. 6 Agents 3 Goals 9 Agents 6 Goals 12 Agents 7 Goals 15 Agents 10 Goals 19 Agents 14 Goals 
+
+0
+
+1000 
+
+2000 
+
+3000 
+
+4000 
+
+5000 
+
+6000 
+
+Scenario Average Completion Time 
+
+πseq (with timeouts) 
+
+π′ 
+
+> θ
+
+(with timeouts) 
+
+πseq (no timeouts) 
+
+π′ 
+
+> θ
+
+(no timeouts) Fig. 7: Average completion time with and without timeouts. 
+
+[2] J. Alonso-Mora, J. A. DeCastro, V. Raman, D. Rus, and H. Kress-Gazit, “Reactive mission and motion planning with deadlock resolu-tion avoiding dynamic obstacles,” Autonomous Robots , vol. 42, no. 4, pp. 801–824, 2018. [3] J. Zeng, B. Zhang, and K. Sreenath, “Safety-critical model predictive control with discrete-time control barrier function,” in 2021 American control conference (ACC) . IEEE, 2021, pp. 3882–3889. [4] M. F. Reis, A. P. Aguiar, and P. Tabuada, “Control barrier function-based quadratic programs introduce undesirable asymptotically stable equilibria,” IEEE Control Systems Letters , vol. 5, no. 2, pp. 731–736, 2021. [5] X. Tan and D. V. Dimarogonas, “On the undesired equilibria induced by control barrier function based quadratic programs,” Automatica ,vol. 159, p. 111359, 2024. [6] Y. Zhang, Y. Lyu, S. Jo, Y. Yang, and W. Luo, “Adaptive deadlock avoidance for decentralized multi-agent systems via cbf-inspired risk measurement,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025, pp. 14 917–14 923. [7] H. Lee, P. Rousseas, and D. Panagou, “Constraint selection in optimization-based controllers,” arXiv preprint arXiv:2505.05502 ,2025. [8] P. Tabuada, “Event-triggered real-time scheduling of stabilizing control tasks,” IEEE Transactions on Automatic control , vol. 52, no. 9, pp. 1680–1685, 2007. [9] A. E. Chriat and C. Sun, “High-order control lyapunov–barrier func-tions for real-time optimal control of constrained non-affine systems,” 
+
+Mathematics , vol. 12, no. 24, p. 4015, 2024. [10] Q. Nguyen and K. Sreenath, “Exponential control barrier functions for enforcing high relative-degree safety-critical constraints,” in 2016 American Control Conference (ACC) . Boston, MA, USA: IEEE, Jul. 2016, p. 322–328. [11] A. Ames, A. Abate, and S. Sastry, “Sufficient conditions for the exis-tence of zeno behavior,” in Proceedings of the 44th IEEE Conference on Decision and Control , 2005, pp. 696–701. [12] M. Black, G. Fainekos, B. Hoxha, H. Okamoto, and D. Prokhorov, “Cbfkit: A control barrier function toolbox for robotics applications,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2024, pp. 12 428–12 434. 
+
+APPENDIX 
+
+TABLE I: Sim Params: Single Integrator Switching Comparison 
+
+Parameter Value Description 
+
+∆t 0.01 s Time step 
+
+N 2500 Total iterations 
+
+umax (0 .2, 0.2) Maximum control input 
+
+rsafe 0.1–0.35 CBF safety radius 
+
+τdwell 8 s / 800 iter Minimum dwell time 
+
+ϵθ 0.1 Similarity angle threshold 
+
+ϵgoal 0.1 Goal completion threshold 
+
+p 1000 .0 Slack penalty 
+
+α 10 .0 CBF gain 
+
+γ 2.5 CLF gain 
+
+TABLE II: Sim Params: Unicycle Dynamics Patrolling Scenario 
+
+Parameter Value Description 
+
+∆t 0.1 s Time step 
+
+N 500 Total iterations 
+
+umax ,agent (5 .0, 5.0) Maximum control input (agent) 
+
+umax ,obs (2 .5, 25 .0) Maximum control input (obstacle) 
+
+rsafe 0.5 CBF safety radius 
+
+τdwell 4.0 s / 40 iter Minimum dwell time 
+
+ϵgoal, agent 0.1 Agent goal completion threshold 
+
+ϵgoal, obs 0.01 Obstacle goal completion threshold 
+
+ϵθ 0.1 Similarity angle threshold 
+
+p 10 Slack penalty 
+
+α 10 CBF gain 
+
+γ 1.0 CLF gain 
+
+TABLE III: Sim Params: Single Integrator Monte Carlo Experi-ments 
+
+Parameter Value Description 
+
+∆t 0.1 s Time step 
+
+N 2000 Maximum iterations 
+
+umax (0 .25 , 0.25) Maximum control input 
+
+rsafe 0.1 CBF safety radius 
+
+τdwell 4.0 s / 40 iter Minimum dwell time 
+
+ϵgoal 0.25 Goal completion threshold 
+
+ϵθ 0.1 Similarity angle threshold 
+
+p 1.0 Slack penalty 
+
+α 1.0 CBF gain 
+
+γ 10 .0 CLF gain

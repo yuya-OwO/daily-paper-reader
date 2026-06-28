@@ -6,26 +6,27 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-27
-- 运行时间：2026-06-27 21:32:29 UTC
+- 最新运行日期：2026-06-28
+- 运行时间：2026-06-28 21:29:17 UTC
 - 运行状态：成功
 - 本次总论文数：2
-- 精读区：1
-- 速读区：1
+- 精读区：0
+- 速读区：2
 
 ### 今日简报（AI）
-今日聚焦多目标导航冲突感知切换与语言模型探索性轨迹优化。精读论文《Conflict-Aware Switching for CBF-CLF-Based Multi-Goal Navigation》（8.0/10）最值得关注，其冲突感知思路对机器人安全导航有直接启发。建议进一步了解CBF-CLF框架在多目标场景下的设计细节，便于实际部署。
-- 详情：[/202606/27/README](/202606/27/README)
+今日推荐2篇非线性动力系统建模论文，分别提出频域神经常微分方程与无注意力Transformer的Koopman算子学习方法。两篇均为6分，适合入门了解前沿数值建模思路。可优先关注频域方法对复杂振荡系统的适用性，再尝试对比两种架构在实测数据上的效率。
+- 详情：[/202606/28/README](/202606/28/README)
 
 ### 精读区论文标签
-1. [Conflict-Aware Switching for CBF-CLF-Based Multi-Goal Navigation](/202606/27/2606.21577v1-conflict-aware-switching-for-cbf-clf-based-multi-goal-navigation)  
-   标签：评分：8.0/10、query:lyapunov-ai
-   evidence：使用控制李雅普诺夫函数进行安全多目标导航
+- 本次无精读推荐。
 
 ### 速读区论文标签
-1. [ExTra: Exploratory Trajectory Optimization for Language Model Reinforcement Learning](/202606/27/2606.24994v1-extra-exploratory-trajectory-optimization-for-language-model-reinforcement-learning)  
-   标签：评分：6.0/10、query:sr
-   evidence：可迁移至符号回归的强化学习探索方法
+1. [Frequency-Domain Neural ODEs for Modeling Non-Linear Dynamical Systems](/202606/28/2606.22075v1-frequency-domain-neural-odes-for-modeling-non-linear-dynamical-systems)  
+   标签：评分：6.0/10、query:lyapunov-ai
+   evidence：频域神经ODE用于非线性动力系统建模，可辅助李雅普诺夫函数发现
+2. [Learning the Koopman Operator using Attention Free Transformers](/202606/28/2606.23957v1-learning-the-koopman-operator-using-attention-free-transformers)  
+   标签：评分：6.0/10、query:lyapunov-ai
+   evidence：基于无注意力变换器的柯普曼算子学习用于动力系统
 
 
 <div class="dpr-home-promo-card">

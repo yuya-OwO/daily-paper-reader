@@ -6,27 +6,26 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-28
-- 运行时间：2026-06-28 21:29:17 UTC
+- 最新运行日期：2026-06-29
+- 运行时间：2026-06-29 21:40:14 UTC
 - 运行状态：成功
-- 本次总论文数：2
-- 精读区：0
-- 速读区：2
+- 本次总论文数：1
+- 精读区：1
+- 速读区：0
 
 ### 今日简报（AI）
-今日推荐2篇非线性动力系统建模论文，分别提出频域神经常微分方程与无注意力Transformer的Koopman算子学习方法。两篇均为6分，适合入门了解前沿数值建模思路。可优先关注频域方法对复杂振荡系统的适用性，再尝试对比两种架构在实测数据上的效率。
-- 详情：[/202606/28/README](/202606/28/README)
+1) 今日精读一篇评分9.0的高分论文《PRONE》，聚焦算子学习新框架。  
+2) 该工作通过Petrov-Galerkin方法统一了DMD、SINDy与Koopman算子理论，为动力系统建模提供了通用范式。  
+3) 推荐关注PRONE如何简化复杂非线性系统的数据驱动建模，尤其适合科研人员快速上手。
+- 详情：[/202606/29/README](/202606/29/README)
 
 ### 精读区论文标签
-- 本次无精读推荐。
+1. [PRONE: Petrov-Galerkin Operator Learning Unifies DMD, SINDy & Koopmanism](/202606/29/2606.27982v1-prone-petrov-galerkin-operator-learning-unifies-dmd-sindy--koopmanism)  
+   标签：评分：9.0/10、query:sr
+   evidence：统一SINDy和Koopman用于动力系统符号回归
 
 ### 速读区论文标签
-1. [Frequency-Domain Neural ODEs for Modeling Non-Linear Dynamical Systems](/202606/28/2606.22075v1-frequency-domain-neural-odes-for-modeling-non-linear-dynamical-systems)  
-   标签：评分：6.0/10、query:lyapunov-ai
-   evidence：频域神经ODE用于非线性动力系统建模，可辅助李雅普诺夫函数发现
-2. [Learning the Koopman Operator using Attention Free Transformers](/202606/28/2606.23957v1-learning-the-koopman-operator-using-attention-free-transformers)  
-   标签：评分：6.0/10、query:lyapunov-ai
-   evidence：基于无注意力变换器的柯普曼算子学习用于动力系统
+- 本次无速读推荐。
 
 
 <div class="dpr-home-promo-card">

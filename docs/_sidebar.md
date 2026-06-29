@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-06-29 <!--dpr-date:20260629-->
+    * 精读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202606/29/2606.27982v1-prone-petrov-galerkin-operator-learning-unifies-dmd-sindy--koopmanism" data-sidebar-item="{&quot;title&quot;: &quot;PRONE: Petrov-Galerkin Operator Learning Unifies DMD, SINDy &amp; Koopmanism&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2606.27982v1-prone-petrov-galerkin-operator-learning-unifies-dmd-sindy--koopmanism&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;sr&quot;}], &quot;evidence&quot;: &quot;统一SINDy和Koopman用于动力系统符号回归&quot;}">PRONE: Petrov-Galerkin Operator Learning Unifies DMD, SINDy &amp; Koopmanism</a>
   * 2026-06-28 <!--dpr-date:20260628-->
     * 速读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202606/28/2606.22075v1-frequency-domain-neural-odes-for-modeling-non-linear-dynamical-systems" data-sidebar-item="{&quot;title&quot;: &quot;Frequency-Domain Neural ODEs for Modeling Non-Linear Dynamical Systems&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2606.22075v1-frequency-domain-neural-odes-for-modeling-non-linear-dynamical-systems&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;频域神经ODE用于非线性动力系统建模，可辅助李雅普诺夫函数发现&quot;}">Frequency-Domain Neural ODEs for Modeling Non-Linear Dynamical Systems</a>

@@ -1,0 +1,1046 @@
+Title: PRONE: Petrov-Galerkin Operator Learning Unifies DMD, SINDy     Koopmanism
+
+URL Source: https://arxiv.org/pdf/2606.27982v1
+
+Published Time: Mon, 29 Jun 2026 00:45:35 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# PRONE : Petrov-Galerkin Operator Learning Unifies DMD, SINDy & Koopmanism 
+
+Matthew J. Colbrook 1 April Herwig 1∗ J. Nathan Kutz 2
+
+> 1
+
+Department of Applied Mathematics and Theoretical Physics, University of Cambridge Cambridge CB3 0WA, UK 
+
+> 2
+
+Autodesk Research, London WC2N 4HN, UK 
+
+Abstract 
+
+Data-driven dynamics often asks how to linearize a nonlinear system. We ask instead: which observables should be advanced, and where should their futures live? This leads to Petrov Regression of Nonlinear Evolution (PRONE), a Petrov–Galerkin regression framework based on Ψ( X)K ≈ Φ( Y), with distinct trial and test dictionaries. In this form, DMD, EDMD, SINDy, Koopman regression, sparse regression, and low-rank regression become variants of one construction: different dictionaries, weights, and constraints. We keep the linear algebra of Koopman learning, but drop the artificial requirement that a finite model map a dictionary into itself. With this asymmetry, eigenmodes are no longer the right objects. Instead, we use singular modes, which identify the observable combinations captured by the data, their projected futures, and the strength of the coupling between the two spaces. We identify the limiting projected operator and prove L2 convergence of the resulting nonlinear predictor. We give examples from chaotic maps, the double gyre, a pitching-airfoil wake, and Lorenz–63, where PRONE outperforms DeepONets, Fourier neural operators, and reservoir computers with considerably fewer parameters. These examples show the same message: lift once, regress once, and let the singular structure reveal statistics, transport, prediction, and dimension. 
+
+MSC 2020: 65P99, 37M10, 46N40 
+
+Keywords: Koopman operator, Perron–Frobenius operator, singular modes, sparse regression, nonlinear dynamical systems 
+
+# 1 Introduction 
+
+We consider a discrete-time dynamical system 
+
+xk+1 = F (xk), F : Ω → Ω ⊂ Rd.
+
+Our aim is to study its evolution from trajectory data. The obstacle is that F is typically nonlinear: a pendulum, a chemical reaction, a chaotic attractor, or a fluid wake may obey a simple law, but not one that is linear in the measured variables. There is an old and powerful way around this difficulty. Instead of looking only at the state x,look at functions of the state. These functions are called observables. The temperature at a point, the energy of an oscillator, a Fourier coefficient, a polynomial feature, or a sensor reading are all 
+
+> ∗
+
+Corresponding author: ahlh2@cam.ac.uk 
+
+1
+
+> arXiv:2606.27982v1 [math.DS] 26 Jun 2026
+
+observables. A nonlinear map on states induces a linear map on observables: ϕ 7 → ϕ ◦ F. This is the Koopman point of view [17]. The price is that the linear operator is infinite-dimensional. The art of data-driven Koopman computation is to choose a useful finite part of it. Most numerical methods make this finite part square. One chooses a dictionary of observables, advances the data, projects back to the same dictionary, and obtains a matrix. Dynamic Mode Decomposition (DMD), Extended Dynamic Mode Decomposition (EDMD), kernel variants, and many related algorithms fit naturally into this pattern [18, 23, 26, 28, 29]. The resulting matrix is then often analysed through its eigenvalues and eigenvectors. This paper begins by changing one line of this story. The observables whose future we want to predict need not be the observables in which we represent that future. That is, the right finite section of Koopman is not necessarily square. Suppose we have snapshot pairs 
+
+X =
+
+
+
+x⊤
+
+> 1
+
+...
+
+x⊤
+
+> M
+
+ , Y =
+
+
+
+F (x1)⊤
+
+...
+
+F (xM )⊤
+
+ .
+
+Choose two finite families of observables: Φ = {ϕj }N2
+
+> j=1
+
+, Ψ = {ψi}N1
+
+> i=1
+
+.
+
+The family Φ contains the quantities whose values at the next time we want to learn. The family Ψ contains the quantities of the present state from which we shall learn them. The computation is simply Ψ( X)K ≈ Φ( Y). (1) Thus each column of K is an ordinary least-squares fit. It approximates one future observable 
+
+ϕj ◦ F by a linear combination of the present observables in Ψ. This is the basic object of the paper. We call the resulting framework Petrov Regression of Nonlinear Evolution (PRONE). The construction is sketched in Figure 1: lift through two dictionaries, regress once, and read the input–output structure through the singular modes. Several familiar methods appear at once. If Ψ = Φ = id, then (1) is DMD [23, 26]. If Ψ = Φ is a nonlinear dictionary, it is EDMD [28, 29]. If Φ = id and Ψ is a nonlinear library, then 
+
+K⊤Ψ( x)is a nonlinear approximation of F (x) obtained by a linear regression, the unregularized least-squares core of SINDy [5]. Sparse, kernel, structure-preserving, and verified Koopman variants arise by changing the dictionaries, the weights, the regularization, or the constraints [4, 7, 9, 10]. The rectangular viewpoint also changes the modal analysis. Eigenvectors are the right objects for a square map from a space to itself. But (1) maps one finite observable space into another. In general there need be no eigenvectors to compute. The natural objects are singular vectors. Right singular modes are combinations of the observables in Φ whose futures are most strongly captured by the chosen trial space. Left singular modes are the corresponding projected futures in the span of Ψ. The singular values measure the strength of these pairings. The distinction is more than cosmetic. Eigenanalysis asks for coordinates that reproduce them-selves up to multiplication. Singular analysis asks which observable combinations are seen, retained, amplified, or lost by the dynamics and by the chosen dictionary. This is an input-output question, and it remains meaningful when the finite Koopman section is rectangular, rank-deficient, or de-liberately asymmetric. The contributions of the paper are as follows. 2A. Data  B. Observable lifting 
+
+& linear evolution 
+
+C. Forecast & 
+
+reconstruction 
+
+Time series    
+
+> …,xt⋮2,xt⋮1,xt
+
+time 
+
+> Xt
+
+Xt
+
+ψ1(Xt)
+
+ψ2(Xt)
+
+ψN(Xt)
+
+→ Xt+1
+
+nonlinear 
+
+lift 
+
+linear 
+
+evolution  
+
+> −(Xt)⋱
+
+sample 1 
+
+sample 2 
+
+sample M   
+
+> ψ1ψ2ψr…
+> →
+
+Low-rank 
+
+compression using 
+
+optimal observables 
+
+active 
+
+inactive 
+
+Predicted statistics 
+
+Bistable attractor 
+
+Attractor 
+
+reconstruction Figure 1: Schematic construction of PRONE. Snapshot pairs are lifted through two possibly dif-ferent observable dictionaries. Least squares gives a finite Petrov–Galerkin map between the ob-servable spaces. When this map is rectangular, singular modes, rather than eigenmodes, give the natural input-output dynamical structures. 3• We formulate DMD, EDMD, SINDy, and Koopman-based regression as instances of one Petrov–Galerkin least-squares problem between observable spaces. The square case is only one possibility; the rectangular case is the main freedom. 
+
+• We show how PRONE gives nonlinear predictors from linear maps in lifted coordinates. In the important case Φ = id, the learned map K⊤Ψ( x) is a nonlinear approximation of the dynamics F (x). 
+
+• We identify the limiting operator. Although the notation is Koopman-theoretic, the learned predictor also exposes the adjoint, transfer-operator side of the story. Under quadrature and density assumptions, the finite-data regressions converge to the corresponding projected operator, and the resulting predictors converge in L2.
+
+• We develop a singular-mode analysis for rectangular Petrov–Galerkin sections. The right modes identify observables whose evolution is captured by the chosen space; the left modes identify their projected futures; the singular values quantify the strength of these pairings. 
+
+• We demonstrate the framework on maps, flows, chaotic attractors, and fluid data. The exam-ples show that the same regression captures the prediction horizon and invariant statistics of a chaotic map, coherent transport in the double gyre, the statistical geometry of Lorenz–63, and an effective rank for a high-dimensional airfoil wake. Moreover the time-series prediction outperforms popular operator methods, while using two orders of magnitude less parameters. The operator-theoretic background is classical. Koopman observed that a nonlinear dynamical system induces a linear operator on observables [17]; modern Koopman theory and DMD turned this observation into a computational program for extracting modes, spectra, and coherent coordinates from data [19, 21–23]. EDMD expanded the dictionary of observables [28], kernel methods made the feature space implicit [29], and SINDy emphasized sparse regression on nonlinear libraries [5,6]. Recent developments have clarified the roles of residuals, spectral pollution, structure preservation, and approximation limits in Koopman computations [2, 11–13, 16]. Our message is complementary to this literature. We do not propose another search for Koop-man eigenfunctions. We regard the finite section itself as the modelling object. Once the two observable spaces are allowed to differ, the square Koopman matrix becomes one case of a larger Petrov–Galerkin construction. PRONE is the forecasting face of this construction; the singular-mode analysis is its interpretive face. The rest of the paper develops this program. The next section introduces the Petrov–Galerkin regression, its special cases, regularization, and convergence. Section 3 explains the singular modes and their interpretation. Section 4 applies the method to representative nonlinear systems, in-cluding coherent transport in the double gyre, singular coordinates on the Lorenz attractor, and reduced modelling of a pitching-airfoil wake. 
+
+# 2 Petrov–Galerkin Learning of Dynamical Systems 
+
+We now pass from dynamics to matrices. From snapshot pairs we form two lifted data matrices, using dictionaries that may differ, and compute the best linear map between them in least squares. This map is a Petrov–Galerkin section of the evolution between observable spaces; it need not be square. We then identify the limiting operator, prove convergence of the associated predictor, and discuss the two regularizations most important in computation: sparsity and low rank. 42.1 A Linear Framework for Nonlinear Problems 
+
+Wishing to perform only a simple linear-regression-based learning method but still having the desire to capture nonlinear effects, we nonlinearly embed X and Y into observable spaces: Ψ( X) = 
+
+
+
+ψ1(x1) . . . ψN1 (x1)... . . . ...
+
+ψ1(xM ) . . . ψN1 (xM )
+
+ ∈ RM ×N1
+
+and Φ( Y) = 
+
+
+
+ϕ1(F (x1)) . . . ϕN2 (F (x1)) ... . . . ...
+
+ϕ1(F (xM )) . . . ϕN2 (F (xM )) 
+
+ ∈ RM ×N2 .
+
+The functions ψi, ϕ j ∈ L2(Ω; R) are real-valued observables, and the collections Ψ and Φ are dictionaries. The inner product is the real Lebesgue L2 inner product ⟨f, g ⟩ = R 
+
+> Ω
+
+f g dm. In some cases we may use a different measure ρ; these cases will be clearly distincted as L2(Ω; R; ρ). The Petrov–Galerkin freedom is that these dictionaries need not coincide: in general N1̸ = N2. After lifting the data, the nonlinear learning problem becomes the linear regression min 
+
+> K∈RN1×N2
+
+√W Ψ( X)K − √W Φ( Y) 2 
+
+> F
+
+(2) where W ∈ RM ×M is a positive diagonal weight matrix. This problem is solved by taking 
+
+K = Ψ( X)†Φ( Y) = 
+
+
+
+Ψ( X)⊤ W Ψ( X)
+
+−1
+
+Ψ( X)⊤ W Φ( Y) (3) where ·† denotes the Moore-Penrose pseudoinverse. Here is the operator behind the regression. For an observable g, the Koopman operator acts as 
+
+K : L2(Ω; R) → L2(Ω; R), g 7 → K g = g ◦ F. 
+
+On a suitable L2 space this is a linear operator; boundedness requires the usual assumptions on 
+
+F and the reference measure [20]. The regression (2) is a Petrov–Galerkin approximation of this operator. For instance, suppose that the samples xm are drawn independently from the reference measure m, and take W = M −1I. Then Eq. (2) is the Monte Carlo discretization of min 
+
+> K∈RN1×N2
+> N2
+
+X
+
+> i=1
+
+Z   N1X
+
+> j=1
+
+Kji ψj (x)  − [Kϕi]( x) 2
+
+dx. (4) Thus each Koopman-advanced observable Kϕi is approximated in the trial space span {ψ1, . . . , ψ N1 },and the regression solves all N2 approximation problems simultaneously. The choice of dictionaries makes the construction flexible. 
+
+Example 2.1. Let Ψ = Φ = id be the identity on a bounded subset Ω ⊂ Rd (so that id ∈ L2(Ω; R)). Then Eq. (3) reduces to K = X†Y, the matrix yielded by Dynamic Mode Decomposition (DMD) [23]. 
+
+Example 2.2. Alternatively, consider that Ψ is again some arbitrary dictionary but Φ is still the identity. One then recovers (an unregularized version of ) Sparse Identification of Nonlinear Dynamics (SINDy) [5]. We mention in Section 2.4 some forms of regularization of Eq. (2) which encompass SINDy as well. 
+
+5Algorithm 1 Petrov Regression of Nonlinear Evolution (PRONE) 
+
+Input: Snapshot data X, Y ∈ RM ×d with Y = F (X), dictionary Ψ, rank r ∈ N 
+
+> 1:
+
+Form the lifted data matrix Ψ( X) ∈ RM ×N . 
+
+> 2:
+
+Compute a truncated SVD Ψ( X) ≈ U ΣV ⊤, with U ∈ RM ×r, Σ ∈ Rr×r, V ∈ RN ×r. 
+
+> 3:
+
+Compute the compressed regressor K = V Σ†U ⊤Y.
+
+Output: The learned map FN,M (x) = K⊤Ψ( x). 
+
+Example 2.3. Further still, if Ψ = Φ is an arbitrary dictionary then one recovers the Extended Dynamic Mode Decomposition (EDMD) [28]. In this context the Petrov–Galerkin method reduces to a Riesz–Galerkin one. The rectangular viewpoint is more revealing: even when the dictionaries contain the same type of observables but have different sizes, for instance Φ ⊂ Ψ, the singular structure exposes information that is invisible in the square formulation. 
+
+The case Φ = id is especially important, for then the regression learns the dynamics themselves. If ϕi(x) = xi, then Kϕi(x) = ϕi(F (x)) = [ F (x)] i, and Eq. (4) becomes min 
+
+> K∈RN1×d
+
+Z   N1X
+
+> j=1
+
+Kj ψj (x)  − F (x) 2 
+
+> Rd
+
+dx.
+
+where Kj is the vector-valued jth row of K. Thus K⊤ maps lifted observables back to state space, giving the optimal linear reconstruction of F from the nonlinear embedding Ψ : Ω →
+
+RN1 . This is the essential architecture of Petrov Regression of Nonlinear Evolution (PRONE): lift nonlinearly, regress linearly, and use rank reduction to retain the dynamically relevant directions; see Algorithm 1. In contrast with a neural network, the nonlinear features are fixed in advance rather than learned through alternating affine maps and nonlinear activations. 
+
+2.2 Extracting Dynamically Relevant Modes 
+
+First consider the EDMD case Ψ = Φ, where the regression produces a square finite section of the Koopman operator K. In this setting spectral language is natural: Koopman eigenfunctions organize the asymptotic growth, decay, and oscillation of observables. If 
+
+g =
+
+> N
+
+X
+
+> j=1
+
+gj ϱj , Kϱj = λj ϱj , then g(x1) = g(F (x0)) = 
+
+> N
+
+X
+
+> j=1
+
+λj gj ϱj (x0).
+
+The eigenvalues record growth, decay, and oscillation. For nonnormal finite sections, however, eigenvalues alone are not enough; pseudospectra control finite-time growth and transient ampli-fication [25, page 25]. This operator-theoretic picture motivates EDMD: eigenfunctions, and ap-proximate eigenfunctions, identify observables that remain coherent under the dynamics. Thus an observable g is coherent at scale ϵ if ∥g ◦ F − λg ∥ = O(ϵ), with λ describing the leading growth, decay, or oscillation over time intervals before the accumulated defect dominates. The top spectral information is the most useful in practice. Eigenvalues and pseudoeigenvalues of largest modulus, together with their associated modes, give a coarse description of the dynamics through observables that decay slowly, oscillate persistently, or exhibit finite-time amplification. This interpretation must be used with care: a finite EDMD matrix K need not inherit the spectrum of the Koopman operator K, and this possible mismatch motivates residual and verified variants 6Algorithm 2 Singular Mode Decomposition for Petrov-Galerkin Regression Π ΨKP ∗
+
+> Φ
+
+Input: Snapshot pairs X, Y ∈ RM ×d with Y = F (X), positive diagonal weights W ∈ RM ×M ,dictionaries Ψ , Φ, target rank r ∈ N 
+
+> 1:
+
+Compute the data matrices Ψ( X) ∈ RM ×N1 , Φ( X) ∈ RM ×N2
+
+Require: N1 ≫ N2; the opposite regime is analogous.  
+
+> 2:
+
+Compute a truncated SVD W 1/2Ψ(X) ≈ U ΣV ⊤, U ∈ RM ×r, Σ ∈ Rr×r, V ∈ RN1×r 
+
+> 3:
+
+Compute the compression H = U ⊤W 1/2Φ( Y) ∈ Rr×N2 
+
+> 4:
+
+Compute an eigendecomposition ( HH ⊤)L = LΛ and set Z = H⊤LΛ−1/2
+
+Output: Singular values Λ1/2 and modes evaluated at the snapshots, W −1/2U L , Φ( X)Z
+
+such as ResDMD [9]. Even so, the eigenvectors vj of K and their associated eigenmodes P 
+
+> ℓ
+
+vjℓ ψℓ
+
+remain useful diagnostic objects in computations; see Section 4. When Ψ ̸ = Φ, this eigenmode picture breaks. The learned map K is now rectangular, or at least acts between distinct observable spaces, so eigenvectors are no longer the right objects. The corresponding structure is singular: an input observable in spanΦ is paired with its best-resolved output in spanΨ. Given a truncated singular value decomposition 
+
+K = SΛ1/2Z⊤, S ∈ RN1×r, Λ1/2 ∈ Rr×r, Z ∈ RN2×r, r ≤ min {N1, N 2},
+
+we define the singular modes 
+
+φk =
+
+> N1
+
+X
+
+> ℓ=1
+
+Sℓk ψℓ and ζk =
+
+> N2
+
+X
+
+> ι=1
+
+Zιk ϕι, 1 ≤ k ≤ r. 
+
+They are evaluated on data by Ψ( X)S and Φ( X)Z, respectively. Their interpretation is developed in Section 3, and their computation is summarized in Algorithm 2. 
+
+2.3 Convergence 
+
+We now connect the regression matrix K to its limiting operator and prove convergence of the resulting nonlinear predictor in the appropriate topology. Define the analysis and synthesis maps 
+
+PΨ : L2(Ω; R) → RN1 , PΨg =
+
+
+
+⟨ψ1, g ⟩⟨ψ2, g ⟩
+
+...
+
+⟨ψN1 , g ⟩
+
+ ,
+
+P∗ 
+
+> Ψ
+
+: RN1 → L2(Ω; R), P∗
+
+> Ψ
+
+c =
+
+> N1
+
+X
+
+> ℓ=1
+
+cℓψℓ
+
+with analogous definitions for Φ. If Ψ is orthonormal, then P∗
+
+> Ψ
+
+PΨ is the orthogonal projection onto span {ψ1, . . . , ψ N1 }. For a general linearly independent dictionary, the same projection is ΠΨ = P∗ 
+
+> Ψ
+
+(PΨP∗
+
+> Ψ
+
+)−1 PΨ : L2(Ω; R) → L2(Ω; R) (5) (and analogously for Φ). Since Eq. (4) is approximated from data by quadrature, the snapshots should sample the reference measure through a convergent quadrature rule: Monte Carlo in high dimension, and higher-order rules such as Gauss–Legendre when the dimension permits. We also 7assume that the trial data matrix Ψ( X) ∈ RM ×N1 has full column rank for all sufficiently large M ;with positive diagonal weights this is equivalent to full column rank of W 1/2Ψ( X). This is the finite-data counterpart of L2-linear independence of the dictionary functions ψj , and in computation it is enforced by an SVD, with unresolved or nearly dependent directions discarded. 
+
+Proposition 2.1. Let Ψ and Φ be dictionaries whose elements are linearly independent in L2(Ω; R).Suppose that the snapshots {xm}Mm=1 and weights W define a convergent quadrature rule for the relevant inner products. Let K be the least-squares solution of Eq. (2) , and set 
+
+GΨ = Ψ( X)⊤W Ψ( X), GΦ = Φ( X)⊤W Φ( X), A = Ψ( X)⊤W Φ( Y). (6) 
+
+Then 
+
+lim   
+
+> M→∞
+
+P∗
+
+> Ψ
+
+K = Π ΨKP ∗
+
+> Φ
+
+, (7) lim   
+
+> M→∞
+
+P∗
+
+> Ψ
+
+G−1Ψ AG −1Φ PΦ = Π ΨKΠΦ. (8) 
+
+Corollary 2.1. Assume the conditions of Proposition 2.1 are satisfied. Let Ψ = Ψ N be a se-quence of dictionaries which span a dense subset of L2(Ω; R) in the limit N → ∞ . Let Φ = id 
+
+be the coordinate dictionary. The corresponding PRONE predictor is FN,M (x) = K⊤ΨN (x). Then 
+
+lim N →∞ lim M →∞ F − FN,M L2(Ω; Rd) = 0 .
+
+Remark 2.1. This result clarifies what data-based predictors such as PRONE, SINDy [5], Exact DMD [26], and kernel EDMD [29] actually learn. Although the construction can be written in Koopman language, the fitted predictor is tied to the adjoint action: it represents the transfer operator, adjoint to Koopman, projected through the chosen trial and test dictionaries. 
+
+Example 2.4 (Pointwise convergence in Corollary 2.1 is not guaranteed) . Let Ω = [0 , 1) be the one-dimensional torus and let ΨN (x) = {1, cos(2 πx ), sin(2 πx ), . . . , cos(2 πN x ), sin(2 πN x )} be the real Fourier dictionary. The theorem of DuBois–Reymond implies that there exists a bounded continuous function F : Ω → Ω such that [15, Prop. 3.3.5] lim sup N →∞ ΠΨN F ( 12 ) = ∞. Thus L2 convergence of the learned maps does not imply pointwise convergence, even for continuous targets and classical dictionaries. 
+
+Example 2.5 (Smoothness can restore pointwise convergence) . Keep Ω and ΨN as in the previous example. If F is differentiable and extends periodically to [0 , 1] , then ΠΨN F (x) → F (x) as N → ∞ 
+
+for every x ∈ [0 , 1) [15, Cor. 3.3.9]. Fourier extensions provide a practical way to recover pointwise convergence almost everywhere for functions that admit a differentiable periodic extension on a larger domain, including in higher dimensions [3, 27]. Proof of Proposition 2.1. We first notice lim   
+
+> M→∞
+
+GΨ = (⟨ψi, ψ j ⟩)1≤i,j ≤N1 = PΨP∗
+
+> Ψ
+
+.
+
+Analogous statement holds for Φ. Similarly, lim   
+
+> M→∞
+
+A =  ⟨ψi, Kϕj ⟩1≤i≤N1
+
+> 1≤j≤N2
+
+= PΨKP ∗
+
+> Φ
+
+.
+
+Since the dictionary functions are linearly independent, the limiting Gram matrices are nonsingular, and hence matrix inversion is continuous along the sequence for all sufficiently large M . Therefore 
+
+P∗ 
+
+> Ψ
+
+lim   
+
+> M→∞
+
+K = P∗ 
+
+> Ψ
+
+lim   
+
+> M→∞
+
+G−1Ψ A = P∗
+
+> Ψ
+
+(PΨP∗
+
+> Ψ
+
+)−1PΨKP ∗
+
+> Φ
+
+,
+
+which, using Eq. (5), is precisely Π ΨKP ∗
+
+> Φ
+
+. The proof of Eq. (8) is identical, using the additional convergence G−1Φ → (PΦP∗
+
+> Φ
+
+)−1.8Proof of Corollary 2.1. Let eΨ = (PΨP∗
+
+> Ψ
+
+)−1/2Ψ be the orthonormal family induced by Gram-Schmidt. Then PeΨ = G−1/2Ψ PΨ so that (PeΨP∗
+
+> eΨ
+
+)−1PeΨKP ∗ 
+
+> Φ
+
+= lim   
+
+> M→∞
+
+G−1/2Ψ A = lim   
+
+> M→∞
+
+G1/2Ψ K. 
+
+Hence lim   
+
+> M→∞
+
+FN,M = lim   
+
+> M→∞
+
+K⊤Ψ = lim   
+
+> M→∞
+
+K⊤G1/2Ψ G−1/2Ψ Ψ= PΦK∗P∗
+
+> eΨ
+
+(PeΨP∗
+
+> eΨ
+
+)−1 eΨ = PΦK∗P∗ 
+
+> eΨ
+
+eΨ.
+
+Let ej (x) = [ x]j be the jth component function. Now 
+
+h
+
+PΦK∗P∗ 
+
+> eΨ
+
+eΨ( x)
+
+i 
+
+> j
+
+=
+
+D
+
+ej , K∗
+
+> N1
+
+X
+
+> ℓ=1
+
+eψℓ(x) eψℓ
+
+E
+
+=
+
+> N1
+
+X
+
+> ℓ=1
+
+D
+
+ej , K∗ eψℓ
+
+E eψℓ(x).
+
+Since eΨ is orthonormal we have 
+
+> N1
+
+X
+
+> ℓ=1
+
+D
+
+ej , K∗ eψℓ
+
+E eψℓ(x) = 
+
+> N1
+
+X
+
+> ℓ=1
+
+D
+
+Kej , eψℓ
+
+E eψℓ
+
+!
+
+(x) =  ΠeΨKej
+
+ (x) =   ΠeΨF  (x)
+
+> j
+
+Noting that Π eΨ = Π Ψ and since Ψ = Ψ N spans a dense subset of L2(Ω; R) in the limit N → ∞ , the projected coordinate functions converge in L2(Ω; R) to the coordinate functions of F . This proves the claimed convergence of the learned map. 
+
+2.4 Regularization 
+
+The least-squares solution of Eq. (2) is explicit, but applications often call for more structure. Sparsity is the simplest example. One may replace Eq. (2) by min 
+
+> K∈RN1×N2
+
+W 1/2 Ψ( X)K − Φ( Y) 2 
+
+> F
+
++ λ∥K∥1
+
+penalizes the number and size of active dictionary couplings, with λ ≥ 0 setting the sparsity level. This objective generally loses the closed-form pseudoinverse solution, but it can be solved by standard sparse-regression algorithms [1]. When Φ = id and Ψ is a nonlinear library, this is the discrete-time, sparsity-promoting form of the SINDy architecture: a small set of nonlinear observables is selected to predict the next state [5]. Low rank gives a second regularization. It is useful when the dictionary is redundant, or nearly so, and several observables carry almost the same information. Let 
+
+W 1/2Ψ( X) ≈ U ΣV ⊤
+
+be a truncated SVD, with U ∈ RM ×r, Σ ∈ Rr×r, and V ∈ RN1×r. Then the least-squares solution is approximated by 
+
+K ≈ V Σ†U ⊤W 1/2Φ( Y).
+
+In the square case Ψ = Φ, one may work with the compressed matrix 
+
+eK = V ⊤KV = Σ †U ⊤W 1/2Φ( Y)V ∈ Rr×r,
+
+9whose eigenvectors lift back to the original dictionary coordinates by multiplication with V . This is the computational core of Exact DMD: the dominant spectral information is obtained from an 
+
+r × r matrix rather than the full dictionary matrix. For Ψ ̸ = Φ, the same compression gives 
+
+eK = V ⊤K = Σ †U ⊤W 1/2Φ( Y) ∈ Rr×N2 .
+
+Since V is an isometry on the retained trial subspace, the singular values and right singular vectors of K are obtained from eK, while the left singular vectors are lifted by V . Thus the rectangular Petrov–Galerkin singular modes can be computed from the smaller regression, as summarized in Algorithm 2. 
+
+# 3 Singular Modes 
+
+A square Koopman matrix invites eigenvectors. A rectangular Petrov–Galerkin matrix does not, and this is a feature rather than a defect. This section studies the singular modes of Π ΨKP ∗
+
+> Φ
+
+produced in Algorithm 2. Given an SVD K = SΛ1/2Z⊤ the singular modes are the functions 
+
+φk =
+
+> N1
+
+X
+
+> ℓ=1
+
+Sℓk ψℓ and ζj =
+
+> N2
+
+X
+
+> ι=1
+
+Zιj ϕι, 1 ≤ k, j ≤ r. 
+
+These can be evaluated at the snapshots via Ψ( X)S and Φ( X)Z, respectively. The right modes are the observables in spanΦ whose Koopman images are best seen by the trial space; the left modes are those images after projection into spanΨ. We show that the right modes are governed by K∗K and hence by future mass, while the left modes are governed by KK ∗ and hence by folding, compression, and preimages. This distinction is particularly important when Φ consists only of coordinate functions, as in PRONE (Algorithm 1), rather than a full dictionary of nonlinear observables. Table 1 summarizes the resulting interpretations. 
+
+3.1 Right Singular Modes 
+
+The right singular modes are eigenvectors/eigenfunctions of the operator 
+
+PΦK∗ΠΨKP ∗ 
+
+> Φ
+
+resp. ΠΦK∗ΠΨKΠ∗
+
+> Φ
+
+.
+
+Taking Ψ = Ψ N1 to be a sequence of dictionaries which span a dense subset of L2(Ω; R) in the limit 
+
+N1 → ∞ , we have lim  
+
+> N1→∞
+
+PΦK∗ΠΨN1 KP ∗ 
+
+> Φ
+
+= PΦK∗KP ∗ 
+
+> Φ
+
+∈ RN2×N2 (9) in operator norm (since Φ is finite). Thus, in the rich-trial-space limit, the right modes are governed by K∗K. We will make use of the following fact for Koopman operators (see, e.g., [8]). Let F♯m
+
+be the pushforward of the standard Lebesgue measure m on Ω (i.e., F♯m(A) = m(F −1(A)) where 
+
+F −1(A) is the preimage). 
+
+Lemma 3.1. Suppose that F♯m is absolutely continuous with respect to m, and let ρ = dF ♯mdm be essentially bounded. Then 
+
+(K∗Kg)( x) = g(x)ρ(x).
+
+The proof of this lemma is immediate from the inner product representation 
+
+⟨f, K∗Kg⟩ = ⟨K f, Kg⟩ =
+
+Z
+
+f ◦ F · g ◦ F dm =
+
+Z
+
+f · g dF♯m =
+
+Z
+
+f · g · ρ dm = ⟨f, gρ ⟩.
+
+10 Setting Right singular modes 
+
+ζj ∈ spanΦ Left singular modes 
+
+φj ∈ spanΨ Singular values General Petrov–Galerkin, Ψ̸ = Φ Observables in spanΦ whose Koopman images are strongly resolved in spanΨ. Projected future images 
+
+φj = Π ΨKζj in the trial space. Coupling strengths between selected observables and their projected future images. Coordinate space, Φ = id 
+
+Orthogonal combinations of state coordinates that maximize future variance under the pushforward measure. Nonlinear reconstructions of those evolved coordinate directions in spanΨ. Predictive importance of each physical direction after nonlinear lifting. Full observable dictionary, Φ rich Observable patterns, not coordinate axes; they maximize future L2 mass within spanΦ. Koopman-advanced versions of those patterns, projected into spanΨ. Transfer strength between the two finite observable spaces. Square EDMD-type case, Ψ = Φ Finite-time amplification or preservation directions for observables, complementary to eigenmodes. Paired output-side observable structures; mismatch reveals non-normal finite-time effects. Finite-time gain under the projected Koopman operator. Enriched trial space, Φ ⊂ Ψ or N1 > N 2
+
+Coarser observables whose evolved images are tested in a richer trial space. Higher-resolution evolved modes, useful when simple observables map to more complicated functions. A diagnostic for whether Ψ retains the evolved content of Φ. 
+
+Table 1: Interpretation of the singular mode decomposition K = SΛ1/2Z⊤. Right-mode interpre-tation depends on Φ: coordinate functions give physical directions, while richer dictionaries give observable combinations. The left modes are best read as the associated projected future images in the trial dictionary Ψ. Combining Lemma 3.1 with Eq. (9), the limiting right-mode problem is governed by 
+
+PΦK∗KP ∗
+
+Φ =  ⟨ϕi, ϕ j ⟩L2(ρ)
+
+
+
+1≤i,j ≤N2 .
+
+The eigenvectors Z:,k therefore satisfy the Rayleigh principle 
+
+λk+1 = max 
+
+n
+
+∥ϕ∥2
+
+L2(ρ) ϕ =
+
+N2X
+
+ℓ=1 
+
+[z]ℓ ϕℓ, z⊤z = 1 , z ⊥ Z:,j , ∀ 1 ≤ j ≤ k
+
+o
+
+. (10) In particular, when Φ is orthonormal, then 
+
+λk+1 = max 
+
+( ∥ζ∥2
+
+L2(ρ)
+
+∥ζ∥2
+
+L2(m)
+
+ζ ∈ span Φ , ζ ⊥ ζj ∀ 1 ≤ j ≤ k
+
+)
+
+.
+
+From this we conclude that the right singular modes ζk = PN2
+
+ℓ=1 Zℓ,k ϕℓ are preciseley the mutually orthogonal observables in spanΦ with maximal future L2 mass. Arnold’s cat map gives a clean illustration. Let F : T2 → T2 be 
+
+F
+
+xy
+
+
+
+=
+
+2x + y mod 1 
+
+x + y mod 1 
+
+
+
+,
+
+a classically studied map on the torus. Since F is measure-preserving, ρ = 1, and the Rayleigh quotient in Eq. (10) is identically one in the full-space limit. Finite sections can nevertheless lose modes. For the real Fourier block 
+
+Cn,m (x, y ) = cos(2 π(nx + my )) , Sn,m (x, y ) = sin(2 π(nx + my )) ,
+
+11 Figure 2: Singular modes for the inverse Arnold cat map. The colored fields show the right singular modes selected by Algorithm 2; the arrows indicate the corresponding coordinate directions. These directions align closely with the expanding and contracting directions of the linear map, shown schematically on the right, but they are not identical. The singular modes optimize future variance in the measure-theoretic sense of Eq. (11), rather than topological stretching alone. the Koopman action is 
+
+KCn,m = C2n+m,n +m, KSn,m = S2n+m,n +m.
+
+Thus, if Φ contains all sine–cosine blocks with |n|, |m| ≤ N and Ψ contains all blocks with |n|, |m| ≤ 
+
+3N , every Koopman image of a test block is retained and all singular values are one. A square truncation need not have this property: blocks whose images leave the truncated box are projected away, producing zero singular values. This is the practical advantage of the Petrov–Galerkin view: a rectangular trial space can preserve the dynamically generated content that a square EDMD section discards. Equation (10) is especially revealing when Φ = id , the prediction setting of PRONE (Algo-rithm 1). In this case the columns of Z rotate the coordinate observables into directions that best capture future states: they maximize variance with respect to the pushforward density ρ. More precisely, if the coordinate functions are centered, then for z ∈ Rd,Var ρ
+
+ dX
+
+> ℓ=1
+
+[z]ℓ [·]ℓ
+
+
+
+= ∥z⊤ · ∥ 2 
+
+> L2(ρ)
+
+= ∥z⊤F (·)∥2
+
+> L2(m)
+
+. (11) As a concrete example, take F to be the inverse Arnold cat map and parameterize the torus by [ −1/2, 1/2] 2per . Let Φ = √12 id , so that the coordinate functions are normalized, and choose an orthonormal family Ψ ⊂ L2([ −1/2, 1/2] 2per ; R) for which Π ΨF −1 = F −1. The singular modes selected by Algorithm 2 are shown in Fig. 2; their analytic computation is given in Section A. 
+
+3.2 Left Singular Modes 
+
+The left singular modes admit a dual interpretation. Since φj = Π ΨKζj , they are the Koopman-evolved right singular modes, resolved in the trial space spanΨ. To isolate the limiting structure, consider the fully projected operator Π ΨKΠΦ. If Ψ is fixed and Φ = Φ N2 becomes dense in L2(Ω; R)as N2 → ∞ , then the left singular modes are governed by Π ΨKK ∗ΠΨ. This operator has an explicit 12 form for nonsingular, finite-to-one C1 maps with nonzero Jacobian determinant almost everywhere. In that case (K∗h)( y) = X 
+
+> x∈F−1(y)
+
+h(x)
+
+| det DF (x)| ,
+
+and therefore (KK ∗h)( x) = X    
+
+> ex:F(ex)= F(x)
+
+h(ex)
+
+| det DF (ex)| .
+
+Thus the left singular modes are the observables in spanΨ whose weighted sums over preimage fibers have maximal L2 energy. Values on points that are mapped to the same future state add constructively or cancel, while the Jacobian weights emphasize regions whose volume is compressed by the map. If F is injective, this reduces to (KK ∗h)( x) = h(x)
+
+| det DF (x)| ,
+
+so the left modes concentrate on directions resolved by Ψ where the inverse-volume weight is large. The conceptual duality of this multiplication operator with K∗K (cf. Lemma 3.1) should be emphasized: K∗K measures future mass, while KK ∗ measures how evolved observables fold back geometrically through the preimage. Returning to Arnold’s cat map, the Koopman operator is orthogonal on the real L2 space. The right singular modes for the map are therefore the left singular modes for the inverse map, which is precisely the relationship illustrated in Fig. 2. 
+
+# 4 Examples 
+
+We test the method on four problems of increasing difficulty: a chaotic cubic map, the periodically driven double gyre, the Lorenz–63 system, and a pitching-airfoil wake. Each example stresses a different aspect of the framework. For the cubic map, pointwise prediction gives way to invariant statistics. For the double gyre, singular modes reveal coherent transport. For Lorenz–63, nonlinear lifting improves finite-time prediction while preserving the statistical shape of the attractor. For the airfoil data, the singular spectrum gives a practical rank. 
+
+4.1 Cubic map 
+
+We begin with a one-dimensional chaotic map, 
+
+F (x) = αx (1 − x2),
+
+where α ≈ 2.598076211353312 makes F surjective from [0 , 1] to [0 , 1]. We train PRONE from a single trajectory of length M + 1, giving M = 1000 snapshot pairs, using the dictionary Ψ( x) =  x x2 x3 x4 x5 sin( πx ) sin(2 πx ) cos( πx ) cos(2 πx )⊤ .
+
+For this example, the model class contains the dynamics exactly: 
+
+Ktrue =  α 0 −α 0 0 0 0 0 0 .
+
+Here Φ = id and there is only one coordinate direction, so the coordinate-space row of Table 1 reduces to a scalar test: whether the nonlinear trial dictionary carries the future state strongly enough to preserve both trajectory-level information and invariant statistics. 13 Figure 3: Forecast of the chaotic cubic map from a model trained with M = 5 ,000 snapshots. The blue curve is the true trajectory and the orange curve is the PRONE prediction. The trajectories agree until the Lyapunov exponent divided by machine precision, indicated by the black dashed line; after this horizon, trajectory-level agreement is no longer meaningful for a chaotic system. 
+
+Figure 4: Long-time statistics for the cubic map over a trajectory of length 10 6. The blue histogram shows the true invariant statistics on a logarithmic scale, while the orange bars show the binwise discrepancy for the PRONE model. Although individual trajectories separate after the Lyapunov horizon, the learned map preserves the invariant measure to within approximately 1%. 14 With M = 5 ,000, PRONE reproduces the true trajectory until the chaotic shadowing horizon set by the Lyapunov exponent and machine precision; see Fig. 3. This is the strongest trajectory-level agreement one should expect in a chaotic system. The more important test is statistical. We iterate the learned model for 10 6 steps and compare the resulting histogram with that of the true map in Fig. 4. The invariant statistics agree at the percent level, showing that the Petrov–Galerkin predictor captures both short-time evolution and long-time measure. 
+
+4.2 Periodically Driven Double Gyre 
+
+We consider an (initially) nonautonomous flow on the domain [0 , 2] × [0 , 1] governed by ˙x = −πA sin( πf (t, x )) cos( πy ), ˙y = πA cos( πf (t, x )) sin( πy ) ∂f ∂x (t, x )where f (t, x ) = α sin( ωt )x2 + (1 − 2α sin( ωt )) x. With A = 0 .25, α = 0 .25, and ω = 2 π, the vector field has period one, so its time-1 stroboscopic map defines an autonomous discrete-time system. The flow consists of two counter-rotating gyres separated by an oscillating vertical bound-ary, allowing particles to exchange intermittently between the two regions [14]. This transport mechanism is a standard failure mode for purely linear prediction methods such as DMD. We apply PRONE using 50 Cartesian products of Legendre polynomials, ( x, y ) 7 → Pi(x)Pj (y), with (i, j ) = (0 , 0) , (1 , 0) , (0 , 1) , (1 , 1) , (2 , 1) , . . . . Following the coordinate-centering lesson from the cubic-map example, we transplant the domain to [ −1, 1] × [−1, 1] and rescale the dictionary ac-cordingly. The regression uses 250 Gauss–Legendre nodes in each dimension, for a total of 62 ,500 snapshots. Because the time-1 double-gyre map is volume-preserving, the Rayleigh quotient in Eq. (10) is constant: in the infinite-resolution limit, no coordinate direction is intrinsically preferred. The finite computation tells a more useful story. Quadrature and dictionary truncation introduce a small nonuniformity in the numerical pushforward ρ = df ♯mdm , concentrating slightly more mass near the gyre cores. The right singular vectors respond exactly as Eq. (11) predicts: they choose the coordinate directions with maximal variance under this approximate future distribution; see Fig. 5 and the coordinate-space interpretation in Table 1. We also apply Algorithm 2 with the same setup but reduce Φ to 25 Legendre-product observ-ables. The leading singular mode, split by sign, recovers the two coherent sets reported in [14]; see Fig. 6. Here the enriched-trial-space row of Table 1 is used: coarser Legendre observables in Φ evolve into higher-resolution projected modes in Ψ. Thus the singular-mode calculation does more than predict trajectories: it extracts the transport geometry encoded by the rectangular Petrov–Galerkin regression. 
+
+4.3 The Lorenz–63 Equations 
+
+Lorenz’s 1963 equations ˙x = σ(y − x), ˙y = x(r − z) − y, ˙z = xy − bz 
+
+with the classical parameters σ = 10, r = 28, and b = 8 /3, provide a compact three-dimensional test case for nonlinear Petrov–Galerkin learning. We compute Eq. (7) using the polynomial dictionary (x, y, z ) 7 → xp1 yp2 zp3 with p1, p 2, p 3 ≤ 3, giving 64 observables. The data consist of 10 ,000 points drawn from 25 trajectories initialized randomly near the origin and sampled with time step ∆ t =0.1; these trajectory samples serve as ergodic quadrature points. Figure 7 shows the output of Algorithm 2, with the coordinate frame selected by PRONE superimposed. The selected directions 15 Figure 5: Numerical pushforward weighting for the periodically driven double gyre, together with the leading coordinate directions selected by Algorithms 1 and 2. The first direction, shown in green, has singular value 0 .953 and corresponds to the linear observable x 7 → − 0.981 x1 − 0.193 x2.The second direction, shown in blue, has singular value 0 .929. These directions maximize variance with respect to the computed pushforward measure, illustrating the coordinate-selection mechanism in Eq. (11). again maximize future variance, now on the Lorenz attractor rather than on a prescribed quadrature grid. Referring back to Table 1, the green arrows are right modes in coordinate space, while the colored fields are the corresponding projected future images in spanΨ. Predictive performance for a representative initial condition is shown in Fig. 8, where the predictions are compared across all three Lorenz state variables. We benchmark PRONE against 
+
+• a reservoir computer with a reservoir dimension 128, 
+
+• a DeepONet with branch-network layer widths (3 , 32 , 32 , 16) and trunk-network layer widths (1 , 32 , 32 , 16), 
+
+• a Fourier neural operator with channel widths (1 , 12 , 24 , 24 , 12 , 1) across successive layers. All methods are trained on the same M training samples. The DeepONet and Fourier neural operator architectures were selected through a hyperparameter sweep, subject to a budget of at most 10 ,000 trainable parameters per model. PRONE uses only 64 polynomial observables and reevaluates the nonlinear lift Ψ : R3 → R64 
+
+at every time step. This relifting is crucial: EDMD rapidly collapses toward a nearly steady trajectory. The resulting learned map tracks the true trajectory substantially longer than all other tested methods despite having (by far) the least number of parameters. We compute the normalized 50-step-ahead root mean square error NRMSE( x, ˆx) = 
+
+> 50
+
+X
+
+> k=1
+
+|x(t + k∆t) − ˆx(t + k∆t)|2 . 50 X
+
+> k=1
+
+|x(t + k∆t)|2
+
+and average this over 150 trajectories. The result is shown in Table 2. Finally, to demonstrate the long-term statistical behavior of the system we compute the Sinai-Ruelle-Bowen (SRB) measure which we approximate by ergodic sampling, using 150 trajectories over t ∈ [0 , 25] and binning the resulting points on a 40 × 40 × 40 grid. The measures in Fig. 9 show that PRONE recovers the two-lobed Lorenz attractor and its dominant mass distribution, while the reservoir model captures the broad geometry but distorts the density along the wings. We compute the L1 error between the true and predicted invariant densities, R 
+
+> R3
+
+|ρ − ˆρ|, in Table 2. 16 Figure 6: Leading singular modes for the periodically driven double gyre. The test dictionary Φ contains 50 Cartesian products of Legendre polynomials, ( x, y ) 7 → Pi(x)Pj (y), transplanted to the double-gyre domain, while the trial dictionary Ψ uses twice as many Legendre products to resolve the evolved observables. The top modes separate the two gyres and their transport boundary, matching the coherent-set structure expected for this flow. Higher modes refine this geometry near the upper and lower transport channels. 17 Figure 7: PRONE singular modes for Lorenz–63. Each panel shows one left singular mode evaluated on trajectory samples from the Lorenz attractor, with color indicating the mode amplitude. The green arrow gives the associated right singular direction in coordinate space. These paired objects show how the learned Petrov–Galerkin map selects physical coordinate combinations and resolves their nonlinear Koopman-advanced images on the attractor. 
+
+Figure 8: Coordinate-wise Lorenz–63 forecasts from a generic initial condition. The black dashed curve is the true trajectory, blue is PRONE, yellow is the reservoir computer, green is EDMD, pink is a DeepONet, orange is a Fourier neural operator. Model Short-term prediction error Long-term statistics error PRONE 8.78 0.540 DeepONet 693 1.43 Fourier neural operator 177 2.00 Reservoir computer 136 0.90 Table 2: Short-term and long-term errors to three significant figures for the tested models. 18 Figure 9: Approximate SRB measures for Lorenz–63, computed by ergodic sampling and binning on a 40 ×40 ×40 grid. Left: the true flow. Middle: the measure generated by the PRONE predictor. Right: the measure generated by the reservoir computer. PRONE preserves the two-wing attractor geometry and the dominant density distribution, while the reservoir model captures the broad support but distorts the mass along the wings. 
+
+4.4 Pitching Airfoil in Low-Reynolds Number Fluid 
+
+We close with a high-dimensional fluid example: the wake of a pitching flat-plate airfoil at low Reynolds number [24]. Pitching airfoils are relevant to small engineered and biological flyers, where rapid wing motions generate strongly unsteady aerodynamic loads. Accurate reduced-order models are therefore essential. Each snapshot contains the x- and y-velocity components on four nested 600 × 300 grids. We use M = 950 snapshots and radial basis functions ψc(x) = exp( −∥ x − c∥2/ε ), with N = 90 centers c chosen by uniform subsampling of the trajectory and bandwidth ε = 10 −3.The resulting left singular modes are shown in Fig. 10: the leading modes resolve coherent wake structures shed from the airfoil, while higher modes capture finer downstream oscillations (see ”left singular modes” in coordinate space in Table 1). Figure 11 compares the singular values with the NRMSE for five-step-ahead prediction on 50 held-out snapshots. The error drops rapidly as the first modes are added and then levels off after roughly r = 10, matching the decay of the singular values. Thus the singular spectrum gives a practical rank-selection rule: modes beyond this point carry little additional predictive energy. 
+
+# 5 Conclusion 
+
+We have framed a broad class of data-driven dynamics methods as Petrov–Galerkin regressions between observable spaces. The key change—allowing the two observable spaces to differ—puts DMD, EDMD, SINDy, and Koopman regression into the same Petrov–Galerkin framework. The regression Ψ( X)K ≈ Φ( Y) is a finite section of the Koopman action between two chosen observable spaces; when Φ = id , it is also a nonlinear predictor of the state obtained by reevaluating the lift at each step. In the large-data limit the fitted maps converge to the corresponding projected operator, and the predictor converges in L2 as the trial space is enriched. The rectangular viewpoint also changes what should be plotted and interpreted. Eigenvectors belong to square maps from a space to itself. A Petrov–Galerkin section between different observable spaces asks a different question: which observable combinations are carried by the dynamics into the chosen trial space, and with what strength? Singular modes answer this question directly. The right modes identify the inputs that are best resolved after evolution; the left modes are their projected futures; the singular values measure the coupling. In this sense the singular value decomposition is not merely a compression device. It is the modal decomposition appropriate to finite, asymmetric 19 Figure 10: Left singular modes for the low-Reynolds-number pitching-airfoil wake. Columns show modes 1, 4, and 16. The top row gives the x-velocity component and the bottom row gives the 
+
+y-velocity component. The airfoil is shown in black. The leading modes resolve large coherent wake structures, while the higher mode captures finer downstream oscillations. 
+
+Figure 11: Rank dependence for the pitching-airfoil model. Left: singular values λ1/2 of the Petrov–Galerkin regression, ordered by rank. Right: normalized root mean square error for five-step-ahead prediction on held-out snapshots. The prediction error drops rapidly as the leading modes are included and then saturates after roughly r = 10, consistent with the decay of the singular spectrum. 20 Koopman computation. The examples show the range of this interpretation. For the chaotic cubic map, trajectory agree-ment ends at the Lyapunov horizon, but the learned map still captures invariant statistics. For the double gyre, singular modes recover coherent transport structures. For Lorenz–63, nonlinear lifting gives a compact predictor that preserves the geometry and dominant statistics of the attractor. For the pitching-airfoil wake, the singular spectrum supplies a practical rank selection rule and the leading modes resolve coherent flow structures. The same least-squares object and singular modes therefore supports prediction, statistics, transport diagnostics, and reduced modelling. The message is simple. Do not force the data-driven Koopman problem to be square. Choose the observables whose future matters, choose the space in which that future can be represented, fit the Petrov–Galerkin map, and read its singular structure. This is PRONE: a rectangular, regression-based view of nonlinear dynamics in which forecasting and interpretation are two sides of the same matrix. 
+
+# Acknowledgements 
+
+MJC would like to thank Andrew Stuart for discussions about composing EDMD with nonlinear dictionary lifting. AH acknowledges that the project was supported by G-Research. 
+
+# References 
+
+[1] Francis Bach, Rodolphe Jenatton, Julien Mairal, and Guillaume Obozinski. Optimization with sparsity-inducing penalties, 2011. [2] Nicolas Boull´ e, Matthew J. Colbrook, and Gustav Conradie. Convergent methods for koopman operators on reproducing kernel hilbert spaces, 2025. [3] John P. Boyd. A comparison of numerical algorithms for fourier extension of the first, second, and third kinds. Journal of Computational Physics , 178(1):118–160, 2002. [4] Steven L. Brunton, Marko Budiˇ si´ c, Eurika Kaiser, and J. Nathan Kutz. Modern koopman theory for dynamical systems. SIAM Review , 64(2):229–340, 2022. [5] Steven L. Brunton, Joshua L. Proctor, and J. Nathan Kutz. Discovering governing equations from data by sparse identification of nonlinear dynamical systems. Proceedings of the National Academy of Sciences , 113(15):3932–3937, March 2016. [6] Steven L. Brunton, Joshua L. Proctor, and J. Nathan Kutz. Sparse identification of nonlinear dynamics with control (SINDYc). IFAC-PapersOnLine , 49(18):710–715, 2016. [7] Matthew J. Colbrook. The mpEDMD algorithm for data-driven computations of measure-preserving dynamical systems. SIAM Journal on Numerical Analysis , 61(3):1585–1608, 2023. [8] Matthew J. Colbrook. Infinite-dimensional spectral computation. Being reviewed, 2026. [9] Matthew J. Colbrook, Lorna J. Ayton, and M´ at´ e Sz˝ oke. Residual dynamic mode decomposi-tion: robust and verified koopmanism. Journal of Fluid Mechanics , 955:A21, 2023. [10] Matthew J. Colbrook, Catherine Drysdale, and Andrew Horning. Rigged dynamic mode de-composition: Data-driven generalized eigenfunction decompositions for koopman operators. 
+
+SIAM Journal on Applied Dynamical Systems , 24(2):1150–1190, 2025. 21 [11] Matthew J. Colbrook, Igor Mezi´ c, and Alexei Stepanenko. Limits and powers of koopman learning, 2024. [12] Matthew J. Colbrook and Alex Townsend. Rigorous data-driven computation of spectral properties of koopman operators for dynamical systems. Communications on Pure and Applied Mathematics , 77(1):221–283, 2024. [13] Gustav Conradie, Nicolas Boull´ e, Jean-Christophe Loiseau, Steven L. Brunton, and Matthew J. Colbrook. Trustworthy koopman operator learning: Invariance diagnostics and error bounds, 2026. [14] Gary Froyland and P´ eter Koltai. Estimating long-term behavior of periodically driven flows without trajectory integration. Nonlinearity , 30(5):1948, apr 2017. [15] Loukas Grafakos. Classical Fourier Analysis . Graduate Texts in Mathematics. Springer, New York, NY, 3 edition, July 2014. [16] Kelan Gray, Finlay Brown, Nicolas Boull´ e, and Matthew J. Colbrook. Deep embedded multi-plicative DMD for algebra-preserving koopman learning, 2026. [17] B. O. Koopman. Hamiltonian systems and transformation in hilbert space. Proceedings of the National Academy of Sciences of the United States of America , 17(5):315–318, 1931. [18] Milan Korda and Igor Mezi´ c. On convergence of extended dynamic mode decomposition to the koopman operator. Journal of Nonlinear Science , 28(2):687–710, 2018. [19] J. Nathan Kutz, Steven L. Brunton, Bingni W. Brunton, and Joshua L. Proctor. Dynamic Mode Decomposition: Data-Driven Modeling of Complex Systems . Society for Industrial and Applied Mathematics, Philadelphia, 2016. [20] Andrzej Lasota and Michael C Mackey. Chaos, fractals, and noise . Applied Mathematical Sciences. Springer, New York, NY, 2 edition, November 2013. [21] Igor Mezi´ c. Spectral properties of dynamical systems, model reduction and decompositions. 
+
+Nonlinear Dynamics , 41(1–3):309–325, 2005. [22] Clarence W. Rowley, Igor Mezi´ c, Shervin Bagheri, Philipp Schlatter, and Dan S. Henningson. Spectral analysis of nonlinear flows. Journal of Fluid Mechanics , 641:115–127, 2009. [23] Peter J. Schmid. Dynamic mode decomposition of numerical and experimental data. Journal of Fluid Mechanics , 656:5–28, 2010. [24] Aaron Towne and Scott Dawson. Low-Reynolds-number pitching airfoil direct numerical sim-ulations, 2022. [25] Lloyd N Trefethen. Spectra and pseudospectra. In The Graduate Student’s Guide to Numerical Analysis ’98 , Springer Series in Computational Mathematics, pages 217–250. Springer Berlin Heidelberg, Berlin, Heidelberg, 1999. [26] Jonathan H. Tu, Clarence W. Rowley, Dirk M. Luchtenburg, Steven L. Brunton, and J. Nathan Kutz. On dynamic mode decomposition: Theory and applications. Journal of Computational Dynamics , 1(2):391–421, 2014. 22 [27] Marcus Webb, Vincent Copp´ e, and Daan Huybrechs. Pointwise and uniform convergence of fourier extensions, 2019. [28] Matthew O. Williams, Ioannis G. Kevrekidis, and Clarence W. Rowley. A data–driven ap-proximation of the koopman operator: Extending dynamic mode decomposition. Journal of Nonlinear Science , 25(6):1307–1346, June 2015. [29] Matthew O. Williams, Clarence W. Rowley, and Ioannis G. Kevrekidis. A kernel-based ap-proach to data-driven koopman spectral analysis, 2015. 
+
+# A Analytic Computations of Singular Modes for Cat Map 
+
+We consider the inverse Arnold cat map 
+
+F −1
+
+xy
+
+
+
+=
+
+
+
+x − y
+
+2y − x + 1 
+
+!
+
+if 0 ≤ yx < 12
+
+x − y
+
+2y − x
+
+!
+
+if 12 ≤ yx < 1
+
+x + 1 − y
+
+2y − x − 1
+
+!
+
+if y ≥ x
+
+2 + 12
+
+x − y + 1 2y − x
+
+!
+
+if x ≤ y < x
+
+2 + 12where ( x, y ) ∈ [0 , 1] 2 here. We transplant this map to [ −1/2, 1/2] 2 to apply Algorithm 2. Choosing Φ = id , we desire an (ideally orthonormal) set of functions Ψ such that Π ΨF −1 = F −1. This is easily computed by performing Gram-Schmidt on {[F −1]1, [F −1]2} ⊂ L2([ −1/2, 1/2] 2per ). Now ΠΨKP Φ can be represented by the matrix 
+
+Kij = Aij = ( ⟨ψi, Kϕj ⟩)1≤i≤21≤j≤2
+
+=
+
+> 12√31√3
+
+0
+
+q 11 12 
+
+!
+
+with the singular value decomposition                         
+
+> K=
+> 
+> −3 + √53
+> p
+> 106 −6√53 −3 + √53
+> p
+> 106 + 6 √53
+> r12 +32√53
+> r12−32√53
+> 
+> 12
+> s
+> 8 + √53 30012
+> s
+> 8− √53 3
+> 
+> −7 + √53
+> q
+> 2(53 −7√53)
+> −7 + √53
+> q
+> 2(53 + 7 √53)
+> r12 +72√53
+> r253 + 7 √53
+> 
+
+The left singular modes φ1, φ 2 are linear functions represented by the left singular vectors of K.Their direction is represented by arrows in Fig. 2. The corresponding right singular modes are shown alongside. 23

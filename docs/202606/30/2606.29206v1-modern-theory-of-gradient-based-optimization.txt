@@ -1,0 +1,1155 @@
+Title: Modern Theory of Gradient-Based Optimization
+
+URL Source: https://arxiv.org/pdf/2606.29206v1
+
+Published Time: Tue, 30 Jun 2026 00:58:47 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+> Proceedings of the International Consortium of Chinese Mathematicians
+
+# Modern Theory of Gradient-Based Optimization 
+
+Bin Shi 
+
+Abstract. In this review, we offer a comprehensive survey of emerging techniques in gradient-based optimization, with a particular emphasis on the interplay between ordinary differential equation (ODE) perspectives and their extensions into discrete Lyapunov analysis. We begin by ex-amining the acceleration mechanisms underlying Nesterov’s accelerated gradient method for strongly convex functions ( NAG-SC ) and Polyak’s heavy-ball method, identifying the gradient-correction term as the pri-mary driver of acceleration. This mechanistic insight is substantiated through high-resolution ODE modeling and the systematic construction of Lyapunov functions. We then synthesize recent advancements in con-vex optimization regarding NAG and its proximal generalization, the fast iterative shrinkage-thresholding algorithm ( FISTA ). Key topics include the accelerated convergence of gradient norms, underdamped acceler-ation, linear convergence under strong convexity, and novel Lyapunov frameworks for establishing convergence and monotonicity properties of generalized accelerated methods. Furthermore, we demonstrate how these ODE approximations and Lyapunov techniques can be extended to provide a unified framework for analyzing advanced optimization algo-rithms, including the alternating direction method of multipliers ( ADMM ), the primal-dual hybrid gradient ( PDHG ) method, and their respective ac-celerated variants. Finally, we discuss recent progress in minimax op-timization and outline future directions for extending Lyapunov-based analysis to saddle-point problems. 
+
+1. Introduction 
+
+The study of gradient-based optimization algorithms has a storied his-tory, perhaps tracing its origins back to the pioneering work of Cauchy [ 6]. However, the quest for truly “accelerated” methods gained significant mo-mentum only in the 1960s, largely inspired by the insights of Gelfand and Tsetlin [ 15 ]. Building upon these advancements, Polyak [ 28 ] bridged the gap 
+
+This work was partially supported by the NSFC (Grant No. 12241105) and by SIMIS (startup fund and cross-disciplinary research projects). 
+
+1 
+
+> arXiv:2606.29206v1 [math.OC] 28 Jun 2026 2BIN SHI
+
+between optimization and classical mechanics. Drawing from invariant man-ifold theory, a local theory concerning equilibria of dynamical system, he proposed the heavy-ball method. This contribution effectively introduced the concept of inertia into the optimization process, allowing iterates to “roll” past local oscillations. The field underwent a paradigm shift when Ne-mirovski and Yudin [ 24 ] established computational complexity as a formal framework for evaluating algorithmic performance. This theoretical rigor set the stage for Nesterov, who developed the “Estimate Sequence” technique, which led to the landmark Nesterov’s accelerated gradient ( NAG ) method for convex objective functions [ 25 ]. He later refined this approach for strongly convex functions ( NAG-SC ), with a comprehensive mathematical treatment presented in [ 26 ]. Since the turn of this century, machine learning has experienced explo-sive growth, largely propelled by the development of efficient optimization algorithms. A major bottleneck in large-scale optimization is the substan-tial computational and memory cost required to evaluate or store Hessian matrices, which often renders second-order methods impractical for modern high-dimensional datasets. Consequently, gradient-based methods, valued for their low per-iteration overhead, have become the engine driving re-cent advancements. With the rise of deep learning, NAG has become widely regarded as a momentum-based method of central importance [ 31 ]. To bet-ter understand its behavior, a perspective that investigates NAG through the lens of ordinary differential equations (ODEs) is introduced in [ 30 ], using a continuous-time approximation to model its dynamics. Departing from earlier local approaches [ 28 ], this framework adopts a numerical anal-ysis standpoint centered on discretization error. When combined with the Lyapunov function technique for global analysis, as proposed in [ 30 ], this method opens up a new methodology for studying optimization algorithms. While the technical seeds of this framework can be traced back to [ 30 ], its true utility as a robust and essential analytical tool was first recognized and fully articulated in Jordan’s ICM 2018 plenary lecture [ 16 ]. This review begins by adopting the perspective of high-resolution ODEs and the discrete Lyapunov analysis introduced in [ 29 ] to address the funda-mental question proposed in [ 16 ]:“ What is the underlying mechanism that generates acceleration? ” Building upon this foundation, Section 2 provides a detailed analysis for the acceleration mechanism. The framework’s utility is then demonstrated through broader applications: Section 3 intro-duces several new results for NAG and its proximal version, the Faster It-erative Shrinkage-Thresholding Algorithm ( FISTA ). Furthermore, Section 4 extends this analytical lens to other prominent algorithms, such as the Alter-nating Direction Method of Multipliers ( ADMM ) and the Primal-Dual Hybrid Gradient ( PDHG ) methods, including their various extensions. Finally, Sec-tion 5 provides concluding remarks and outlines potential directions for fu-ture research. MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 3
+
+2. The acceleration mechanism 
+
+In this section, we assume that the objective function f is sufficiently smooth and satisfies both L-smoothness and μ-strong convexity. 
+
+Definition 2.1. For any x, y ∈ Rn, there exists two constants L, μ > 0 such that the following conditions hold: 
+
+• L-smoothness : The gradient ∇f is Lipschitz continuous with con-stant L:(2.1) ‖∇ f (x) − ∇ f (y)‖ ≤ L‖x − y‖.
+
+• μ-strong convexity : The function f satisfies: (2.2) f (y) ≥ f (x) + 〈∇ f (x), y − x〉 + μ
+
+2 ‖y − x‖2.
+
+The class of objective functions satisfies (2.1) and (2.2) is denoted as S1
+
+> μ,L
+
+.According Theorem 2.1, any function f ∈ S 1 
+
+> μ,L
+
+can be equivalently ex-pressed by the following inequalities for all x, y ∈ Rn:
+
+• Gradient variation bounds :(2.3) μ‖x − y‖ ≤ ‖∇ f (x) − ∇ f (y)‖ ≤ L‖x − y‖.
+
+• Quadratic growth bounds :(2.4) μ
+
+2 ‖x − y‖2 ≤ f (y) − f (x) − 〈∇ f (x), y − x〉 ≤ L
+
+2 ‖x − y‖2.
+
+With the properties (2.1) — (2.4) established, we consider standard gradient-based optimization algorithms. Given a step size 0 < s ≤ 1/L and an initial point x0 ∈ Rd, the gradient descent update is given by (2.5) xk+1 = xk − s∇f (xk).
+
+Taking the gradient descent method (2.5) as a baseline, we introduce the heavy-ball method. For any initial x0, x 1 ∈ Rd, the update rule incorporates a momentum term as: (2.6) xk+1 = xk − s∇f (xk) + 1 − √μs 
+
+1 + √μs (xk − xk−1).
+
+Finally, NAG-SC is defined by the following coupled iterations, starting with 
+
+x0 = y0 ∈ Rd:(2.7) 
+
+
+
+yk+1 = xk − s∇f (xk),xk+1 = yk+1 + 1 − √μs 
+
+1 + √μs (yk+1 − yk) .4 BIN SHI 
+
+If we expand NAG-SC solely in terms of the iterate {xk}∞
+
+> k=0
+
+, we obtain: 
+
+xk+1 = xk − s∇f (xk) + 1 − √μs 
+
+1 + √μs (xk − xk−1)
+
+− 1 − √μs 
+
+1 + √μs · s (∇f (xk) − ∇ f (xk−1)) 
+
+︸ ︷︷ ︸
+
+> Gradient Correction
+
+,(2.8) which is known as the gradient-correction scheme, discussed extensively in [29 ]. Alternatively, expanding NAG-SC in terms of the iterate {yk}∞ 
+
+> k=0
+
+yields: (2.9) yk+1 = yk − s∇f
+
+(
+
+yk + 1 − √μs 
+
+1 + √μs (yk − yk−1)
+
+︸ ︷︷ ︸
+
+> Implicit Velocity
+
+)
+
++ 1 − √μs 
+
+1 + √μs (yk − yk−1).
+
+where the difference yk − yk−1 can be viewed as the velocity, so we refer it to as the implicit-velocity scheme, as discussed in [ 10 ]. Although these three gradient-based algorithms share closely related iterative structure, their convergence rates differ significantly, as summa-rized in Table 1. This discrepancy raises a fundamental question: Why               
+
+> Algorithms Objective μ-Strongly Convex Objective
+> Gradient Descent (2.5) Global O
+> ((1−μ
+> L
+> )k)
+> Heavy-Ball Method (2.6) Local O
+> ((
+> 1−
+> √μ
+> L
+> )k)
+> NAG-SC (2.7) Global O
+> ((
+> 1−
+> √μ
+> L
+> )k)
+
+Table 1. Convergence rates of gradient-based algorithms. 
+
+does NAG-SC (2.7) achieve global acceleration, whereas the heavy-ball method (2.6) only accelerates locally? A direct comparison sug-gests that this distinction arises from the effects of “gradient-correction” or “implicit-velocity”. To further investigate the mechanism, we first illustrate their convergence behaviors in Figure 1. We observe that, while the heavy-ball method (2.6) oscillates throughout the convergence process, NAG-SC (2.7) exhibits only minor initial oscillations before transitioning into a smooth and stable convergence regime. To understand the acceleration phenomenon, a high-resolution ODE framework was introduced in [ 29 ] and subsequently refined in [ 10 ]. As vi-sually outlined in Figure 2, this framework consists of the following four steps: MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 5    
+
+> k
+> 050 100 150
+> f (xk ) − f (x⋆)
+> 10 -4
+> 10 -3
+> 10 -2
+> 10 -1
+> 10 0
+> 10 1
+> Heavy-ball method: s=0.09
+> NAG-SC: s=0.09
+
+Figure 1. Comparison of the convergence behaviors of the heavy-ball method and NAG-SC .    
+
+> Algorithms
+> High-Resolution ODEs Continuous E(t)
+> Discrete E(k)
+> Nesterov’s Acceleration
+> Gradient Norm Minimization
+
+dimensional analysis phase-space representation 
+
+Figure 2. An illustration of our high-resolution ODE framework. The three solid straight lines represent Steps 1, 2 and 3, and the two curved lines denote Step 4. The dashed line is used to emphasize that it is difficult, if not impracti-cal, to construct discrete Lyapunov functions directly from the algorithms. Step-1: Deriving high-resolution ODEs. It can be observe that the second-order derivative can be approximated by the second-order central difference with a truncation error of O(s), expressed as: (2.10) xk+1 + xk−1 − 2xk
+
+s = ¨X + O( s).6 BIN SHI 
+
+Thus, dimensional analysis from physics (as exemplified in [ 27 ]) was intro-duced in [ 29 ] to derive high-resolution ODEs. For NAG-SC (2.7), the high-resolution ODE is given by: (2.11) ¨X + 2 √μ ˙X + √s∇2f (X) ˙X + (1 + √μs )∇f (X) = 0 .
+
+Meanwhile, for the heavy-ball method (2.6), the high-resolution ODE is (2.12) ¨X + 2 √μ ˙X + (1 + √μs )∇f (X) = 0 .
+
+In contrast, the low-resolution ODE derived in [ 30 ] is identical for both the methods: (2.13) ¨X + 2 √μ ˙X + ∇f (X) = 0 By comparing these three continuous-time models, we find that the high-resolution ODEs successfully differentiate between the two algorithms. This distinguishing capability is validated by the numerical demonstrations illus-trated in Figure 3.          
+
+> t
+> 036912 15 18
+> f (X(t))  − f (x⋆)
+> 10 -4
+> 10 -3
+> 10 -2
+> 10 -1
+> 10 0
+> 10 1
+> Low-Resolution
+> High-Resolution (heavy-ball): s=0.09
+> High-Resolution (NAG-SC): s=0.09
+> Heavy-ball method: s=0.09
+> NAG-SC: s=0.09
+
+Figure 3. The convergence behaviors of gradient-based al-gorithms and their approximating ODEs. Step-2: Analyzing continuous dynamics via Lyapunov functions. Based on the high-resolution ODEs, we next construct appropriate Lyapunov func-tions to characterize their continuous-time dynamics. For the high-resolution ODE (2.11), we consider the Lyapunov function 
+
+E(t) = (1 + √μs ) ( f (X) − f (x⋆)) + 1
+
+4 ‖ ˙X‖2
+
++ 1
+
+4 ‖ ˙X + 2 √μ(X − x⋆) + √s∇f (X)‖2.(2.14) MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 7
+
+Conversely, for the high-resolution ODE (2.12), we define the Lyapunov function as (2.15) E(t) = (1 + √μs ) ( f (X) − f (x⋆)) + 1
+
+4 ‖ ˙X‖2 + 1
+
+4 ‖ ˙X + 2 √μ(X − x⋆)‖2.
+
+The underlying construction involves substituting the mixed term and its de-rivative into the high-resolution ODEs to isolate a term containing only the gradient. This is followed by integrating the kinetic energy and, ultimately, the potential energy. The details of this design principle can be found in [ 10 ]. Both Lyapunov functions (2.14) and (2.15) yield the same continuous-time convergence rate: 
+
+f (X(t)) − f (x⋆) ≤ O
+
+(
+
+e−
+
+> √μt
+> 4
+
+)
+
+.
+
+However, a comparison reveals that the derivative inequality for the high-resolution ODE (2.11) involves additional terms generated by the gradient correction, expressed as: (2.16) dE
+
+dt ≤ − √μ
+
+4 E − √s
+
+2
+
+[
+
+‖∇ f (X)‖2 + ˙X⊤(∇2f ) ˙X
+
+]
+
+,
+
+where the extra structure demonstrates how the gradient correction term in the discretization can effectively accommodate a larger step size s > 0. Step-3: Constructing corresponding discrete Lyapunov functions. To trans-fer the continuous Lyapunov functions to the discrete counterparts, we intro-duce the velocity variable: xk −xk1 = √sv k−1. By virtue of this substitution, the two gradient-based methods can be reformulated as the phase-space rep-resentation. Specifically, NAG-SC (2.7) can be rewritten as (2.17) 
+
+
+
+xk − xk−1 = √sv k−1,vk − vk−1 = − 2√μs 
+
+1 − √μs vk − 1 + √μs 
+
+1 − √μs · √s∇f (xk)
+
+−√s (∇f (xk) − ∇ f (xk−1)) .
+
+Similarly, the heavy-ball method (2.6) can be expressed in terms of the velocity variable as the following discrete scheme: (2.18) 
+
+
+
+xk − xk−1 = √sv k−1,vk − vk−1 = − 2√μs 
+
+1 − √μs vk − 1 + √μs 
+
+1 − √μs · √s∇f (xk).
+
+In the absence of friction terms (i.e., setting the velocity coefficients to zero), the two discrete schemes above correspond exactly to the symplectic dis-cretization of a Hamiltonian system [ 12 ]. With the two phase-space repre-sentations, we can translate the two continuous Lyapunov functions, (2.14) 8 BIN SHI 
+
+and (2.15), into the discrete ones as: 
+
+E(k) = 1 + √μs 
+
+1 − √μs (f (xk) − f (x⋆)) + 1
+
+4 ‖vk‖2
+
++ 1
+
+4
+
+∥∥∥∥vk + 2√μ
+
+1 − √μs (yk+1 − x⋆) + √s∇f (yk)
+
+∥∥∥∥ − s‖∇ f (yk)‖2
+
+2(1 − √μs )
+
+︸ ︷︷ ︸
+
+> additional term
+
+(2.19) and 
+
+E(k) = 1 + √μs 
+
+1 − √μs (f (xk) − f (x⋆)) + 1
+
+4 ‖vk‖2
+
++ 1
+
+4
+
+∥∥∥∥vk + 2√μ
+
+1 − √μs (xk+1 − x⋆)
+
+∥∥∥∥
+
+> 2
+
+.(2.20) Step-4: Establishing convergence rates through discrete Lyapunov func-tions. Using the two discrete Lyapunov functions, (2.19) and (2.20), we can demonstrate that the permissible step size can be enlarged to s = 1 /(4 L)for NAG-SC , to s = μ/ (16 L2) for the heavy-ball method (2.6). Consequently, we derive the convergence rates for these two gradient-based methods to illustrate the acceleration mechanism, as detailed in the following theorems. 
+
+Theorem 2.2 (Theorem 4 in [ 29 ]) . Let f ∈ S 1
+
+> μ,L
+
+. If the step size is set to s = μ/ (16 L2), the iterates {xk }∞ 
+
+> k=0
+
+generated by the heavy-ball method satisfy 
+
+f (xk) − f (x0) ≤ 5L‖x0 − x⋆‖2
+
+(1 + μ
+
+> 16 L
+
+)k ,
+
+for all k ≥ 0. 
+
+Theorem 2.3 (Theorem 3 in [ 29 ]) . Let f ∈ S 1
+
+> μ,L
+
+. If the step size is set to s = 1 /(4 L), the iterates {xk}∞ 
+
+> k=0
+
+generates by NAG-SC satisfy 
+
+f (xk) − f (x⋆) ≤ 5L‖x0 − x⋆‖2
+
+(
+
+1 + 1
+
+> 12
+
+√ μ
+
+> L
+
+)k ,
+
+for all k ≥ 0. In [ 10 ], the additional term cancels out, yielding a simplified form of the Lyapunov function (2.19) for the implicit-velocity scheme (2.9): (2.21) E(k) = f (xk) − f (x⋆) + ‖vk ‖2
+
+4(1 + 2 √μs ) + ‖vk + 2 √μ(xk − x⋆)‖
+
+4 ,
+
+which leads directly to the following theorem. 
+
+Theorem 2.4 (Theorem 4 in [ 10 ]) . Let f ∈ S 1
+
+> μ,L
+
+. If the step size is set to s = 1 /L , the iterates {xk }∞ 
+
+> k=0
+
+generates by NAG-SC satisfy 
+
+f (xk) − f (x⋆) ≤ 4L‖x0 − x⋆‖2
+
+(
+
+1 + 1
+
+> 4
+
+√ μ
+
+> L
+
+)k ,MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 9
+
+for all k ≥ 0. Subsequently, [ 21 ] generalizes these results to composite optimization for proper, lower semi-continuous, and convex functions by deriving the fol-lowing proximal inequality: Φ( x − Gs(x)) ≤ Φ( y) + 〈Gs(x), x − y〉 − s
+
+2 ‖Gs(y)‖2 − μ
+
+2 ‖y − x‖2.
+
+3. NAG and FISTA 
+
+In this section, we consider the more general class of convex objective functions, denoted as F1
+
+> L
+
+, where the strong convexity assumption (2.2) is weaken to the standard convexity condition: for any x, y ∈ Rn,(3.1) f (y) ≥ f (x) + 〈∇ f (x), y − x〉 ,
+
+Consequently, the strong convexity terms on the left-hand sides of inequali-ties (2.3) and (2.4) reduce to zero. In this setting, classical gradient descent no longer converges linearly, but rather achieves a sub-linear convergence rate of 
+
+f (xk) − f (x⋆) ≤ O
+
+( 1
+
+k
+
+)
+
+.
+
+The celebrated NAG , proposed by Nesterov [ 25 ], accelerates this convergence rate to 
+
+f (xk) − f (x⋆) ≤ O
+
+( 1
+
+k2
+
+)
+
+.
+
+The iteration scheme for NAG is given by: 
+
+xk+1 = yk − s∇f (yk),(3.2a) 
+
+yk+1 = xk+1 + k
+
+k + r + 1 (xk+1 − xk),(3.2b) where s > 0 represents the step size, and r ≥ 2 is a tuning parameter (with 
+
+r = 2 corresponding to Nesterov’s original scheme). In the remainder of this section, we provide a brief review of several recent results analyzed through the lens of the high-resolution ODE framework [ 29 ]. 
+
+3.1. Gradient norm minimization and composite optimization. 
+
+In [ 29 ], the high-resolution ODE for NAG (3.2) is derived as (3.3) ¨X + r
+
+t ˙X + √s∇f (X) ˙X +
+
+(
+
+1 + 3√s
+
+2t
+
+)
+
+∇f (X) = 0 .
+
+Following the same four-step process outlined in Section 2, we construct the discrete Lyapunov function, using vk−1 = ( xk − xk−1)/s , as (3.4) E(k) = sk (k + r) ( f (xk) − f (x⋆)) + 1
+
+2 ‖√skv k−1 + r(yk − x⋆) + sk ∇f (yk−1)‖210 BIN SHI 
+
+which yields an accelerated convergence rate of O(1 /k 2) for the objective function error f (xk) − f (x⋆). Furthermore, this framework allows us to es-tablish a faster convergence rate for the gradient norm, achieving: (3.5) min  
+
+> 0≤i≤k
+
+‖∇ f (xi)‖2 ≤ O
+
+( 1
+
+k3
+
+)
+
+.
+
+Unlike the objective function error, which requires knowing the optimal value 
+
+f (x⋆), the gradient norm ‖∇ f (xk)‖ can be explicitly computed at each iter-ation. This makes it a highly practical quantity for monitoring convergence and establishing stopping criteria in real-world applications. 
+
+Original Blurred and Noisy 
+
+Figure 4. The image deblurring problem: An image of an elephant In [ 9], both the gradient-correction scheme and the implicit-velocity scheme for NAG (3.2) was studied further, improving the convergence rate of the gradient norm to o(1 /k 3). Equivalent forms of the discrete Lyapunov function (3.4) have been demonstrated for both schemes. For the implicit-velocity scheme with vk = ( yk −yk−1)/s , , the Lyapunov function is expressed as: (3.6) E(k) = sk (k + r) ( f (xk) − f (x⋆)) + 1
+
+2 ‖√s(k − 1) vk + r(xk − x⋆)‖2.
+
+Meanwhile, the original NAG scheme (3.2), it is given by: (3.7) E(k) = sk (k + r) ( f (xk) − f (x⋆)) + 1
+
+2 ‖√sk (yk − xk) + r(xk − x⋆)‖2.
+
+In [ 22 ], the fundamental proximal inequality has been improved as (3.8) Φ( x − Gs(x)) ≤ Φ( y) + 〈Gs(x), x − y〉 − 
+
+(
+
+s − Ls 2
+
+2
+
+)
+
+‖Gs(y)‖2.
+
+The accelerated gradient norm rate (3.5) is generalized to composite opti-mization problems for FISTA , an application of which is demonstrated in the MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 11 
+
+image deblurring problem shown in Figure 4. Letting F0 denote the class of proper, convex and lower semi-continuous functions, this result is rigorously stated in the following theorem. 
+
+Theorem 3.1 (Theorem 5.1 in [ 22 ]) . Let Φ = f + g be a composite function, where f ∈ F 1 
+
+> L
+
+and g ∈ F 0. Then, for any step size 0 < s ≤ 1/L ,the iterative sequence {xk}∞ 
+
+> k=0
+
+generated by FISTA satisfies (3.9) Φ( xk) − Φ( x⋆) ≤ r2‖x0 − x⋆‖2
+
+2sk (k + r) .
+
+Moreover, if the step size satisfies 0 < s < 1/L , the iterative sequence 
+
+{yk}∞ 
+
+> k=0
+
+satisfies (3.10) 
+
+
+
+min  
+
+> 0≤i≤k
+
+‖Gs(yi)‖2 ≤ 6r2‖x0 − x⋆‖2
+
+s2(1 − sL )( k + 1) (2 k2 + (6 r + 1) k + 6 r2) ,
+
+lim 
+
+> k→∞
+
+(
+
+k3 min  
+
+> 0≤i≤k
+
+‖Gs(yi)‖2
+
+)
+
+= 0 .
+
+Furthermore, if r > 2, the iterative sequence {xk}∞ 
+
+> k=0
+
+also satisfies (3.11) lim 
+
+> k→∞
+
+[
+
+k2
+
+(
+
+min  
+
+> 0≤i≤k
+
+Φ( xk) − Φ( x⋆)
+
+)] 
+
+= 0 .
+
+3.2. Underdamped case: r ∈ [−1, 2) . While the tuning parameter for the overdamped case ( r ≥ 2) has been thoroughly investigated via the high-resolution ODE framework in [ 29, 9, 22 ], the underdamped case where 
+
+r ∈ [−1, 2) was analyzed in [ 11 ]. Motivated by the intuition of scaling the 
+
+k−1 factor in the mixed term to ( k−1) γ , we construct the discrete Lyapunov function as follows: 
+
+E(k) = sγ kγ [kγ + 2 γ(k + 1) γ ] ( f (xk) − f (x⋆)) + 1
+
+2
+
+∥∥∥sγ/ 2(k − 1) γ vk + 2 γs (γ−1) /2kγ−1(xk − x⋆)
+
+∥∥∥2
+
++
+
+{ (k − 2) kγ−1 [(k − 1) γ + 2 γk γ−1]
+
+k + 3 γ − 2 − (k − 1) γ−1(k − 2) γ
+
+}
+
+·2γs γ−1 ‖xk−1 − x⋆‖2 .(3.12) By analyzing this Lyapunov function, the convergence rate for the objective function error is derived as: (3.13) f (xk) − f (x⋆) ≤ O
+
+( 1
+
+k 2( r+1) 
+
+> 3
+
+)
+
+,
+
+and the convergence rate for the minimum gradient norm is given by: (3.14) min  
+
+> 0≤i≤k
+
+‖∇ f (xi)‖2 ≤ O
+
+( 1
+
+k 2r+5 
+
+> 3
+
+)
+
+.
+
+Moreover, these two convergence rates, (3.13) and (3.14), have been success-fully generalized to the composite optimization for FISTA in [ 11 ]. 12 BIN SHI 
+
+3.3. Linear convergence on strongly convex functions. Take a closer look at the high-resolution ODE (3.3), we observe that if the objective function is strongly convex, then the eigenvalues of the Hessian has a uniform lower bound: 
+
+|λ(∇2f (x)) | ≥ μ. 
+
+Consequently, the friction does not diminish as time t → ∞ . If the step size satisfies √sμ ≪ √μ, it is highly probable that linear convergence can be derived. Based on the intuition from the high-resolution ODE (3.3), a iteration-varying Lyapunov function is constructed in [ 20 ] as (3.15) E(k) = s(k + r)(2 k + r)
+
+1 − μs (f (xk) − f (x⋆)) + s(k − 1) 2
+
+2 ‖vk‖2 + 1
+
+2
+
+∥∥√s(k − 1) vk + r(xk − x⋆)∥∥2 ,
+
+which establishes the linear convergence rate for NAG (3.2). Moreover, for the composite function Φ = f + g (where f ∈ F 1 
+
+> L
+
+and g ∈ F 0), the following proximal inequality is established in [ 20 ]: (3.16) ‖Gs(y)‖2 ≥ 2μ (Φ( y − sG s(y)) − Φ( x⋆)) .
+
+Thus, the linear convergence for FISTA is established in [ 20 ], resolving the open problem posed in [ 8]. The rigorous statement is provided below. 
+
+Theorem 3.2 (Theorem 4.4 in [ 20 ]) . Let Φ = f + g be a composite function, where f ∈ F 1 
+
+> L
+
+and g ∈ F 0. For any step size 0 < s < 1/L ,there exists some positive integer K := K(L, μ, s, r ) such that the iterative sequence {(xk, y k)}∞ 
+
+> k=0
+
+generated by FISTA with any initial x0 = y0 ∈ R
+
+satisfies the following inequalities as (3.17) 
+
+
+
+Φ( xk) − Φ( x⋆) ≤ E(K)
+
+s(k + r)(2 k + r) [1 + (1 − Ls ) · μs 
+
+> 4
+
+]k−K
+
+‖Gs(yk)‖ ≤ 4E(K)
+
+s2(1 − Ls )( k + r)(2 k + r) [1 + (1 − Ls ) · μs 
+
+> 4
+
+]k−K
+
+for any k ≥ K.
+
+3.4. Monotonicity. A monotonic variant of NAG , referred to as M-NAG ,was proposed in [ 3] and is defined by the following iteration scheme: 
+
+zk = yk − s∇f (yk),(3.18a) 
+
+xk+1 =
+
+{zk, if f (zk) ≤ f (xk),xk, if f (zk) > f (xk),
+
+(3.18b) 
+
+yk+1 = xk+1 + k
+
+k + r + 1 (xk+1 − xk) + k + r
+
+k + r + 1 (zk − xk+1 ).(3.18c) MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 13 
+
+In the final part of this section, we review the theoretical insights estab-lished in [ 13 ] based on the high-resolution ODE framework. By substitut-ing (3.18a) into (3.18c), we can express the relationship between the iterative sequences M-NAG , {xk}∞ 
+
+> k=0
+
+and {yk}∞ 
+
+> k=0
+
+as follows: (3.19) yk+1 = xk+1 + k
+
+k + r + 1 (xk+1 −xk)+ k + r
+
+k + r + 1 (yk −s∇f (yk)−xk+1 ),
+
+which shows that M-NAG executes a single update that couples information from both sequences {xk}∞ 
+
+> k=0
+
+and {yk}∞
+
+> k=0
+
+. Crucially, this formulation shows how updating {yk}∞ 
+
+> k=0
+
+guarantees that the objective values {f (xk)}∞ 
+
+> k=0
+
+form a monotonically non-increasing sequence. Furthermore, this relation (3.19) reveals that M-NAG is essentially a linear combination of the momentum step (3.2b) and the gradient step (3.2a), as depicted in Figure 5. In this manner, M-NAG retains only part information from the full update NAG (3.2), effectively isolating and recombining its key components.                                                
+
+> Momentum Update (3.2b)
+> yk+1 =xk+1 +k
+> k+r+ 1 (xk+1 −xk)
+> Gradient Update (3.2a)
+> xk+1 =yk−s∇f(yk)
+> M-NAG (3.19)
+> yk+1 =xk+1 +k
+> k+r+1 (xk+1 −xk) + k+r
+> k+r+1 (yk−s∇f(yk)−xk+1 )
+> NAG (3.2) k+r
+> k+r+ 1
+> k+r
+> k+r+ 1
+> k+r
+> k+r+ 1
+
++
+
+×=
+
+Figure 5. Illustration of how M-NAG consolidates the mo-mentum and gradient steps of classical NAG into a unified update rule. Each solid arrow A → B indicates that B is a component or derived step of A.Under this formulation, the classical NAG iteration can be rewritten as: 
+
+xk+1 − xk = √sv k+1 ,(3.20a) 
+
+vk+1 − vk = − r + 1 
+
+k + r vk − √s∇f (yk) ,(3.20b) 14 BIN SHI 
+
+where the auxiliary sequence {yk}∞ 
+
+> k=0
+
+satisfies the phase-coupling relation: (3.21) yk = xk + k − 1
+
+k + r · √sv k.
+
+Following [ 9], we introduce the mixed sequence Rk = ( k − 1) √sv k + rx k.Combining (3.20a) with (3.20b) yields the update rule: (3.22) Rk+1 − Rk = − (k + r) s∇f (yk).
+
+The implicit-velocity phase-space formulation clarifies the precise connection between M-NAG and NAG . As illustrated in Figure 6, a bidirectional equiva-lence exists among the velocity update (3.20b), the mixed-sequence itera-tion (3.22), and the M-NAG scheme (3.19). Specifically: 
+
+• Given the position update (3.20a), the velocity update (3.20b) is equivalent to the mixed-sequence iteration (3.22). 
+
+• Given the phase-coupling relation (3.21), the mixed-sequence iter-ation (3.22) is equivalent to the M-NAG update rule (3.19). Since the velocity sequence {vk}∞ 
+
+> k=0
+
+is defined directly via {xk}∞ 
+
+> k=0
+
+and 
+
+{yk}∞
+
+> k=0
+
+, each of the two conditions, (3.20a) and (3.21), can be imposed inde-pendently without external assumptions. Crucially, however, enforcing both conditions simultaneously does not inherently follow from M-NAG . Therefore, while M-NAG update (3.19) can recover the full NAG iteration, it requires an additional external assumption: either the position update (3.20a) or the phase-coupling relation (3.21). This highlights that M-NAG only partially encodes the full structure of NAG derived from the implicit-velocity formu-lation. As shown above, the mixed-sequece iteration is logically equivalent to the M-NAG update rule. By substituting the phase-coupling relation (3.21) to the definition of Sk, we eliminate the velocity term vk, yielding: 
+
+Sk = ( k − 1) √sv k + rx k − (k + r) s∇f (yk)= ( k + r)yk − kx k − (k + r)s∇f (yk).(3.23) Using this expression, the new iterative difference can be reformulated as: (3.24) (k + r + 1) yk+1 − (k + 1) xk+1 − (k + r + 1) ∇f (yk+1 )= ( k + r)yk − kx k − (k + r)s∇f (yk) − (k + r + 1) ∇f (yk+1 ),
+
+which is exactly equivalent to the M-NAG scheme (3.19). Consequently, the reformulated iteration (3.24) is adopted as the foundation for constructing the Lyapunov function in [ 13 ]. Together with the earlier formulation (3.22), the result demonstrate that the construction of a Lyapunov function funda-mentally depends only on the M-NAG formulation, without requiring the full update structure of classical NAG . Furthermore, according to the proximal MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 15                                                    
+
+> NAG (3.2)
+> Implicit-Velocity Phase-Space Representation
+> (3.20) and (3.21)
+> Position Update (3.20a)
+> xk+1 −xk=√sv k+1
+> Phase-Coupling Relation (3.21)
+> yk=xk+k−1
+> k+r· √sv k
+> Velocity Update (3.20b)
+> vk+1 −vk=−r+ 1
+> k+r vk− √s∇f(yk)
+> Iteration of Mixed-Sequence Rk(3.22)
+> Rk+1 −Rk=−(k+r)s∇f(yk)
+> M-NAG (3.19)
+> yk+1 =xk+1 +k
+> k+r+1 (xk+1 −xk) + k+r
+> k+r+1 (yk−s∇f(yk)−xk+1 )
+> Under Condition
+> Under Condition
+
+Figure 6. Illustration of how M-NAG recovers the NAG update though the implicit-velocity phase-representation. Each solid arrow A → B indicates that B is a component or derived step of A, while each dashed arrow represents a conditional relation required to establish the connection. inequality (3.16), the smooth results can be generalized to the composite optimization via the following Lyapunov function 
+
+E(k) = s(k + 1)( k + r + 1) (Φ( xk+1 ) − Φ( x⋆)) + 1
+
+2
+
+∥∥(k − 1) √sv k + r(xk − x⋆) − s(k + r)Gs(yk)∥∥2 ,(3.25) which establishes the linear convergence rate. The rigorous statement is presented as follows. 
+
+Theorem 3.3 (Theorem 4.2 in [ 13 ]) . Let Φ = f +g, where f ∈ S 1
+
+μ,L (Rd)and g ∈ F 0(Rd). Given that any step size satisfies 0 < s < 1/L , there exists a positive integer K := max 
+
+{
+
+0, 3r2−4r−12 
+
+8
+
+}
+
+such that the iterative sequence 
+
+{xk}∞
+
+k=0 generated by M-FISTA , with any initial x0 = y0 ∈ Rd, satisfies the 16 BIN SHI 
+
+following inequality: (3.26) Φ( xk) − Φ( x⋆) ≤ (r + 1) (Φ( x1) − Φ( x⋆)) + r2L‖x1 − x⋆‖2
+
+k(k + r) [1 + (1 − Ls ) · μs 
+
+> 4
+
+]k ,
+
+for any k ≥ max {1, K }.Moreover, the results regarding the critical step size s = 1 /L within the high-resolution ODE framework are established in [ 14 ], which also suggests a potentially faster convergence rate in this direction. 
+
+4. ADMM and PDHG 
+
+In this section, we review recent advances in high-resolution ODE frame-works designed for analyzing advanced gradient-based algorithms, with a focus on ADMM and PDHG . In modern applications such as total-variation de-noising and ℓ1 trend filtering, the generalized least absolute shrinkage and selection operator ( Lasso ) is frequently formulated as: min 
+
+> x∈Rd
+
+Φ( x) := ‖Ax − b‖2 + λ‖F x ‖1,
+
+where the standard gradient-based or proximal gradient algorithms cannot directly solve this problem. Because the linear operator F is nested inside the non-smooth regularization term, an efficient computation of its proximal operator is prevented. More generally, this problem can be framed in the following composite optimization form: (4.1) min  
+
+> x∈Rd
+
+Φ( x) := f (x) + g(F x ),
+
+where f is smooth and convex, and g is a proper, convex, and lower semi-continuous function. 
+
+4.1. ADMM and its mechanism. To decouple the linear operator from the non-smooth term, we can express (4.1) in the general two-block constrained form: (4.2) min f (x) + g(y) s.t. F x + Gy = h
+
+where x ∈ Rd1 and y ∈ Rd2 are primal variables, F ∈ Rm×d1 and G ∈ Rm×d2
+
+are two matrices, and h ∈ Rm is a m-dimensional vector. The ADMM iterations are derived from the augmented Lagrangian: (4.3) Ls(x, y ; λ) = f (x) + g(y) + 〈λ, F x + Gy − h〉 + 1
+
+2s ‖F x + Gy − h‖2 ,
+
+where λ ∈ Rm is the dual multiplier and s > 0 is a penalty parameter. The algorithm proceeds by sequentially updating x, y, and the dual multiplier λ
+
+according to the following steps: MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 17 
+
+xk+1 = arg min 
+
+> x∈Rd1
+
+{
+
+f (x) + 1
+
+2s ‖F x + Gy k − h + sλ k‖2
+
+}
+
+,(4.4a) 
+
+yk+1 = arg min 
+
+> y∈Rd2
+
+{
+
+g(y) + 1
+
+2s ‖F x k+1 + Gy − h + sλ k‖2
+
+}
+
+,(4.4b) 
+
+λk+1 = λk + 1
+
+s (F x k+1 + Gy k+1 − h).(4.4c) As established in [ 18 ], the high-resolution ODE system modeling ADMM 
+
+is given by 
+
+F ⊤G ˙Y = F ⊤Λ + ∇f (X),(4.5a) 0 = G⊤Λ + ∇g(Y ),(4.5b) 
+
+s2 ˙Λ = F X + GY − h. (4.5c) Compared to the previous low-resolution ODE model, the primary advance-ment lies in (4.5c), which explicitly captures the λ-correction effect, a distinc-tive feature of ADMM . The small but essential perturbation causes the variable pair ( X, Y ) to deviate from the constraint hyperplane F x + Gy = h. This underlying dynamical phenomenon is visualized in Figure 7.       
+
+> F x +Gy −h= 0
+> (x0, y ′
+> 0)
+> (x0, y 0)
+> (x⋆, y ⋆)
+
+Figure 7. Schematic comparison of the discrete ADMM tra-jectory (black), the continuous limit ODE (blue), and the high-resolution ODE system (red). Unlike the low-resolution ODE, which requires the initialization y′ 
+
+> 0
+
+to satisfy F x 0 +
+
+Gy ′ 
+
+> 0
+
+= h, the high-resolution model captures the trajectory for any arbitrary initial ( x0, y 0), mirroring the discrete algo-rithm’s flexibility. 18 BIN SHI 
+
+The continuous dynamical model was established, which enables the transition to a discrete Lyapunov function: (4.6) E(k) = 1
+
+2s ‖G(yk − y⋆)‖2 + s
+
+2 ‖λk − λ⋆‖2,
+
+which leads to the convergence rate for both the primal-dual gap and the numerical error induced by implicit discretization. Furthermore, by defining the numerical error itself as a Lyapunov function: (4.7) N E (k) = 1
+
+2s ‖G(yk+1 − yk)‖2 + s
+
+2 ‖λk+1 − λk‖2
+
+which determines the numerical error is monotonically non-increasing. The rigorous statement is established in [ 18 ], and is presented below. 
+
+Theorem 4.1 (Theorem 5.1 and Theorem 5.3 in [ 18 ]) . Let f ∈ F 0(Rd)and g ∈ F 0(Rd). For any step size s > 0, the ergodic sequence {(xN , yN ; λN )}∞ 
+
+> N=0
+
+generated by the ADMM iterations (4.4a) — (4.4c) converges to the saddle point ( x⋆, y ⋆; λ⋆) with the following rate: (4.8) L(xN , yN ; λ⋆) − L (x⋆, y ⋆; λN ) ≤ ‖G(y0 − y⋆)‖2 + s2 ‖λ0 − λ⋆‖2
+
+2s(N + 1) .
+
+Moreover, for any initial ( x0, y 0; λ0) ∈ Rd1 ×Rd2 ×Rm, the iterative sequence 
+
+{(xk, y k; λk)}∞ 
+
+> k=0
+
+satisfies the following rate for the last iterate: 
+
+‖G(yN +1 − yN )‖2 + s2 ‖λN +1 − λN ‖2
+
+≤ ‖G(y0 − y⋆)‖2 + s2 ‖λ0 − λ⋆‖2
+
+N + 1 .(4.9) 
+
+4.2. PDHG and its variants. By utilizing the Legendre-Fenchel trans-form, the composite optimization problem (4.1) can also be transformed into a minimax problem as: (4.10) min 
+
+> y∈Rd2
+
+max 
+
+> x∈Rd1
+
+Φ( x, y ) = min 
+
+> x∈Rd1
+
+max 
+
+> y∈Rd2
+
+Φ( x, y ) := f (x) + 〈F x, y 〉 − g⋆(y),
+
+which was original proposed in [ 2], alongside a saddle-point solving method known as the Arrow–Hurwicz algorithm: 
+
+xk+1 = arg min 
+
+> x∈Rd1
+
+{
+
+f (x) + 〈F x, y k
+
+〉 + 1
+
+2s ‖x − xk‖2
+
+}
+
+,(4.11a) 
+
+yk+1 = arg max 
+
+> y∈Rd2
+
+{
+
+−g⋆(y) + 〈F x k+1 , y 〉 − 1
+
+2s ‖y − yk‖2
+
+}
+
+.(4.11b) However, the Arrow-Hurwicz algorithm (4.11) suffers from a major draw-back: it is not guaranteed to converge generally. This lack of convergence is il-lustrated in Figure 8. To guarantee the convergence for the problem (4.1), PDHG MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 19     
+
+> -1 0123
+> -1 0123
+
+Figure 8. A counterexample demonstrating the non-convergence of the Arrow-Hurwicz algorithm. For a bilinear saddle-point objective Φ( x, y ) = x − xy + y and the initial point (0 , 1), the algorithm’s iterates fail to converge to the unique saddle point (1 , 1). is proposed in [ 7], which introduces an extrapolated momentum step as: (4.12a) (4.12b) (4.12c) 
+
+
+
+xk+1 = arg min 
+
+> x∈Rd1
+
+{
+
+f (x) + 〈F x, y k
+
+〉 + 1
+
+2s ‖x − xk‖2
+
+}
+
+,
+
+xk+1 = xk+1 + ( xk+1 − xk),yk+1 = arg max 
+
+> y∈Rd2
+
+{
+
+−g⋆(y) + 〈F xk+1 , y 〉 − 1
+
+2s ‖y − yk‖2
+
+}
+
+.
+
+In [ 19 ], the high-resolution ODE system for PDHG (4.12) is derived as ˙X − sF ⊤ ˙Y = −F T Y − ∇ f (X),(4.13a) ˙Y − sF ˙X = F X − ∇ g⋆(Y ),(4.13b) where the two terms, sF ⊤ ˙Y and F ˙X, referred to as the combined x-correction and y-correction, distinguish this system from the one for the Arrow-Hurwicz algorithm (4.11). In the Arrow-Hurwicz algorithm, these two correction terms vanish. As a result, the system degenerates into a Hamiltonian system for the counterexample shown in Figure 8. This guarantees energy conser-vation, which prevents convergence. Consequently, the high-resolution ODE system (4.13) successfully explains why the Arrow-Hurwicz algorithm fails to converge in certain scenarios, whereas the PDHG algorithm converges. Similar to the analysis for ADMM, the continuous model enables the construction 20 BIN SHI 
+
+of a discrete Lyapunov function: (4.14) E(k) = 1
+
+2s ‖xk − x⋆‖2 + 1
+
+2s ‖yk − y⋆‖2 − 〈F (xk − x⋆), y k − y⋆〉.
+
+Furthermore, the numerical error induced by implicit discretization can also be interpreted as a secondary Lyapunov function: 
+
+N E (k) = 1
+
+2s ‖xk+1 − xk‖2 + 1
+
+2s ‖yk+1 − yk‖2
+
+− 〈F (xk+1 − xk), y k+1 − yk
+
+〉.(4.15) Together, the two Lyapunov functions, (4.14) and (4.15), establish the con-vergence results for PDHG analogous to those shown in Theorem 4.1. An accelerated variant of PDHG is also proposed in [ 7]. By utilizing the iteration-varying parameters τk, σ k > 0 satisfying the coupling condition 
+
+τk+1 σk = s2, alongside the extrapolation factor θk = τk+1 /τ k ∈ (0 , 1), the resulting iteration scheme is given by: 
+
+xk+1 = arg min 
+
+> x∈Rd1
+
+{
+
+f (x) + 〈F x, y k
+
+〉 + 1
+
+2τk
+
+‖x − xk‖2
+
+}
+
+,(4.16a) 
+
+xk+1 = xk+1 + θk(xk+1 − xk),(4.16b) 
+
+yk+1 = arg max 
+
+> y∈Rd2
+
+{
+
+−g∗(y) + 〈F xk+1 , y 〉 − 1
+
+2σk
+
+‖y − yk‖2
+
+}
+
+,(4.16c) which achieves an accelerated convergence rate of: (4.17) ‖xk − x⋆‖2 ≤ O
+
+( 1
+
+k2
+
+)
+
+.
+
+In [ 32 ], we design a novel discrete Lyapunov function as 
+
+E(k) = ‖xk − x⋆‖2
+
+2τ 2
+
+> k
+
++ ‖yk−1 − y⋆‖2
+
+2s2
+
++ 〈F (xk − xk−1), y k−1 − y⋆〉
+
+τk−1
+
++ ‖xk − xk−1‖2
+
+2τ 2
+
+> k−1
+
+,(4.18) which yields a concise and elegant proof establishing the convergence rate in (4.17). 
+
+5. Conclusion and future directions 
+
+In this review, we have provided a comprehensive survey of recent de-velopments in gradient-based optimization, with a particular focus on the application of high-resolution ODE frameworks and newly developed dis-crete Lyapunov functions. Our analysis has encompassed several key areas: the acceleration mechanism of NAG-SC ; the core dynamics of NAG and its proximal generalization, FISTA , including their practical utility in gradient norm acceleration for image deblurring; the establishment of new results regarding the linear convergence of these methods for strongly convex func-tions; and the systematic design of novel Lyapunov functions to extend these MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 21 
+
+analytical frameworks to their monotonic counterparts. Beyond these basic methods, we have demonstrated the utility of high-resolution ODE modeling and Lyapunov analysis in uncovering and explaining the convergence mech-anisms of advanced gradient-based algorithms, such as ADMM , PDHG , and its accelerated variants. While the ODE framework is well-established for minimization prob-lems, its extension to the minimax setting remains incomplete. Such an extension would be highly valuable for a broad range of applications, in-cluding constrained convex optimization, which is often formulated as large-scale saddle-point problems [ 5], inverse problems and variational data as-similation [ 17 ], and classical control challenges such as the linear quadratic regulator (LQR) problem [ 1]. At present, these problems are often solved us-ing the preconditioned generalized minimal residual (GMRES) method [ 4]. However, GMRES suffers from increasing memory and computational costs as the number of iterations grows, and its practical performance depends critically on the availability of high-quality preconditioners that effectively exploit the structure of the underlying problem. From an optimization per-spective, these challenges are often addressed via the augmented Lagrangian method; yet, its slow convergence necessitates the development of acceler-ation techniques. Recently, it is demonstrated in [ 23 ] that incorporating a proximal operator into the augmented Lagrangian can be interpreted as an implicit gradient descent-ascent ( GDA ) scheme, which naturally facilitates variable step-size extensions. Furthermore, the Lyapunov techniques specif-ically designed for minimax objective functions in [ 23 ] offer a promising new avenue for the design and analysis of efficient algorithms for large-scale saddle-point problems, particularly in nonsmooth settings. 
+
+References          
+
+> [1] Brian D. Anderson and John B Moore. Optimal control: linear quadratic methods .Courier Corporation, Mineola, NY, 2007. [2] Kenneth J. Arrow, Leonid Hurwicz, and Hirofumi Uzawa. Studies in Linear and Non-Linear Programming . Stanford Mathematical Studies in the Social Sciences. Stanford University Press, 1958. [3] Amir Beck and Marc Teboulle. Fast gradient-based algorithms for constrained to-tal variation image denoising and deblurring problems. IEEE transactions on image processing , 18(11):2419–2434, 2009. [4] Michele Benzi and Gene H Golub. A preconditioner for generalized saddle point problems. SIAM Journal on Matrix Analysis and Applications , 26(1):20–41, 2004. [5] Michele Benzi, Gene H Golub, and J¨ org Liesen. Numerical solution of saddle point problems. Acta numerica , 14:1–137, 2005. [6] Augustin-Louis Cauchy. M´ ethode g´ en´ erale pour la r´ esolution des syst` emes d’´ equations simultan´ ees. Comptes Rendus de l’Acad´ emie des Sciences , 25:536–538, 1847. [7] A. Chambolle and T. Pock. A first-order primal-dual algorithm for convex problems with applications to imaging. Journal of Mathematical Imaging and Vision , 40:120– 145, 2011. [8] Antonin Chambolle and Thomas Pock. An introduction to continuous optimization for imaging. Acta Numerica , 25:161–319, 2016. 22 BIN SHI
+
+[9] Shuo Chen, Bin Shi, and Ya-xiang Yuan. Gradient norm minimization of Nesterov acceleration: o(1 /k 3 ). arXiv preprint arXiv:2209.08862 , 2022. [10] Shuo Chen, Bin Shi, and Ya-xiang Yuan. Revisiting nesterov’s acceleration via high-resolution differential equations. Journal of Global Optimization , 93(2):551–569, 2025. [11] Shuo Chen, Bin Shi, and Ya-xiang Yuan. On underdamped Nesterov’s acceleration. 
+
+Journal of Computational Mathematics , 44(6):1912–1934, 2026. [12] Kang Feng. Collected Works of Feng Kang , volume II. Science Press, Beijing, 1995. Edited by Institute of Computational Mathematics and Scientific/Engineering Com-puting, Academy of Mathematics and Systems Science, Chinese Academy of Sciences; Proofread by Liqun, Cao and Yifa, Tang. [13] Mingwei Fu and Bin Shi. Lyapunov analysis for monotonically forward-backward accelerated algorithms. arXiv preprint arXiv:2412.13527 , 2024. [14] Mingwei Fu and Bin Shi. A family of controllable momentum coefficients for forward-backward accelerated algorithms. arXiv preprint arXiv:2501.10051 , 2025. [15] I. M. Gelfand and M. Tsetlin. Printsip nelokal’nogo poiska v sistemakh avtomatich-eskoy optimizatsii. Doklady Akademii Nauk SSSR , 137:295–298, 1961. [16] M. I. Jordan. Dynamical, symplectic and stochastic perspectives on gradient-based optimization. In Proceedings of the International Congress of Mathematicians: Rio de Janeiro 2018 , pages 523–549, Singapore, 2018. World Scientific. [17] Fran¸ cois-Xavier Le Dimet and Olivier Talagrand. Variational algorithms for anal-ysis and assimilation of meteorological observations: theoretical aspects. Tellus A: Dynamic Meteorology and Oceanography , 38(2):97–110, 1986. [18] Bowen Li and Bin Shi. Understanding the ADMM algorithm via high-resolution dif-ferential equations. Applied Mathematics and Optimization , 2024. to appear. [19] Bowen Li and Bin Shi. Understanding the PDHG algorithm via high-resolution dif-ferential equations. arXiv preprint arXiv:2403.11139 , 2024. [20] Bowen Li, Bin Shi, and Ya-xiang Yuan. Linear convergence of forward-backward accelerated algorithms without knowledge of the modulus of strong convexity. SIAM Journal on Optimization , 34(2):2150–2168, 2024. [21] Bowen Li, Bin Shi, and Ya-xiang Yuan. Linear convergence of ISTA and FISTA. 
+
+Journal of the Operations Research Society of China , 14:345–363, 2024. [22] Bowen Li, Bin Shi, and Ya-xiang Yuan. Proximal subgradient norm minimization of ISTA and FISTA. Applied and Computational Harmonic Analysis , 82:101848, 2026. [23] Jiaqi Liu and Bin Shi. Accelerated implicit gda schemes: Theoretical guaran-tees and application to proximal augmented lagrangian methods. arXiv preprint arXiv:2606.11800 , 2026. [24] A. S. Nemirovsky and D. B. Yudin. Problem Complexity and Method Efficiency in Optimization . Wiley-Interscience Series in Discrete Mathematics. Wiley-Interscience, New York, 1983. [25] Yurii Nesterov. A method of solving a convex programming problem with convergence rate O(1 /k 2 ). Soviet Mathematics-Doklady , 27(2):372–376, 1983. [26] Yurii Nesterov. Lectures on Convex Optimization . Springer Optimization and Its Ap-plications. Springer Cham, 2 edition, 2018. [27] Joseph Pedlosky. Geophysical fluid dynamics . Springer Science & Business Media, 2013. [28] Boris T Polyak. Some methods of speeding up the convergence of iteration methods. 
+
+Ussr computational mathematics and mathematical physics , 4(5):1–17, 1964. [29] Bin Shi, Simon S. Du, Weijie Su, and Michael I. Jordan. Understanding the acceler-ation phenomenon via high-resolution differential equations. Mathematical Program-ming , 195:79–148, 2022. [30] Weijie Su, Stephen Boyd, and Emmanuel J Candes. A differential equation for model-ing nesterov’s accelerated gradient method: Theory and insights. Journal of Machine Learning Research , 17(153):1–43, 2016. MODERN THEORY OF GRADIENT-BASED OPTIMIZATION 23 
+
+[31] Ilya Sutskever, James Martens, George Dahl, and Geoffrey Hinton. On the impor-tance of initialization and momentum in deep learning. In International conference on machine learning , pages 1139–1147. pmlr, 2013. [32] Xueying Zeng and Bin Shi. A lyapunov analysis of accelerated pdhg algorithms. 
+
+Journal of Optimization Theory and Applications , 207(3):67, 2025. 
+
+Center for Mathematics and Interdisciplinary Sciences, Fudan Univer-sity, Shanghai 200433, China Shanghai Institute for Mathematics and Interdisciplinary Sciences, Shang-hai 200433, China 
+
+Email address : binshi@fudan.edu.cn

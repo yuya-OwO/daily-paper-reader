@@ -1,0 +1,884 @@
+Title: Reachability Guarantees for Cart-Pole Swing-Up and Stabilization
+
+URL Source: https://arxiv.org/pdf/2606.28627v1
+
+Published Time: Tue, 30 Jun 2026 00:20:09 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Reachability Guarantees for Cart-Pole Swing-Up and Stabilization 
+
+Mohamed Khalid M Jaffar 
+
+Department of Aerospace Engineering University of Maryland, College Park, USA Email: khalid26@umd.edu 
+
+Abstract —The cart-pole swing-up is a canonical benchmark for nonlinear control of underactuated systems, yet an end-to-end guarantee linking the global swing-up maneuver to the local stabilizer is seldom formalized. We present a reachability analysis of a switched energy-based/LQR controller that certifies convergence to the upright equilibrium from a compact set of initial conditions. The swing-up law is derived from an energy-error Lyapunov function; canceling the autonomous conservative term yields a strictly sign-definite Lyapunov derivative, and convergence follows from LaSalle’s invariance principle. We also propose an augmented Lyapunov function to regulate the steady-state cart velocity to zero, for which we establish almost-global convergence. For the controller handoff, a switching region is designed to lie strictly within the LQR region of attraction, formally certifying the swing-up-to-stabilization transition. Nu-merical simulations corroborate the theoretical analysis. 
+
+Index Terms —Cart-pole, energy-based swing-up, reachability analysis, Lyapunov theory, LaSalle invariance, region of attrac-tion, LQR, underactuated systems. 
+
+I. I NTRODUCTION 
+
+The cart-pole, or pendulum on a cart, is a classical bench-mark for nonlinear control and planning of underactuated mechanical systems [ 1], [ 2]. It serves as a representative model for many practical systems, such as an overhead crane transporting a load, the pitch dynamics of a rocket with gimballed thrust, fuel slosh in a moving tank, and the balance models used to study bipedal locomotion [ 3]. Its swing-up task: driving the pendulum from the stable hanging equilibrium to the unstable upright equilibrium while keeping the cart near the origin, requires traversal through a highly nonlinear region of the state space, making it a compelling testbed for formal verification. Energy-shaping controllers are the dominant paradigm for swing-up of underactuated pendulums. ˚ Astr¨ om and Furuta [ 2]pump energy toward the upright homoclinic level set, whereas Chung and Hauser [ 4] regulate the swing energy as an output. Spong’s partial feedback linearization of an acrobot [ 5] and a pendubot [ 6] extends the energy-based idea to two-link robots; Lozano et al. [ 7] stabilize the pendulum directly about its homoclinic orbit. A common challenge is ensuring internal stability — the energy law governs the pendulum subspace but leaves the cart (or passive joint) position unconstrained. Our    
+
+> *This work was not supported by any organization. The simulation scripts are available at github.com/khalid2696/cartpole swing analysis .
+
+work addresses this gap by proposing an augmented Lyapunov function-based control law that regulates the cart to rest, and presenting a closed-form cart-position bound. A parallel line of work certifies stability regions for con-trollers of locally-linearized systems: Lyapunov sublevel sets computed via sum-of-squares programming [ 8], [ 9] and the LQR-trees framework [ 10 ]. These methods certify regions around equilibria or trajectories but typically assume the state is already delivered into the certified set. This paper supplies that missing link for the swing-up task in a cart-pole, certifying that the energy-based controller deposits the state inside the LQR region of attraction, so that the global maneuver and the local certificate compose into a single end-to-end guarantee. This paper makes three contributions. (i) We derive an energy-based swing-up law whose feedforward cancellation of the autonomous conservative term gives a strictly sign-definite Lyapunov derivative, unlike classical energy-pumping laws where this term is left to vanish asymptotically. (ii) We augment the Lyapunov function to also regulate the cart velocity, yielding an almost-global convergence guarantee with a measure-zero exception set. (iii) We formalize the control switching condition by defining a handoff region contained strictly within the certified region of attraction of the LQR stabilizer, yielding an end-to-end reachability guarantee from a compact set of initial conditions to the upright equilibrium. To our knowledge, this is among the first works to certify the swing-up-to-stabilization transition in a cart-pole system holistically. II. S YSTEM DESCRIPTION AND EQUATIONS OF MOTION 
+
+The system comprises a cart of mass M on a frictionless horizontal track and a uniform pendulum of mass m and length 
+
+ℓ pivoting from the cart. The generalized coordinates are the cart position x and the pendulum angle θ, measured from the 
+
+downward vertical ( θ = 0 is the hanging equilibrium, θ = π is the upright equilibrium). The control input u is the horizontal force F . The state vector is x = [ x, ˙x, θ, ˙θ]⊤. Introducing shorthand, 
+
+sθ , sin θ, c θ , cos θ, and D , M + ms 2
+
+> θ
+
+, (1) 
+
+> arXiv:2606.28627v1 [eess.SY] 26 Jun 2026
+
+Euler–Lagrange equations of cart-pole system dynamics are,                    
+
+> ˙x=f(x,u),
+> 
+> ˙xF+mℓ ˙θ2sθ+mgs θcθ
+> D˙θ
+> −F c θ−mℓ ˙θ2sθcθ−(M+m)gs θ
+> ℓD
+> 
+> .(2)
+
+The system has two equilibria of interest: the downward equilibrium x↓ = [0 , 0, 0, 0] ⊤ (open-loop stable) and the upright equilibrium x∗ = [0 , 0, π, 0] ⊤ (open-loop unstable). III. E NERGY -B ASED SWING -U P AND LQR S TABILIZATION 
+
+The control objective is a swing-up and stabilization task: starting from the open-loop stable downward equilibrium, bring the pendulum to the unstable upright equilibrium and hold it there, while keeping the cart near the origin. Because the upright equilibrium is unstable and the system is under-actuated (one actuated degree of freedom, two mechanical degrees of freedom), no single linear controller can achieve this globally. The approach decomposes the task into two phases connected by a switching rule: 1) Swing-up phase. An energy-shaping controller, derived from a Lyapunov function based on the total mechanical energy of the pendulum, pumps energy into the system until the pendulum approaches the upright equilibrium. 2) Stabilization phase. Once the state enters a certified neighborhood of the upright equilibrium, switch to an LQR controller that locally stabilizes the nonlinear sys-tem. The two phases are connected through a region of attraction (RoA) argument: the ellipsoidal sublevel set of the LQR Lyapunov function is certified as a forward-invariant subset of the nonlinear RoA, and the switching surface is designed to lie strictly inside this ellipsoid. 
+
+A. Energy-Based Swing-Up Controller a) Pendulum mechanical energy: The total mechanical energy of the pendulum, with pendulum pivot as reference, is 
+
+E(θ, ˙θ) = 1 
+
+> 2
+
+mℓ 2 ˙θ2 − mgℓ cos θ. (3) At the upright equilibrium E∗ = mgℓ . Define the energy error 
+
+˜E as: 
+
+˜E(θ, ˙θ) , E − E∗ = 1 
+
+> 2
+
+mℓ 2 ˙θ2 − mgℓ (1 + cos θ). (4) The swing-up objective is to drive ˜E → 0.
+
+b) Lyapunov function candidate: Following the energy-shaping approach of [ 2], [ 3], [ 5], propose 
+
+V (θ, ˙θ) = 1 
+
+> 2
+
+˜E2. (5) 
+
+V is positive semi-definite, equals zero on { ˜E = 0 }, and is radially unbounded in the energy error. 
+
+c) Time derivative of V along trajectories: Differentiat-ing ( 5) along solutions of ( 2): 
+
+˙V = ˜E ˙E. (6) Differentiating ( 3) and substituting ¨θ from ( 2):                 
+
+> ˙E=mℓ ˙θ· −F c θ−mℓ ˙θ2sθcθ−(M+m)gs θ
+> D+mgℓs θ˙θ. (7)
+
+Collecting the gravity terms and using D− (M + m) = ms 2 
+
+> θ
+
+−
+
+m = −mc 2
+
+> θ
+
+:
+
+mℓ ˙θ
+
+D
+
+[−(M + m)gs θ
+
+] + mgℓs θ ˙θ = −m2ℓ ˙θgs θc2
+
+> θ
+
+D . (8) Substituting ( 8) back into ( 7): 
+
+˙E = −mℓ ˙θc θ
+
+D F − m2ℓ ˙θs θcθ (ℓ ˙θ2 + gc θ )
+
+D . (9) The first term is the power delivered to the pendulum by F ;the second is the autonomous conservative exchange internal to the pendulum subsystem, denoted Φ. Hence 
+
+˙V = ˜E
+
+[
+
+−mℓ ˙θc θ
+
+D F + Φ 
+
+]
+
+= ˜E · −mℓ ˙θc θ
+
+D
+
+[
+
+F + ms θ (ℓ ˙θ2 + gc θ)
+
+]
+
+.
+
+(10) 
+
+d) Control law synthesis: To render ˙V ≤ 0, cancel the autonomous term Φ via feedforward and inject a negative definite contribution. Choosing the term in bracket as, 
+
+F + ms θ(ℓ ˙θ2 + gc θ) = k ˜E ˙θc θ, (11) and solving for F :
+
+F = k ˜E ˙θ c θ − ms θ (ℓ ˙θ2 + gc θ ), k > 0. (12) The first term shapes the energy; the second cancels the autonomous term, ensuring no cross-term appears in ˙V . Sub-stituting ( 12 ) into ( 10 ) and noting that D > 0:
+
+˙V = − mℓk ˜E2 ˙θ2c2
+
+> θ
+
+D ≤ 0. (13) Hence ˙V ≤ 0 everywhere. 
+
+Remark 1. The feedforward term −ms θ(ℓ ˙θ2 + gc θ) in ( 12 )is absent from the standard energy-pumping law of [ 2], [ 5], where the autonomous term Φ is left in ˙V and argued to vanish asymptotically. Including it gives a cleaner ˙V expression ( 13 ), removes any residual coupling between the pendulum and cart dynamics in the Lyapunov analysis, and improves closed-loop performance in simulation. 
+
+e) Convergence via LaSalle’s invariance principle: Since 
+
+V ≥ 0 and ˙V ≤ 0, every sublevel set {V ≤ c} is positively invariant. Because ˙V is only negative semi-definite, LaSalle’s invariance principle [ 12 ] is applied. 
+
+Theorem 1 (S WING -UP CONVERGENCE ). Under control law 
+
+(12 ), every bounded trajectory of (2) satisfies (θ(t), ˙θ(t)) →
+
+(π, 0) as t → ∞ .Proof. The set S , {x | ˜E = 0 } is the homoclinic orbit of the unforced pendulum passing through (π, 0) , satisfying 
+
+˙θ2 = 2g
+
+ℓ (1 + cos θ) = 4g
+
+ℓ cos 2 θ 
+
+> 2
+
+. (14) 
+
+S is also such that x ∈ S =⇒ ˙V (x) = 0 , from ( 13 ). When 
+
+˜E = 0 the first term of ( 12 ) vanishes, so F = −ms θ(ℓ ˙θ2 +
+
+gc θ), which is the exact feedforward that makes ¨x = 0 on S
+
+(verified by substituting into ( 2)). Thus on S the pendulum evolves under its own conservative dynamics. Any point with 
+
+˙θ 6 = 0 immediately leaves S since θ is changing while ( 14 ) is only instantaneously satisfied. The only point with ˙θ ≡ 0 on S
+
+where ¨θ also vanishes is (π, 0) : at θ = π, ¨θ = ( g/ℓ ) sin π = 0 .Thus {(π, 0) } is the unique positively invariant subset of S,and LaSalle’s principle gives (θ, ˙θ) → (π, 0) .
+
+Remark 2. Theorem 1 guarantees convergence only in the 
+
+(θ, ˙θ) subspace. The cart position and velocity are not governed by V and may drift during swing-up. As ˜E → 0 the energy-shaping term of ( 12 ) vanishes while the feedforward term remains, making ¨x → 0, implying cart velocity converges to a constant value. For any finite horizon [0 , T ∗] the cart states are bounded (see Lemma 2). 
+
+Lemma 2 (C ART DRIFT BOUND ). Starting from |x0| ≤ ¯x0,
+
+| ˙x0| ≤ ¯v0, and initial energy error ˜E0, the cart states at any 
+
+t ∈ [0 , T ∗] satisfy 
+
+| ˙x(t)| ≤ ¯v0 + ¯ a T ∗, (15) 
+
+|x(t)| ≤ ¯x0 + ¯ v0T ∗ + 1 
+
+> 2
+
+¯aT ∗2, (16) 
+
+where 
+
+¯a = Fmax + mℓω 2max + mg 
+
+M , ωmax =
+
+√
+
+2( | ˜E0| + 2 mgℓ )
+
+mℓ 2 , (17) 
+
+and Fmax = k| ˜E0|ωmax .Proof. Since V (t) ≤ V (0) = 1 
+
+> 2
+
+˜E20 , we have | ˜E(t)| ≤ | ˜E0| for all t. Bounding | ˙θ| ≤ ωmax from the kinetic energy inequality  
+
+> 1
+> 2
+
+mℓ 2 ˙θ2 ≤ | ˜E0| + 2 mgℓ , and bounding |F | from ( 12 ), the cart acceleration satisfies |¨x| ≤ ¯a. Integrating once and twice yields ( 15 )–( 16 ). 
+
+Remark 3 (A UGMENTED LYAPUNOV FUNCTION FOR CART VELOCITY REGULATION ). The Lyapunov function ( 5) governs only the pendulum subsystem and leaves the cart velocity ˙x
+
+unconstrained during swing-up. To also drive ˙x → 0, one may instead use the augmented candidate Lyapunov function, 
+
+Vaug = 1 
+
+> 2
+
+˜E2 + μ 
+
+> 2
+
+˙x2, μ > 0, (18) with the corresponding control law 
+
+Faug = k
+
+(
+
+mℓ ˙θ cos θ · ˜E − μ ˙x
+
+)
+
+− m sin θ
+
+(
+
+ℓ ˙θ2 + g cos θ
+
+)
+
+, (19) 
+
+which yields 
+
+˙Vaug = −kσ 2
+
+D ≤ 0, σ = μ ˙x − mℓ ˙θ cos θ · ˜E. (20) The largest invariant set in { ˙Vaug = 0 } is 
+
+M = {(x, 0, π, 0) }
+
+︸ ︷︷ ︸ 
+
+> MA:upright (stable)
+
+∪ {(x, 0, 0, 0) }
+
+︸ ︷︷ ︸  
+
+> MB:downward (unstable)
+
+, (21) so generic trajectories satisfy ( ˙ x, θ, ˙θ) → (0 , π, 0) . Setting 
+
+μ = 0 in ( 19 ) recovers the control law derived in ( 12 ). Full derivation of ˙Vaug , the invariant set characterisation, the instability argument for MB , and the convergence proof are given in Appendix A.The approach to (π, 0) along S is asymptotic, governed by the unstable eigenvalue of the pendulum linearized at θ = π.The state never reaches (π, 0) in finite time under ( 12 ) alone; this motivates switching to LQR once the state is sufficiently close. 
+
+B. LQR Stabilization and Ellipsoidal Region of Attraction a) Linearization at the upright equilibrium: Let φ = θ −
+
+π and z = [ x, ˙x, φ, ˙φ]⊤. For small φ: sθ ≈ − φ, cθ ≈ − 1,
+
+D ≈ M . Linearising ( 2) about z∗ = 0:
+
+˙z = Az + Bu, (22) 
+
+A =
+
+
+
+0 1 0 00 0 mg  
+
+> M
+
+00 0 0 10 0 (M+m)g 
+
+> Mℓ
+
+0
+
+ , B =
+
+
+
+0
+
+> 1
+> M
+
+0
+
+> 1
+> Mℓ
+
+ . (23) The pair (A, B ) is controllable; A has one unstable eigenvalue 
+
+λ = + √(M + m)g/ (M ℓ ).
+
+b) LQR design: Choose Q  0, R > 0. Define the gain 
+
+K = R−1B⊤Plqr , (24) where Plqr ≻ 0 solves the algebraic Riccati equation (ARE) 
+
+A⊤Plqr + Plqr A − Plqr BR −1B⊤Plqr + Q = 0 . (25) Then, 
+
+ulqr = −Kz (26) is a stabilizing feedback control law that drives arbitrarily small z → z∗ = 0.
+
+c) Region of attraction (RoA) for the nonlinear system: 
+
+Consider the LQR Lyapunov function, 
+
+W (z) = z⊤Plqr z, (27) with ˙W |linear = −z⊤ ˜Qz < 0 where ˜Q = Q + K⊤RK ≻ 0.Under u = −Kz (26 ) applied to the system ( 2), write ˙z =(A − BK )z + g(z) where g(z) ∼ O(‖z‖2) consists of the higher-order nonlinear terms. Then 
+
+˙Wnl = −z⊤ ˜Qz + 2 z⊤Plqr g(z). (28) 
+
+Definition 1 (Certified RoA of LQR stabilizing controller ).
+
+Consider ellipsoidal set, 
+
+Ωc = {z ∈ R4 ∣∣ z⊤Plqr z ≤ c}, (29) with 
+
+c∗ = min    
+
+> z:˙Wnl =0 ,z6=0
+
+W (z). (30) For any c ≤ c∗, Ωc is forward-invariant and every trajectory starting in Ωc converges to z = 0, i.e., [x, ˙x, θ, ˙θ]⊤ →
+
+[0 , 0, π, 0] ⊤.
+
+Theorem 3 (LQR LOCAL ASYMPTOTIC STABILITY ). Let c ≤
+
+c∗. For all z(0) ∈ Ωc, the closed-loop trajectory under u =
+
+−Kz satisfies z(t) ∈ Ωc for all t ≥ 0 and z(t) → 0 as 
+
+t → ∞ .Proof. Since c ≤ c∗, ˙W < 0 on Ωc \ { 0} by ( 30 ). Forward invariance follows: if z(0) ∈ Ωc then W (z(t)) ≤ W (z(0)) ≤
+
+c for all t ≥ 0. Since W is strictly decreasing and bounded below by zero, W (t) → W∞ ≥ 0. If W∞ > 0, the trajectory stays in a compact set away from the origin where ˙W ≤ − ε < 
+
+0, contradicting convergence of W . Hence W∞ = 0 , giving 
+
+z(t) → 0.
+
+C. Overall Switching Control Strategy (see Figure 1)
+
+Define switching surface, 
+
+Σ = {z ∈ R4 ∣∣ |φ| < δ φ, | ˙φ| < δ ω , | ˜E| < ε } (31) for small thresholds δφ, δ ω, ε > 0. The combined controller is 
+
+u =
+
+{F from ( 12 ) z /∈ Σ,
+
+−Kz with K from ( 24 ) z ∈ Σ. (32) Switching is one-way: once z ∈ Σ, LQR is activated and not deactivated, since Theorem 3 guarantees forward invariance of 
+
+Ωc ⊃ Σ.The switching surface Σ defined in ( 31 ) must satisfy Σ ⊆
+
+Ωc∗ for the handoff from the energy-shaping controller to the LQR to be formally valid. This requirement translates into explicit bounds on all four state components at switching time 
+
+T ∗, which must lie within the certified ellipsoidal RoA Ωc∗
+
+established in Definition 1.
+
+Remark 4 (A SUFFICIENT CONDITION FOR CONTAINMENT 
+
+Σ ⊆ Ωc). Using the Rayleigh-Ritz theorem, a valid switching rule is 
+
+sup 
+
+> z∈Σ
+
+W (z) ≤ λmax (Plqr )(δ2 
+
+> φ
+
++ δ2 
+
+> ω
+
++ ¯ x2Σ + ¯ v2Σ
+
+) ≤ c∗, (33) where ¯xΣ and ¯vΣ bound the cart states at switching time (see Lemma 2). 
+
+Theorem 4 (G LOBAL SWING -UP AND LOCAL STABILIZA -
+
+> TION
+
+). Let Plqr solve (25 ) and let c∗ be as in (30 ). Choose 
+
+k > 0 and thresholds δφ, δ ω , ε > 0 satisfying Σ ⊂ Ωc with 
+
+c ≤ c∗. Then for all x(0) in a compact set around origin 
+
+[0 , 0, 0, 0] ⊤, the switching controller (32 ) drives the state to the upright equilibrium: 
+
+[x(t), ˙x(t), θ (t), ˙θ(t)] ⊤ t→∞ 
+
+−−−→ [0 , 0, π, 0] ⊤. (34) 
+
+Proof. Phase 1 — t ∈ [0 , T ∗), swing-up control law active: By Theorem 1, ˜E(t) → 0 and (θ, ˙θ) → (π, 0) . By Lemma 2
+
+the cart states are bounded, and the state enters Σ at a finite switch-time T ∗ < ∞.
+
+Transition at t = T ∗: Given the containment condition Σ ⊂
+
+Ωc is satisfied, z(T ∗) ∈ Σ ⊆ Ωc.
+
+Step 1. System dynamics ˙x = f (x, u),identify upright equilibrium x∗ = [0 , 0, π, 0] ⊤
+
+Step 2. Define pendulum energy E = 
+
+> 1
+> 2
+
+mℓ 2 ˙θ2 − mgℓ cos θ and energy error ( 4)
+
+Step 3. Lyapunov candidate V = 1 
+
+> 2
+
+˜E2;derive control law ( 12 ) so that ˙V ≤ 0
+
+Step 4. LaSalle: largest invariant set in { ˙V = 0} is the homoclinic orbit S; unique positively invariant point within S is (θ, ˙θ) = (π, 0) 
+
+|v| < δ v ,
+
+|θ−π| < δ θ ,
+
+| ˙θ| < δ ω ?
+
+Continue swing-up 
+
+F from ( 12 )
+
+Step 5. Switch to LQR ( 26 ): u = −Kz;verify z(T ∗) ∈ Σ ⊆ Ωc
+
+Step 6. LQR Lyapunov function W = z⊤P z;
+
+˙W < 0 in Ωc; Ωc forward-invariant 
+
+Result. (x, ˙x, θ, ˙θ) → (0 , 0, π, 0) as t → ∞ 
+
+for all x(0) in a compact set X0 around 0
+
+> No
+> Yes
+
+Fig. 1: Sequential logic of the energy-shaping swing-up and LQR stabilization controller. Steps 1–4 constitute the swing-up phase; the diamond represents the switching condition; Steps 5–6 constitute the stabilization phase. 
+
+Phase 2 — t ≥ T ∗, LQR controller active: By Theorem 3,
+
+z(t) ∈ Ωc for all t ≥ T ∗ and z(t) → 0, i.e., [x, ˙x, θ, ˙θ]⊤ →
+
+[0 , 0, π, 0] ⊤.
+
+D. Revisiting Augmented Lyapunov Function-derived Control Law (19 )This subsection derives analytical bounds on cart position and velocity of the closed-loop system designed using the augmented Lyapunov function ( 18 ). 
+
+a) Analytic bound on cart velocity: From ( 20 ), ˙Vaug =
+
+−kσ 2/D ≤ 0, the augmented Lyapunov function is non-increasing along every trajectory of the closed-loop system. In particular, for all t ∈ [0 , T ∗]:
+
+μ
+
+2 ˙x(t)2 ≤ Vaug (t) ≤ Vaug (0) = 1
+
+2 ˜E20 + μ
+
+2 ˙x20 , V0. (35) 0 5 10 15            
+
+> t (s)
+> -0.4 -0.2 00.2 0.4 0.6 0.8 1
+> Cart Position (m)
+> 0510 15
+> t (s)
+> -1 -0.5 00.5 11.5
+> Cart Velocity (m/s)
+> 0510 15
+> t (s)
+> -200 -150 -100 -50 050 100 150 200
+> (rad)
+> Upright
+> 0510 15
+> t (s)
+> -10 -8 -6 -4 -2 0246810
+> (rad/s)
+> X11.2613
+> Y0.109074
+> Switch to LQR
+
+(a) Control law ( 12 ) derived from unaugmented V (5)              
+
+> 0510 15
+> t (s)
+> -0.4 -0.3 -0.2 -0.1 00.1 0.2
+> Cart Position (m)
+> 0510 15
+> t (s)
+> -1.5 -1 -0.5 00.5 1
+> Cart Velocity (m/s)
+> 0510 15
+> t (s)
+> -200 -150 -100 -50 050 100 150 200
+> (rad)
+> Upright
+> 0510 15
+> t (s)
+> -10 -8 -6 -4 -2 0246810
+> (rad/s)
+> X11.8018
+> Y-0.000334982
+> Switch to LQR
+
+(b) Control law ( 19 ) derived from augmented V (18 )
+
+Fig. 2: Simulated state trajectories of cart-pole swing-up and stabilization starting from x(0) = [0 , 0, 0, 0] ⊤, under two different control laws. Note that in the left plot – (a), cart velocity converges to a constant (non-zero) value (see Remark 2), and in the right plot – (b), cart velocity converges to 0, by the design of control law ( 19 ) that includes a velocity-damping component. The switch time T ∗ in both cases is empirically observed to be ∼ 12 s.    
+
+> 0510 15
+> t (s)
+> -8 -6 -4 -2 02468
+> F (N)
+> Input profile
+
+(a) Control law ( 12 ) derived from unaugmented V (5)   
+
+> 0510 15
+> t (s)
+> -8 -6 -4 -2 02468
+> F (N)
+> Input profile
+
+(b) Control law ( 19 ) derived from augmented V (18 )
+
+Fig. 3: Sample input profiles required for cart-pole swing-up and stabilization. Rearranging gives the uniform bound 
+
+| ˙x(t)| ≤ 
+
+√
+
+2V0
+
+μ , ¯v, ∀ t ∈ [0 , T ∗]. (36) For the nominal starting condition ˙x0 = 0 , θ0 = 0 , and ˙θ0 = 0 ,
+
+V0 = 1
+
+2 ˜E20 = 2 m2g2l2 and 
+
+¯v = | ˜E0|
+
+√μ . (37) This bound is derived directly from the Lyapunov decrease and is independent of any trajectory integration. It is directly adjustable through the weight μ: increasing μ tightens ¯v at the cost of a stiffer control law. 
+
+b) Bound on cart position: A direct integration bound for x0 = 0 and ˙x0 = 0 is: 
+
+|x(T ∗)| ≤ ¯v · T ∗ = | ˜E0|
+
+√μ T ∗ , ¯x. (38) 
+
+Remark 5. The analytical bound in ( 38 ) is valid but overly conservative, since it treats | ˙x(t)| as a constant at its max-imum throughout swing-up. In reality, the μ ˙x2/2 term in 
+
+Vaug actively damps ˙x toward zero, making the cart velocity oscillatory and mean-reverting (to zero) rather than sustained at ¯v.The cart position bound ¯x and velocity bound ¯v together establish that the switching state cannot be arbitrarily far from the origin. IV. N UMERICAL SIMULATIONS 
+
+For cart-pole parameters M = 1 .0 kg, m = 0 .1 kg, ℓ =0.5 m, g = 9 .81 m s −2, energy-control gains k = 2 , μ = 1 ,LQR cost matrices Q = diag (10 , 1, 100 , 1) , R = 0 .5, and ini-tial conditions as small perturbations about x0 = [0 , 0, 0, 0] ⊤,the relevant quantities evaluate as follows. 
+
+Initial energy error: | ˜E0| = 2 mgℓ = 2 × 0.1 × 9.81 × 0.5 = 0.981 J. 
+
+Cart velocity bound (37 ): ¯v = 0 .981 /√1 = 0 .981 m s −1,consistent with the peak cart velocity of ≈ 1.0 m s −1 observed in simulation (see Figure 2). 
+
+Cart position bound (38 ) with empirically observed switch-time T ∗ ≈ 12 s: ¯x = 0 .981 × 12 ≈ 11 .772 m. The position bound ¯x from ( 38 ) provides a valid reachability guarantee, albeit too conservative and not practically useful. From simu-lations, we observe |x(t)| . 0.9 m ∀t ∈ [0 , T ∗] (see Figure 2). 
+
+LQR RoA: A radial line search yields c∗ = 25 .850 with largest eigenvalue of P matrix solved from ( 25 ), λmax (Plqr ) = 122 .7. The maximum per-axis extents √c∗[P −1]kk certify |x| ≤ 2.24 m, | ˙x| ≤ 4.35 m s −1, |φ| ≤ 1.44 rad, | ˙φ| ≤
+
+8.54 rad s −1 within Ωc∗ .
+
+Containment check: The formal verification of Σ ⊆ Ωc∗
+
+therefore proceeds by evaluating W (z(T ∗)) directly on the trajectory, yielding W (T ∗) ≪ c∗ in simulation. The numeri-cal RoA computation using radial line search or SOS-based verification then certifies that the actual switching state lies inside Ωc∗ , closing the formal argument. 
+
+A. Results 
+
+Sample simulations are visualized in Figures 2–3. Across both control laws, the energy-pumping phase is oscillatory in behavior; the pendulum accumulates amplitude over succes-sive swings while the input force stays bounded within ±8 N(Figure 3), and the state is handed to the LQR at T ∗ ≈ 12 s, after which it converges to the upright equilibrium [0 , 0, π, 0] ⊤.The two laws differ chiefly in the steady-state cart velocity: the unaugmented control law ( 12 ) settles it to a non-zero constant (see Figure 2a and Remark 2), whereas the augmented controller ( 19 ) damps cart velocity to zero at switching time (Figure 2b ), corroborating the velocity-regulation design. Throughout the swing-up maneuver under augmented con-trol law (Figure 2b ), the cart position stays bounded: |x(t)| .
+
+0.4 m, far inside both the conservative analytic bound ¯x ≈
+
+11 .77 m and the maximum per-axis extent of the LQR’s certified region of attraction: 2.24 m. Thus, W (z(T ∗)) ≪ c∗
+
+(see Eqs. ( 27 ), ( 29 ), and ( 30 )) and the containment condition 
+
+Σ ⊆ Ωc∗ holds with a wide margin, validating the formal handoff between the energy-pumping swing-up controller and the stabilizing LQR. V. C ONCLUSION 
+
+We presented an end-to-end reachability analysis for cart-pole swing-up and stabilization, certifying that trajectories from a compact neighborhood of the downward equilib-rium reach the upright equilibrium under a switched energy-based/LQR controller. Canceling the cart-pendulum coupling term through controller design yields a strictly sign-definite Lyapunov derivative, and the convergence proof follows via LaSalle’s invariance principle. We also introduce an aug-mented Lyapunov function whose control law regulates the steady-state cart velocity to zero. The controller switching region is designed to be contained strictly within the LQR sta-bilizer’s certified ellipsoidal region of attraction, formalizing the handoff condition between the energy-pumping controller and LQR. The theoretical results are corroborated by numeri-cal simulations. Future work will derive analytical bounds on the swing-up time required before switching, and use them to obtain tighter cart-position bounds than the conservative estimates established here. ACKNOWLEDGMENT 
+
+The author thanks his advisor, Prof. Michael Otte, for his guidance throughout this work, and Prof. Nikhil Chopra for insightful discussions that helped shape these ideas. REFERENCES [1] R. Tedrake, Underactuated Robotics: Algorithms for Walking, Running, Swimming, Flying, and Manipulation . MIT Press, 2022, available:                                       
+
+> https://underactuated.csail.mit.edu .[2] K. J. ˚Astr¨ om and K. Furuta, “Swinging up a pendulum by energy control,” Automatica , vol. 36, no. 2, pp. 287–295, 2000. [3] M. W. Spong, S. Hutchinson, and M. Vidyasagar, Robot Modeling and Control , 2nd ed. Hoboken, NJ: Wiley, 2020. [4] C. C. Chung and J. Hauser, “Nonlinear control of a swinging pendulum,”
+> Automatica , vol. 31, no. 6, pp. 851–862, 1995. [5] M. W. Spong, “The swing up control problem for the Acrobot,” IEEE Control Systems Magazine , vol. 15, no. 1, pp. 49–55, 1995. [6] I. Fantoni, R. Lozano, and M. W. Spong, “Energy based control of the Pendubot,” IEEE Transactions on Automatic Control , vol. 45, no. 4, pp. 725–729, 2000. [7] R. Lozano, I. Fantoni, and D. J. Block, “Stabilization of the inverted pendulum around its homoclinic orbit,” Systems & Control Letters ,vol. 40, no. 3, pp. 197–204, 2000. [8] P. A. Parrilo, “Structured semidefinite programs and semialgebraic geometry methods in robustness and optimization,” Ph.D. dissertation, California Institute of Technology, 2000. [9] W. Tan and A. Packard, “Stability region analysis using polynomial and composite polynomial Lyapunov functions and sum-of-squares programming,” IEEE Transactions on Automatic Control , vol. 53, no. 2, pp. 565–571, 2008. [10] R. Tedrake, I. R. Manchester, M. M. Tobenkin, and J. W. Roberts, “LQR-trees: Feedback motion planning via sums-of-squares verification,” The International Journal of Robotics Research , vol. 29, no. 8, pp. 1038– 1052, 2010. [11] A. Majumdar and R. Tedrake, “Funnel libraries for real-time robust feed-back motion planning,” The International Journal of Robotics Research ,vol. 36, no. 8, pp. 947–982, 2017. [12] H. K. Khalil, Nonlinear Systems , 3rd ed. Upper Saddle River, NJ: Prentice Hall, 2002.
+
+APPENDIX 
+
+AUGMENTED LYAPUNOV FUNCTION : D ERIVATION AND 
+
+CONVERGENCE PROOF 
+
+This appendix provides the full derivation of the time deriva-tive of the augmented Lyapunov function Vaug introduced in Remark 3, the complete characterisation of its invariant set, the instability argument for the downward equilibrium, and the proof of convergence to the upright equilibrium. 
+
+A.1 Time Derivative of Vaug 
+
+Recall 
+
+Vaug = 1 
+
+> 2
+
+˜E2 + μ 
+
+> 2
+
+˙x2, μ > 0. (18 )Differentiating along solutions of ( 2): 
+
+˙Vaug = ˜E ˙E + μ ˙x¨x. (39) 
+
+a) Step 1 — Expand ˙E: From ( 9) with the full dynamics: 
+
+˙E = −mℓ ˙θc θ
+
+D F − m2ℓ ˙θs θcθ (ℓ ˙θ2 + gc θ)
+
+D . (40) Therefore: 
+
+˜E ˙E = −mℓ ˙θc θ ˜E
+
+D F − m2ℓ ˙θs θcθ (ℓ ˙θ2 + gc θ)
+
+D ˜E. (41) 
+
+b) Step 2 — Expand μ ˙x¨x: Substituting ¨x from ( 2): 
+
+μ ˙x¨x = μ ˙x
+
+D F + μm ˙xs θ(ℓ ˙θ2 + gc θ)
+
+D . (42) 
+
+c) Step 3 — Factorize: Adding ( 41 ) and ( 42 ): 
+
+˙Vaug = 1
+
+D
+
+[
+
+μ ˙x − mℓ ˙θc θ ˜E
+
+]︸ ︷︷ ︸
+
+> σ/ D
+
+·F
+
++ (ℓ ˙θ2 + gc θ)
+
+D
+
+[
+
+μm ˙xs θ − m2ℓ ˙θs θcθ ˜E
+
+]︸ ︷︷ ︸ 
+
+> ms θσ
+
+. (43) Define the composite error 
+
+σ , μ ˙x − mℓ ˙θ cos θ · ˜E. (44) The autonomous bracket factors as μm ˙xs θ − m2ℓ ˙θs θcθ ˜E =
+
+ms θσ, giving the key factorisation 
+
+˙Vaug = σ
+
+D
+
+[
+
+F + ms θ(ℓ ˙θ2 + gc θ)
+
+]
+
+. (45) 
+
+d) Control law and resulting ˙Vaug : Choosing F to make the bracket equal −kσ :
+
+Faug = −kσ − ms θ (ℓ ˙θ2 + gc θ), (19 )which contains no division and is globally defined. Substituting back into ( 45 ): 
+
+˙Vaug = − kσ 2
+
+D ≤ 0. (46) 
+
+A.2 Invariant Set Characterisation 
+
+Since Vaug ≥ 0 and ˙Vaug = − kσ 2 
+
+> D
+
+≤ 0, every sublevel set 
+
+ΩVc = {Vaug ≤ c} is positively invariant. LaSalle’s invariance principle [ 12 ] states that every trajectory in ΩVc converges to the largest positively invariant subset M of 
+
+Z = { ˙V = 0 = σ} = {μ ˙x = mℓ ˙θ cos θ · ˜E}. (47) 
+
+e) Step 1 — Dynamics on Z: On any trajectory with 
+
+σ ≡ 0, substitute Faug with σ = 0 :
+
+F ∣∣σ=0 = −ms θ(ℓ ˙θ2 + gc θ). (48) Evaluating ¨x from ( 2) with ( 48 ): 
+
+¨x∣∣σ=0 = ms θ
+
+[−ℓ ˙θ2 − gc θ + ℓ ˙θ2 + gc θ
+
+]
+
+D = 0 , (49) so ˙x is constant on Z. Evaluating ˙E from ( 40 ) with ( 48 ): 
+
+˙E∣∣σ=0 = m2ℓ ˙θs θ cθ (ℓ ˙θ2 + gc θ )
+
+D − m2ℓ ˙θs θ cθ (ℓ ˙θ2 + gc θ )
+
+D = 0 ,
+
+(50) 
+
+so ˜E is constant on Z; call it ˜E0.
+
+f) Step 2 — Constraint from ˙σ = 0 : Differentiating σ
+
+and using ¨x = 0 , ˙˜E = 0 :
+
+˙σ∣∣σ=0 = −mℓ ˜E0(¨θc θ − ˙θ2sθ ) = 0 . (51) This requires either 
+
+˜E0 = 0 , or (52) 
+
+¨θc θ = ˙θ2sθ . (53) 
+
+g) Case A: ˜E0 = 0 , condition (52 ): Then σ = 0 gives 
+
+˙x = 0 , and the pendulum is on the homoclinic orbit { ˜E =0} under conservative dynamics. The only positively invariant point is (θ, ˙θ) = ( π, 0) (as in the proof of Theorem 1), giving 
+
+MA = {(x, 0, π, 0) | x ∈ R}. (54) 
+
+h) Case B: ˜E0 6 = 0 , condition (53 ): Evaluate ¨θ on Z
+
+using ( 2) and ( 48 ): 
+
+¨θ∣∣σ=0 = sθ
+
+[mc θ (ℓ ˙θ2 + gc θ ) − mℓ ˙θ2cθ − (M + m)g]
+
+ℓD= sθ (mgc 2 
+
+> θ
+
+− (M + m)g)
+
+ℓD = −gs θ[( M + m) − mc 2 
+
+> θ
+
+]
+
+ℓD= −gs θ
+
+ℓ , (55) 
+
+where (M + m) − mc 2 
+
+> θ
+
+= D . Substituting into ( 53 ): 
+
+−gc θsθ
+
+ℓ = ˙θ2sθ =⇒ sθ = 0 or ˙θ2 = −gc θ/ℓ. (56) 
+
+Sub-case B1: sθ = 0 , i.e., θ ∈ { 0, π }. Invariance requires 
+
+˙θ = 0 . With σ = 0 : μ ˙x = mℓ · 0 · cθ · ˜E0 = 0 , so ˙x = 0 .At θ = π: ˜E| ˙θ=0 = −mgℓ (1 + cos π) = 0 , contradicting 
+
+˜E0 6 = 0 . At θ = 0 : ˜E| ˙θ=0 = −2mgℓ 6 = 0 (consistent), and 
+
+¨θ|σ=0 ,θ =0 = 0 , confirming it is an equilibrium. This is the downward equilibrium x↓, contributing MB = {(x, 0, 0, 0) }.
+
+Sub-case B2: ˙θ2 = −gc θ/ℓ , sθ 6 = 0 . Invariance requires  
+
+> d
+> dt
+
+( ˙θ2 + gc θ/ℓ ) = 0 , giving ˙θ(2 ¨θ − gs θ /ℓ ) = 0 . If ˙θ 6 = 0 ,then ¨θ = gs θ/(2 ℓ). But from ( 55 ), ¨θ = −gs θ/ℓ . Setting equal: 
+
+−gs θ/ℓ = gs θ/(2 ℓ), which forces sθ = 0 , contradicting the assumption. Sub-case B2 yields no new invariant trajectories .
+
+i) Complete invariant set: 
+
+M = {(x, 0, π, 0) }
+
+︸ ︷︷ ︸
+
+> MA
+
+∪ { (x, 0, 0, 0) }
+
+︸ ︷︷ ︸
+
+> MB
+
+. (21 )A.3 Instability of MB
+
+Linearize the closed-loop system ( 2), ( 19 ) about (x0, 0, 0, 0) .For small θ, ˙θ: sθ ≈ θ, cθ ≈ 1, D ≈ M , and ˜E ≈ − 2mgℓ to leading order, giving 
+
+σ ≈ μ ˙x + 2 m2gℓ 2 ˙θ. (57) The linearized force is 
+
+F ≈ − kM (μ ˙x + 2 m2gℓ 2 ˙θ) − mgθ. (58) The Jacobian of the closed-loop system at x↓ is 
+
+A↓ =
+
+
+
+0 1 0 00 −kμ 0 −2km 2gℓ 2
+
+0 0 0 10 kμ/ℓ −g/ℓ 2km 2gℓ 
+
+ . (59) The characteristic polynomial of the (θ, ˙θ) block (isolating the pendulum mode by setting ˙x = 0 ) is 
+
+λ2 − 2km 2gℓ λ + g
+
+ℓ = 0 . (60) The product of the roots is g/ℓ > 0 and their sum is 2km 2gℓ > 
+
+0, so both eigenvalues have positive real part . Therefore MB
+
+is an unstable equilibrium under ( 19 ): any perturbation in θ or 
+
+˙θ about (0 , 0) causes the trajectory to diverge from MB .
+
+A.4 Convergence Theorem for the Augmented Law 
+
+Theorem 5 (S WING -UP CONVERGENCE UNDER Vaug ). Under control law (19 ) with k, μ > 0, for almost all initial conditions in any compact sublevel set ΩVc = {Vaug ≤ c}:
+
+˙x(t) → 0, ˜E(t) → 0, (θ(t), ˙θ(t)) → (π, 0) as t → ∞ .
+
+(61) 
+
+The exception set (initial conditions converging to MB ) has Lebesgue measure zero in R4.Proof. Vaug ≥ 0 and ˙Vaug = −kσ 2 ≤ 0, so ΩVc is positively invariant and compact. By LaSalle’s invariance principle [ 12 ], every trajectory in ΩVc converges to M = MA ∪ M B .The set MB is an unstable equilibrium of the closed-loop system: the Jacobian ( 59 ) has eigenvalues with positive real part in the (θ, ˙θ) directions, so the stable manifold of MB is a proper submanifold of R4 with Lebesgue measure zero [ 12 ]. Trajectories not starting on this manifold are repelled from 
+
+MB and must converge to MA.On MA: ˜E = 0 (see ( 52 )), ˙x = 0 (from σ = 0 and ˜E =0), and the only positively invariant point in the pendulum subspace with ˜E = 0 is (π, 0) (by the argument in the proof of Theorem 1). 
+
+Remark 6. Setting μ = 0 in Vaug and ( 19 ) recovers the unaugmented Lyapunov function V = 1 
+
+> 2
+
+˜E2 and control law (12 ). In that case Theorem 1 applies directly and ˙x → 0 is not guaranteed by the Lyapunov analysis, though ¨x = 0 on the invariant set S means the cart coasts at constant velocity until the LQR takes over. The augmented law ( 19 ) with μ > 0
+
+additionally ensures ˙x(T ∗) ≈ 0 at switching time, which reduces the cart-velocity contribution to W (z(T ∗)) and makes the containment condition Σ ⊆ Ωc∗ easier to satisfy.

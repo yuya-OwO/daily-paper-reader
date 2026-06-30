@@ -1,0 +1,396 @@
+Title: CHAMB-GA: A Containerized HPC Scalable Microservice-Based Framework for Genetic Algorithms
+
+URL Source: https://arxiv.org/pdf/2606.27217v1
+
+Published Time: Fri, 26 Jun 2026 01:25:17 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+Page 1 of 23 
+
+# CHAMB-GA: A Containerized HPC Scalable Microservice-Based Framework for Genetic Algorithms 
+
+Felix Bonhoff a,b , Thiemo Pesch a, Andrea Benigni d,a , Alexander Mitsos e,a,c , Manuel Dahmen a, ∗     
+
+> aInstitute of Climate and Energy Systems, Energy Systems Engineering (ICE-1), Forschungszentrum Jülich GmbH, Jülich 52425, Germany
+> bRWTH Aachen University, Aachen 52062, Germany
+> cRWTH Aachen University, Process Systems Engineering (AVT.SVT), Aachen 52074, Germany
+> dJARA-ENERGY, Jülich 52425, Germany
+> eJARA-CSD, Jülich 52425, Germany
+
+Metaheuristic-based global optimization with embedded, long-running simulations is a computation-ally expensive process. To support various stages of development and execution, a seamless transition from personal computers to distributed clusters is desired, enabling execution across all computational scales. However, existing tool chains are often characterized by rigidity and hardware-bound constraints, which impede scalability and the integration of complex simulations. Bridging this gap, we present a containerized HPC scalable microservice-based framework for genetic algorithms with embedded simula-tions (CHAMB-GA). The deployment of the framework scales consistently across cloud infrastructure via container orchestration and HPC clusters via batch-scheduled parallel execution. Users provide the GA operators and simulation backend separately. The framework is designed to run these components in a distributed and decoupled manner, mapped to separate hardware. This approach ensures that the fitness evaluation and genetic operations are not managed within the same process and are utilizing distinct parts of the compute infrastructure. A central message broker coordinates asynchronous manager-worker communication between microservices, thereby parallelizing evolutionary operations and fitness evalua-tions. We demonstrate CHAMB-GA’s scalability, portability, and reproducibility, while facilitating the integration of external tools and complex simulations on benchmark and powerflow problems. The ca-pabilities of CHAMB-GA are validated in a two-part approach: (i) a benchmark study demonstrating minimal overhead while scaling to over 3,500 CPU cores, and (ii) a dispatch optimization of High Voltage Direct Current (HVDC) lines in the German transmission grid, showing seamless migration from Ku-bernetes to SLURM, combined horizontal and vertical scaling, and integration of multi-stage workflows. 
+
+Keywords : Container, HPC, Kubernetes, SLURM, Genetic Algorithm, Power Systems  
+
+> ∗M. Dahmen, Institute of Climate and Energy Systems, Energy Systems Engineering (ICE-1), Forschungszentrum Jülich GmbH, Jülich 52425, Germany E-mail: m.dahmen@fz-juelich.de
+> arXiv:2606.27217v1 [cs.DC] 25 Jun 2026
+
+1 INTRODUCTION 2
+
+# 1 Introduction 
+
+Finding (near) optimal solutions to many real optimization problems is computationally challenging and may include embedded simulations, by choice or necessity. For instance, in the power systems domain, a prototypical simulation task is solving the AC powerflow equations. The computational effort for such simulations rapidly increases as network size expands (Shin et al., 2019; Böttcher et al., 2023), which becomes especially critical when many simulations have to be performed, for example in the context of security assessment, contingency analysis, or probabilistic studies. Furthermore, future approaches that integrate additional energy sectors, such as heating and gas (Dibos et al., 2024; Lu et al., 2022), are expected to further increase model complexity, thereby making the associated simulation problems more computationally demanding. Solving optimization problems with embedded simulations is often approached with heuristic solvers (Chugh et al., 2019; Kaushik et al., 2022), which require extensive sampling of the search space to limit the risk of being trapped in a suboptimal solution (Mallipeddi and Suganthan, 2008). Many population-based heuristic algorithms, like genetic algorithms (GAs), inherently involve nu-merous independent fitness evaluations, making them specifically well-suited to run on parallel hardware. Inspired by natural selection, GAs are a class of meta heuristic optimization schemes that iteratively evolve a population of candidate solutions, called individuals, toward an optimal state. This process is driven by a few core mechanisms: evaluating the solution quality of each individual (fitness) via a problem-specific fitness function, selecting the most promising individuals (selection), and applying genetic operations (crossover and mutation) to generate the population of the subsequent iteration (generation) (Talbi, 2009). The growing accessibility and performance of parallel computing infrastructure, such as multicore systems, GPUs, and distributed architectures like HPC systems or cloud infrastructures, align with the increasing computational demands of large populations and complexity of fitness evaluations in GAs (Don-garra et al., 2024; TOP500). In combination with being applicable to a wide variety of problems, GAs provide a flexible environment to utilize computational power and quickly adapt to different fitness evalu-ations and genetic operations. Particularly in research contexts, the ease of use, modularity, compatibility with complex simulation tools used for fitness evaluation, and integration with machine learning workflows to aid evolution (Ma et al., 2026), make GAs a popular choice for solving a wide range of optimization problems (Chugh et al., 2019; Kaushik et al., 2022). Many approaches and solutions arose to utilize this inherent parallelism, often closely coupled to current developments in computing hardware, such as multi-core processors, GPUs, cloud-computing 1 INTRODUCTION 3and HPC systems. (Ivanovic and Simic, 2022; Gong et al., 2015) GAs are a widely used class of evolutionary algorithms (EAs), a generalization combining all stochas-tic search methods that mimic natural evolution. Cant’u-Paz (1998) defined a taxonomy of three types of parallelism in EAs: (i) The global model (manager-worker model) consisting of a single global popu-lation distributed across multiple worker processes. (ii) The coarse-grained model (island model) which partitions the population into multiple subpopulations, or islands, that evolve mostly independently of each other. Occasional migration of few individuals between islands to exchange knowledge enhances ex-ploration. (iii) The fine-grained model where individuals undergo an evolutionary process on a structured grid, i.e., each individual only interacts with its neighbours or individuals from a neighbouring region, depending on the algorithm settings. To combine large-scale scalability with modular integration of different software stacks and simulation tools across container orchestration software and batch scheduling alike, we present a containerized HPC scalable microservice based framework for genetic algorithms with embedded simulations (CHAMB-GA). CHAMB-GA is a lightweight, open-source framework specifically designed to support scalable execution of evolutionary algorithms driven by computationally expensive fitness evaluations in various distributed compute environments. Utilizing containerized components enables independent development of separate tasks, such as propagation and fitness evaluation, and portability between different hardware, promoting reproducibility. Specifically, CHAMB-GA is a set of orchestration scripts that at its core employs a RabbitMQ (RabbitMQ, 2025, 2010) message broker. Rather than adding more broker nodes, RabbitMQ scales vertically with the available CPU cores (RabbitMQ, 2025; Stenman, 2025) achieving good scala-bility while being deployable independently of the chosen orchestration software. The advanced routing capabilities of the broker (RabbitMQ, 2025) are used to internally handle parallel schemes such as the manager-worker scheme, the island model, or multi-stage workflows, as well as dynamically adjust worker counts and handling load balancing without redeployment or relying on a fixed pattern. All applica-tions and tools run in containerized environments and can be combined to interact with each other in a scalable manner, enabling, e.g., multi-oracle analysis, see, e.g., Jin et al. (2002), or hyperparameter tuning. Various works have combined GA inherent parallelisation methods with distributed and parallel hardware (Khalloof, 2023; Biscani and Izzo, 2020; Salza, 2021). We quantitatively compare CHAMB-GA to these approaches in Section 2. The remainder of this paper is structured as follows. Section 2 provides an overview of related works. Section 3 introduces the CHAMB-GA framework and describes key design choices and features. In Section 4, scalability and overhead are analyzed, followed by a power systems optimization problem 2 RELATED WORKS 4demonstrating flexible resource assignment and a multi-stage workflow. Section 5 concludes with final remarks and possible future work. 
+
+Tab. 1. Comparison of evolutionary computing frameworks. 
+
+Class Relevant frameworks Main features Existing frameworks distinctions to CHAMB-GA 
+
+Monolithic •
+
+DEAP (De Rainville et al., 2012)  
+
+> •
+
+Geneva (Berlich et al., 2025)  
+
+> •
+
+Pagmo (Biscani and Izzo, 2020) Highly integrated using lower-level parallelism (MPI, multiprocessing, and streaming multiprocessors)  
+
+> •
+
+Domain and language specific  
+
+> •
+
+No flexible integration of external tools  
+
+> •
+
+No native support for heterogeneous hardware Functional / data-flow • FlexGP (Sherry et al., 2012)  
+
+> •
+
+Offspring (Vecchi-ola et al., 2009) 
+
+> •
+
+Elephant56 (Salza, 2021)  
+
+> •
+
+Spark-GA (Maqbool et al., 2019) Genetic operations are fitted to data-flow of big data paradigms, achieving high throughput and scalability  
+
+> •
+
+Rigid communication patterns  
+
+> •
+
+Limited support for external tools and workflows Microservice • AMQPGA (Salza and Ferrucci, 2019) 
+
+> •
+
+KafkEO (Merelo Guervós and García-Valdez, 2018) 
+
+> •
+
+BeeNestOpt.IAI (Khal-loof et al., 2021) Container virtualization and stateless functions enable quick scaling and flexible software stacks in distributed cloud environments  
+
+> •
+
+Proof of concept  
+
+> •
+
+Not open source  
+
+> •
+
+Incompatible with SLURM 
+
+# 2 Related Works 
+
+A variety of parallel genetic algorithm frameworks have been developed in recent years. To provide a structured overview, we introduce a novel taxonomy that classifies existing frameworks based on their ar-chitectural design into three categories: monolithic, functional/data-flow-based, and microservice-oriented approaches. As summarized in Table 1, this classification captures key differences in modularity, paral-lelism, and deployment strategy. 2 RELATED WORKS 5Monolithic frameworks, such as DEAP (De Rainville et al., 2012), Geneva (Berlich et al., 2025), and Pagmo (Biscani and Izzo, 2020), tightly integrate all components (e.g., initialization, propagation, fitness evaluation) within a single program, offering efficient resource utilization. Parallelism is often achieved through low-level implementations such as multiprocessing, multi-threading, message passing interface (MPI) based communication or shared-memory message passing (Berlich et al., 2025; Weßner et al., 2023). These tightly coupled approaches are typically limited with respect to flexibility, scalability across distributed and heterogeneous hardware and the use of external tools or existing workflows. Functional and data-flow based approaches, including FlexGP (Sherry et al., 2012), Offspring (Vecchi-ola et al., 2009), Elephant56 (Salza, 2021), and Spark-GA (Maqbool et al., 2019), map genetic operations to established big data paradigms. Patterns such as MapReduce enable high throughput and robustness by acting on data through higher level or mathematical function without maintaining an inner state, treating data as immutable. While throughput and dataflow-centric design principles offer clear advan-tages, they introduce distinct drawbacks: they require specific data structures, and mapping complex algorithmic patterns to the frameworks native functionality is non-trivial. For instance, MapReduce is a suitable scheme for mapping each individual to a worker and reducing all results into a common list. How-ever, to handle dynamic mutation or crossover rates, complex analysis over the whole population must be performed to determine the next steps, thus breaking the predefined data flow and drastically reducing efficiency and throughput. Furthermore, the given functionality often relies on API implementations being available, limiting the compatibility across languages. Microservice-based frameworks, such as AMQPGA (Salza and Ferrucci, 2019), KafkEO (Merelo Guervós and García-Valdez, 2018), and BeeNestOpt.IAI (Khalloof et al., 2021), leverage containerization and state-less architectures to achieve modularity with communication through lightweight network technologies. Parallelism is handled by splitting the workload into separate tasks that can be scaled independently. The microservice approach is widely adopted in the area of cloud computing and is designed from ground-up as a distributed system achieving extensive scalability. However, existing frameworks lack native support for the batch scheduling mechanisms of traditional HPC environments (Yoo et al., 2003; Mcluckie, 2014), limiting their deployment on scientific computing clusters. While a wide variety of parallel GA frameworks exist, CHAMB-GA extends these approaches with its seamless integration of container orchestration and SLURM managed HPC clusters. This interoperability is critical as it bridges the gap between cloud-native flexibility and the computational power of traditional research clusters, while maintaining modularity through microservices. This seamless blend of technolo-gies allows for integration of existing workflows extending the rigid scaling of monolithic approaches 3 FRAMEWORK DESIGN 6and the fixed patterns of functional and data-flow based approaches. CHAMB-GA’s compatibility with SLURM managed HPC clusters allows for deployment on a wider variety of computational hardware. To validate this architectures applicability, we demonstrate its massive scalability by scaling up to 25 nodes (3200 CPU cores) to optimize multiple real-world problems, thereby providing a more robust empirical evaluation compared to proof-of-concept studies commonly found in current open-source microservice GA literature. 
+
+# 3 Framework design 
+
+CHAMB-GA is an orchestration script for massively scaling evolutionary algorithms. By integrating containerization with asynchronous communication, the framework physically decouples simulation work-loads from the evolutionary propagation within a microservice architecture. Through seamless interac-tion with dynamic cloud-native orchestration (Kubernetes) as well as traditional HPC batch schedulers (SLURM), it ensures massive parallelism and reproducibility of optimization workflows across diverse distributed hardware environments. CHAMB-GA’s structure is visualized in Figure 1 for deployment of an optimization with distributed fitness evaluations on multiple CPUs across distinct nodes within a cluster. 
+
+Fig. 1. Overview of CHAMB-GA scripts (right), the cluster (left), and the involved data flows for an evolutionary optimization with distributed fitness evaluations. CHAMB-GA handles the user input, image build process and deployment, and manages the workflow, while the cluster handles the computational load without direct user interaction. The CHAMB-GA scripts act as a control hub that handles all user interaction. They automatically detect the underlying computational environment (Kubernetes or SLURM), facilitate image generation, orchestrate container deployment, and centralize both logging and data retrieval. Users interact with 3 FRAMEWORK DESIGN 7CHAMB-GA exclusively through a configuration file in JSON format. This file specifies the paths to the evolutionary algorithm and simulation source files, alongside the required compute resources, memory resources, and the desired scaling. CHAMB-GA handles source files consisting of a requirements file, a supplemental data folder, and a primary execution file. Utilizing these inputs, language specific, pa-rameterized Docker files generate the required Apptainer (Kurtzer et al., 2021) (in case of SLURM) or Docker (Merkel, 2014) (in case of Kubernetes) images tailored to the detected cluster architecture. By packaging the evolutionary operations and the simulation as independent containers, CHAMB-GA enables the distributed execution of complex simulations. Once, the images are built, it orchestrates the deployment to the cluster. A strict sequence is enforced, first setting up the environment, then initializing the RabbitMQ message broker (RabbitMQ, 2025), and finally the user-defined containers. To account for the separate file system within a container, CHAMB-GA handles the logging and retrieval of the final output from the cluster. The cluster handles the computational load and executes the optimization workflow. The basis of this workflow is a microservice architecture connecting all components via a central RabbitMQ message broker (RabbitMQ, 2025). Communication is unified through queues, accessible for all components in the cluster, allowing for the asynchronous distribution of individuals across all available simulation workers. After deployment, each container is assigned its specified resources and acts independently, communicating only with the message broker. This architecture is well suited for distributed island model GAs, as a shared queue acts as load-balance mechanism between the independent sub populations (Izzo et al., 2012). Unlike traditional GAs that rely on rigid synchronization after each generation (Biscani and Izzo, 2020), CHAMB-GA allows islands to operate independently in parallel, interacting with each other only for migration at the end of an epoch and global termination. This removal of synchronization barriers, enabled by asynchronous message passing, significantly increases parallel efficiency, especially if heterogeneous evaluations times would otherwise stall the evolutinoary process. The general workflow of a distributed evolutionary process using multiple islands is shown in Figure 2. With each island distributing its individuals to a shared set of workers, the evolutionary process of one island can be performed in parallel with the fitness evaluation of other islands. CHAMB-GA mitigates the impact of heterogeneous fitness evaluation durations by evaluating queued individuals from a collective pool maintaining high resource utilization regardless of individual simulation time variance and thus maximizing throughput. The architecture of CHAMB-GA accommodates complex, multi-level workflows, such as hyperparam-eter tuning or bilevel optimization, where an outer genetic algorithm dynamically communicates with 3 FRAMEWORK DESIGN 8
+
+Fig. 2. High-level overview of the evolutionary process in CHAMB-GA: Several islands operate inde-pendently, interacting only for migration and for global termination. Independent intra island execution steps are shown in blue; global tasks requiring synchronization (shown in red). an inner optimization loop or multi-stage simulation pipeline. This nesting is technically demanding as all components must execute in isolation and on demand, while the framework routes messages bidirec-tionally across hierarchical levels. To prevent resource contention, this isolation includes the source files, the software stack and the allocated compute resources, while the communication must avoid deadlocks during execution. To allow for granular resource assignment within these nested structures, CHAMB-GA supports vertical and horizontal scaling (see Figure 3). Horizontal scaling increases the throughput of individuals by increasing the amount of workers being deployed in parallel. Vertical scaling may decrease the time taken per fitness evaluation by increasing the resources available to each worker. 
+
+Fig. 3. Horizontal and vertical scaling: Each block indicates a container and the assigned resources for CPU and memory are indicated by the amount of pictograms in each container. 4 NUMERICAL EXPERIMENTS 9The optimal scaling strategy depends on the relationship between population size and the computa-tional demand of a fitness evaluation as well as the available resources. Optimization problems requiring large populations align well with horizontal scaling, especially if the computational demand of the fitness evaluation is limited. If small populations are advantageous, the available compute resources can be used to vertically scale each worker. This dual scaling capability enables CHAMB-GA to better utilize available hardware and increase parallel efficiency for a wide variety of optimization problems. 
+
+# 4 Numerical experiments 
+
+We demonstrate the capabilities of CHAMB-GA in three steps. The first step benchmarks framework scalability and overhead without computational load. The second step optimizes the dispatch of high voltage direct current (HVDC) lines under security constraints. The third step combines horizontal and vertical scaling with a hierarchical analysis consisting of an inner and an outer optimization loop for hyperparameter tuning. Steps 2 and 3 are computationally intractable without large-scale parallelism. To guide the parallel evaluation, a slightly modified Non-Dominated Sorting Algorithm (NSGA-2) (Deb et al., 2002) with islands and single-objective sorting is used. The total population size is distributed across I islands with P individuals each. The islands communicate via a ring migration pat-tern after M generations (epoch) by sending out the best individual and replacing a randomly selected individual. The ability to efficiently execute global optimization workflows across differently-sized compute hard-ware is demonstrated by scaling evaluations on a local computer, a multi-node Kubernetes cluster, and the SLURM managed JURECA-DC supercomputer of Forschungszentrum Jülich using up to 3200 cores across 25 nodes. The three considered hardware tiers are summarized in Table 2. This tiered hardware selection demonstrates the portability and scheduler-agnostic deployment of CHAMB-GA on all sizes of hardware managed by either SLURM or Kubernetes. In CHAMB-GA, independent processes are mapped to physical compute resources through the respective scheduler. Communication across distinct processes on the same node is fundamentally different compared to inter-nodal communication, making it complex to scale simultaneously across both. The queue based communication enables robust and flexible com-munication on all tiers, essential for analysis transitioning from local development to massively parallel evaluations. The lowest tier of computational power and complexity is a single-node Kubernetes cluster initialized with 18 CPU cores of an AMD EPYC 9534 64-core processor and 16 GB of RAM. The next tier is a dedicated multi-node Kubernetes cluster consisting of 3 nodes housing 128 cores split between two AMD 4.1 Baseline efficiency 10 EPYC 7763 processors and 256 GB RAM each. Rocky Linux 9.6 is used as host operating system while K3S v1.29.6+k3s2 is the installed Kubernetes version and 1.7.17-k3s1 the container runtime. The highest tier being the JURECA-DC supercomputer at the Forschungszentrum Jülich, consisting of 480 standard compute nodes each containing two 64 core AMD EPYC 7742 processors and 516 GB of RAM connected through NVIDIA’s InfiniBand HDR100 (Jülich Supercomputing Centre, 2025). CHAMB-GA is used to perform evaluations across up to 25 nodes, accumulating to 3200 CPU cores. This exceeds the 4 nodes, 128 cores maximum of Khalloof (2023) and the 400 cloud based CPU cores of Sherry et al. (2012). 
+
+Tab. 2. Computational hardware used for numerical results, along with the number of nodes utilized, the cores per node and the scheduling environment inherent to the system. Tier #Nodes #Cores per node Scheduling environment single-node Kubernetes 1 18 Container orchestration (Kubernetes) multi-node Kubernetes 3 128 Container orchestration (Kubernetes) JURECA-DC 25 128 Batch scheduler (SLURM) 
+
+# 4.1 Baseline efficiency 
+
+To assess the scaling efficiency of the CHAMB-GA framework, we conduct a baseline analysis across the three distinct hardware tiers. Isolating framework related overhead from variations in the fitness evaluation, we simulate the computational load using a sleep function of duration s, following Weßner et al. (2023). The parallel efficiency ( ρ) is calculated by dividing the theoretical runtime of the GA by the measured wall-clock time (T): 
+
+ρ = s · P · M · NE · IT · Nw
+
+(1) where N E is the number of epochs and N w the number of parallel workers. As no computational load is considered, each worker is assigned a single CPU core. The population size is adjusted alongside the number of parallel worker containers to guarantee a total computational load of at least 100 individuals per worker. From the theoretical runtime considered in Equation 1 follows that the population size is P = Nw ·100  
+
+> I·M·NE
+
+, with P rounded up to the next integer. This ensures that the time spent on fitness evaluations significantly outweighs the one-time costs of deployment to the cluster and worker start-up, focusing on the communication overhead incurred by the framework. On each hardware tier a distinct set of combination of worker counts and sleep times is evaluated to reflect the scale of each tier. The worker counts range from a single worker on the single-node Kubernetes configuration up to 3500 parallel workers on the JURECA-DC supercomputer, while the sleep time is varied from 0.1 seconds up to 10 .04.1 Baseline efficiency 11 seconds. The resulting parallel efficiencies for all combinations, averaged over 5 runs, are shown in Figure 4. The lowest efficiency of 0.8 is only recorded for the shortest evaluation times of 0.1 seconds and 18 parallel workers, shown in the top left of Figure 4a. The efficiency is above 0.95 for all sleep times above 0.1
+
+seconds with up to 150 workers using Kubernetes as orchestrator (Figure 4b) and up to 3500 parallel workers using SLURM as scheduler (Figure 4c). 1 5 10 
+
+[s] 
+
+1
+
+5
+
+10 
+
+15 
+
+20 
+
+25 
+
+> Nw
+
+0.7 
+
+0.8 
+
+0.9 
+
+1.0  
+
+> (a) Single-node Kubernetes cluster (1-25 workers, 0.1-10 s evaluations).
+
+5 10 
+
+[s] 
+
+50 
+
+60 
+
+70 
+
+80 
+
+90 
+
+100 
+
+110 
+
+120 
+
+130 
+
+140 
+
+150 
+
+> Nw
+
+0.7 
+
+0.8 
+
+0.9 
+
+1.0  
+
+> (b) Multi-node Kubernetes cluster (50-150 workers, 1-10 s evaluations).
+
+2 4
+
+[s] 
+
+1000 
+
+1500 
+
+2000 
+
+2500 
+
+3000 
+
+3500 
+
+> Nw
+
+0.7 
+
+0.8 
+
+0.9 
+
+1.0  
+
+> (c) JurecaDC supercomputer (1000-3500 workers, 1-5 s evaluations).
+
+Fig. 4. Scalability tests to evaluate the parallel efficiency across three distinct computing environments: (a) a single-node Kubernetes cluster, (b) a multi-node Kubernetes cluster, and (c) the JurecaDC super-computer at Forschungszentrum Jülich for varying worker counts and fitness evaluation durations. 4.2 HVDC Dispatch 12 The deployment of the workflow onto the JURECA-DC compute cluster yields performance char-acteristics consistent with the Kubernetes-based results. Deploying CHAMB-GA utilizing SLURM and Apptainer (Kurtzer et al., 2021) introduces negligible overhead, even at the scale of several thousand workers compared to the Kubernetes based results. These results validate the framework’s ability to scale efficiently across the full hardware hierarchy: from multiple cores on a single CPU, to multiple CPUs within a node, and finally across distributed nodes in a large-scale cluster independent of Kubernetes or SLURM being used for deployment. 
+
+# 4.2 HVDC Dispatch 
+
+To evaluate CHAMB-GA under computational load, nonlinear AC powerflow calculations are used as fitness evaluation (Molzahn et al., 2017). Building on our previous work (Pesch, 2019), a realistic rep-resentation of the German high-voltage transmission network, based on the grid topology defined in the 2012 network development plan (Feix et al., 2012), is considered. The network consisting of 2715 
+
+buses and 871 generators connected by 5351 lines, with the three-phase network simplified into a single phase substitute system is extended to include the planned 18 HVDC lines (Pesch, 2019). These DC lines enable bidirectional point-to-point low loss bulk power transport within a continuous range of either 
+
+[−1300 , 1300] MW or [−2000 , 2000] MW (Feix et al., 2012). Each powerflow can be controlled individually and is a degree of freedom within the dispatch decision. The objective is to minimize total grid usage fees defined through the total power transmitted across all lines, i.e., 
+
+min x F (x) = X
+
+> i∈L
+
+Pi(x), (2) where x is the vector of the 18 HVDC powerflow settings (optimization variables), L is the set of all lines in the network, and Pi represents the positive powerflow transported through line i.Based on this minimization problem, CHAMB-GA’s core capabilities are demonstrated in two distinct case studies. The first highlights the combination of vertical and horizontal scaling by extending the fitness evaluation to consider security constraints, and the second deploys a hierarchical workflow tuning the GA hyperparameters via a governing GA. An extensive GA-based optimization minimizing 2 was conducted to define the best found solution of the HVDC dispatch problem. The gap to this fitness value is used as measure for the solution quality in the subsequent evaluations. 4.2 HVDC Dispatch 13 
+
+4.2.1 Horizontal and vertical scalability 
+
+In real-world power system operations, any viable HVDC dispatch configuration must satisfy N − 1
+
+security, ensuring the grid remains stable even under a single line failure. For the given network, instead of a single AC powerflow calculation each fitness evaluation is extended to include 2004 contingency cases, increasing the computational load by 3 orders of magnitude. As all contingency cases are independent of each other, CHAMB-GA’s flexible resource allocation allows the workers not only to be scaled horizontally, but also vertically by increasing the utilized CPU cores of each worker. This two axis scaling can be applied in a wide variety of combinations, enabling tailored resource utilization. Two possible combinations are further considered highlighting the relevance on evolutionary optimization: (a) prioritizing horizontal scaling with 384 parallel workers with 8 CPU cores each, and (b) prioritizing vertical scaling with 24 parallel workers, each utilizing 128 cores. Both configuration consist of a total of 3072 cores to calculate the fitness values. These configurations are matched with suitable GA hyperparameters to decrease the time of cores being idle, shown in Table 3. The fitness of each individual is adjusted to account for violations of the thermal limits during any contingency case. Any line failure resulting in a violation of a thermal line limit is called critical. Driving the GA population towards robust solutions, a penalty of 10% is added to the objective for each critical line. To avoid even close to critical solutions, a smaller penalty of 1% is added if any line loading reaches a loading between 95% and 100% . The penalized objective function F ′(x), extending 2, is defined as: 
+
+min x F ′(x) = F (x) ·
+
+"
+
+1 + X
+
+> c∈C
+
+(0 .10 · I10% (x, c ) + 0 .01 · I1% (x, c )) 
+
+#
+
+,
+
+where 
+
+I1% (x, c ) = 
+
+
+
+1 if (∃i ∈ L s.t. Pi,c (x) ≥ 0.95 · P max  
+
+> i
+
+) ∧ (I10% (x, c ) = 0) 0 otherwise and 
+
+I10% (x, c ) = 
+
+
+
+1 if ∃i ∈ L such that Pi,c (x) > P max 
+
+> i
+
+0 otherwise Here, C is the set of all N − 1 contingency cases indexed by c, and F ′(x) is the penalty incurred objective function for the contingency analysis. The powerflow on line i under contingency c is denoted by Pi,c (x), while P max  
+
+> i
+
+represents the thermal limit (maximal line loading) for line i. High- and overloaded 4.2 HVDC Dispatch 14 lines are captured through the indicator function I1% and I10% , respectively. 
+
+Tab. 3. NSGA-2 hyperparameter settings for the two scaling approaches: Population size (P), mutation method, mutation probability ( μmut ), mutation distribution index ( ηmut ), crossover method, crossover probability ( μcx ), crossover distribution index ( ηcx ), migration pattern and migration frequency (M). Scaling P Mutation Crossover Migration Method μmut ηmut Method μcx ηcx Pattern M(a) 412 Polynomial a 0.7 34.6 SBX b 1.0 97.5 Ring 5(b) 16 Polynomial a 0.5 90.2 SBX b 1.0 5.2 Ring 6
+
+Polynomial mutation as implemented in original NSGA-II algorithm (Deb et al., 2002). Simulated Binary Bounded Crossover - a real-coded crossover operator with similar search power as the single-point crossover in binary-coded GAs (Deb et al., 2002). 
+
+Figure 5 shows the best found fitness of each island in each generation. Both configurations are evaluated for a wall-clock time of 6 hours, using the same amount of computational resources. 4 8 12 16 
+
+> Generation
+> 0
+> 2.83
+> 10
+> 20
+> 30
+> 40
+> Fitness Gap [%]
+> Island 0
+> Island 1
+> Island 2
+> Island 3
+
+(a) Best fitness value of each island in each gener-ation for a GA evolving 384 individuals in parallel, each using 8 CPU cores with a time limit of 6 hours. 0 80 160 240 
+
+> Generation
+> 0
+> 1.69
+> 10
+> 20
+> 30
+> 40
+> Fitness Gap [%]
+> Island 0
+> Island 1
+> Island 2
+> Island 3
+
+(b) Best fitness value of each island in each gener-ation for a GA evolving 24 individuals in parallel, each using 128 CPU cores with a time limit of 6 hours. 
+
+Fig. 5. Best fitness of each island for the contingency constrained HVDC dispatch problem. The GA hyperparameters are set according to Table 3 using a total of 3072 CPU cores for the fitness evaluation. The target fitness is a theoretical limit as it was achieved without penalization and without considering contingency cases. During the evaluation of distributed GAs, scaling is often a trade-off between sampling efficiency and high throughput. While horizontal scaling is primarily limited by the GA itself through the population size, and the subsequent evolutionary pressure, vertical scaling efficiency often depends on the available 4.2 HVDC Dispatch 15 parallelization of the fitness function. For the given security constrained powerflow based evaluation, a total of 60 million AC powerflow calculations are evaluated for the primarily horizontal scaling in Figure 5a. For the vertically scaled approach in Figure 5b the total number of evaluations decreased to roughly 36 million. While both number of evaluations are computationally intractable using a sequential or mildly parallel approach, this indicates that no single scaling approach is strictly superior. Ultimately achieving a balance between sampling efficiency and optimization wall-clock time requires a flexible combination of both horizontal and vertical scaling to efficiently utilize available hardware. The results in Figure 5 show not only the capability, but also the necessity, for CHAMB-GA to allow for nuanced, problem and hardware specific adjustments for both vertical and horizontal scaling through user-input, without adjustments to the framework. 
+
+4.2.2 Hierarchical evaluation 
+
+CHAMB-GA enables flexible message routing and the deployment of multiple algorithm and simulation components to seamlessly interact with each other. A recurring hierarchical problem when using GAs is the choice of hyperparameters (Ma et al., 2026), which, as shown in Section 4.2.1, is problem specific and also depends on the available parallelism and target hardware. To guide the hyperparameter search, we employ a hierarchical setup consisting of a governing GA (meta GA) and a set of worker GAs. Each individual of the meta GA encodes a hyperparameter con-figuration, whose fitness is evaluated by running a worker GA configured with those hyperparameters based on the AC powerflow HVDC dispatch problem. In principle, each worker GA could be parallelized internally (e.g., using Python’s multiprocessing), but doing so would lock the degree of vertical paral-lelism at design time, an undesirable constraint given the large variations of the population size during the parameter search. Instead, CHAMB-GA enables the deployment of a hierarchical workflow in which all three stages, (i) the meta-GA, (ii) the pool of worker GAs and (iii) the pool of AC powerflow evaluators, scale inde-pendently. The meta GA sends individuals (hyperparameters) to a pool of worker GAs, which in turn communicate with a pool of shared AC powerflow evaluators. The shared pool design enables parallel evaluation while performing load balancing across worker GAs. Any idle evaluator picks up the next available individual, independent of its originating worker GA. This scheme scales more effectively than statically assigning a fixed number of evaluators to each worker GA, especially when population sizes vary within the meta GA. The genes of the meta GA are defined in Table 4 together with their respective bounds. The genes 5 CONCLUSION 16 of the worker GA are the 18 HVDC dispatch decisions without contingency considerations as defined in 2. For the meta GA the termination criterion is a wall-clock limit of 12 hours, while each set of hyperparameters is evaluated for 5 different seeds for 20 generations, and the overall best found solution is returned as fitness. 
+
+Tab. 4. Definitions of the meta GA genes defining the hyperparameters tuned, the bounds define the search space. All parameters are implemented according to the NSGA-2 algorithm within the DEAP framework (De Rainville et al., 2012; Deb et al., 2002). 
+
+Hyperparameter Symbol Bounds Description 
+
+Population size P [12 , 500] Number of individuals per island. Crossover probability μcx [0 .0, 1.0] Probability of each individual to create an offspring by mating. Mutation probability μmut [0 .0, 1.0] Probability of each individual to create an offspring through mutation. Mutation distribution index ηm [0 .01 , 100] Crowding degree of the mutation operation, a high value indicating an offspring similar to the parents. Crossover distribution index ηsbx [0 .01 , 100] Crowding degree of the crossover operation, a high value indicating an offspring similar to the parents. Figure 6 shows the average value of each hyperparameter within a generation of the meta GA along with the standard deviation and minimal and maximal value within the same generation. These results provide insights into the evolutionary dynamics. μcx converges rapidly to its upper bound, whereas μmut 
+
+increases slowly but exhibits a visibly shrinking standard deviation. Most notably, the population size remains well below its upper bound, indicating that, under the given termination criterion, horizontal scaling is inherently limited. Efficiently exploiting massively parallel compute resources therefore requires combining both scaling axes. CHAMB-GA’s native capability to combine horizontal and vertical scaling alongside multi-step work-flows allows for optimization of a wide variety of problems. Complex workflows can be embedded into the optimization solely by adjusting the user input. Adding additional pools of workers can be used to, e.g., enable multi-oracle evaluations, to combine different simulation frameworks within a combined fitness evaluation or to allow for load-balanced vertical scaling even if it is not natively supported. 
+
+# 5 Conclusion 
+
+The growing demand for global optimization in scientific and engineering domains is progressively con-strained by the computational cost associated with long-running simulations. Traditional optimization pipelines are tightly coupled to specific hardware or software stacks, limiting their scalability, applicability, 5 CONCLUSION 17 Best Found Solution             
+
+> Target Gap: 0.351%
+> P: 412 M: 5
+> cx : 1.00 sbx : 97.5
+> mut : 0.73 m: 34.56 0.0
+> 0.4
+> 0.8
+> mut
+> 200
+> 400
+> P
+> 0
+> 40
+> 80
+> m
+> 010 20 30 40
+> Generation
+> 0.0
+> 0.4
+> 0.8
+> cx
+> 010 20 30 40
+> Generation
+> 0
+> 40
+> 80
+> sbx
+
+Fig. 6. The best found parameters (top left) and the evolution of average hyperparameters within the population at each generation. The standard deviation of each parameter value within the meta GA generation is given as shaded area while the minimum and maximum values of the parameters are given as dotted lines. The meta GA is configured with I = 3 islands and a population size of P = 96 . Each individual which corresponds to a set of hyperparameters is evaluated 5 times, each time with a different seed for the worker GAs initial population. and interoperability across distributed compute environments. CHAMB-GA addresses these issues using a containerized microservice approach that targets HPC scalability specifically. The proposed framework leverages a central message broker for asynchronous manager-worker communication, and seamlessly dis-tributes evolutionary operations and fitness evaluations across heterogeneous infrastructure. It utilizes both SLURM’s batch scheduling and Kubernetes container orchestration. This design eliminates the need to embed simulations within the same process as the genetic operations, enabling each component to be operated and scaled independently. The practicality of CHAMB-GA was demonstrated through a systematic benchmark study and a massively scaled, case study that optimized HVDC setpoints. The benchmarks confirm that, under both SLURM and Kubernetes, containerized orchestration with queue-based communication incurs negligible overhead. The system scales near-linear to more than 3500 CPU cores distributed across 28 compute nodes without reaching throughput saturation. These results validate the framework’s ability to effi-ciently handle large-scale, asynchronous, evolutionary searches, independent of the underlying scheduler. This portability is essential for workflows transitioning from local development environments to massive production evaluations deployed on distributed systems and HPC clusters. 5 CONCLUSION 18 When applied to a dispatch optimization problem derived from Germany’s transmission grid exten-sion plans, CHAMB-GA successfully transferred this scalability to an optimization under computational load. Including security relevant contingency cases increased the computational load by three orders of magnitude, evaluating nearly 60 million AC powerflow calculations during a single optimization. This, sequentially intractable number of calculations required the framework’s dual scaling capability. The GA’s fitness evaluations scales horizontally while simultaneously each constrained powerflow calculation is scaled vertically. Together with CHAMB-GA’s native ability to interact with SLURM- and Kubernetes-managed cluster environments, this enables problem-specific resource allocation tailored to the structure of each optimization task and the available hardware. To further demonstrate the framework’s flexibility and modularity, a hyperparameter analysis was conducted using a two-stage GA workflow. A meta GA that evolves worker GAs was configured to, in turn, interact with a shared pool of workers, without modifying the underlying architecture. Such hierarchical workflows, combining multiple algorithms and simulations with independent resource allocations, allow for complex optimization tasks to be incorporated. These tasks stretch from utilizing the queue-based load balancing across components to multi-oracle optimizations based on varying software and hardware stacks. CHAMB-GA advances the current state of distributed evolutionary algorithm frameworks by pro-viding a unified, scalable, open-source approach. Its ability to adapt to diverse fitness evaluations or workflows as well as its seamless migration from Kubernetes to SLURM distinctively positions it as a widely applicable tool for massively scalable optimization. As a lightweight orchestration framework, it can be easily integrated with existing tools, allowing users to configure workflows through a single configuration file. Future development will focus on integrating heterogeneous computing resources, such as GPU accel-eration, into the evolutionary pipeline. Additionally, the usage of heterogeneous programming languages needs to be evaluated to showcase the full flexibility and potential. 
+
+# Acknowledgment 
+
+The authors gratefully acknowledge computing time on the supercomputer JURECA at Forschungszen-trum Jülich under grant no. 60265 and financial support by the Helmholtz Association of German Research Centres through program-oriented funding. REFERENCES 19 
+
+# Data availability 
+
+The framework architecture is openly accessible via CHAMB-GA. Results, algorithm implementation and simulation scripts are modified to exclude underlying power systems data, which are subject to confidentiality agreements and cannot be disclosed. 
+
+# Declaration of competing interests 
+
+The authors have no competing interests to declare that are relevant to the content of this article.. 
+
+# Authors’ contributions 
+
+Conceptualization: F.B., T.P., M.D.; Methodology: F.B, M.W., T.P.; Software: F.B.; Formal analysis and investigation: F.B.; Visualization: F.B.; Writing - original draft preparation: F.B.; Writing - review and editing: A.M., M.D., T.P., A.B.; Funding acquisition: A.M., A.B.; Supervision: A.M., M.D., T.P. 
+
+# Declaration of generative AI and AI-assisted technologies in the manuscript preparation process. 
+
+During the preparation of this work, F.B. used Gemini in order to correct grammar and spelling and to improve the style of writing. After using this tool, all authors reviewed and edited the content as needed and take full responsibility for the content of the publication. 
+
+# References 
+
+Berlich, R., Ariel, G., Gabriel, S., 2025. Geneva manual. URL: https://gemfony-scientific.eu/ .(Accessed on: 2025-04-23). Biscani, F., Izzo, D., 2020. A parallel global multiobjective framework for optimization: Pagmo. Journal of Open Source Software 5, 2338. doi: 10.21105/joss.02338 .Böttcher, L., Wolf, H., Jung, B., Lutat, P., Trageser, M., Pohl, O., Tao, X., Ulbig, A., Grohe, M., 2023. Solving AC Power Flow with Graph Neural Networks under Realistic Constraints, in: 2023 IEEE Belgrade PowerTech, IEEE. pp. 1–7. doi: 10.1109/PowerTech55446.2023.10202246 .REFERENCES 20 Cant’u-Paz, E., 1998. A survey of parallel genetic algorithms. Calculateurs paralleles, reseaux et systems repartis 10, 141–171. Chugh, T., Sindhya, K., Hakanen, J., Miettinen, K., 2019. A survey on handling computationally expen-sive multiobjective optimization problems with evolutionary algorithms. Soft Computing 23, 3137–3166. doi: 10.1007/s00500-017-2965-0 .De Rainville, F.M., Fortin, F.A., Gardner, M.A., Parizeau, M., Gagné, C., 2012. DEAP: A python framework for evolutionary algorithms, in: Proceedings of the 14th Annual Conference Companion on Genetic and Evolutionary Computation, ACM, Philadelphia Pennsylvania USA. pp. 85–92. doi: 10. 1145/2330784.2330799 .Deb, K., Pratap, A., Agarwal, S., Meyarivan, T., 2002. A fast and elitist multiobjective genetic algorithm: NSGA-II. IEEE Transactions on Evolutionary Computation 6, 182–197. doi: 10.1109/4235.996017 .Dibos, S., Pesch, T., Benigni, A., 2024. Heatnetsim: An open-source simulation tool for heating and cooling networks suitable for future energy systems. Energy 312, 133588. doi: https://doi.org/10. 1016/j.energy.2024.133588 .Dongarra, J., Gunnels, J., Bayraktar, H., Haidar, A., Ernst, D., 2024. Hardware trends impacting floating-point computations in scientific applications. doi: 10.48550/arXiv.2411.12090 , arXiv:2411.12090 .Feix, O., Obermann, R., Hermann, M., Zelter, S., 2012. Network development plan electricity 2012. URL: https://www.netzentwicklungsplan.de/sites/default/files/paragraphs-files/ nep_2012_1_entwurf_teil_1_kap_1_bis_8.pdf . (Accessed on: 2026-03-27). Gong, Y.J., Chen, W.N., Zhan, Z.H., Zhang, J., Li, Y., Zhang, Q., Li, J.J., 2015. Distributed evolutionary algorithms and their models: A survey of the state-of-the-art. Applied Soft Computing 34, 286–300. doi: 10.1016/j.asoc.2015.04.061 .Ivanovic, M., Simic, V., 2022. Efficient evolutionary optimization using predictive auto-scaling in con-tainerized environment. Applied Soft Computing 129, 109610. doi: 10.1016/j.asoc.2022.109610 .Izzo, D., Ruciński, M., Biscani, F., 2012. The Generalized Island Model, in: Fernández De Vega, F., Hidalgo Pérez, J.I., Lanchares, J. (Eds.), Parallel Architectures and Bioinspired Algorithms. Springer Berlin Heidelberg, Berlin, Heidelberg. volume 415, pp. 151–169. doi: 10.1007/978-3-642-28789-3_7 .REFERENCES 21 Jin, Y., Olhofer, M., Sendhoff, B., 2002. A framework for evolutionary optimization with approximate fitness functions. IEEE Transactions on Evolutionary Computation 6, 481–494. doi: 10.1109/TEVC. 2002.800884 .Jülich Supercomputing Centre, 2025. Jureca user documentation — jureca user documentation docu-mentation. URL: https://apps.fz-juelich.de/jsc/hps/jureca/index.html . (Accessed on: 2025-08-04). Kaushik, E., Prakash, V., Mahela, O.P., Khan, B., Abdelaziz, A.Y., Hong, J., Geem, Z.W., 2022. Optimal Placement of Renewable Energy Generators Using Grid-Oriented Genetic Algorithm for Loss Reduction and Flexibility Improvement. Energies 15, 1863. doi: 10.3390/en15051863 .Khalloof, H., 2023. A Generic Flexible and Scalable Method for Using Evolutionary Algorithms in Cluster Computing Environments. Ph.D. thesis. Karlsruher Institut für Technologie. Karlsruhe. Khalloof, H., Mohammad, M., Shahoud, S., Duepmeier, C., Hagenmeyer, V., 2021. A generic flexible and scalable framework for hierarchical parallelization of population-based metaheuristics. Internet of Things 16, 100433. doi: 10.1016/j.iot.2021.100433 .Kurtzer, G.M., Cclerget, Bauer, M., Kaneshiro, I., Trudgian, D., Godlove, D., 2021. Hpcng/singularity: Singularity 3.7.3. Zenodo. doi: 10.5281/ZENODO.4667718 .Lu, Y., Pesch, T., Benigni, A., 2022. GasNetSim: An Open-Source Package for Gas Network Simulation with Complex Gas Mixture Compositions, in: 2022 Open Source Modelling and Simulation of Energy Systems (OSMSES), IEEE, Aachen, Germany. pp. 1–6. doi: 10.1109/OSMSES54027.2022.9769148 .Ma, Z., Guo, H., Gong, Y.J., Zhang, J., Tan, K.C., 2026. Toward Automated Algorithm Design: ASurvey and Practical Guide to Meta-Black-Box-Optimization. IEEE Transactions on Evolutionary Computation 30, 667–687. doi: 10.1109/TEVC.2025.3568053 .Mallipeddi, R., Suganthan, P.N., 2008. Empirical study on the effect of population size on differential evolution algorithm, in: 2008 IEEE Congress on Evolutionary Computation (IEEE World Congress on Computational Intelligence), IEEE, Hong Kong, China. pp. 3663–3670. doi: 10.1109/CEC.2008. 4631294 .Maqbool, F., Razzaq, S., Lehmann, J., Jabeen, H., 2019. Scalable distributed genetic algorithm using apache spark (s-ga), in: Huang, D.S., Bevilacqua, V., Premaratne, P. (Eds.), Intelligent Comput-ing Theories and Application. Springer International Publishing, Cham. volume 11643, pp. 424–435. doi: 10.1007/978-3-030-26763-6_41 .REFERENCES 22 Mcluckie, C., 2014. Google cloud platform blog: Containers, vms, kubernetes and vmware. URL: https: //cloudplatform.googleblog.com/2014/08/containers-vms-kubernetes-and-vmware.html .(Accessed on: 2025-07-21). Merelo Guervós, J.J., García-Valdez, J.M., 2018. Introducing an event-based architecture for concurrent and distributed evolutionary algorithms, in: Auger, A., Fonseca, C.M., Lourenço, N., Machado, P., Pa-quete, L., Whitley, D. (Eds.), Parallel Problem Solving from Nature – PPSN XV. Springer International Publishing, Cham. volume 11101, pp. 399–410. doi: 10.1007/978-3-319-99253-2_32 .Merkel, D., 2014. Docker: lightweight linux containers for consistent development and deployment. Linux J. 2014. Molzahn, D.K., Dorfler, F., Sandberg, H., Low, S.H., Chakrabarti, S., Baldick, R., Lavaei, J., 2017. A Survey of Distributed Optimization and Control Algorithms for Electric Power Systems. IEEE Transactions on Smart Grid 8, 2941–2962. doi: 10.1109/TSG.2017.2720471 .Pesch, T.C., 2019. Multiskalare Modellierung integrierter Energie- und Elektrizitätssysteme. Disser-tation. RWTH Aachen University. Jülich. doi: 10.18154/RWTH-2020-00990 . Druckausgabe: 2019. -Onlineausgabe: 2020. - Auch veröffentlicht auf dem Publikationsserver der RWTH Aachen University; Dissertation, RWTH Aachen University, 2019. RabbitMQ, 2010. Rabbitmq/rabbitmq-server. URL: https://github.com/rabbitmq/ rabbitmq-server . (Accessed on: 2026-03-17). RabbitMQ, 2025. Rabbitmq: One broker to queue them all | rabbitmq. URL: https://www.rabbitmq. com/ . (Accessed on: 2025-05-27). Salza, P., 2021. Pasqualesalza/elephant56. URL: https://github.com/pasqualesalza/elephant56 .(Accessed on: 2025-05-15). Salza, P., Ferrucci, F., 2019. Speed up genetic algorithms in the cloud using software containers. Future Generation Computer Systems 92, 276–289. doi: 10.1016/j.future.2018.09.066 .Sherry, D., Veeramachaneni, K., McDermott, J., O’Reilly, U.M., 2012. Flex-gp: Genetic programming on the cloud, in: Hutchison, D., Kanade, T., Kittler, J., Kleinberg, J.M., Mattern, F., Mitchell, J.C., Naor, M., Nierstrasz, O., Pandu Rangan, C., Steffen, B., Sudan, M., Terzopoulos, D., Tygar, D., Vardi, M.Y., Weikum, G., Di Chio, C., Agapitos, A., Cagnoni, S., Cotta, C., De Vega, F.F., REFERENCES 23 Di Caro, G.A., Drechsler, R., Ek’art, A., Esparcia-Alc’azar, A.I., Farooq, M., Langdon, W.B., Merelo-Guervós, J.J., Preuss, M., Richter, H., Silva, S., Simões, A., Squillero, G., Tarantino, E., Tettamanzi, A.G.B., Togelius, J., Urquhart, N., Uyar, A.Ş., Yannakakis, G.N. (Eds.), Applications of Evolutionary Computation. Springer Berlin Heidelberg, Berlin, Heidelberg. volume 7248, pp. 477–486. doi: 10.1007/ 978-3-642-29178-4_48 .Shin, S., Hart, P., Jahns, T., Zavala, V.M., 2019. A Hierarchical Optimization Architecture for Large-Scale Power Networks. IEEE Transactions on Control of Network Systems 6, 1004–1014. doi: 10.1109/ TCNS.2019.2906917 .Stenman, E., 2025. The Beam Book: Understanding the Erlang Runtime System. First edition ed., HappiHacking, Upplands Väsby. Talbi, E., 2009. Metaheuristics: From Design to Implementation. 1 ed., Wiley. doi: 10.1002/ 9780470496916 .TOP500, 2025. Performance development |top500. URL: https://top500.org/statistics/ perfdevel/ . (Accessed on: 2025-04-23). Vecchiola, C., Kirley, M., Buyya, R., 2009. Multi-objective problem solving with offspring on enterprise clouds. URL: https://arxiv.org/abs/0903.1386 , arXiv:0903.1386 .Weßner, J., Berlich, R., Schwarz, K., Lutz, M.F.M., 2023. Parametric optimization on HPC clusters with geneva. Computing and Software for Big Science 7, 4. doi: 10.1007/s41781-023-00098-6 .Yoo, A.B., Jette, M.A., Grondona, M., 2003. SLURM: Simple linux utility for resource management, in: Feitelson, D., Rudolph, L., Schwiegelshohn, U. (Eds.), Job Scheduling Strategies for Parallel Processing, Springer Berlin Heidelberg, Berlin, Heidelberg. pp. 44–60.

@@ -6,49 +6,39 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-30
-- 运行时间：2026-06-30 21:05:50 UTC
+- 最新运行日期：2026-07-01
+- 运行时间：2026-07-01 22:17:30 UTC
 - 运行状态：成功
-- 本次总论文数：9
-- 精读区：5
-- 速读区：4
+- 本次总论文数：5
+- 精读区：3
+- 速读区：2
 
 ### 今日简报（AI）
-今日共处理9篇论文，精读5篇、速读4篇，重点聚焦科学发现复杂度与阿尔茨海默病模型稳定性。  
-最值得关注的是《组合函数树的PAC可学习性》和《阿尔茨海默病数学模型全局稳定性分析》，分别获10分和9分高分。  
-建议优先精读这两篇高评分论文，深入理解组合函数树的可学习性理论及疾病模型的稳定性分析。
-- 详情：[/202606/30/README](/202606/30/README)
+今日精读两篇高分论文，速读两篇，重点关注连续时间状态估计的高概率ISS管以及控制理论与机器学习的范式转换。
+
+最值得精读的是《High-Probability ISS Tubes for Continuous-Time State Estimation》（10.0/10），其次是《Stabilization Learning: A Paradigm Transition》（9.0/10），前者在估计理论中提供严格概率保证，后者为控制与ML融合开辟新路径。
+
+建议普通读者优先阅读这两篇精读论文，尤其是10分论文的数学框架；后续可关注从多个稀疏数据集学习动力系统的层次贝叶斯方法，以及晶体结构预测的潜在遗传算法。
+- 详情：[/202607/01/README](/202607/01/README)
 
 ### 精读区论文标签
-1. [Sample Complexity of Scientific Discovery: PAC Learnability of Compositional Function Trees](/202606/30/2606.29331v1-sample-complexity-of-scientific-discovery-pac-learnability-of-compositional-function-trees)  
-   标签：评分：10.0/10、query:sr
-   evidence：直接研究符号回归的样本复杂度
-2. [Global stability analysis of a mathematical model from Alzheimer's disease](/202606/30/2606.29191v1-global-stability-analysis-of-a-mathematical-model-from-alzheimers-disease)  
+1. [High-Probability ISS Tubes for Continuous-Time State Estimation](/202607/01/2606.29536v1-high-probability-iss-tubes-for-continuous-time-state-estimation)  
+   标签：评分：10.0/10、query:lyapunov-ai
+   evidence：使用二次李雅普诺夫不等式进行输入-状态稳定性边界分析
+2. [Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning](/202607/01/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning)  
    标签：评分：9.0/10、query:lyapunov-ai
-   evidence：使用李雅普诺夫函数进行全局稳定性分析
-3. [Comparison of Non-Deterministic Nonlinear Systems](/202606/30/2606.27464v1-comparison-of-non-deterministic-nonlinear-systems)  
-   标签：评分：8.0/10、query:lyapunov-ai
-   evidence：非线性系统比较和耗散性与李雅普诺夫函数的联系
-4. [Equilibria in Motion: Stability, Tracking, and Convergence](/202606/30/2606.28422v1-equilibria-in-motion-stability-tracking-and-convergence)  
-   标签：评分：8.0/10、query:lyapunov-ai
-   evidence：使用Lyapunov框架分析非自治系统稳定性
-5. [Reachability Guarantees for Cart-Pole Swing-Up and Stabilization](/202606/30/2606.28627v1-reachability-guarantees-for-cart-pole-swing-up-and-stabilization)  
-   标签：评分：8.0/10、query:lyapunov-ai
-   evidence：使用李雅普诺夫函数进行倒立摆稳定性分析
+   evidence：直接涉及基于李雅普诺夫的分析与设计的稳定化学习
+3. [Evaluation of Population Initialization Methods for Genetic Programming-based Symbolic Regression](/202607/01/2606.31990v1-evaluation-of-population-initialization-methods-for-genetic-programming-based-symbolic-regression)  
+   标签：评分：9.0/10、query:sr
+   evidence：遗传编程符号回归初始化评估
 
 ### 速读区论文标签
-1. [CHAMB-GA: A Containerized HPC Scalable Microservice-Based Framework for Genetic Algorithms](/202606/30/2606.27217v1-chamb-ga-a-containerized-hpc-scalable-microservice-based-framework-for-genetic-algorithms)  
-   标签：评分：7.0/10、query:sr
-   evidence：可扩展的遗传算法框架，适用于符号回归
-2. [Robust Sparse Identification of Nonlinear Dynamics via Least Trimmed Squares](/202606/30/2606.28584v1-robust-sparse-identification-of-nonlinear-dynamics-via-least-trimmed-squares)  
-   标签：评分：7.0/10、query:lyapunov-ai
-   evidence：数据驱动发现动力学用于李雅普诺夫函数
-3. [Modern Theory of Gradient-Based Optimization](/202606/30/2606.29206v1-modern-theory-of-gradient-based-optimization)  
+1. [Learning Dynamical Systems from Multiple Sparse Datasets: A Hierarchical Bayesian Modeling Approach](/202607/01/2606.24966v1-learning-dynamical-systems-from-multiple-sparse-datasets-a-hierarchical-bayesian-modeling-approach)  
    标签：评分：6.0/10、query:lyapunov-ai
-   evidence：优化中的动力系统Lyapunov函数构建
-4. [Why can genetic algorithms work in high-dimensional search spaces?](/202606/30/2606.30619v1-why-can-genetic-algorithms-work-in-high-dimensional-search-spaces)  
+   evidence：基于层次贝叶斯的稀疏数据动力学系统学习，与数据驱动李雅普诺夫函数发现相关
+2. [Latent Genetic Algorithm for Crystal Structure Prediction](/202607/01/2606.29220v1-latent-genetic-algorithm-for-crystal-structure-prediction)  
    标签：评分：6.0/10、query:sr
-   evidence：遗传算法理论对符号回归有启发
+   evidence：用于晶体结构预测的潜在遗传算法，与遗传算法符号回归方法相关
 
 
 <div class="dpr-home-promo-card">

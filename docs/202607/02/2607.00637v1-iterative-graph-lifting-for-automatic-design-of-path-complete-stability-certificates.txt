@@ -1,0 +1,705 @@
+Title: Iterative graph lifting for automatic design of path-complete stability certificates
+
+URL Source: https://arxiv.org/pdf/2607.00637v1
+
+Published Time: Thu, 02 Jul 2026 00:44:22 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Iterative graph lifting for automatic design of path-complete stability certificates 
+
+L´ ea Ninite and Rapha¨ el M. Jungers 
+
+Abstract — Stability of switched linear systems under arbi-trary switching is a fundamental problem in control theory, closely related to the joint spectral radius (JSR), which char-acterizes the worst-case growth rate of system trajectories. In this paper, we contribute to the path-complete approach for approximating the JSR. This framework constructs algebraic stability certificates using labeled directed graphs, known as path-complete graphs. These certificates can be computed via an associated optimization problem. We propose an iterative algorithm that refines path-complete graphs in an efficient and parsimonious manner. The algorithm relies on a graph-theoretic analysis of the optimality conditions of the underlying optimization problem. In particular, we derive a sufficient condition under which the exact JSR is attained by a given path-complete graph. When this condition is not satisfied, we identify bottleneck nodes by analyzing the graph induced by the active constraints. We then use this information to refine the path-complete graph via local graph lifting (node splitting), and repeat the procedure. Numerical experiments demonstrate the effectiveness and scalability of the proposed approach, out-performing state-of-the-art methods on all challenging instances tested. 
+
+I. INTRODUCTION Switched systems arise naturally in many areas of control and dynamical systems [1], [2]. They appear in a variety of applications including networked control systems [3], mechanical and engineering systems [4], and biological or epidemiological models [5]. A fundamental problem in the analysis of such systems is the assessment of their stability under arbitrary switching. For discrete-time switched linear systems, this question is closely related to the joint spectral radius (JSR), introduced by Rota and Strang [6]. The JSR captures the worst-case growth of products of matrices taken from a finite set and characterizes stability under arbitrary switching. However, computing or even approximating the JSR is known to be computationally challenging in general [7], [8]; see also [2] for a survey of the theory and applications of the JSR. Classical methods for certifying stability construct a com-mon Lyapunov function within a prescribed function class (e.g., quadratic functions that are LMI-representable [9]) by solving an optimization problem. However, these methods           
+
+> L. Ninite is a Research Fellow of the Fonds de la Recherche Scien-tifique – FNRS. R. M. Jungers is a FNRS honorary Research Associate. This project has received funding from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme under grant agreement No 864017 - L2C, from the Horizon Europe programme under grant agreement No101177842 - Unimaas, and from the ARC (French Community of Belgium)-project name: SID-DARTA. L. Ninite and R. M. Jungers are with the ICTEAM, UCLou-vain (Louvain-la-Neuve, Belgium). E-mail adresses:
+
+{lea.ninite, raphael.jungers }@uclouvain.be 
+
+suffer from conservatism induced by this restriction, as a valid common Lyapunov function may require a richer representation than the prescribed class. To reduce this conservatism, richer classes of Lyapunov certificates have been proposed, including polynomial Lya-punov functions computed via sum-of-squares (SOS) tech-niques [10] and approaches based on multiple Lyapunov functions [11], [12]. More recently, the path-complete Lyapunov framework 
+
+introduced in [13] appeared as a unifying perspective. It associates Lyapunov functions with the nodes of a labeled directed graph and enforces decrease conditions along its edges. If the graph satisfies a path-completeness property (see Definition 1 below), these inequalities guarantee that the resulting optimization problem provides an upper bound on the JSR. From early numerical experiments, it quickly became clear that the choice of the path-complete graph is crucial for the quality of the resulting bound on the JSR. Empirically, larger graphs (in terms of their number of nodes or edges) tend to provide tighter bounds. However, constructing suitable graphs for a given system remains a challenging task, and only a few systematic families of path-complete graphs are currently known. A notable systematic construction arises from Lyapunov functions that depend on a finite history of the switch-ing signal. This idea appeared in early work on switch-dependent quadratic Lyapunov functions [14]. In the path-complete Lyapunov framework, these constructions corre-spond to De Bruijn graphs [15]. Increasing the graph order yields tighter JSR bounds that converge asymptotically to the true value [13, Theorem 6.1]. However, the size of these graphs grows exponentially with the order, leading to large optimization problems. This motivates the search for systematic procedures to refine path-complete graphs and obtain tighter bounds on the JSR without the exponential increase in graph size associated with memory-based constructions such as De Bruijn graphs. To this end, we propose a theoretical analysis of the link between the optimality conditions of the optimization problem and the topological structure of the graph. This analysis leads to a systematic procedure to refine path-complete graphs in a parsimonious and efficient manner. 
+
+Contributions: Our contributions are threefold. First, we introduce a local graph transformation, referred to as a lifting operation. Given a node v, the lift splits 
+
+v into multiple copies, one for each of its out-neighbors, thereby refining the graph locally without uniformly increas-
+
+> arXiv:2607.00637v1 [math.OC] 1 Jul 2026
+
+ing the memory of the switching signal as in De Bruijn constructions. This transformation is shown to preserve path-completeness, a particularly desirable property since ver-ifying path-completeness of a labeled graph is PSPACE-complete [16, Theorem 4]. Second, we analyze the structure of the subgraph induced by the tight constraints of the optimal solution of the path-complete Lyapunov optimization problem. We show that this structure provides a simple certificate to determine whether a given path-complete graph already yields the exact joint spectral radius. Finally, we exploit this insight to design an iterative algorithm that refines path-complete graphs through local lifting operations. The algorithm uses the structure of the tight constraints to identify nodes whose lifting may improve the bound on the JSR. 
+
+Related work: Graph lifting operations were previ-ously considered in the context of polyhedral path-complete Lyapunov functions [17], where several candidate lifts are generated and the one yielding the best JSR bound is selected after solving the corresponding optimization problems. Our lifting operation differs from that of [17], and is coupled with an analysis of the optimization problem itself: rather than selecting among candidate lifts, we exploit the structure induced by the tight constraints of the optimal solution to determine which particular lifting operation may improve the bound. More recently, [18] proposed an SMT-based method to construct path-complete stability certificates. While this ap-proach can produce compact path-complete graphs, it suffers from the limited scalability of SMT solvers. In contrast, we leverage optimization theory combined with graph-theoretic analysis to iteratively build efficient and scalable stability certificates. 
+
+Outline: The remainder of the paper is organized as follows. Section II reviews the necessary background. Section III introduces the proposed lifting operation and demonstrates its main properties. Section IV analyzes the structure of the tight subgraph (see Definition 6) and estab-lishes the optimality certificate. Section V presents the lifting algorithm. Finally, Section VI illustrates the effectiveness of the proposed approach and its improved scalability compared to De Bruijn constructions. 
+
+Notations: Given M ∈ N, we let ⟨M ⟩ := {1, . . . , M }.For a set of matrices A = {A1, . . . , A M } ⊆ Rn×n, ρ(A)
+
+denotes the joint spectral radius, while for a matrix A ∈
+
+Rn×n, ρ(A) denotes the spectral radius. II. PRELIMINARIES 
+
+A. Problem: stability of arbitrarily switching systems 
+
+Consider a finite set of matrices A = {A1, . . . , A M } ⊂ 
+
+Rn×n. A switched linear system is defined as 
+
+xk+1 = Aσ(k)xk, (1) where xk ∈ Rn is the state at time k, and σ(k) ∈ ⟨ M ⟩ is the mode at time k. The function σ : N → ⟨ M ⟩ is called the 
+
+switching signal .We consider arbitrary switching , meaning that the switch-ing signal is viewed as an external uncontrolled signal. The stability of the arbitrarily switching system (1) is characterized by the joint spectral radius (JSR) of the matrix set A. The joint spectral radius of A is defined as 
+
+ρ(A) := lim  
+
+> k→∞
+
+max  
+
+> σ∈⟨ M⟩k
+
+∥Aσk · · · Aσ2 Aσ1 ∥1/k ,
+
+and is independent of the chosen norm. The JSR corresponds to the worst-case asymptotic growth rate of all products of matrices in A. In particular, the switched system (1) is stable if and only if ρ(A) < 1 (see e.g. [2, Corollary 1.1]). Computing the JSR is notoriously difficult and deter-mining whether ρ(A) ≤ 1 is an undecidable problem [7, Theorem 2]. As a consequence, most existing approaches aim at computing tractable bounds on ρ(A).
+
+B. The path-complete framework 
+
+Among the existing approaches to approximate the JSR, the path-complete Lyapunov framework , introduced in [13], provides a systematic way to derive tractable stability con-ditions and upper bounds on the JSR using directed labeled graphs and multiple Lyapunov functions. A directed labeled graph on ⟨M ⟩ is a pair G = ( S, E ),where S is a finite set of nodes and E ⊆ S × S × ⟨ M ⟩ is a set of labeled edges. An element (a, b, i ) ∈ E represents a directed edge from a to b labeled by i, corresponding to a transition under mode i.Intuitively, a directed labeled graph is path-complete if every possible switching sequence can be realized as a path in the graph. This is formalized below. 
+
+Definition 1 (Path-complete graph): Let G = (S, E )
+
+be a directed labeled graph on ⟨M ⟩. We say that G
+
+is path-complete if for any K ∈ N>0 and any se-quence σ = (i1, . . . , i K ) ∈ ⟨M ⟩K , there exists a path 
+
+{(ak, a k+1 , i k)}Kk=1 ⊆ E.Figure 1a shows a path-complete graph. The graph in Fig-ure 1b is not path-complete; for instance, it cannot generate the sequence 22 . Path-complete graphs are used to certify  
+
+> a1a2
+
+1 2
+
+1
+
+2 
+
+> (a)
+> a1a2
+
+1
+
+1
+
+2
+
+> (b)
+
+Fig. 1: (a) Path-complete graph with two nodes, for a system with two switching modes. (b) Graph not path-complete. stability of arbitrarily switching systems by associating a Lyapunov function to each node and enforcing decrease conditions along the edges of the graph. We formalize this idea below. 
+
+Definition 2 (Candidate Lyapunov function): A
+
+candidate Lyapunov function is a positive definite homogeneous function V : Rn → R≥0 satisfying 
+
+V (x) ≥ 0, ∀x ∈ Rn; V (x) = 0 ⇐⇒ x = 0; 
+
+V (λx ) = |λ|V (x), ∀x ∈ Rn, ∀λ ∈ R.
+
+Definition 3 (Path-complete Lyapunov function): Given 
+
+A = {A1, . . . , A M } ⊂ Rn×n, a path-complete Lyapunov function (PCLF) for A is a pair (G, V S ), where G = ( S, E )
+
+is a path-complete graph on ⟨M ⟩ and VS := {Va}a∈S is a set of candidate Lyapunov functions satisfying 
+
+Vb(Aix) ≤ Va(x), ∀(a, b, i ) ∈ E, ∀x ∈ Rn.
+
+The existence of a PCLF provides bounds on the joint spectral radius, as formalized in the following theorem. 
+
+Theorem 1 ([13, Theorem 2.4]): Let A = {A1, . . . , A M }
+
+and G be a path-complete graph. For γ > 0, set Aγ := 
+
+{γ−1Ai : i ∈ ⟨ M ⟩} . If Aγ admits a PCLF on G, then 
+
+ρ(A) ≤ γ.In practice, functions Va are often restricted to a tractable class of Lyapunov functions. When quadratic Lyapunov functions are considered, the smallest scalar γ satisfying the Lyapunov inequalities associated with a graph G can be obtained by solving the following optimization problem. 
+
+Problem 1: Let G = ( S, E ) be a directed labeled graph on ⟨M ⟩ and let A = {A1, . . . , A M } be a set of matrices. We consider the following optimization problem: 
+
+min   
+
+> {Pa}a∈S,γ ≥0
+
+γ
+
+s.t. γ2Pa ⪰ A⊤ 
+
+> i
+
+PbAi, ∀(a, b, i ) ∈ E, Pa ≻ 0, ∀a ∈ S. 
+
+We denote by γ⋆(G) the optimal value of Problem 1 on 
+
+G.If G is path-complete, then ρ(A) ≤ γ⋆(G). The quality of this upper bound γ⋆(G) strongly depends on the choice of the graph G. To construct path-complete graphs that yield tighter bounds, we introduce in the next section a local lift that lies at the core of our algorithm. III. THE FORWARD LIFT Intuitively, the forward lift of a graph G with respect to a node v consists of creating several copies of this node, one for each out-neighbor of v in G, including v itself if there is a self-loop. 1 The edges of the lifted graph are then defined so that the path-completeness of the graph is preserved after the lifting operation. The construction is formalized through the following definitions. 
+
+Definition 4: Let G = ( S, E ) be a directed labeled graph on ⟨M ⟩. For v ∈ S, define 
+
+Post( v) := {w ∈ S : ∃i, (v, w, i ) ∈ E}.
+
+Definition 5 (Forward lift): Let G = ( S, E ) be a directed labeled graph on ⟨M ⟩ and consider v ∈ S. The forward lift 
+
+of G with respect to v is the directed graph Gv = ( Sv , E v ),where the node set is defined by 
+
+Sv := ( S \ { v}) ∪ { v(w) : w ∈ Post( v)} 
+
+> 1One can analogously define a dual notion, the backward lift , by consid-ering in-neighbors instead of out-neighbors.
+
+and the edge set is defined by 
+
+Ev := E1 ∪ E2 ∪ E3 ∪ E4, (2) where 
+
+E1 := {(a, b, i ) ∈ E : a̸ = v, b ̸ = v},E2 := {(a, v (w), i ) : ( a, v, i ) ∈ E, w ∈ Post( v), a ̸ = v},E3 := {(v(w), w, i ) : ( v, w, i ) ∈ E, w ̸ = v},E4 := {(v(v), v (w), i ) : ( v, v, i ) ∈ E, w ∈ Post( v)}.
+
+An example of forward lift is shown in Figure 2.  
+
+> a(a1)1a2
+> a(a2)1
+
+1 2
+
+1
+
+1
+
+2
+
+2
+
+Fig. 2: Forward lift of the graph in Figure 1a with respect to node a1.In the theorem below, we prove that the forward lift preserves path-completeness. 
+
+Theorem 2: Let G = ( S, E ) be a path-complete graph. Then, for any node v ∈ S, the forward lift of G with respect to v is path-complete. 
+
+Proof: Let K ∈ N>0 and let σ = ( i1, . . . , i K ) ∈ ⟨ M ⟩K
+
+be any sequence of labels. Since G is path-complete, there exists a path {(ak, a k+1 , i k)}Kk=1 ⊆ E.Let v ∈ S and let Gv = ( Sv , E v ) be the forward lift of 
+
+G with respect to v. We construct a path in Gv with the sequence of labels σ. Define b1, . . . , b K+1 ∈ Sv as follows. If ak̸ = v, set bk = ak. If ak = v and k ≤ K, set bk =
+
+v(ak+1 ). If aK+1 = v, choose any w ∈ Post( v) and set 
+
+bK+1 = v(w).We verify that (bk, b k+1 , i k) ∈ Ev (defined in (2)) for all 
+
+k = 1 , . . . , K : 
+
+> •
+
+if ak̸ = v and ak+1 ̸ = v, then (bk, b k+1 , i k) ∈ E1, 
+
+> •
+
+if ak̸ = v and ak+1 = v, then (bk, b k+1 , i k) ∈ E2, 
+
+> •
+
+if ak = v and ak+1 ̸ = v, then (bk, b k+1 , i k) ∈ E3, 
+
+> •
+
+if ak = v and ak+1 = v, then (bk, b k+1 , i k) ∈ E4.Therefore, {(bk, b k+1 , i k)}Kk=1 ⊆ Ev , which shows that 
+
+Gv is path-complete. The following theorem shows that solving Problem 1 on a forward lift of a graph (not necessarily path-complete) yields a relaxation of the problem on the original graph. 
+
+Theorem 3: Let G = ( S, E ) be a directed labeled graph and let v ∈ S. Let Gv be the forward lift of G with respect to v. Then γ⋆(Gv ) ≤ γ⋆(G).
+
+Proof: Let (γ, {Pa}a∈S ) be feasible for Problem 1 on 
+
+G = ( S, E ). We construct a feasible solution for the forward lift Gv = ( Sv , E v ) with the same value γ.We define matrices on Sv as follows: 
+
+˜Pa := Pa for a ∈ S \ { v},
+
+˜Pv(w) := Pv for all w ∈ Post( v).
+
+We verify feasibility for each type of edge in Ev as defined in (2). 
+
+a) Edges in E1: These are edges (a, b, i ) ∈ E with 
+
+a̸ = v, b̸ = v. The inequality 
+
+γ2 ˜Pa = γ2Pa ⪰ A⊤ 
+
+> i
+
+PbAi = A⊤ 
+
+> i
+
+˜PbAi
+
+holds by feasibility for G.
+
+b) Edges in E2: These are edges (a, v (w), i ) with 
+
+(a, v, i ) ∈ E and a̸ = v. The required inequality is 
+
+γ2 ˜Pa = γ2Pa ⪰ A⊤ 
+
+> i
+
+Pv Ai = A⊤ 
+
+> i
+
+˜Pv(w) Ai,
+
+which holds because (a, v, i ) ∈ E in G.
+
+c) Edges in E3: These are edges (v(w), w, i ) with 
+
+(v, w, i ) ∈ E and w̸ = v. We must check 
+
+γ2 ˜Pv(w) ⪰ A⊤ 
+
+> i
+
+PwAi,
+
+which holds by feasibility for G since ˜Pv(w) = Pv .
+
+d) Edges in E4: These are edges (v(v), v (w), i ) with 
+
+(v, v, i ) ∈ E. The inequality 
+
+γ2 ˜Pv(v) = γ2Pv ⪰ A⊤ 
+
+> i
+
+Pv Ai = A⊤ 
+
+> i
+
+˜Pv(w) Ai
+
+is satisfied by feasibility for G.Thus (γ, { ˜Pa}) is feasible for Gv . Therefore every feasible solution for G yields a feasible solution for Gv with the same objective value, which concludes the proof. IV. THE TIGHT SUBGRAPH In this section, we analyze the structure of the tight subgraph , defined by the constraints that are active at a given solution of Problem 1. This analysis reveals when the current path-complete graph already provides a tight bound on the JSR and when additional forward lifts may still improve the bound, which will guide the design of the algorithm in Section V. 
+
+A. Definition and useful property 
+
+The definition of tight subgraph is formalized below. 
+
+Definition 6 (Tight subgraph): Given a directed labeled graph G = ( S, E ), let (γ, {Pa}a∈S ) be a feasible solution of Problem 1. The tight subgraph associated with this solution is the directed labeled graph ˜G = ( S, ˜E), where ˜E ⊆ E is defined as 
+
+˜E := (a, b, i ) ∈ E λmin 
+
+ γ2Pa − A⊤ 
+
+> i
+
+PbAi
+
+ = 0 .
+
+In the next proposition, we show that solving Problem 1 on the original graph or on the tight subgraph yields the same upper bound on the JSR. While this property is well known for convex programs, note that Problem 1 is non-convex. However, for any fixed γ ≥ 0, it reduces to a convex semidefinite feasibility problem. 
+
+Proposition 1: Let G = (S, E ) be a directed labeled graph on ⟨M ⟩, and let (γ⋆, {P ⋆a }a∈S ) be an optimal solution of Problem 1 on G. Let ˜G = ( S, ˜E) be the tight subgraph associated with this solution. Then γ⋆( ˜G) = γ⋆(G).
+
+Proof: The proof is given in Appendix A. 
+
+B. Cycle-based lower bound on the JSR 
+
+In this subsection, we consider graphs that are not path-complete, in particular directed cycles, for which Problem 1 yields lower bounds on the JSR (see Lemma 1). While these results do not involve the tight subgraph directly, they serve as auxiliary technical tools for deriving the graph-theoretic optimality certificate in Theorem 4. We first recall the definition of a directed cycle. 
+
+Definition 7 (Directed cycle): Let G = ( S, E ) be a di-rected labeled graph. A directed cycle is a sequence of edges 
+
+(a1, a 2, i 1), (a2, a 3, i 2), . . . , (ak, a 1, i k) ∈ E, 
+
+with a1, . . . , a k distinct nodes. The following lemma shows that solving Problem 1 on a cycle yields a lower bound on the JSR. 
+
+Lemma 1: Let G = ( S, E ) be a directed labeled graph consisting of a single directed cycle. Then γ⋆(G) ≤ ρ(A).
+
+Proof: The constraints of Problem 1 read 
+
+γ2Paj ⪰ A⊤ 
+
+> ij
+
+Paj+1 Aij , j = 1 , . . . , k, 
+
+with ak+1 = a1. Composing along the cycle gives 
+
+γ2kPa1 ⪰ (Aik · · · Ai1 )⊤Pa1 (Aik · · · Ai1 ).
+
+The smallest γ2k for which this holds for some Pa1 ≻ 0 is known to be ρ(Aik · · · Ai1 )2. Hence 
+
+γ⋆(G) = ρ(Aik · · · Ai1 )1/k .
+
+Since for any product Aik · · · Ai1 , one has ρ(A) ≥
+
+ρ(Aik · · · Ai1 )1/k , we obtain γ⋆(G) ≤ ρ(A).The following lemma shows that the value of γ⋆(G) is determined by the strongly connected components of G.
+
+Lemma 2: Let G = ( S, E ) be a directed labeled graph and let S(G) ⊆ S denote the set of strongly connected components of G. For each C ∈ S (G), denote by GC =(C, E C ) the subgraph induced by C.2 Then γ⋆(G) =max C∈S (G) γ⋆(GC ).
+
+Proof: The inequality 
+
+γ⋆(G) ≥ max  
+
+> C∈S (G)
+
+γ⋆(GC )
+
+is immediate since, for each C ∈ S(G), the constraints of Problem 1 on GC are a subset of those for G. We will therefore prove the reverse inequality. Let 
+
+¯γ := max  
+
+> C∈S (G)
+
+γ⋆(GC ).
+
+Let ε > 0 and set γ = ¯ γ + ε > 0.Consider the graph obtained by contracting each strongly connected component of G, that is, by replacing every component C ∈ S (G) with a single node and keeping all edges (a, b, i ) ∈ E with a ∈ C and b ∈ C′ as edges from 
+
+C to C′. The resulting graph is a directed acyclic graph with m := |S (G)| nodes. Hence the components admit a               
+
+> 2The subgraph induced by Cis the graph GC= ( C, E C)where EC=
+> {(a, b, i )∈E:a, b ∈C}.
+
+topological ordering C1, . . . , C m such that edges between components are of the form Ci → Cj with i < j .We construct a feasible solution (γ, {Pa}a∈S ) for Prob-lem 1 on G by combining optimal solutions on each strongly connected component and appropriately rescaling them to satisfy the inter-component constraints. For each k, let (γk, {P (k) 
+
+> a
+
+}a∈Ck ) be an optimal solution of Problem 1 on GCk = ( Ck, E Ck ). Since γ > γ k, we have 
+
+γ2P (k) 
+
+> a
+
+⪰ A⊤ 
+
+> i
+
+P (k) 
+
+> b
+
+Ai, ∀(a, b, i ) ∈ ECk .
+
+To enforce the constraints between components, we in-troduce scaling factors αk > 0 and define them along the topological ordering. Set α1 = 1, and suppose that 
+
+α1, . . . , α k−1 have been fixed. We choose αk so that, for any edge (a, b, i ) ∈ E with a ∈ Cj , b ∈ Ck, and j < k ,
+
+γ2αj P (j) 
+
+> a
+
+⪰ αkA⊤ 
+
+> i
+
+P (k) 
+
+> b
+
+Ai.
+
+Since γ2αj P (j) 
+
+> a
+
+≻ 0 and A⊤ 
+
+> i
+
+P (k) 
+
+> b
+
+Ai ⪰ 0, this is ensured by taking αk > 0 sufficiently small. Define Pa := αkP (k) 
+
+> a
+
+for a ∈ Ck. Then Pa ≻ 0 and, by construction, 
+
+γ2Pa ⪰ A⊤ 
+
+> i
+
+PbAi, ∀(a, b, i ) ∈ E. 
+
+Thus γ is feasible for Problem 1 on G, so γ⋆(G) ≤ γ = ¯ γ+ε
+
+for all ε > 0, hence γ⋆(G) ≤ ¯γ.Combining the previous two lemmas, we obtain the follow-ing result. 
+
+Proposition 2: Let G = (S, E ) be a directed labeled graph. Assume that each strongly connected component of G
+
+is a directed cycle or an isolated node 3. Then γ⋆(G) ≤ ρ(A).
+
+Proof: Let S(G) be the set of strongly connected components of G. By Lemma 2, there exists C ∈ S (G)
+
+such that γ⋆(G) = γ⋆(GC ).If C is a directed cycle, Lemma 1 gives γ⋆(GC ) ≤ ρ(A).If C is an isolated node, then GC has no edge and thus 
+
+γ⋆(GC ) = 0 ≤ ρ(A), concluding the proof. 
+
+C. Certificate of optimality 
+
+Building on the previous results, we derive a structural condition on the tight subgraph that guarantees tightness of the upper bound obtained by solving Problem 1 on a path-complete graph. Before stating the main theorem, we recall the following elementary result from graph theory. 
+
+Lemma 3: Let G = ( S, E ) be a directed labeled graph such that each node has at most one outgoing edge. Then every strongly connected component of G is either a directed cycle or an isolated node. 
+
+Proof: The proof is given in Appendix B. We can now state the following optimality certificate. 
+
+Theorem 4: Let G = ( S, E ) be a path-complete graph and let (γ⋆, {P ⋆a }a∈S ) be an optimal solution of Problem 1 on G. Let ˜G = ( S, ˜E) be the tight subgraph associated with this solution. Assume that in ˜G every node has at most one outgoing edge. Then γ⋆(G) = ρ(A).  
+
+> 3We call an isolated node a strongly connected component consisting of a single node and no self-loop.
+
+Proof: By Lemma 3, each strongly connected com-ponent of ˜G is either an isolated node or a directed cycle. Hence, by Proposition 2 applied on ˜G, γ⋆( ˜G) ≤ ρ(A). Since 
+
+γ⋆(G) = γ⋆( ˜G) by Proposition 1, and γ⋆(G) ≥ ρ(A) by Theorem 1, the result follows. 
+
+D. Forward lifts and the tight subgraph 
+
+We now study how the structure of the tight subgraph interacts with forward lifts introduced in Section III. In particular, we identify nodes for which performing a forward lift cannot improve the bound on the JSR. The following proposition formalizes this. 
+
+Proposition 3: Let G = (S, E ) be a directed labeled graph, and let (γ⋆, {P ⋆a }a∈S ) be an optimal solution of Problem 1 on G. Let ˜G = ( S, ˜E) be the tight subgraph associated with this solution. Suppose that there exists v ∈ S
+
+with at most one outgoing edge in ˜G, i.e., |{ (v, b, i ) ∈ ˜E}| ≤ 
+
+1. Then the forward lift of G with respect to v, denoted Gv ,satisfies γ⋆(Gv ) = γ⋆(G).
+
+Proof: Let v ∈ S with at most one outgoing edge in 
+
+˜E. We already know that γ⋆(Gv ) ≤ γ⋆(G) by Theorem 3. Let (γ, { ˆPa}a∈Sv ) be feasible for Problem 1 on Gv . We construct (γ, {Pa}a∈S ) feasible for ˜G = ( S, ˜E).If {(v, b, i ) ∈ ˜E} = {(v, ¯b, ¯i)}, set 
+
+Pa := ˆPa (a̸ = v), Pv := ˆPv(¯b) .
+
+If {(v, b, i ) ∈ ˜E} = ∅, choose ¯b ∈ Post( v) and set Pv := ˆPv(¯b) .We verify feasibility for each (a, b, i ) ∈ ˜E.If a, b ̸ = v, the edge appears identically in Gv , hence 
+
+γ2Pa ⪰ A⊤ 
+
+> i
+
+PbAi.
+
+If a = v and b̸ = v, then necessarily b = ¯b, and Gv
+
+contains the edge (v(¯b), ¯b, i ), so 
+
+γ2Pv = γ2 ˆPv(¯b) ⪰ A⊤ 
+
+> i
+
+ˆP¯bAi = A⊤ 
+
+> i
+
+P¯bAi.
+
+If a = b = v, then ¯b = v and Gv contains (v(v), v (v), i ),and feasibility of Gv gives 
+
+γ2 ˆPv(v) ⪰ A⊤ 
+
+> i
+
+ˆPv(v) Ai,
+
+which yields γ2Pv ⪰ A⊤ 
+
+> i
+
+Pv Ai.If a̸ = v and b = v, then (a, v (w), i ) ∈ Ev for any w ∈
+
+Post( v), hence 
+
+γ2 ˆPa ⪰ A⊤ 
+
+> i
+
+ˆPv(w) Ai.
+
+Taking w = ¯b gives γ2Pa ⪰ A⊤ 
+
+> i
+
+Pv Ai.Thus (γ, {Pa}) is feasible for ˜G. Therefore every feasible solution for Gv yields a feasible solution for ˜G with the same objective value, implying γ⋆(Gv ) ≥ γ⋆( ˜G). Since 
+
+γ⋆(G) = γ⋆( ˜G) by Proposition 1, we obtain γ⋆(Gv ) ≥
+
+γ⋆(G), concluding the proof. V. MAIN ALGORITHM In this section, we combine the forward lift introduced in Section III with the insights on the tight subgraph from Section IV to design an iterative algorithm that refines path-complete graphs. In particular, performing a forward lift with respect to a node that has at most one tight outgoing edge cannot improve the upper bound on the JSR (see Proposition 3). This significantly reduces the search space, allowing us to focus only on nodes with at least two tight outgoing edges, which are precisely nodes for which lifting may improve the bound. Moreover, Theorem 4 shows that if no such node exists, then the current graph is already optimal, in the sense that the resulting bound coincides with the JSR. In this case, the algorithm terminates with a certificate of optimality. The resulting procedure is summarized in Algorithm 1. 
+
+Algorithm 1 Optimization-Based Graph Lifting  
+
+> 1:
+
+Initialization  
+
+> 2:
+
+Let G0 = ( S0, E 0) be an arbitrary path-complete graph (e.g., the one in Figure 1a if M = 2 ).  
+
+> 3:
+
+Solve Problem 1 on G0 to obtain (γ0, {P (0)  
+
+> a
+
+}a∈S0 ). 
+
+> 4:
+
+Let ˜E0 be the set of tight edges.  
+
+> 5:
+
+for n = 0 , 1, 2, . . . do  
+
+> 6:
+
+Candidate node selection  
+
+> 7:
+
+Define 
+
+An := {a ∈ Sn : |{ (a, b, i ) ∈ ˜En}| ≥ 2}. 
+
+> 8:
+
+if An = ∅ then  
+
+> 9:
+
+return γn (certificate of optimality)  
+
+> 10:
+
+end if  
+
+> 11:
+
+Select vn ∈ An. 
+
+> 12:
+
+Graph lifting  
+
+> 13:
+
+Construct the forward lift 
+
+Gn+1 := Gvn 
+
+> n
+
+. 
+
+> 14:
+
+Optimization step  
+
+> 15:
+
+Solve Problem 1 on Gn+1 to obtain 
+
+(γn+1 , {P (n+1)  
+
+> a
+
+}a∈Sn+1 ). 
+
+> 16:
+
+Let ˜En+1 be the set of tight edges.  
+
+> 17:
+
+end for 
+
+VI. NUMERICAL EXPERIMENTS In this section, we evaluate the performance of the pro-posed algorithm on randomly generated systems and com-pare it with the De Bruijn hierarchy. We recall the definition of De Bruijn graphs, which form a hierarchical family indexed by their order and provide a systematic sequence of increasingly tight bounds on the JSR. They are therefore commonly used as a baseline when evaluating path-complete graph constructions. 
+
+Definition 8 (De Bruijn graph): The (primal) De Bruijn graph of order l ∈ N on ⟨M ⟩ is the directed graph whose nodes are the elements of ⟨M ⟩l. There is an edge labeled 
+
+i ∈ ⟨M ⟩ from (j1, . . . , j l) to (i, j 1, . . . , j l−1) for every 
+
+(j1, . . . , j l) ∈ ⟨ M ⟩l.Our experimental setup is similar to the protocol of [18, Example 4.3]. We generate 500 random systems consisting of M = 6 matrices of dimension n = 2 . All experiments are performed in Julia using JuMP and MOSEK on a laptop equipped with an Apple M5 processor and 16GB of RAM. For each system, we proceed as follows. First, we run Algorithm 1, initialized with the dual 4 De Bruijn graph of order 1. The algorithm is run until two successive estimates of the JSR differ by less than 10 −5, or until no node with two tight outgoing edges remains. We denote by γ the resulting estimate. Next, we solve Problem 1 on De Bruijn graphs of increas-ing order until the resulting estimate matches the accuracy achieved by γ.Figure 3a compares the size of the graphs produced by Al-gorithm 1 and by the corresponding De Bruijn graphs achiev-ing the same JSR estimate. When a low-order De Bruijn graph suffices (yellow dots), both approaches yield graphs of comparable size. In contrast, when higher-order graphs are required, our method produces significantly smaller graphs. Across all instances, our graphs are never larger than their De Bruijn counterparts, and are strictly smaller in 46 out of 500 cases. A striking example requires 7776 nodes and 
+
+46656 edges for De Bruijn, while our method produces a graph with only 36 nodes and 216 edges. Figure 3b compares the computation time required to reach the same estimate. When very small graphs are sufficient, our algorithm is slightly slower than the De Bruijn hierarchy; however, the computation time remains below one second in these cases. For more challenging instances where larger De Bruijn graphs are required, the proposed approach becomes significantly faster since it constructs the graph adaptively rather than growing the full hierarchy. In the most extreme instance of our experiments, the De Bruijn hierarchy required 
+
+2165 seconds, while our approach terminated in 10 .5 sec-onds. Overall, these results show that the proposed lifting pro-cedure adapts the graph structure to the system at hand, producing more compact certificates than the De Bruijn con-struction. This advantage becomes particularly pronounced when high-order graphs are required, where the exponential growth of the De Bruijn hierarchy leads to a sharp increase in both graph size and computation time. To highlight the scalability limitations of the De Bruijn hierarchy with respect to the number of modes, we generate random systems and evaluate its performance for several values of M . Table I reports cases where it fails to reach the same level of accuracy as Algorithm 1 within a time limit of 30 minutes. The table shows that, although De Bruijn graphs involve significantly larger numbers of nodes, they fail to match the accuracy achieved by Algorithm 1 within the time limit. In 
+
+> 4The dual De Bruijn graph is obtained by reversing all edges of the (primal) De Bruijn graph.
+
+(a) Number of nodes and edges 
+
+(b) Computation time 
+
+Fig. 3: Comparison between the De Bruijn hierarchy and the graph construction from Algorithm 1 on 500 random systems with n = 2 and M = 6 . The dashed line indicates equality. Points below the line correspond to instances where the proposed method produces smaller graphs or requires less computation time. Our method yields substantially smaller graphs and faster computation times when high-order De Bruijn graphs are required. contrast, the proposed method attains more accurate esti-mates using substantially smaller graphs. Importantly, for all instances, the estimate returned by Algorithm 1 is obtained within 40 seconds, and within 10 seconds for values of M
+
+smaller than 10 .VII. CONCLUSION We proposed a method for refining path-complete graphs in the Lyapunov-based approximation of the joint spectral radius (JSR). Our analysis shows that the structure of the tight constraints of the optimal solution provides a simple certificate to determine whether a given graph already yields the exact JSR bound. Based on this insight, we designed an iterative algorithm that selects nodes to lift by inspecting the tight subgraph and applies a local lifting operation. Numeri-cal experiments show that achieving the same estimate as our algorithm with the De Bruijn hierarchy requires much larger graphs, resulting in significantly higher computation times. This limitation becomes more pronounced as the number of modes increases, with De Bruijn graphs failing to reach 
+
+Algorithm 1 De Bruijn 
+
+M γ Nodes γ Nodes 4 1.82388 25 1.82476 4096 
+
+6 2.31039 26 2.31065 1296 
+
+8 2.09257 29 2.092878 512 
+
+10 2.5635 73 2.58689 1000 
+
+TABLE I: Comparison between Algorithm 1 and the De Bruijn hierarchy for increasing numbers of modes M ,on challenging instances. For each method, we report the achieved upper bound γ and the number of nodes in the corresponding graph. For the De Bruijn hierarchy, γ and the number of nodes correspond to the largest order completed within a 30-minute time limit. the same accuracy within the time limit, while our method remains computationally efficient. Our results suggest that the structure of tight constraints contains valuable information about the minimal graph struc-ture required to certify the JSR. Future work includes investi-gating alternative lifting operations and node-selection strate-gies that further exploit this structure to design optimization-guided algorithms for constructing path-complete graphs. VIII. ACKNOWLEDGMENTS We thank Guillaume O. Berger for insightful discussions. REFERENCES [1] D. Liberzon, Switching in systems and control . Springer, 2003, vol. 190. [2] R. Jungers, The joint spectral radius: theory and applications .Springer Science & Business Media, 2009, vol. 385. [3] M. Donkers, W. M. H. Heemels, N. Van de Wouw, and L. Hetel, “Stability analysis of networked control systems using a switched linear systems approach,” IEEE Transactions on Automatic control ,vol. 56, no. 9, pp. 2101–2115, 2011. [4] F. Blanchini, D. Casagrande, P. Gardonio, and S. Miani, “Constant and switching gains in semi-active damping of vibrating structures,” 
+
+International Journal of Control , vol. 85, no. 12, pp. 1886–1897, 2012. [5] E. A. Hernandez-Vargas, R. H. Middleton, and P. Colaneri, “Optimal and mpc switching strategies for mitigating viral mutation and escape,” 
+
+IFAC Proceedings Volumes , vol. 44, no. 1, pp. 14 857–14 862, 2011. [6] G.-C. Rota and G. Strang, “A note on the joint spectral radius,” 
+
+Indagationes Mathematicae , vol. 22, pp. 379–381, 1960. [7] V. Blondel and J. Tsitsiklis, “The boundedness of all products of a pair of matrices is undecidable,” Systems & Control Letters , vol. 41, pp. 135–140, 10 2000. [8] J. N. Tsitsiklis and V. D. Blondel, “The lyapunov exponent and joint spectral radius of pairs of matrices are hard—when not impossible—to compute and to approximate,” Mathematics of Control, Signals, and Systems , vol. 10, pp. 31–40, 1997. [9] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan, Linear Matrix Inequalities in System and Control Theory . Society for Industrial and Applied Mathematics, 1994. [10] P. A. Parrilo and A. Jadbabaie, “Approximation of the joint spectral radius using sum of squares,” Linear Algebra and its Applications ,vol. 428, no. 10, pp. 2385–2402, 2008. [11] M. Branicky, “Multiple lyapunov functions and other analysis tools for switched and hybrid systems,” IEEE Transactions on Automatic Control , vol. 43, no. 4, pp. 475–482, 1998. [12] J.-W. Lee and G. E. Dullerud, “Uniform stabilization of discrete-time switched and markovian jump linear systems,” Automatica , vol. 42, no. 2, pp. 205–218, 2006. [13] A. A. Ahmadi, R. M. Jungers, P. A. Parrilo, and M. Roozbehani, “Joint spectral radius and path-complete graph lyapunov functions,” SIAM Journal on Control and Optimization , vol. 52, no. 1, pp. 687–717, 2014. [14] P.-A. Bliman and G. Ferrari-Trecate, “Stability analysis of discrete-time switched systems through lyapunov functions with nonminimal state,” IFAC Proceedings Volumes , vol. 36, no. 6, pp. 325–329, 2003. [15] N. G. De Bruijn and P. Erd¨ os, “On a combinatorial problem,” 
+
+Proceedings of the Section of Sciences of the Koninklijke Nederlandse Akademie van Wetenschappen te Amsterdam , vol. 51, no. 10, pp. 1277– 1279, 1948. [16] R. Jungers, A. Ahmadi, P. Parrilo, and M. Roozbehani, “A charac-terization of lyapunov inequalities for stability of switched systems,” 
+
+IEEE Transactions on Automatic Control , vol. 62, no. 6, pp. 3062– 3067, 2017. [17] N. Athanasopoulos and R. M. Jungers, “Polyhedral path-complete lyapunov functions,” in 2019 IEEE 58th Conference on Decision and Control (CDC) , 2019, pp. 3399–3404. [18] A. Abate, V. Debauche, M. Giacobbe, and D. Roy, “Succinct synthesis of multiple lyapunov certificates for switched systems,” in Proceedings of the ACM International Conference on Hybrid Systems: Computation and Control (HSCC) , 2026, to appear. 
+
+APPENDIX 
+
+A. Proof of Proposition 1 
+
+Let (γ⋆, {P ⋆a }) and (˜ γ, { ˜Pa}) be optimal solutions to Problem 1 on G and ˜G, respectively. Since ˜E ⊆ E, any feasible solution of Problem 1 on G is feasible on ˜G,hence ˜γ ≤ γ⋆. Assume for contradiction that ˜γ < γ ⋆. For 
+
+λ ∈ [0 , 1] , define 
+
+ˆPa(λ) = λP ⋆a + (1 − λ) ˜Pa ≻ 0.
+
+For (a, b, i ) ∈ E, define 
+
+Fa,b,i (λ) = γ⋆ ˆPa(λ) − A⊤ 
+
+> i
+
+ˆPb(λ)Ai.
+
+By linearity, 
+
+Fa,b,i (λ) = λF a,b,i (1) + (1 − λ)Fa,b,i (0) ,
+
+where 
+
+Fa,b,i (1) = γ⋆P ⋆a − A⊤ 
+
+> i
+
+P ⋆b Ai ⪰ 0.
+
+If (a, b, i ) ∈ ˜E, then feasibility of (˜ γ, { ˜Pa}) and ˜γ < γ ⋆
+
+give 
+
+Fa,b,i (0) ⪰ (γ⋆ − ˜γ) ˜Pa ≻ 0,
+
+hence Fa,b,i (λ) ≻ 0 for every λ < 1.If (a, b, i ) /∈ ˜E, then Fa,b,i (1) ≻ 0 and by continuity there exists ¯λa,b,i < 1 such that Fa,b,i (λ) ≻ 0 for λ ∈ (¯λa,b,i , 1] .Let ¯λ = max (a,b,i ) /∈ ˜E ¯λa,b,i and choose λ ∈ (¯λ, 1) . Then 
+
+Fa,b,i (λ) ≻ 0 for all (a, b, i ) ∈ E, so (γ⋆, { ˆPa(λ)}) is strictly feasible for Problem 1 on G. It implies that there exists ε > 0
+
+such that (γ⋆ − ε, { ˆPa(λ)}) remains feasible for Problem 1 on G, contradicting optimality of γ⋆.
+
+B. Proof of Lemma 3 
+
+Let C be a strongly connected component of G. If C
+
+consists of a single node with no self-loop, it is an isolated node. Otherwise, since C is strongly connected, every node in 
+
+C must have an outgoing edge whose endpoint also lies in 
+
+C. As each node has at most one outgoing edge, each node in C has exactly one successor in C. Starting from any node and following successive edges therefore produces a directed cycle contained in C.If C contained a node outside this cycle, it would have a path to the cycle but no path back, contradicting strong connectivity. Hence C is a directed cycle.

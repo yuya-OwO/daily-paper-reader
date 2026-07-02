@@ -6,39 +6,40 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-01
-- 运行时间：2026-07-01 22:17:30 UTC
+- 最新运行日期：2026-07-02
+- 运行时间：2026-07-02 21:56:32 UTC
 - 运行状态：成功
-- 本次总论文数：5
-- 精读区：3
-- 速读区：2
+- 本次总论文数：6
+- 精读区：2
+- 速读区：4
 
 ### 今日简报（AI）
-今日精读两篇高分论文，速读两篇，重点关注连续时间状态估计的高概率ISS管以及控制理论与机器学习的范式转换。
-
-最值得精读的是《High-Probability ISS Tubes for Continuous-Time State Estimation》（10.0/10），其次是《Stabilization Learning: A Paradigm Transition》（9.0/10），前者在估计理论中提供严格概率保证，后者为控制与ML融合开辟新路径。
-
-建议普通读者优先阅读这两篇精读论文，尤其是10分论文的数学框架；后续可关注从多个稀疏数据集学习动力系统的层次贝叶斯方法，以及晶体结构预测的潜在遗传算法。
-- 详情：[/202607/01/README](/202607/01/README)
+1) 今日精读聚焦LLM多智能体框架破解电力系统动态模型发现难题，以及稳定学习范式融合控制理论与机器学习。  
+2) 最值得关注两篇：基于大模型的协同建模方法（9.0分）与稳定学习理论突破（8.0分），两者均指向工业智能与理论交叉前沿。  
+3) 建议优先尝试将LLM协作框架应用于自身动态系统建模，同时关注稳定学习在非线性控制中的落地可能性。
+- 详情：[/202607/02/README](/202607/02/README)
 
 ### 精读区论文标签
-1. [High-Probability ISS Tubes for Continuous-Time State Estimation](/202607/01/2606.29536v1-high-probability-iss-tubes-for-continuous-time-state-estimation)  
-   标签：评分：10.0/10、query:lyapunov-ai
-   evidence：使用二次李雅普诺夫不等式进行输入-状态稳定性边界分析
-2. [Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning](/202607/01/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning)  
-   标签：评分：9.0/10、query:lyapunov-ai
-   evidence：直接涉及基于李雅普诺夫的分析与设计的稳定化学习
-3. [Evaluation of Population Initialization Methods for Genetic Programming-based Symbolic Regression](/202607/01/2606.31990v1-evaluation-of-population-initialization-methods-for-genetic-programming-based-symbolic-regression)  
+1. [A Novel Method for Differential-Algebraic Dynamic Model Discovery in Power Systems: An LLM-Based Multi-Agent Collaborative Framework](/202607/02/2606.31314v1-a-novel-method-for-differential-algebraic-dynamic-model-discovery-in-power-systems-an-llm-based-multi-agent-collaborative-framework)  
    标签：评分：9.0/10、query:sr
-   evidence：遗传编程符号回归初始化评估
+   evidence：基于大语言模型的动态模型发现框架，类似于符号回归
+2. [Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning](/202607/02/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning)  
+   标签：评分：8.0/10、query:lyapunov-ai
+   evidence：综述稳定性学习，包括基于Lyapunov的方法和数据驱动方法
 
 ### 速读区论文标签
-1. [Learning Dynamical Systems from Multiple Sparse Datasets: A Hierarchical Bayesian Modeling Approach](/202607/01/2606.24966v1-learning-dynamical-systems-from-multiple-sparse-datasets-a-hierarchical-bayesian-modeling-approach)  
+1. [Metric Aggregation Divergence: A Hidden Validity Threat in Agent-Based Policy Optimization and a Contractual Remedy](/202607/02/2606.29038v1-metric-aggregation-divergence-a-hidden-validity-threat-in-agent-based-policy-optimization-and-a-contractual-remedy)  
+   标签：评分：7.0/10、query:sr
+   evidence：使用多目标进化算法于基于代理的策略优化
+2. [Approximation and Controllability of Nonlinear Control-Affine Systems via Semiautonomous Neural Ordinary Differential Equations](/202607/02/2606.29338v1-approximation-and-controllability-of-nonlinear-control-affine-systems-via-semiautonomous-neural-ordinary-differential-equations)  
+   标签：评分：7.0/10、query:lyapunov-ai
+   evidence：神经ODE用于非线性控制系统近似，可间接用于李雅普诺夫函数
+3. [An Inner-Outer Iteration Algorithm with Optimal Parameters for Stochastic Lyapunov Matrix Equation](/202607/02/2607.00451v1-an-inner-outer-iteration-algorithm-with-optimal-parameters-for-stochastic-lyapunov-matrix-equation)  
+   标签：评分：7.0/10、query:lyapunov-ai
+   evidence：求解随机Lyapunov矩阵方程，这是Lyapunov函数构造的关键
+4. [Iterative graph lifting for automatic design of path-complete stability certificates](/202607/02/2607.00637v1-iterative-graph-lifting-for-automatic-design-of-path-complete-stability-certificates)  
    标签：评分：6.0/10、query:lyapunov-ai
-   evidence：基于层次贝叶斯的稀疏数据动力学系统学习，与数据驱动李雅普诺夫函数发现相关
-2. [Latent Genetic Algorithm for Crystal Structure Prediction](/202607/01/2606.29220v1-latent-genetic-algorithm-for-crystal-structure-prediction)  
-   标签：评分：6.0/10、query:sr
-   evidence：用于晶体结构预测的潜在遗传算法，与遗传算法符号回归方法相关
+   evidence：通过路径完备图自动设计切换系统稳定性证书
 
 
 <div class="dpr-home-promo-card">

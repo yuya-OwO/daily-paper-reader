@@ -1,0 +1,283 @@
+Title: Metric Aggregation Divergence: A Hidden Validity Threat in Agent-Based Policy Optimization and a Contractual Remedy
+
+URL Source: https://arxiv.org/pdf/2606.29038v1
+
+Published Time: Tue, 30 Jun 2026 00:47:13 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Metric Aggregation Divergence: A Hidden Validity Threat in Agent-Based Policy Optimization and a Contractual Remedy 
+
+A P REPRINT 
+
+Ruiyu Zhang 
+
+Department of Politics and Public Administration The University of Hong Kong 
+
+ruiyuzh@connect.hku.hk 
+
+Lin Nie 
+
+Department of Applied Social Sciences The Hong Kong Polytechnic University 
+
+lin-apss.nie@polyu.edu.hk 
+
+Xin Zhao 
+
+Department of Applied Social Sciences The Hong Kong Polytechnic University 
+
+xinnn.zhao@connect.polyu.hk 
+
+June 30, 2026 
+
+# ABSTRACT 
+
+Metric aggregation divergence (MAD) is the silent inconsistency that arises when distinct pipeline stages in an agent-based model coupled with a multi-objective evolutionary algorithm (ABM+MOEA) independently re-implement how an outcome metric is extracted from simulation trajectories. Unlike deliberate analysis choices, MAD operates at the level of pipeline architecture: each stage is internally coherent, and the inconsistency becomes visible only when cross-stage outputs are compared. Code inspection of EpidemiOptim , a JAIR-published epidemic policy toolbox, reveals three structurally independent aggregation paths in peer-reviewed code. A faithful replication of this structure produces champion disagreement in 64.2% of independent runs ( n=500 , 95% CI: [59.9%, 68.3%]). In a 300-seed policy-flip experiment, divergent aggregation causes the optimizer to recommend the wrong champion in 83% of replications, with a mean welfare gap of 2.19 units and a Gini inequality gap of 0.050 units; in a follow-up inference audit, 3 of 249 flipped seeds cross the significance boundary itself. A complementary enterprise follow-up produces the predicted null under near-commensurable rankings ( ρ = 0 .991 ), while a public upstream rerun of the Lake Problem DPS workflow shows that the archived published-path recommendation reaches joint-threshold success 0.401 whereas a shared contract-path rule reaches 0.552. We introduce the metric contract — a single shared callable enforced at dispatch time across all pipeline stages — as the remedy. Framed as standard engineering discipline applied to the cross-stage metric interface, the contract eliminates divergence by construction with approximately 3% runtime overhead. 
+
+Keywords agent-based modeling · policy optimization · multi-objective evolutionary algorithms · validity threats ·
+
+metric aggregation · reproducibility · NSGA-II 
+
+# 1 Introduction 
+
+To understand which tax policy maximizes sustained welfare, a regulatory analyst couples an agent-based model with NSGA-II, identifies a Pareto-optimal champion across eight economic scenarios, and validates it with a bootstrap confidence interval. The paper is published; the policy is recommended. What no reviewer saw: the optimizer measured welfare as episode-mean biomass; the tournament scorer measured it as final-step biomass; the confidence-interval loop measured it as a rolling 10-step mean. Three independent implementations of the same metric, none aware of the others. This discrepancy across the three implementations can change which policy is selected: the evolved “champion” is the 
+
+> arXiv:2606.29038v1 [cs.MA] 27 Jun 2026
+
+Metric Aggregation Divergence A P REPRINT 
+
+policy with volatile but occasionally high peaks, not the one with the highest sustained welfare. Conversely, when the candidate rankings induced by final-step and episode-mean aggregation are already near-commensurable, the same architecture is predicted to produce no flip at all. This scenario is not an edge case. It arises from a structural feature of ABM+MOEA policy pipelines that has gone unnamed and unaudited: each pipeline stage — optimizer, tournament evaluator, statistical inference engine — independently re-implements how an outcome metric is computed from simulation trajectories. We call this metric aggregation divergence (MAD ): the silent inconsistency that arises when distinct pipeline stages independently re-implement the aggregation of a shared outcome metric. Unlike data bugs that produce obvious anomalies, MAD is self-concealing — each stage produces internally consistent results, and the divergence emerges only when their outputs are compared side-by-side, which no reviewer, co-author, or automated check is designed to do.  
+
+> MAD
+
+belongs to the same family of hidden validity threats as researcher degrees of freedom [ 1] and the garden of forking paths [ 2], but it operates at the level of pipeline architecture rather than deliberate analysis choices. The distinction matters: researcher degrees of freedom require a choice point that could have been made differently; MAD requires only that different people (or different times) coded different pipeline stages without a shared metric specification. No bad intent is needed; the natural workflow of building a pipeline in stages is sufficient. This article makes three contributions. 1. Conceptual. We identify pipeline architecture as a previously unnamed locus of unregistered degrees of freedom in computational policy research. Metric aggregation divergence is a specific instance: when the same outcome metric is aggregated independently at each pipeline stage, the resulting inconsistency can silently alter which policy is selected as optimal. This framing extends the reproducibility reform agenda — which has focused on analysis choices — to the architectural level where pipeline stages are connected. 2. Empirical. We demonstrate the threat through controlled experiments and a real-world replication plus one published recommendation comparison. Code inspection of EpidemiOptim [3], a JAIR-published toolbox for epidemic policy optimization, reveals three structurally independent aggregation paths in peer-reviewed code. A faithful replication produces champion disagreement in 64.2% of independent runs, translating the divergence into different epidemic-control recommendations. In a 300-seed policy-flip experiment, divergent aggregation causes the optimizer to recommend the wrong champion in 83% of replications (welfare gap 2.19 units). A complementary enterprise follow-up produces the predicted null under near-commensurable rankings ( ρ = 0 .991 ), identifying the boundary condition under which the threat is suppressed. In the exact repo-backed Lake Problem DPS workflow [ 4], a public rerun of the archived published-path recommendation against a shared contract-path rule over the same candidate set produces a direct policy difference: the contract path wins 159 versus 8 discordant DPS states and 132 versus 16 intertemporal states, with materially higher joint-threshold success in both formulations. The threat is driven by aggregator functional distance ( 4.1× more variance than noise), not by stochastic noise — practitioners cannot mitigate it by increasing episode count. 3. Practical. We introduce the metric contract — a single shared callable enforced at dispatch time across all pipeline stages — as the remedy. Framed honestly as the application of established engineering discipline (Design by Contract [ 5], dependency injection) to the cross-stage metric interface, the contract eliminates diver-gence by construction with approximately 3% runtime overhead. A six-item reporting checklist operationalizes the remedy for practitioners. The remainder of this article is organized as follows. Section 2 defines the pipeline architecture framing and formalizes  
+
+> MAD
+
+with its scope conditions. Section 3 characterizes the mechanism through controlled experiments, demonstrating that aggregator distance drives divergence across structurally distinct ABMs. Section 4 demonstrates the policy consequences through code-verified divergence in a published pipeline, a faithful replication that translates into different epidemic-control recommendations, and an archived published recommendation comparison in the Lake Problem DPS workflow. Section 5 introduces the metric contract remedy and its properties. Discussion and limitations follow in Sections 6 and 7. 
+
+# 2 Pipeline Architecture and Metric Aggregation Divergence 
+
+2.1 The Three-Stage Pipeline 
+
+A typical ABM+MOEA policy-search pipeline can be summarized in three stages. Stage 1 (optimizer): NSGA-II [ 6 ]or a similar algorithm evaluates candidate policy parameter vectors by running the ABM for Nep episodes across Nsc 
+
+scenarios and aggregating per-episode trajectories into scalar fitness values. Stage 2 (tournament): the Pareto front is re-evaluated — often at higher episode count or under different scenario conditions — and candidates are ranked to 2Metric Aggregation Divergence A P REPRINT 
+
+select a champion. Stage 3 (inference): bootstrap confidence intervals or hypothesis tests are computed to quantify uncertainty around the champion’s performance. Each stage requires a mapping f : T → R from an episode trajectory τ = ( x1, x 2, . . . , x T ) to a scalar. Typical choices include the episode mean ¯τ , the terminal value xT , the 75th percentile, or normalized Shannon entropy. When stages are implemented independently — the default in published pipelines — each developer naturally selects the statistic that is convenient to compute at that point in the code: the mean where a running accumulator exists, the final step where the simulation object is still alive. This convenience-driven selection is the structural root cause of MAD .ABM-based public-policy modeling is commonly used as a decision-support workflow rather than as a single-shot predictive model, which means that simulation, search, scenario exploration, and post-optimization evaluation are often assembled from distinct components [ 7, 8, 3, 9]. Comparable modular policy-search architectures and problem-formulation-sensitive water-resources workflows also appear in published robust-management and infrastructure-planning studies [ 4 , 10 , 11 ], and ABM-native electricity-market design likewise optimizes multi-year policy schedules rather than one-shot terminal actions [ 12 ], while the broader decision-making-under-deep-uncertainty literature explicitly frames such settings as wicked public-policy problems that require exploratory workflow design rather than one-shot optimization [ 13 ], and the surrounding many-objective robust decision-making tooling treats robustness evaluation as an explicit workflow object rather than a mere afterthought [ 14 ]. Closely related threshold-oriented pollution-control studies in the same lake-problem family likewise frame the task as discovering policy tradeoffs under environmental tipping behavior [ 15 ], and optimization-oriented ABM workflows are documented explicitly in the social-simulation methods literature [ 16 ], indicating that the interface problem studied here is not unique to epidemic control. That modularity is useful, but it also creates a new validity burden at the handoff between stages: the same substantive outcome must remain the same computed metric throughout the pipeline. Two criteria bear on the validity of an ABM+MOEA policy pipeline [ 17 , 18 , 19 ]. First is internal consistency : do the pipeline stages share a common definition of the outcome metric? Second is external validity : does the champion policy identified by the pipeline perform as expected when deployed? MAD violates both simultaneously: it corrupts internal consistency (each stage operationalizes the metric differently) and thereby undermines external validity (the reported champion is not the genuine optimum under any single operationalization). 
+
+2.2 Formal Definition and Scope Conditions Definition 1 (Metric Aggregation Divergence) . Let f, g : T → R be the aggregators used by any two distinct pipeline stages. Metric aggregation divergence occurs when f and g induce conflicting ordinal rankings on the policy space: there exist policies π1, π 2 such that f (τπ1 ) > f (τπ2 ) but g(τπ1 ) < g (τπ2 ).
+
+The definition captures champion reversal : the policy ranked first by Stage 1 is not the policy ranked first by Stage 2 or 3, with consequences for reported welfare estimates, policy recommendations, and inferential conclusions. 
+
+Scope conditions. The MAD threat is activated when two conditions hold simultaneously: (i) the aggregator pair (f, g )
+
+is incommensurable — measuring structurally different latent properties of the trajectory (e.g., entropy vs. mean); and (ii) the trajectory dynamics exhibit sufficient temporal structure (non-monotone, hump-shaped, or convergent patterns) such that different aggregators extract genuinely different signals. For monotone trajectories, all standard aggregators preserve the same ordinal ranking — so we infer that monotone welfare dynamics constitute a scope condition under which MAD does not manifest, at least for the parameter range studied here. The scope condition serves as both an explanation of null results and a diagnostic for which pipeline designs are at risk. 
+
+2.3 Why Entropy Is the Worst Aggregator 
+
+The choice of aggregation operator is responsible for the greatest amount of policy divergence in our experiments. Entropy captures trajectory shape : the full distributional signature of how the outcome variable moves over time. Mean and median capture central location ; final-step captures the endpoint . These statistics measure fundamentally different latent properties of a trajectory, and for policies that trade off stability against peak performance — common in regulatory, ecological, and epidemic intervention design — the latent properties are genuinely incommensurable. In our data, the Spearman correlation between episode entropy and episode mean is ρ = 0 .37 ; between mean and Q75, ρ = 0 .94 . Commensurable pairs (mean, Q75, median) produce low reversal rates at all noise levels; the incommensurable entropy–mean pair produces high reversal rates that are invariant to noise, confirming the structural rather than stochastic origin. 3Metric Aggregation Divergence A P REPRINT 
+
+2.4 Positioning: Pipeline Architecture as Unregistered Degrees of Freedom 
+
+The broader reproducibility literature [ 20 , 21 ] has established that flexible analysis choices inflate false-positive rates and bias effect sizes. MAD is a structural analogue: not a deliberate analysis choice, but an architectural non-decision that introduces unregistered degrees of freedom into metric computation. The distinction is important: researcher degrees of freedom [ 1] operate at the level of analysis choices (which test, which covariates, which stopping rule);  
+
+> MAD
+
+operates at the level of pipeline architecture (which aggregation function at which stage). Unlike deliberate HARKing [ 22 ], MAD requires no bad intent — it emerges from the natural workflow of building a pipeline in stages, each developed by a different person or at a different time. Existing validation approaches for ABM+MOEA pipelines focus on whether the champion policy is consistent with empirical benchmarks, which requires ground-truth data that may not be available [23]. Even when modeling choices are examined, the evaluation is typically post-hoc and domain-specific. MAD represents a process-level threat — one that results-level V&V is structurally unable to detect, because each stage produces internally consistent outputs and the error is only visible at the cross-stage interface. ABM rigor and documentation guidelines emphasize transparent model description, credible validation, and artifact traceability [ 24 , 19 , 25 , 26 , 27 ], but they do not specify cross-stage metric consistency as a required element. Sensitivity analysis [ 28 ] varies input parameters, not aggregation conventions, and therefore cannot detect MAD .Meyer’s Design by Contract [ 5] and the measurement-theory principle of operationalization consistency [ 29 ] — same construct, same operationalization at every point of measurement — provide the theoretical basis for the remedy proposed in Section 5. 
+
+# 3 Mechanism: Why Aggregation Divergence Occurs 
+
+For clarity, the experimental results in this section are presented in two layers: 1) interpretive (EA-2, EA-3), which characterizes which pipeline features drive MAD severity; and 2) generalizable (EA-7), which tests the pattern across structurally distinct ABMs. For EA-3 and EA-7, reported 95% interval estimates are percentile bootstrap confidence intervals over independent simulation runs, with the run — rather than within-run policy comparisons — as the inferential unit. 
+
+3.1 Aggregator Distance Drives Divergence (EA-3) 
+
+The selection of aggregation operator is responsible for the greatest amount of variation in rank-reversal rates. Rank-reversal rates are predicted by aggregator functional distance (δ, defined as 1 minus the Spearman correlation between aggregator outputs across the policy space) rather than by stochastic noise level τ (Fig. 1): RRR = α + βδ · δ + βτ · τ + ε, R2 = 0 .769 
+
+Standardized coefficients: βδ = 4 .1 × βτ . Distance explains 4.1× more variance than noise. A researcher who attempts to mitigate MAD by increasing episode count (reducing effective τ ) or reducing simulation stochasticity will observe no meaningful improvement in champion stability. Only closing the aggregator gap eliminates the threat. The dosing relationship is nonlinear: reversal rate is near-flat across mixing parameters α ≤ 0.7, then steps sharply at α = 1 .0.Only pure aggregator incommensurability drives the confound; intermediate mixing does not. 
+
+3.2 Controlled Aggregation Experiment (EA-2) 
+
+In a controlled within-ABM experiment ( n = 100 runs per condition), the WC condition produces 0% rank reversals at all tested noise levels. WoC-Step (optimizer reads final-step; tournament reads episode-mean) produces a significant reversal rate (Cohen’s h = 0 .586 , p < 0.0001 , Holm-corrected). WoC-Mean (mean vs. median, a commensurable pair) is null ( p = 0 .164 ), consistent with the distance mechanism. 
+
+3.3 Multi-ABM Replication (EA-7) 
+
+The divergence pattern replicates across three structurally distinct ABMs: Schelling segregation, Wolf–Sheep predator– prey, and Boltzmann wealth exchange. Two behavioral regimes emerge. Models with non-monotone dynamics (Schelling, Boltzmann) exhibit high flip rates under all incommensurable aggregator pairs. The Wolf–Sheep model, with near-monotone population dynamics, exhibits a low flip rate regardless of aggregator choice — consistent with the scope condition, not a failure of replication. 4Metric Aggregation Divergence A P REPRINT 
+
+Figure 1: Rank-reversal rate (RRR) and effect size (Cohen’s h) as a function of stochastic noise level τ across five aggregation conditions (EA-3; n = 50 runs per τ level). Ad-hoc-Entropy dominates at all τ levels; the WC baseline remains at zero throughout. For Schelling segregation, WoC-Entropy yields a mean reversal rate of 91.3% vs. 0% for WC (Mann–Whitney 
+
+p = 5 .1 × 10 −13 , Cohen’s h = 2 .54 ). For Boltzmann wealth exchange, the entropy reversal rate is 68.0% . Wolf–Sheep produces 10.3% — a scope condition, as the theory predicts: near-monotone trajectories preserve ordinal ranking across aggregators, suppressing MAD regardless of pipeline configuration. 
+
+# 4 Policy Consequences: Real-World Demonstration 
+
+4.1 Code-Verified Divergence in EpidemiOptim 
+
+The clearest externally relevant example comes from EpidemiOptim , a JAIR-published toolbox for optimizing epidemic control policies [ 3 ]. Code inspection of the published repository ( flowersteam/EpidemiOptim on GitHub) reveals three structurally independent aggregation paths in the NSGA-II pipeline. 
+
+Stage 1 (NSGA-II training). The optimizer evaluates candidate policies via stochastic rollouts ( eval=False ;
+
+nsga.py , lines 125–140). In the NSGA-II configuration, the environment is stochastic ( stochastic=True in 
+
+configs/nsga_ii.py ), and each policy is evaluated across n = 30 stochastic replications before the mean cost is returned to the optimizer. The aggregation is NSGA-II’s non-dominated sorting over these mean costs. 
+
+Stage 2 (post-optimization re-evaluation). The same Pareto-optimal solutions are re-evaluated under deterministic policy behavior ( eval=True ; nsga.py , lines 206–213). Removing exploration noise changes the cost landscape: policies that appeared costly under stochastic evaluation may appear cheaper under deterministic evaluation. 
+
+Stage 3 (champion selection). A normalized cost-sum rule is applied to select the champion ( nsga.py , lines 232–234): 
+
+> normalized_costs = [c_f.scale(c) for c_f, c in zip(self.cost_function.costs, costs.T)] agg_cost = normalized_costs.sum(axis=1) ind_min = np.argmin(agg_cost)
+
+5Metric Aggregation Divergence A P REPRINT 
+
+This equal-weight scalarization was not used during NSGA-II training , which relies on Pareto dominance rather than scalarized aggregation. The champion selected by Stage 3 can therefore differ from the champion that Stage 1’s optimizer identified as Pareto-optimal. These three aggregation paths — stochastic fitness, deterministic re-evaluation, and normalized cost sum — implement the same outcome metric via structurally incompatible procedures. No automated test detects the discrepancy because each stage produces internally consistent outputs. 
+
+4.2 Faithful Replication: Policy Consequences 
+
+To confirm that the three-stage divergence produces real champion disagreements, we replicate EpidemiOptim’s pipeline structure with a minimal SEIR suppression model and ε-greedy policy, matching the eval=False training and eval=True evaluation semantics. This is also the kind of modular simulation-search-evaluation workflow for which HEAS was designed as reusable research software infrastructure [ 9]. Policy genes are suppression threshold 
+
+η ∈ [0 .01 , 0.10] and suppression intensity α ∈ [0 .20 , 0.90] . We run 500 independent NSGA-II replications (pop = 40 ,
+
+ngen = 25 ). Stage 1 (stochastic) vs. Stage 3 (greedy + normalized sum) champion disagreement rate: 64.2% [95% CI: 59.9%, 68.3%]. Proportion test against H0 : p ≤ 10% : z = 40 .40 , p ≈ 0. In nearly two-thirds of independent runs, the policy that the EpidemiOptim-style optimizer identifies as champion would not be chosen if the pipeline used consistent evaluation throughout. The policy consequence is concrete. All champions choose near-maximum suppression intensity ( α remains in the 0.86–0.90 band), but they disagree on the trigger threshold: Stage 1 champions in disagreement cases average 
+
+η = 0 .0201 while Stage 3 champions average η = 0 .0192 . The mean absolute shift in η is 0.44 percentage points — a material difference in epidemic intervention timing. A companion 30-run gene-saving rerun recovers the same pattern (15/30 disagreements): α stays confined to the 0.875–0.900 band while the mean absolute threshold shift remains 0.40 percentage points. In policy terms, the disagreement is mainly about when to trigger a near-maximal suppression response, not whether to suppress strongly at all. Different aggregation paths lead to a different champion; the different champion implies a different epidemic-control rule. Applying the metric contract (Section 5) to this same pipeline reduces disagreement from 64.2% to 0%: all 100 champion selections are byte-identical under the shared callable. 
+
+4.3 Policy-Flip Demonstration (EA-1) 
+
+The mock-ecological model is intentionally minimalist, with non-monotone welfare dynamics — the scope condition under which MAD is active. It is not presented as a standalone empirical policy case; rather, it isolates the same temporally structured decision regime that motivates staged epidemic control, dynamic carbon-tax design, and deeply uncertain lake-management workflows, where policy consequences unfold across time rather than at a single terminal state [ 3 , 12 , 4]. Using a 2-gene ecological ABM with logistic biomass dynamics under stochastic forcing ( σ = 0 .15 ), evaluated over 8 scenarios × 5 episodes, we run 300 independent NSGA-II seeds. Under WoC, MAD causes a policy flip in 83% [78%, 87%] of 300 independent replications ( p ≈ 0). Under WC, the flip rate is zero by construction. The flipped champion achieves mean welfare 2.19 units [2.01, 2.39] lower than the correct (WC) champion, with a Gini inequality gap of 0.050 units [0.045, 0.055]. A policy recommendation based on the WoC pipeline would direct practitioners toward a regime that is both lower in mean welfare and more unequal in its distribution, with no signal in the pipeline output that either error has occurred. Among the 249 flipped seeds, the WoC pipeline does not merely recommend the wrong policy; it also produces different welfare estimates that would lead to different inferential conclusions. In a follow-up inference-stage audit on this same arena (EA-10b), 3 of those 249 flipped seeds (1.2%, exact 95% CI [0.2%, 3.5%]) cross the significance boundary itself: the contract champion is significant against the baseline under the full-trajectory metric, while the ad hoc final-window comparison is not. The complementary enterprise follow-up defines the opposite boundary: across 300 independent seeds, the enterprise arena produces 0 champion flips, which is the mechanism’s predicted null rather than a failed replication. In that arena, final-step and episode-mean welfare rankings are already nearly commensurable (ρ = 0 .991 ), so the aggregator distance is too small to reorder the champion. Read together, the two arenas identify the practical scope condition: MAD is active when temporally structured trajectories make candidate rankings genuinely incommensurable, and suppressed when they do not. 6Metric Aggregation Divergence A P REPRINT 
+
+Figure 2: Policy-flip consequences of MAD (EA-1; n = 300 seeds). (a) Representative NSGA-II Pareto front (seed 171). (b) Distribution of welfare gaps across all 249 flipped seeds. 
+
+# 5 The Metric Contract Remedy 
+
+5.1 Principle 
+
+The metric contract rests on the measurement-theory principle of operationalization consistency : the same latent construct must be operationalized identically at every point of measurement [ 29 ]. Applied to ABM+MOEA pipelines, this means a single callable implementing the metric computation is registered at initialization and shared — without re-implementation — across all pipeline stages. The contract eliminates divergence by construction on all WC-verified execution paths. The metric contract is not a new software engineering idea in isolation — dependency injection, unit testing, and Design-by-Contract [ 5 ] all share the principle of making implicit assumptions explicit. What distinguishes the metric contract is the cross-stage aggregation interface it targets: the aggregator function at each pipeline stage. That emphasis on explicit stage interfaces is also consistent with the modular research-software rationale behind HEAS [ 9]. Unit tests verify that individual components return correct outputs for given inputs, but they do not test whether two separately tested components use the same aggregation convention . Schema validation checks data types and ranges, not functional identity across callsites. The metric contract fills precisely this gap by requiring all three pipeline stages to share a single registered callable, converting an undetectable distributional divergence into an immediate construction-time failure. This kind of procedural specificity is exactly what reproducibility critiques in evolutionary computation identify as often under-documented in published optimization studies [30]. 
+
+5.2 What the Contract Does Not Guarantee 
+
+The contract enforces structural consistency — same function, same code path — but not semantic correctness. An incorrect but consistently applied metric will pass contract verification. Semantic correctness (whether the metric accurately represents the policy-relevant outcome) remains the researcher’s responsibility and is addressed by domain expertise, explicit model documentation, and face-validity assessment [19, 26, 18], not by the contract mechanism. 
+
+5.3 Overhead and Adoption 
+
+The metric contract lowers the threshold for deploying valid ABM+MOEA policy pipelines: it can be adopted incrementally, beginning at the tournament stage first, without rewriting optimizer fitness functions or simulation code. Runtime overhead of the contract dispatch mechanism is approximately 3% — within measurement noise for any 7Metric Aggregation Divergence A P REPRINT 
+
+Table 1: Six-item reporting checklist for ABM+MOEA policy papers.                   
+
+> #Item What to report Risk if omitted 1Single-function declaration Name the callable used to extract the outcome metric from each episode. Undetectable stage divergence 2Stage-by-stage audit Confirm optimizer fitness, tournament scorer, and CI engine all invoke the same declared function. Silent champion substitution 3Trajectory class State whether the outcome trajectory is monotone, convergent, hump-shaped, or oscillatory; assign scope-condition risk level. Unassessed MAD exposure 4Aggregator pair distance If aggregators are compared, report Spearman
+> ρbetween outputs across the Pareto front. Distance risk unquantified 5Coincidence check Run the pipeline once with all stages on the WC function; confirm byte-identical champions. Latent divergence undetected 6Contract or equivalent Deposit a shared metric callable in the replication archive, or document line-level equivalence of all stage implementations. Irreproducible champion selection
+
+multi-episode ABM evaluation. When all pipeline stages share the identical aggregator function, the contract produces byte-identical champions (100/100 coincidence checks), confirming that it imposes no cost when aggregators already coincide. 
+
+5.4 Usage Scenario 
+
+To make the contract concrete, consider a researcher building an SEIR+MOEA epidemic policy pipeline. At initialization, the researcher registers a single callable that computes the outcome metric from simulation trajectories: 
+
+> metric = MetricContract( fn=lambda ep: np.mean(ep["infections"]) )optimizer.set_metric(metric) tournament.set_metric(metric) inference.set_metric(metric)
+
+Before proceeding to statistical inference, the researcher runs a coincidence check: execute the pipeline once with all stages on the registered function and confirm byte-identical champion selection. If the check passes, the pipeline is structurally consistent — no stage has silently re-implemented the metric. If it fails, the divergence is located immediately at the construction stage, before any policy recommendation is produced. This five-minute verification eliminates the class of silent divergence demonstrated in Section 4. 
+
+5.5 Reporting Checklist 
+
+Operationalizing the remedy for practitioners, we propose a six-item reporting checklist for ABM+MOEA policy papers (Table 1). 
+
+# 6 Discussion 
+
+6.1 Relation to the Reproducibility Crisis 
+
+ABM-based public-policy modeling typically requires researchers to combine domain models, scenario exploration, ranking rules, and decision criteria across multiple software layers [ 7 , 8, 9]. Evolutionary computation adds a further reproducibility burden because champion-selection procedures and computational artifacts are often less fully documented than the headline optimization results [ 30 ]. This paper identifies one concrete consequence of that workflow: pipeline architecture itself can become a source of unregistered degrees of freedom.  
+
+> MAD
+
+is a structural analogue of the researcher degrees of freedom problem [ 1]: like undisclosed analysis choices, independent metric implementations introduce unregistered degrees of freedom into policy-search pipelines. Unlike 8Metric Aggregation Divergence A P REPRINT 
+
+deliberate HARKing [ 22 ], MAD requires no bad intent — it emerges from the natural workflow of building a pipeline in stages. The same workflow flexibility that makes ABM+MOEA pipelines powerful for policy design — the ability to build stages independently — is the root cause of MAD .The analogy to preregistration is limited but useful: the contract commits the pipeline to a single operationalization before downstream evaluation begins [ 31 ]. Compared with the existing reproducibility reform agenda, which focuses on analysis choices, this paper adds pipeline architecture as a new locus of unregistered flexibility. That claim should be read with bounded scope. In our accompanying literature audit of 23 published ABM+MOEA policy pipelines, 10 were code-inspectable and 17 were classifiable from code or full text. Even under the most favorable assumption — treating all 6 indeterminate cases as clean — the posterior mean divergence rate remains 56% among the code-inspectable subset; in the directly code-verified sample it rises to 75%. We therefore do not claim universality across the entire published literature. The defensible statement is narrower and still consequential: independent metric aggregation appears common among code-available ABM+MOEA policy pipelines. 
+
+6.2 Contract Value in Parallel Pipelines 
+
+The comprehensive experiment (EA-11-C) confirms this risk empirically across three dimensions. Scaling. We ran 100 NSGA-II replications and distributed champion selection across W =2 , 4, and 8 workers, each using a different aggregation function (mean, entropy, final-step, or normalized cost sum). Cross-worker champion disagreement reached 
+
+100% at all tested worker counts (95% CI: [96.3%, 100%]). Metric-pair matrix. Systematic pairwise comparison of all six metric pairs reveals that Spearman correlation predicts disagreement exactly: incommensurable pairs (mean–entropy, 
+
+ρ = −1.000 ; mean–final-step, ρ = −0.999 ) disagree on every replication, while the commensurable entropy–final-step pair ( ρ = +0 .999 ) disagrees on only 14%. Overhead. The contract’s dispatch time (31–39 ms) is negligible compared with independent metric implementation (2.2–5.0 s); at W =8 , the contract approach is 134 × faster, confirming that consistency and efficiency are not in tension. Dimensionality alone also does not remove the threat: in a separate 3-objective MockArena follow-up (EA-12; 10 independent NSGA-II runs), champion disagreement remains at 25% ([12.5%, 40.0%]) and the worst ad hoc condition still produces entropy-based rank reversals of 3.6% ([3.5%, 3.7%]). That follow-up is smaller than the 2-objective benchmark and does not amplify the effect, but it shows that MAD is not confined to a two-objective front. 
+
+6.3 Recovered Published-Path Signal 
+
+The Lake Problem DPS workflow now provides the direct archived published-recommendation comparison that the faithful EpidemiOptim replication alone did not. Using the public upstream replication bundle associated with [ 4], we reran the archived paper-path recommendation against a shared contract-path rule over the same candidate set in the same robust lake-management problem family [ 15 , 14 , 4 ]. The archived Lake Problem DPS bundle pins both the paper-path reliability object used for figure reproduction and the robustness-stage selector computed across the same archived candidate set. That recovered selector split is substantively relevant, not a repository curiosity: in this literature family, robustness evaluation is already treated as an explicit workflow stage for decision making under deep uncertainty rather than as a cosmetic post-processing step [ 14 , 13 ]. Under a conservative same-candidate-set replay (Appendix C), the paper-path DPS policy (row 26) reaches benefit 0.3326 , reliability 1.0000 , and joint robustness 0.401 ,whereas the archived robustness-stage selector (row 43) reaches 0.4922 , 0.9005 , and 0.552 . Across the archive’s 1000 re-evaluated states of the world, the robustness-stage selector satisfies the joint benefit/reliability thresholds in 159 states where the paper-path selector fails, while the reverse occurs in only 8 states; the intertemporal formulation shows 132 versus 16. Among discordant archived states, the contract path therefore wins 159/167 DPS comparisons and 132/148 intertemporal comparisons ( 95 .2% and 89 .2% , exact two-sided sign test p < 10 −18 in both formulations). On the DPS states where only the contract path clears the archived joint threshold, mean benefit rises from 0.166 to 0.273 
+
+while reliability stays effectively perfect ( 1.000 versus 0.9996 ); the intertemporal formulation shows the same pattern, with benefit increasing from 0.177 to 0.223 while reliability shifts from 1.000 to 0.995 . The recovered decision vectors also imply a substantive policy contrast rather than a mere row-index difference: the paper-path DPS rule stays at the minimum phosphorus-release floor across 26.7% of the normalized lake-state grid, versus 4.0% for the robustness-stage rule. This remains a conservative same-candidate-set replay rather than a regenerated optimization under the contract rule, but it is already a direct archived published-path versus contract-path recommendation comparison, and the disagreement is intelligible in policy language rather than only in replication-audit terms. 9Metric Aggregation Divergence A P REPRINT 
+
+# 7 Limitations and Conclusion 
+
+7.1 Limitations 
+
+Although the evidence presented here is encouraging, the proposed remedy is still in an early stage of empirical validation. 
+
+Experiment design. We tested 4 ABM types across 2 policy domains (ecology, epidemiology). Generalizability to other domains (e.g., transportation, energy) and to ABM types with fundamentally different trajectory structures remains open. We do not claim the 83% flip rate to be universal; it reflects the mock-arena parameterization. The EpidemiOptim case strengthens external relevance because it audits a published policy-optimization pipeline, but it remains a faithful replication of that pipeline structure rather than a direct rerun of one archived published policy recommendation. Published policy-search systems with similar multi-stage architecture also exist in water-resources robust management and infrastructure planning [ 14 , 4, 11 ], and Appendix C now reports one exact repo-backed Lake Problem workflow in which the archived published-path recommendation is directly compared against a shared contract-path rule over the same candidate set. ABM-native electricity-market policy optimization is another plausible next audit target because it offers a closer computational-social-systems policy match while still using temporally structured, multi-year intervention schedules [ 12 ]; however, the public artifact currently exposes a front-level carbon-tax recommendation rather than one archived champion policy: the paper recommends an increasing tax schedule and reports that all Pareto-optimal strategies stay above a common tax floor and a mean carbon-tax strategy, but it does not pin one archived winner or yet expose the archived front object needed to reproduce that summary as a selector-level recommendation surface. The remaining empirical limitation is therefore no longer the absence of any real-policy recommendation comparison, but the fact that the completed Lake Problem case is a same-candidate-set replay in an adjacent water-management domain rather than a regenerated contract-optimized run in an ABM-native policy domain. 
+
+Experiment analysis. The key features of the welfare trajectory that determine MAD severity — non-monotonicity, cross-individual variance — have not been formally characterized beyond the scope-condition sketch. 
+
+Metric scope. The contract enforces scalar episode summaries. Time-series outputs — agent-level wealth distributions, spatial segregation patterns over time — require an extended contract interface and are outside the current scope. 
+
+Contract limitations. The contract enforces structural consistency, not semantic correctness; an overly narrow or incorrect metric specification will satisfy the contract while still producing misleading policy conclusions. 
+
+7.2 Conclusion 
+
+The metric contract is applicable, and the MAD threat is active, when two conditions are met: 1) the pipeline uses a multi-objective evolutionary algorithm to identify champion policies, and 2) the MOEA fitness function and the post-optimization evaluation share at least one aggregated outcome metric extracted from non-monotone welfare trajectories. The contract is inapplicable, and the threat is suppressed, when welfare dynamics are monotone or convergent. This boundary is not only theoretical: in the enterprise follow-up, the near-commensurable final-step and episode-mean rankings ( ρ = 0 .991 ) produce the predicted null, so the absence of champion flips is itself evidence for the scope condition rather than a counterexample to the threat. This article identified pipeline architecture as a previously unnamed locus of unregistered degrees of freedom in computational policy research. Metric aggregation divergence — the silent inconsistency that arises when distinct pipeline stages independently re-implement the aggregation of a shared outcome metric — was demonstrated through controlled experiments and a real-world replication. Code inspection of a JAIR-published epidemic policy toolbox revealed three structurally independent aggregation paths in peer-reviewed code; a faithful replication produced champion disagreement in 64.2% of independent runs, translating into different epidemic-control recommendations. In the exact repo-backed Lake Problem DPS workflow, a public rerun of the archived published-path recommendation against a shared contract-path rule raises joint-threshold success from 0.401 to 0.552 in DPS and from 0.247 to 0.363 in the intertemporal formulation, while changing the implied phosphorus-release policy in substantively recognizable ways. The remedy — the metric contract — consists of a formal aggregation function definition, a pipeline-stage binding specification, and a reporting checklist; it lowers the threshold for deploying valid ABM+MOEA policy pipelines without restructuring existing simulation or optimizer code. Future work may extend the metric contract in four directions: 1) applying the contract to other ABM frameworks and policy domains; 2) developing a formal characterization of the trajectory features that predict MAD severity; and 3) regenerating candidate sets under the contract rule, so that the empirical payoff moves from archived same-candidate-set recommendation comparison to full end-to-end contract optimization in published workflows; and 4) extending contract enforcement to ensemble pipelines in which multiple ABM implementations are jointly optimized. 10 Metric Aggregation Divergence A P REPRINT 
+
+# A Experiment Parameters 
+
+Table 2: Pre-specified parameters for all experiments.                                        
+
+> Exp Model Key params n
+> EA-1 mock_4gene 300 seeds; 8 sc ×5 ep 300 EA-2 MockArena 100 runs/cond; τ∈[0 .05 ,0.30] 100 EA-3 MockArena τ-sweep 6 levels 50/level EA-7 3 ABMs Mixed-effects; 3 noise levels 50/model EA-10b mock_4gene inference audit; 10-step tail vs full traj 249 flips EA-11 SEIR+policy pop=40, ngen=25, ε= 0 .15 500 EA-11-MC SEIR+policy W=4,8; 4 metrics; Phase 1+2 50 EA-11-C SEIR+policy W=2,4,8; 6 pairs; overhead 100 EA-12 MockArena-3obj pop=60, ngen=40; 3 objectives 10
+
+# B FDR Correction 
+
+Holm–Bonferroni correction with family-wise error rate α = 0 .05 is applied to the pre-specified experimental family: EA-1, EA-2, EA-3, and EA-7. All significant results within this family survive correction. EA-11 was added as a confirmatory replication after the core results were observed and is reported without family-wise correction. 
+
+# C Archived Published-Path Replay Details 
+
+Table 4 records the archived selector comparison recovered from the Lake Problem DPS replication bundle associated with [ 4]. The public rerun reported in the main text uses a conservative same-candidate-set replay: the published path uses the paper-specific reliability objects pinned by the archived figure workflow, whereas the contract path applies one shared joint-threshold rule across the same archived policy set. The main text discussion reports the state-level asymmetry of this replay; Table 3 records that paired-state asymmetry directly, while Table 4 records the selector-level metrics. One additional policy-language observation is that, in DPS, the paper-path reliability rule stays at the minimum phosphorus-release floor across 26.7% of the normalized lake-state grid, versus 4.0% for the robust-joint rule. In the intertemporal formulation, the robust-joint plan releases more phosphorus in 61 of 100 years and nearly triples cumulative release over the last 20 years (0.833 versus 0.290). 
+
+# D Implementation Notes 
+
+The following listings illustrate the MAD pattern and its contractual remedy. Both are provided for concreteness; the conceptual remedy (Section 5) is independent of any specific simulation framework. Listing 1: Three independent metric implementations producing MAD (WoC condition). 
+
+# Stage 1 -- Optimizer fitness 
+
+def fitness(individual): env.run(individual) return env.data["final_biomass"] # terminal value # Stage 2 -- Tournament scorer 
+
+def score(individual): env.run(individual) return np.mean(env.data["biomass"]) # episode mean # Stage 3 -- Bootstrap CI 
+
+def bootstrap_metric(individual): env.run(individual) return np.mean(env.data["biomass_rolling10"]) # rolling mean 
+
+Listing 2: Metric contract remedy (WC condition). 
+
+# Register once at pipeline initialization 
+
+contract = MetricContract( fn=lambda ep: {"welfare": np.mean(ep.biomass), 
+
+11 Metric Aggregation Divergence A P REPRINT 
+
+Table 3: Archived same-candidate-set replay asymmetry for the Lake Problem follow-up. The final column reports mean benefit and reliability on contract-only winning states, shown as published →contract. Exact two-sided sign-test 
+
+p < 10 −18 for both methods.               
+
+> Method Pub. Contract C wins / disc. B;Ron C-only states DPS 0.401 0.552 159/167 (0.952) 0.166 →0.273; 1.000 →1.000 Intertemp. 0.247 0.363 132/148 (0.892) 0.177 →0.223; 1.000 →0.995
+
+Table 4: Archived selector comparison for the Lake Problem follow-up case.                                     
+
+> Method Selector Row Benefit Reliability Joint rob. DPS Paper rel. 26 0.3326 1.0000 0.4010 DPS Robust joint 43 0.4922 0.9005 0.5520 DPS ∆–+0.1596 -0.0995 +0.1510 Intertemp. Paper rel. 80.2917 1.0000 0.2470 Intertemp. Robust joint 38 0.3801 0.9583 0.3630 Intertemp. ∆–+0.0884 -0.0417 +0.1160
+> "gini": gini(ep.agent_wealth)} )
+> # All stages consume the same registered object
+> optimizer.set_metric(contract) tournament.set_metric(contract) bootstrap_ci.set_metric(contract)
+
+# References 
+
+[1] J. P. Simmons, L. D. Nelson, and U. Simonsohn, “False-positive psychology: Undisclosed flexibility in data collection and analysis allows presenting anything as significant,” Psychological Science , vol. 22, no. 11, pp. 1359–1366, 2011. [2] A. Gelman and E. Loken, “The statistical crisis in science,” American Scientist , vol. 102, no. 6, pp. 460–465, 2014. [3] C. Colas, B. Hejblum, S. Rouillon, R. Thiébaut, P.-Y. Oudeyer, C. Moulin-Frier, and M. Prague, “EpidemiOptim: A toolbox for the optimization of control policies in epidemiological models,” Journal of Artificial Intelligence Research , vol. 71, pp. 479–519, 2021. [4] J. D. Quinn, P. M. Reed, and K. Keller, “Direct policy search for robust multi-objective management of deeply uncertain socio-ecological tipping points,” Environmental Modelling & Software , vol. 92, pp. 125–141, 2017. [5] B. Meyer, Object-Oriented Software Construction , 2nd ed. Upper Saddle River, NJ: Prentice Hall, 1997. [6] K. Deb, A. Pratap, S. Agarwal, and T. Meyarivan, “A fast and elitist multiobjective genetic algorithm: NSGA-II,” 
+
+IEEE Transactions on Evolutionary Computation , vol. 6, no. 2, pp. 182–197, 2002. [7] N. Gilbert, P. Ahrweiler, P. Barbrook-Johnson, K. P. Narasimhan, and H. Wilkinson, “Computational modelling of public policy: Reflections on practice,” Journal of Artificial Societies and Social Simulation , vol. 21, no. 1, p. 14, 2018. [8] J. H. Kwakkel, “The exploratory modeling workbench: An open source toolkit for exploratory modeling, scenario discovery, and (multi-objective) robust decision making,” Environmental Modelling & Software , vol. 96, pp. 239–250, 2017. [9] R. Zhang, L. Nie, and X. Zhao, “Heas: Hierarchical evolutionary agent simulation framework for cross-scale modeling and multi-objective search,” arXiv preprint arXiv:2508.15555 , 2025. [10] J. D. Quinn, P. M. Reed, M. Giuliani, and A. Castelletti, “Rival framings: A framework for discovering how problem formulation uncertainties shape risk management trade-offs in water resources systems,” Water Resources Research , vol. 53, no. 8, pp. 7208–7233, 2017. 12 Metric Aggregation Divergence A P REPRINT 
+
+[11] B. C. Trindade, D. F. Gold, P. M. Reed, H. B. Zeff, and G. W. Characklis, “Water pathways: An open source stochastic simulation system for integrated water supply portfolio management and infrastructure investment planning,” Environmental Modelling & Software , vol. 132, p. 104772, 2020. [12] A. J. Kell, A. S. McGough, and M. Forshaw, “Optimizing carbon tax for decentralized electricity markets using an agent-based model,” in Proceedings of the Eleventh ACM International Conference on Future Energy Systems .New York, NY, USA: ACM, 2020, pp. 454–460. [13] J. H. Kwakkel, W. E. Walker, and M. Haasnoot, “Coping with the wickedness of public policy problems: Approaches for decision making under deep uncertainty,” Journal of Water Resources Planning and Management ,vol. 142, no. 3, 2016. [14] D. Hadka, J. Herman, P. Reed, and K. Keller, “An open source framework for many-objective robust decision making,” Environmental Modelling & Software , vol. 74, pp. 114–129, 2015. [15] V. L. Ward, R. Singh, P. M. Reed, and K. Keller, “Confronting tipping points: Can multi-objective evolutionary algorithms discover pollution control tradeoffs given environmental thresholds?” Environmental Modelling & Software , vol. 73, pp. 27–43, 2015. [16] M. Oremland and R. Laubenbacher, “Optimization of agent-based models: Scaling methods and heuristic algorithms,” Journal of Artificial Societies and Social Simulation , vol. 17, no. 2, pp. 1–26, 2014. [17] T. D. Cook and D. T. Campbell, Quasi-Experimentation: Design and Analysis Issues for Field Settings . Rand McNally, 1979. [18] P. Windrum, G. Fagiolo, and A. Moneta, “Empirical validation of agent-based models: Alternatives and prospects,” 
+
+Journal of Artificial Societies and Social Simulation , vol. 10, no. 2, p. 8, 2007. [19] W. Rand and R. T. Rust, “Agent-based modeling in marketing: Guidelines for rigor,” International Journal of Research in Marketing , vol. 28, no. 3, pp. 181–193, 2011. [20] J. P. A. Ioannidis, “Why most published research findings are false,” PLOS Medicine , vol. 2, no. 8, p. e124, 2005. [21] Open Science Collaboration, “Estimating the reproducibility of psychological science,” Science , vol. 349, no. 6251, p. aac4716, 2015. [22] N. L. Kerr, “HARKing: Hypothesizing after the results are known,” Personality and Social Psychology Review ,vol. 2, no. 3, pp. 196–217, 1998. [23] R. G. Sargent, “Verification and validation of simulation models,” Journal of Simulation , vol. 7, no. 1, pp. 12–24, 2013. [24] C. M. Macal and M. J. North, “Tutorial on agent-based modelling and simulation,” Journal of Simulation , vol. 4, no. 3, pp. 151–162, 2010. [25] V. Grimm, U. Berger, F. Bastiansen, S. Eliassen, V. Ginot, J. Giske, J. Goss-Custard, T. Grand, and others, “A standard protocol for describing individual-based and agent-based models,” Ecological Modelling , vol. 198, no. 1–2, pp. 115–126, 2006. [26] V. Grimm, S. F. Railsback, C. E. Vincenot, U. Berger, C. Gallagher, D. L. DeAngelis, B. Edmonds, J. Ge, J. Giske, J. Groeneveld, A. S. A. Johnston, A. Milles, J. Nabe-Nielsen, J. G. Polhill, V. Radchuk, M.-S. Rohwäder, R. A. Stillman, J. C. Thiele, and D. Ayllón, “The ODD protocol for describing agent-based and other simulation models: A second update to improve clarity, replication, and structural realism,” Journal of Artificial Societies and Social Simulation , vol. 23, no. 2, 2020. [27] V. Grimm, J. Augusiak, A. Focks, B. M. Frank, F. Gabsi, A. S. A. Johnston, C. Liu, B. T. Martin, M. Meli, V. Radchuk, P. Thorbek, and S. F. Railsback, “Towards better modelling and decision support: Documenting model development, testing, and analysis using TRACE,” Ecological Modelling , vol. 280, pp. 129–139, 2014. [28] A. Saltelli, M. Ratto, T. Andres, F. Campolongo, J. Cariboni, D. Gatelli, M. Saisana, and S. Tarantola, Global Sensitivity Analysis: The Primer . Chichester, UK: John Wiley & Sons, 2008. [29] D. Borsboom, Measuring the Mind: Conceptual Issues in Contemporary Psychometrics . Cambridge, UK: Cambridge University Press, 2005. [30] M. López-Ibáñez, J. Branke, and L. Paquete, “Reproducibility in evolutionary computation,” ACM Transactions on Evolutionary Learning and Optimization , vol. 1, no. 4, pp. 1–21, 2021. [31] B. A. Nosek, C. R. Ebersole, A. C. DeHaven, and D. T. Mellor, “The preregistration revolution,” Proceedings of the National Academy of Sciences , vol. 115, no. 11, pp. 2600–2606, 2018. 13

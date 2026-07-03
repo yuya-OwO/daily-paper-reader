@@ -1,0 +1,441 @@
+Title: Influence of Radial Basis Activation Functions on Intelligent Controller for Robotic Manipulators
+
+URL Source: https://arxiv.org/pdf/2607.02167v1
+
+Published Time: Fri, 03 Jul 2026 01:05:47 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+> EURODINAME III EURODINAME III - An International Symposium on Dynamic Problems of Mechanics June 8-11, 2026 - Giens Peninsula, FR
+
+# EURODINAME-2026-9024036 INFLUENCE OF RADIAL BASIS ACTIVATION FUNCTIONS ON INTELLIGENT CONTROLLER FOR ROBOTIC MANIPULATORS 
+
+Kimmo Paldanius Gabriel Da Silva Lima Wallace Moreira Bessa 
+
+Smart Systems Lab, Department of Mechanical Engineering, University of Turku, 20520, Finland. kkpald@utu.fi, gdasil@utu.fi, wmobes@utu.fi 
+
+Abstract. This paper presents an intelligent control framework for trajectory tracking of robotic manipulators using radial basis function (RBF) neural networks for online disturbance estimation. The proposed control structure combines model-based nonlinear control with an adaptive neural approximator that compensates for parametric uncertainties, friction, and unmodeled dynamics. A Lyapunov-based adaptation law with projection guarantees boundedness of the closed-loop signals and convergence of the tracking error to a compact region. The primary objective of this work is to investigate how the choice of activation function within the RBF network influences transient behavior, steady-state accuracy, and control smoothness. The controller is implemented on a robotic manipulator. Experimental results demonstrate that although stability is preserved for all kernels, activation function selection significantly affects adaptation dynamics and practical tracking performance. These findings demonstrate that activation function selection acts as a structural design parameter in intelligent control, directly shaping adaptation dynamics and practical closed-loop performance. 
+
+Keywords: intelligent control, feedback linearization, radial basis function, neural networks, robotic manipulators 
+
+1. INTRODUCTION 
+
+Trajectory tracking of robotic manipulators is commonly addressed using model-based nonlinear control methods such as feedback linearization (Ccari et al. , 2024; Liu et al. , 2025). By exploiting the known system dynamics, these approaches enable systematic cancellation of nonlinearities and precise reference tracking under nominal conditions. In practice, however, accurate tracking can be degraded by parametric uncertainty, friction, unmodeled dynamics, and ex-ternal disturbances. To mitigate these effects, adaptive and learning-based extensions are often incorporated to enhance robustness while preserving the structure of model-based control (Sveen et al. , 2025; Abu-Jassar et al. , 2026). Adaptive control techniques typically address structured parametric uncertainties through online parameter estimation mechanisms, with stability established using tools such as Lyapunov analysis or related adaptive frameworks, thereby ensuring bound-edness of the closed-loop signals despite unknown system parameters (Ioannou and Fidan, 2006; Venanzi, 2016; Zhang and Wei, 2017). In contrast, learning-based approaches, particularly neural-network-based disturbance estimators, aim to approximate unmodeled or unstructured dynamics without requiring explicit parametric representations (Brunke et al. ,2022; Zeng et al. , 2025). Owing to their universal approximation capability, neural networks are well suited to compensate for complex nonlinear effects such as friction and residual coupling dynamics. This paper adopts a hybrid perspective that integrates feedback linearization with an online neural disturbance estima-tor based on radial basis function (RBF) networks. The neural weights are updated through a Lyapunov-based adaptation law, ensuring boundedness of all closed-loop signals and convergence of the tracking error to a neighborhood of the origin while exploiting the approximation capability of neural networks. The primary focus of this work is the influence of the RBF activation (basis) function on closed-loop behavior. Al-though Lyapunov stability holds for a broad class of bounded activation functions, performance characteristics, such as transient response, steady-state accuracy, and control smoothness, can vary significantly with the kernel shape. While Gaussian kernels are commonly adopted by default in RBF-based controllers (Niu et al. , 2023; Li et al. , 2026), this study systematically investigates alternative activation functions, namely Laplacian and inverse multiquadratic kernels, under identical controller tuning and experimental conditions. The approach is implemented on the Quanser QArm robotic manipulator, Fig. 1, and performance is evaluated using 
+
+> This work is licensed under a Creative Commons “Attribution 4.0 International” license.
+> arXiv:2607.02167v1 [eess.SY] 2 Jul 2026 K. Paldanius, G.S. Lima and W.M. Bessa Influence of Radial Basis Activation Functions on Intelligent Controller for Robotic Manipulators
+
+tracking error metrics and control effort. By isolating the activation function as the only varying element in the closed loop, the study demonstrates that kernel properties, such as locality, smoothness, and support, directly influence adapta-tion dynamics and practical tracking performance. These results provide design-oriented insight into activation function selection for neural-network-assisted feedback linearization. 
+
+Figure 1. Quanser QArm (digital twin environment). The remainder of the paper is organized as follows. Section 2 develops the intelligent controller and its stability analysis, Section 3 discusses the activation functions, Section 4 presents the experimental results, and Section 5 provides the concluding remarks. 
+
+2. INTELLIGENT CONTROLLER 
+
+The equations of motion for an n-DOF robotic manipulator can be written as: 
+
+M (q) ¨ q + k(q, ˙q) = h(q, ˙q) + u (1) where q ∈ Rn×1 is the vector of generalized coordinates, u ∈ Rn×1 the control input vector, M (q) ∈ Rn×n is the inertia matrix, k(q, ˙q) ∈ Rn×1 represents the centrifugal and Coriolis forces, and h(q, ˙q) ∈ Rn×1 denotes the vector of external forces acting on the system. For control purposes, the model equation (1) can be rewritten as: 
+
+¨q = ˆf + ˆM −1u + d (2) with ˆM and ˆf being estimates of M and f = M −1(h − k), respectively, and d representing the total uncertainty related to the dynamic model. A control law based on the feedback linearization approach (Slotine et al. , 1991) is given by 
+
+u = ˆM (− ˆf − ˆd + ¨ qd − Λ ˙˜q − Λs) (3) where Λ ∈ Rn×n is a diagonal matrix of strictly positive entries λi, s = ˙˜q + Λ ˜q is the combined error with ˜q = q − qd
+
+being the tracking error. By applying the control (3) into the Eq. (2), the closed-loop dynamics becomes 
+
+˙s + Λs = d − ˆd (4) From the Equation (4), it can be verified that in the ideal case, when d = ˆd, the combined error s and, consequently, the tracking error ˜q exponentially converge to zero. If it is not the case, closed-loop dynamics is driven by the approximation error. Furthermore, it also suggests that the combined error s represents a reasonable metric for tracking success and can be used to help calculate the estimate ˆd.Let us now propose that the components of the disturbance approximator ˆd is given by a RBF neural network, depicted in Fig. 2: 
+
+ˆdi = w⊤ 
+
+> i
+
+φi(si) (5) where wi = [ wi, 1, w i, 2, . . . , w i,n i ]⊤ is the vector of weights, φi = [ φi, 1, φ i, 2, . . . , φ i,n i ]⊤ stands for the activation func-tions φi,j , with i = 1 , 2 and j = 1 , . . . , n i, and ni being the number of neurons in the hidden layer of the corresponding 
+
+ith component of ˆd.EURODINAME III - An International Symposium on Dynamic Problems of Mechanics June 8-11, 2026 - Giens Peninsula, FR s
+
+ϕ1
+
+ϕ2
+
+ϕ3
+
+ϕn
+
+Σ ˆd
+
+...
+
+w1 w2
+
+w3
+
+wn
+
+Input Hidden layer Output 
+
+Figure 2. Architecture of the RBF neural network. Relying on the assumption that artificial neural networks can perform universal approximation (Scarselli and Tsoi, 1998) with an arbitrary precision εi, it follows that di = ˆd∗ 
+
+> i
+
++ εi, where ˆd∗ 
+
+> i
+
+is the output related with the optimal weight vector w∗ 
+
+> i
+
+.The boundedness and convergence properties of the closed-loop signals in the presence of modeling inaccuracies, equation (4), can now be proved by means of a Lyapunov-like stability analysis. Thus, let a positive-definite function Vi
+
+be defined for each component of s:
+
+Vi(t) = 12 s2 
+
+> i
+
++ 12ηi
+
+δ⊤ 
+
+> i
+
+δi (6) with ηi being a strictly positive constant and δi = wi − w∗ 
+
+> i
+
+.Since ˙δi = ˙wi, the time derivative of Vi is 
+
+˙Vi(t) = si ˙si + η−1 
+
+> i
+
+δ⊤ 
+
+> i
+
+˙wi = [ −λisi + di − ˆdi]si + η−1 
+
+> i
+
+δ⊤ 
+
+> i
+
+˙wi
+
+= −[λisi − ( ˆd∗ 
+
+> i
+
++ εi − ˆdi)] si + η−1 
+
+> i
+
+δ⊤ 
+
+> i
+
+˙wi
+
+= −[λisi − εi + δ⊤ 
+
+> i
+
+φi]si + η−1 
+
+> i
+
+δ⊤ 
+
+> i
+
+˙wi
+
+= −[λisi − εi]si + η−1 
+
+> i
+
+δ⊤ 
+
+> i
+
+[ ˙ wi − ηisiφi]
+
+(7) Hence, by updating wi according to ˙wi = ηisiφi, the time derivative becomes ˙Vi(t) = −[λisi − εi]si ≤ − [λi|si| − 
+
+ϵi]|si|, i.e. negative definite when |si| > ϵ i/λ i. It means that the bounds of wi cannot be ensured with ˙wi = ηisiφi when 
+
+|si| ≤ ϵi/λ i. Fortunately, the projection algorithm (Ioannou and Fidan, 2006) can be evoked to guarantee that wi will remain within a convex region Wi = {wi ∈ Rn : w⊤ 
+
+> i
+
+wi ≤ μ2 
+
+> i
+
+}:
+
+˙wi =
+
+
+
+ηisiφi if ∥wi∥2 < μ i or if ∥wi∥2 = μi and ηisiw⊤ 
+
+> i
+
+φi < 0
+
+I − wiw⊤ 
+
+> i
+> w⊤
+> iwi
+
+
+
+ηisiφi otherwise (8) where μi is the desired upper bound of ∥wi∥2.Since ∥wi(0) ∥2 ≤ μi, it follows that |si| ≤ ϵi/λ i and ∥wi(t)∥2 ≤ μi as t → ∞ . Then, recalling that si = ˙ ˜qi + λ1 ˜qi,it follows that the proposed controller ensures the exponential convergence of the tracking error to the closed region 
+
+Q = {( ˜ q, ˙˜q) ∈ R4 : |˜qi| ≤ ϵiλ−2 
+
+> i
+
+, | ˙˜qi| ≤ 2ϵiλ−1 
+
+> i
+
+} (da Silva Lima et al. , 2023). 
+
+3. ACTIVATION FUNCTIONS FOR DISTURBANCE ESTIMATION 
+
+Although Lyapunov stability is guaranteed for any bounded activation function under the proposed projection-based adaptation law, the kernel structure influences the approximation characteristics and, consequently, the evolution of the adaptive weights. Thus, the activation function should be viewed not merely as an implementation detail, but as a design parameter that shapes both transient and steady-state closed-loop behavior. In the proposed framework, the lumped uncertainty term d in (2) is compensated online by the neural approximator defined in (5), where the activation vector determines the mapping from the combined error si to the disturbance estimate 
+
+ˆdi. While the stability analysis in Section 2 ensures boundedness of all closed-loop signals under the projection mecha-nism (8), tracking performance ultimately depends on the approximation accuracy di ≈ ˆdi, which is directly affected by the choice of activation function. Accordingly, this section examines how the kernel shape influences closed-loop performance. To enable a fair com-parison, the control structure (3)–(5), controller gains λi and ηi, number of neurons ni, and projection bounds μi are K. Paldanius, G.S. Lima and W.M. Bessa Influence of Radial Basis Activation Functions on Intelligent Controller for Robotic Manipulators 
+
+kept identical in all cases; only the activation functions are varied. Specifically, three radial basis kernels are considered: Gaussian (baseline), inverse multiquadratic, and Laplacian. 
+
+3.1 Radial basis kernels 
+
+Each neuron is defined from a normalized distance 
+
+ρi,j = ¯si − ci,j 
+
+σi
+
+, (9) where ci,j ∈ R is the center of the jth basis function and σi > 0 is a width parameter. The jth activation is then defined as 
+
+φi,j (¯ si) = κ(ρi,j ), (10) where κ(·) is one of the following kernels: • Gaussian (baseline): 
+
+κG(ρ) = exp( −ρ2). (11) • Inverse multiquadratic: 
+
+κIM Q (ρ) = 1
+
+p1 + ρ2 . (12) • Laplacian: 
+
+κL(ρ) = exp( −| ρ|). (13) The Gaussian and Laplacian kernels are localized and decay away from their centers. The inverse multiquadratic kernel has global support. |ρ|. These differences motivate the comparative analysis presented in Section 4. 
+
+3.2 Kernel parameterization and comparison protocol 
+
+For all kernels, the same number of neurons ni is employed. The centers are chosen uniformly over the normalized interval ¯si ∈ [−1, 1] :
+
+ci,j = −1 + 2( j − 1) 
+
+ni − 1 , j = 1 , . . . , n i. (14) A common width is selected as 
+
+σi = γ 2
+
+ni − 1 , (15) where γ > 0 is a tuning factor, kept identical for all kernels. In summary, the following elements are kept fixed across all tests: controller gains λi, learning rates ηi, projection bounds μi, number of neurons ni, desired trajectories qd(t), and all simulation/experimental conditions. Consequently, any performance differences reported in Section 5 are attributed to the activation kernel selection. 
+
+4. RESULTS 
+
+This section presents the experimental evaluation of the proposed intelligent controller with different radial basis activation functions. The goal is to assess how the kernel choice influences transient response, steady-state accuracy, and control effort. The control parameters were set as follows: λi = 30 , ηi = 10 , μi = 100 , and ni = 6 .
+
+4.1 Experimental Setup 
+
+A single DOF manipulator was considered here. For this case, the generalized coordinates are q = α and the remaining terms of Eq. (1) are defined as follows: 
+
+M = mr 2 + I (16) 
+
+k = 0 (17) 
+
+h = mrg sin( α) (18) EURODINAME III - An International Symposium on Dynamic Problems of Mechanics June 8-11, 2026 - Giens Peninsula, FR 
+
+where m = 5 kg, r = 0 .35 m, l = 0 .7 m, and I = 0 .051 kg.m 2 denote, respectively, the mass, center of mass, length, and moment of inertia about the Z-axis of the robotic arm. The parameter g = 9 .81 m/s 2 denotes the gravitational acceleration. The validation was performed using a digital twin of the Quanser QArm within the Quanser Interactive Labs environ-ment. This setup allows for the precise emulation of the physical arm’s dynamics, including joint friction and actuator constraints. Each experimental trial was conducted for a duration of 62 seconds at a sampling frequency of 500 Hz using hardware-timed acquisition. Before each experiment, the manipulator was driven to a predefined home configuration and allowed to settle to ensure identical initial conditions. Three distinct reference trajectories were evaluated: square, triangular, and sinusoidal waveforms. 
+
+4.2 Performance Metrics 
+
+Tracking performance was quantified using the root-mean-square (RMS) tracking error 
+
+RMS e =
+
+s
+
+1
+
+T
+
+Z T
+
+> 0
+
+e2(t) dt, e(t) = q(t) − qd(t), (19) and the integral of absolute error (IAE) 
+
+IAE = 
+
+Z T
+
+> 0
+
+|e(t)| dt. (20) In this work, q(t) and qd(t) are expressed in degrees, hence RMS e is reported in degrees (deg) and IAE in degree-seconds (deg ·s). Control effort was quantified using the RMS of the commanded PWM signal 
+
+RMS PWM =
+
+s
+
+1
+
+T
+
+Z T
+
+> 0
+
+PWM 2(t) dt, (21) where PWM is bounded by the actuator saturation limits. For the step-like (square) reference, transient performance was additionally characterized by overshoot and settling time. Overshoot is reported as a percentage of the step amplitude, and settling time is defined as the time required for 
+
+|e(t)| to enter and remain within a ±2% band around the commanded step for the specified evaluation window. 
+
+4.3 Sinusoidal Tracking 
+
+The sinusoidal reference, Fig. 3, test evaluates steady-state tracking under smooth excitation. Performance is compared between the baseline controller (conventional feedback linearization controller, η = 0 ) and the intelligent controller using Gaussian, Laplacian, and inverse multiquadratic (IMQ) activation kernels under identical tuning parameters. Quantitative results are reported in Table 1. 0 5 10 15 20 25 30 35 40                        
+
+> Time [s]
+> −20
+> −15
+> −10
+> −50510 15 20
+> α [◦]Trajectory tracking
+> Desired Conventional Gaussian Inverse multiquadratic Laplacian
+> 0510 15 20 25 30 35 40
+> Time [s]
+> −1.00
+> −0.75
+> −0.50
+> −0.25 0.00 0.25 0.50 0.75 1.00
+> ˜α [◦]Tracking error
+> 0510 15 20 25 30 35 40
+> Time [s]
+> −0.100
+> −0.075
+> −0.050
+> −0.025 0.000 0.025 0.050 0.075 0.100
+> P W M
+> (a) (b) (c) Control action
+
+Figure 3. Results for the sinusoidal function. 
+
+4.4 Step-like Tracking (Square Reference) 
+
+The square reference, Fig. 4, test evaluates transient behavior under discontinuous commands. In addition to RMS e,
+
+IAE , and RMS PWM , overshoot and settling time are reported for each kernel. Quantitative results are reported in Table 2. K. Paldanius, G.S. Lima and W.M. Bessa Influence of Radial Basis Activation Functions on Intelligent Controller for Robotic Manipulators 0 5 10 15 20 25 30 35 40 
+
+Time [s] 
+
+> −20
+> −15
+> −10
+> −50510 15 20
+> α [◦]
+
+Trajectory tracking             
+
+> Desired Conventional Gaussian Inverse multiquadratic Laplacian
+> 0510 15 20 25 30 35 40
+
+Time [s] 
+
+> −40
+> −30
+> −20
+> −10 010 20 30 40
+> ˜α [◦]
+
+Tracking error         
+
+> 0510 15 20 25 30 35 40
+
+Time [s] 
+
+> −0.6
+> −0.4
+> −0.20.00.20.40.6
+> P W M
+
+(a) (b) (c) Control action 
+
+Figure 4. Results for the square function. 
+
+4.5 Ramp-like Tracking (Triangular Reference) 
+
+The triangular reference, Fig. 5, test evaluates tracking over constant-velocity segments (ramp-like motion). Quantita-tive results are reported in Table 3. 0 5 10 15 20 25 30 35 40 
+
+Time [s] 
+
+> −20
+> −15
+> −10
+> −50510 15 20
+> α [◦]
+
+Trajectory tracking             
+
+> Desired Conventional Gaussian Inverse multiquadratic Laplacian
+> 0510 15 20 25 30 35 40
+
+Time [s] 
+
+> −1.00
+> −0.75
+> −0.50
+> −0.25 0.00 0.25 0.50 0.75 1.00
+> ˜α [◦]
+
+Tracking error         
+
+> 0510 15 20 25 30 35 40
+
+Time [s] 
+
+> −0.100
+> −0.075
+> −0.050
+> −0.025 0.000 0.025 0.050 0.075 0.100
+> P W M
+
+(a) (b) (c) Control action 
+
+Figure 5. Results for the triangular function. 
+
+4.6 Quantitative Comparison 
+
+Tables 1–3 summarize the mean tracking metrics for each reference type. For the square reference, overshoot and settling time are included to capture transient response characteristics. Table 1. Sine reference metrics (degrees). Kernel RMS e [deg] Imp. [%] IAE [deg ·s] RMS PWM [-] Baseline ( η = 0 ) 0.464 — 25.18 0.0381 Gaussian 0.341 26.5% 19.38 0.0388 Laplacian 0.282 39.2% 16.02 0.0390 IMQ 0.223 51.9% 12.65 0.0391 Table 2. Square reference metrics (degrees; transient metrics included). Kernel RMS e [deg] IAE [deg ·s] RMS PWM [-] Overshoot [%] Settling [s] sat_frac [-] Baseline ( η = 0 ) 3.095 57.76 0.0776 0.00 1.277 0.0213 Gaussian 3.106 49.09 0.0829 2.85 2.567 0.0248 Laplacian 3.127 50.92 0.0837 5.32 2.919 0.0249 IMQ 3.142 50.45 0.0852 6.86 2.624 0.0261 EURODINAME III - An International Symposium on Dynamic Problems of Mechanics June 8-11, 2026 - Giens Peninsula, FR 
+
+Table 3. Triangle reference metrics (degrees). Kernel RMS e [deg] Imp. [%] IAE [deg ·s] RMS PWM [-] Baseline ( η = 0 ) 0.398 — 20.86 0.0356 Gaussian 0.292 26.6% 17.65 0.0362 Laplacian 0.247 37.9% 14.83 0.0364 IMQ 0.203 49.0% 11.89 0.0365 
+
+4.7 Discussion 
+
+The results demonstrate that activation function selection systematically influences the trade-off between tracking precision and transient aggressiveness, even though all kernels preserve boundedness and ultimate convergence under the same Lyapunov-based adaptation law. A key finding is the superior performance of the inverse multiquadratic (IMQ) kernel for continuous trajectories; it achieved a 51.9% reduction in RMS error for sine waves and a 49.0% reduction for triangle waves compared to the baseline. This suggests that kernels with global support, such as the IMQ function, provide a more holistic and accurate approximation of the disturbance manifold when the reference is smooth by enabling wider generalization of the estimate. In contrast, the square reference tests (Table 2) reveal a critical design trade-off. While the neural kernels improved the IAE (reducing it by up to 15.0% for the Gaussian case), they introduced transient overshoot (up to 6.86% for IMQ) and increased settling times. This indicates that more localized kernels lead to sharper adaptation around specific oper-ating regions, which may increase transient aggressiveness under discontinuous commands. These observations indicate that kernel support and smoothness characteristics directly affect the evolution of the adaptive weights and the effective disturbance compensation, suggesting that localized kernels or the baseline controller may be preferable for applications requiring strictly monotonic step responses. 
+
+5. CONCLUDING REMARKS 
+
+This paper investigated the influence of radial basis activation functions on the closed-loop dynamics of an intelligent controller for robotic manipulators. The proposed framework combines model-based nonlinear control with an RBF neural disturbance estimator updated through a Lyapunov-based adaptation law, guaranteeing boundedness of all closed-loop signals and ultimate convergence of the tracking error to a compact region. A systematic experimental comparison was conducted on the Quanser QArm platform (Quanser Interactive Labs) under sinusoidal, square, and triangular reference trajectories. The results demonstrate that, although stability properties are preserved for all bounded kernels, activation function selection significantly influences transient response and steady-state accuracy while maintaining a consistent control effort. The most significant result is that the IMQ kernel can reduce tracking error by approximately 52% while the control effort (RMS PWM ) increased by less than 3% relative to the baseline. In particular, the inverse multiquadratic kernel exhibited improved steady-state tracking performance for smooth and ramp-like trajectories, while more localized kernels led to sharper adaptation and increased transient aggressiveness under discontinuous commands. These findings indicate that kernel support and smoothness characteristics directly affect the disturbance approximation quality and the evolution of the adaptive weights. Overall, the study highlights that activation function choice should be regarded as a structural design parameter in intel-ligent controllers that allows engineers to tune for either maximum steady-state precision or minimal transient overshoot. Future work will extend the analysis to multi-DOF configurations and investigate systematic kernel tuning strategies that balance approximation capability and transient robustness. 
+
+6. REFERENCES 
+
+Abu-Jassar, A., Hamdan, M., Aweisi, N., Howaidi, M. et al. , 2026. “Model with neural network component for adaptive manipulator control under variable load”. Brunke, L., Greeff, M., Hall, A.W., Yuan, Z., Zhou, S., Panerati, J. and Schoellig, A.P., 2022. “Safe learning in robotics: From learning-based control to safe reinforcement learning”. Annual Review of Control, Robotics, and Autonomous Systems , Vol. 5, No. 1, pp. 411–444. Ccari, L.F.C., Aguilar, W., Supo, E., Espinoza, E.S., Vidal, Y.S., Medina, N. and Pari, L., 2024. “Robust finite-time adap-tive nonlinear control system for an eod robotic manipulator: Design, implementation, and experimental validation”. 
+
+IEEE Access , Vol. 12, pp. 93859–93875. da Silva Lima, G., Moreira, V.R.F. and Bessa, W.M., 2023. “Accurate trajectory tracking control with adaptive neural networks for omnidirectional mobile robots subject to unmodeled dynamics”. Journal of the Brazilian Society of Mechanical Sciences and Engineering , Vol. 45, No. 1, p. 48. K. Paldanius, G.S. Lima and W.M. Bessa Influence of Radial Basis Activation Functions on Intelligent Controller for Robotic Manipulators 
+
+Ioannou, P. and Fidan, B., 2006. Adaptive Control Tutorial . SIAM. Li, H., Li, Y., Du, P., Song, C. and Ming, Z., 2026. “An rbfnn-optimized active disturbance rejection controller for path tracking of autonomous vehicles”. International Journal of Automotive Technology , pp. 1–10. Liu, X., Wang, N., Liu, C., Chen, T. and Sun, L., 2025. “Neural adaptive finite-time tracking control for strict-feedback nonlinear systems and application to robotic manipulators”. IEEE Transactions on Automation Science and Engineer-ing , Vol. 23, pp. 86–98. Niu, B., Liu, X., Guo, Z., Jiang, H. and Wang, H., 2023. “Adaptive intelligent control-based consensus tracking for a class of switched nonstrict feedback nonlinear multiagent systems with unmodeled dynamics”. IEEE Transactions on Artificial Intelligence , Vol. 5, No. 4, pp. 1624–1634. Scarselli, F. and Tsoi, A.C., 1998. “Universal approximation using feedforward neural networks: A survey of some existing methods, and some new results”. Neural networks , Vol. 11, No. 1, pp. 15–37. Slotine, J.J.E., Li, W. et al. , 1991. Applied nonlinear control , Vol. 199. Prentice hall Englewood Cliffs, NJ. Sveen, E.M., Zhou, J., Ebbesen, M.K. and Poursina, M., 2025. “Decentralised adaptive learning-based control of robot manipulators with unknown parameters”. Journal of Automation and Intelligence , Vol. 4, No. 2, pp. 136–144. Venanzi, I., 2016. “A review on adaptive methods for structural control”. The Open Civil Engineering Journal , Vol. 10, No. 1. Zeng, C., Li, Z., Yang, Y., Liu, C. and Yang, C., 2025. “Learning-based methods for aerial manipulation: A focused review”. IEEE/ASME Transactions on Mechatronics .Zhang, D. and Wei, B., 2017. “A review on model reference adaptive control of robotic manipulators”. Annual Reviews in Control , Vol. 43, pp. 188–198. 
+
+7. RESPONSIBILITY NOTICE 
+
+The authors are solely responsible for the printed material included in this paper.

@@ -6,40 +6,41 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-02
-- 运行时间：2026-07-02 21:56:32 UTC
+- 最新运行日期：2026-07-03
+- 运行时间：2026-07-03 21:41:47 UTC
 - 运行状态：成功
-- 本次总论文数：6
-- 精读区：2
-- 速读区：4
+- 本次总论文数：7
+- 精读区：4
+- 速读区：3
 
 ### 今日简报（AI）
-1) 今日精读聚焦LLM多智能体框架破解电力系统动态模型发现难题，以及稳定学习范式融合控制理论与机器学习。  
-2) 最值得关注两篇：基于大模型的协同建模方法（9.0分）与稳定学习理论突破（8.0分），两者均指向工业智能与理论交叉前沿。  
-3) 建议优先尝试将LLM协作框架应用于自身动态系统建模，同时关注稳定学习在非线性控制中的落地可能性。
-- 详情：[/202607/02/README](/202607/02/README)
+今天精读2篇高分论文并速读3篇，覆盖稳定化学习等前沿控制理论与机器学习交叉方向。最值得关注的是稳定化学习范式（9.0/10）和线性Markov跳跃双曲PDE的鲁棒稳定化（9.0/10）。建议深入研读这两篇精读论文，并结合LLM多智能体框架在电力系统建模中的应用。
+- 详情：[/202607/03/README](/202607/03/README)
 
 ### 精读区论文标签
-1. [A Novel Method for Differential-Algebraic Dynamic Model Discovery in Power Systems: An LLM-Based Multi-Agent Collaborative Framework](/202607/02/2606.31314v1-a-novel-method-for-differential-algebraic-dynamic-model-discovery-in-power-systems-an-llm-based-multi-agent-collaborative-framework)  
-   标签：评分：9.0/10、query:sr
-   evidence：基于大语言模型的动态模型发现框架，类似于符号回归
-2. [Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning](/202607/02/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning)  
+1. [Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning](/202607/03/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning)  
+   标签：评分：9.0/10、query:lyapunov-ai
+   evidence：基于Lyapunov的稳定化学习分析与设计
+2. [Robust Stabilization of Linear Markov-Jumping Hyperbolic PDEs with Boundary Input Delay](/202607/03/2607.02081v1-robust-stabilization-of-linear-markov-jumping-hyperbolic-pdes-with-boundary-input-delay)  
+   标签：评分：9.0/10、query:lyapunov-ai
+   evidence：构建李雅普诺夫泛函实现PDE镇定
+3. [Symbolic Discovery of Iterative Algorithms: A Continuous Latent Space Bayesian Optimization Framework](/202607/03/2607.01552v1-symbolic-discovery-of-iterative-algorithms-a-continuous-latent-space-bayesian-optimization-framework)  
+   标签：评分：8.0/10、query:sr
+   evidence：符号形式的迭代算法发现
+4. [Influence of Radial Basis Activation Functions on Intelligent Controller for Robotic Manipulators](/202607/03/2607.02167v1-influence-of-radial-basis-activation-functions-on-intelligent-controller-for-robotic-manipulators)  
    标签：评分：8.0/10、query:lyapunov-ai
-   evidence：综述稳定性学习，包括基于Lyapunov的方法和数据驱动方法
+   evidence：基于李雅普诺夫的自适应律与RBF神经网络
 
 ### 速读区论文标签
-1. [Metric Aggregation Divergence: A Hidden Validity Threat in Agent-Based Policy Optimization and a Contractual Remedy](/202607/02/2606.29038v1-metric-aggregation-divergence-a-hidden-validity-threat-in-agent-based-policy-optimization-and-a-contractual-remedy)  
+1. [A Novel Method for Differential-Algebraic Dynamic Model Discovery in Power Systems: An LLM-Based Multi-Agent Collaborative Framework](/202607/03/2606.31314v1-a-novel-method-for-differential-algebraic-dynamic-model-discovery-in-power-systems-an-llm-based-multi-agent-collaborative-framework)  
    标签：评分：7.0/10、query:sr
-   evidence：使用多目标进化算法于基于代理的策略优化
-2. [Approximation and Controllability of Nonlinear Control-Affine Systems via Semiautonomous Neural Ordinary Differential Equations](/202607/02/2606.29338v1-approximation-and-controllability-of-nonlinear-control-affine-systems-via-semiautonomous-neural-ordinary-differential-equations)  
-   标签：评分：7.0/10、query:lyapunov-ai
-   evidence：神经ODE用于非线性控制系统近似，可间接用于李雅普诺夫函数
-3. [An Inner-Outer Iteration Algorithm with Optimal Parameters for Stochastic Lyapunov Matrix Equation](/202607/02/2607.00451v1-an-inner-outer-iteration-algorithm-with-optimal-parameters-for-stochastic-lyapunov-matrix-equation)  
-   标签：评分：7.0/10、query:lyapunov-ai
-   evidence：求解随机Lyapunov矩阵方程，这是Lyapunov函数构造的关键
-4. [Iterative graph lifting for automatic design of path-complete stability certificates](/202607/02/2607.00637v1-iterative-graph-lifting-for-automatic-design-of-path-complete-stability-certificates)  
+   evidence：基于LLM的多智能体动态模型发现框架
+2. [Evolutionary Feature Engineering for Structured Data](/202607/03/2607.01548v1-evolutionary-feature-engineering-for-structured-data)  
+   标签：评分：7.0/10、query:sr
+   evidence：使用基于LLM的进化优化发现符号变换，在方法论上与符号回归相似
+3. [Metastable Transitions in Dynamical Systems with both Time-varying Perturbations and Degenerate Noise](/202607/03/2606.29650v1-metastable-transitions-in-dynamical-systems-with-both-time-varying-perturbations-and-degenerate-noise)  
    标签：评分：6.0/10、query:lyapunov-ai
-   evidence：通过路径完备图自动设计切换系统稳定性证书
+   evidence：研究动力系统稳定性，涉及Lyapunov型分析
 
 
 <div class="dpr-home-promo-card">

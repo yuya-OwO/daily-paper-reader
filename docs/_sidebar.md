@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-07-04 <!--dpr-date:20260704-->
+    * 精读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202607/04/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning" data-sidebar-item="{&quot;title&quot;: &quot;Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;稳定学习范式中的李雅普诺夫分析与设计&quot;}">Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning</a>
   * 2026-07-03 <!--dpr-date:20260703-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202607/03/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning" data-sidebar-item="{&quot;title&quot;: &quot;Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;基于Lyapunov的稳定化学习分析与设计&quot;}">Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning</a>

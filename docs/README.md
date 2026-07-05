@@ -6,23 +6,19 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-04
-- 运行时间：2026-07-04 20:15:19 UTC
+- 最新运行日期：2026-07-05
+- 运行时间：2026-07-05 21:24:42 UTC
 - 运行状态：成功
-- 本次总论文数：1
-- 精读区：1
+- 本次总论文数：0
+- 精读区：0
 - 速读区：0
 
 ### 今日简报（AI）
-今日精读一篇8分论文，提出“稳定化学习”范式，打通控制理论与机器学习的壁垒。  
-核心亮点：将控制理论的稳定性保证融入学习算法，为AI安全与可解释性提供新路径。  
-建议进一步探索强化学习中的稳定性控制相关文献，深化理论交叉理解。
-- 详情：[/202607/04/README](/202607/04/README)
+> 今日无新推荐，系统未产出可展示论文。
+- 详情：[/202607/05/README](/202607/05/README)
 
 ### 精读区论文标签
-1. [Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning](/202607/04/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning)  
-   标签：评分：8.0/10、query:lyapunov-ai
-   evidence：稳定学习范式中的李雅普诺夫分析与设计
+- 本次无精读推荐。
 
 ### 速读区论文标签
 - 本次无速读推荐。

@@ -1,0 +1,1128 @@
+Title: Learning dynamical systems from noisy data with Weak-form Kernel Ridge Regression
+
+URL Source: https://arxiv.org/pdf/2607.00257v1
+
+Published Time: Thu, 02 Jul 2026 00:23:09 GMT
+
+Number of Pages: 32
+
+Markdown Content:
+# LEARNING DYNAMICAL SYSTEMS FROM NOISY DATA WITH 
+
+# WEAK -FORM KERNEL RIDGE REGRESSION 
+
+A P REPRINT 
+
+Max Kreider 
+
+Department of Mathematics The Pennsylvania State University, University Park, PA 16802, USA 
+
+mbk6295@psu.edu 
+
+John Harlim 
+
+Department of Mathematics, Institute for Computational and Data Sciences The Pennsylvania State University, University Park, PA 16802, USA 
+
+jharlim@psu.edu 
+
+Daning Huang 
+
+Department of Aerospace Engineering The Pennsylvania State University, University Park, PA 16802, USA 
+
+daning@psu.edu 
+
+July 2, 2026 
+
+# ABSTRACT 
+
+Accurate prediction of complex dynamical systems from noisy measurements remains a signif-icant challenge in scientific computing. Kernel ridge regression learning strategies are often effective when applied to clean data, but have limited success with noisy data. Recent work has observed that a weak formulation can act to filter noisy data, and different learning strategies have achieved increased noise robustness with a weak-form framework. In this manuscript, we give an overview of the filtering mechanism behind the weak formulation and provide a bias-variance error decomposition. Using these insights, we combine a weak formulation with a kernel learning strategy to propose Weak-form Kernel Ridge Regression (WKRR) for learning dynamical systems. The proposed framework is simple to implement, effective for both clean and noisy data, and outperforms several baseline methods. We demonstrate the performance of WKRR on chaotic benchmark systems in up to 64 dimensions, as well as 15,000-dimensional real-world fluid data. 
+
+# 1 Introduction 
+
+Many problems in scientific computing and engineering disciplines involve modeling and prediction of dynamical systems, with applications including weather [ 17 , 37 , 57 ], environmental and ecological science [ 29 , 49 , 64 , 82 ], biology [ 28 , 60 , 77 ], fluid dynamics [ 1 , 23 , 47 , 62 ], finance [ 14 , 73 ], and traffic [ 5 , 6 , 78 ]. However, many physically relevant problems remain challenging due to high-dimensionality, complex or chaotic dynamics, lack of known underlying dynamics, and noisy or low-fidelity observational data. Purely data-driven methods have emerged as a strong option for learning dynamical systems [ 11 , 27 , 58 , 74 , 75 ]. Such methods circumvent the need to form dynamical equations and typically seek to represent unknown dynamics with a high-fidelity reduced-order model. A variety of popular approaches have proven to be competitive in this context. Dynamic mode decomposition (DMD) and variants leverage a Koopman framework that lifts finite-dimensional nonlinear data to an infinite-dimensional linear representation, often leading to a simplified low-dimensional surrogate model [ 20 , 21 , 41 , 43 , 55 , 75 ]. Sparse identification of nonlinear dynamical systems (SINDy) and variants 
+
+> arXiv:2607.00257v1 [cs.LG] 30 Jun 2026
+
+A PREPRINT - J ULY 2, 2026 discover dynamical equations from data by choosing a suitable, often sparse, linear combination of dictionary functions [ 12 , 13 , 38 , 85 ]. Neural ordinary differential equations (NODEs) learning underlying dynamics by training a neural network to represent a continuous-time vector field [ 15 , 33 , 44 , 59 , 83 , 86 ]. Various machine learning techniques such as Long Short-Term Memory [ 35 , 45 , 71 , 84 ], reservoir computing [ 26 , 56 , 66 , 79 ], and autoencoders [ 25 ] have also gained prominence. Kernel-based approaches such as kernel ridge regression (KRR) mitigate the curse of dimensionality with the so-called “kernel trick” [ 2 , 4 , 24 , 65 , 72 ]. KRR is especially attractive because it does not require a dictionary of functions, and is straightforward to implement. Recent work has shown that KRR outperforms multiple baseline methods in data-driven dynamical system learning and forecasting problems over a wide range of data sets [ 65 ]. While these approaches typically perform well when applied to clean data, their performance often degrades significantly in the presence of measurement or observational noise, especially when the underlying dynamics are chaotic. Several methods have been proposed to mitigate lack of robustness in the presence of noise, including data assimilation and filtering methods [ 16 , 31 , 32 ], and Gaussian process approaches [ 30 , 80 , 81 ]. The approach developed in [ 31 ], coined RAFDA, has proven to be competitive for low-dimensional systems, but does not scale well to high-dimensions. A different approach is to combine a learning strategy with a weak formulation, which involves integrating data residuals over a family of test functions. Classical (strong) approaches enforce pointwise consistency between given observational data, and typically perform poorly for noisy data because pointwise errors are magnified by erroneous fluctuations. In contrast, weak approaches relax pointwise loss strategies in favor of orthogonality constraints between residuals and test functions. Loss functions involving weak formulations have been observed to perform more robustly in the presence of noise, and have been incorporated successfully into both the SINDy framework [ 8 , 51 , 53 , 54 ] and the NODE framework [ 44 ]. Both [ 44 ] and [ 51 ] point out that a weak formulation acts as a filter for noisy data, suggesting a mechanism for its observed noise robustness. In the present manuscript, we will build on these previous insights to show explicitly that the weak formulation acts to filter noisy data. We will consider a family of test functions that arise from uniform translations of a generating function, and will interpret the resulting weak formulation as an orthogonal projection procedure which filters by projecting noisy data onto the subspace spanned by these test functions. Moreover, we provide a brief bias-variance error decomposition of signal filtering via the weak form. In particular, we provide an exact expression for the variance, i.e., the error that arises due to noise corruption. This interpretation connects to well-known results in information theory and signal processing [ 67 , 68 , 69 , 70 , 76 ]. Shannon’s sampling theorem, which states that an ideal band-limited function can be perfectly reconstructed with suitably sampled data, may be interpreted as an orthogonal projection onto a subspace of band-limited functions [ 63 ]. Subsequent work has extended this orthogonal projection analysis to classes of functions arising from integer shifts of generating functions [ 67 ]. While the error analysis that we provide is not novel, we include it to justify the use of a weak formulation and to clarify the mechanism by which it provides noise robustness. Motivated by the simplicity and recent success of kernel-based learning methods and the noise robustness of weak formulations, we propose Weak-form Kernel Ridge Regression (WKRR) as a noise robust, data-driven learning framework. We remark that WKRR does not require a suite of dictionary functions, in contrast to Weak SINDy approaches [ 8 , 51 , 53 , 54 ] that critically need the underlying functions or vector fields to be spanned by the dictionary functions. Moreover, WKRR does not require extensive hyperparameter tuning as many machine learning frameworks, such as NODE, require [ 44 ]. We will show numerically that the forecasting horizon of WKRR is similar to that of a strong KRR formulation, but much less computationally expensive. We will also demonstrate the effectiveness of WKRR with different choices of kernel function, including the standard Gaussian kernel and the Diffusion Maps (DM) kernel, which has recently received attention for its excellent performance across a wide range of chaotic and experimental datasets [ 65 ]. The success of WKRR with various kernel functions broadens the method’s applicability and suggests that the practitioner may select kernel functions that favor speed or accuracy as the situation warrants. The remainder of the manuscript is organized as follows. In §2, we review the classical KRR method and the Gaussian and DM kernel functions. In §3, we review the weak formulation, explain how it acts as a filter, and provide a brief bias-variance error decomposition for the filtering procedure. The main contribution of this work is provided in §4, where we propose WKRR as a noise-robust learning method for dynamical systems. We propose a validation procedure to select appropriate model hyperparameters, and summarize the steps needed to implement WKRR in practice. We apply WKRR to several numerical examples in §5, including chaotic baseline systems in up to 64 dimensions, and real-world turbulent fluid data made available by [ 62 ] as part of a Community Challenge. We conclude with a brief discussion in §6. 2A PREPRINT - J ULY 2, 2026 
+
+# 2 Kernel Ridge Regression Review 
+
+In this section, we review the classical kernel ridge regression (KRR) framework for learning solution operators of dynamical systems. We will refer to this approach as the “strong approach” throughout the manuscript. 
+
+2.1 Kernel Ridge Regression 
+
+Suppose we are given noisy data u(ti ) ≡ ui = (u(1)  
+
+> i
+
+, . . . , u(n) 
+
+> i
+
+) ∈ Rn , i = 1 , . . . , N , sampled at times ti = (i − 1) · ∆t . We assume that the data is of the form 
+
+ui = xi + σξi , (1) where xi denotes clean data generated by an autonomous dynamical system of the form x′ = f(x), and ξi is i.i.d. Gaussian with zero mean and covariance matrix Σ = diag (η21, . . . , η2 
+
+> n
+
+). We define ηℓ to be the root-mean-square (RMS) of the ℓth component of the clean signal 
+
+ηℓ =
+
+vuut 1
+
+N
+
+> N
+
+X 
+
+> i=1
+
+¯¯¯x(ℓ)
+
+> i
+
+¯¯¯2
+
+. (2) The parameter σ ≥ 0 represents the signal-to-noise ratio and will be varied in our numerical experiments. In this section, we assume that σ = 0 so that the given data is not corrupted by noise. Let M ⊂ Rn denote the forward invariant set of the underlying system. Define the flow map Φτ = (Φ(1)  
+
+> τ
+
+, . . . , Φ(n) 
+
+> τ
+
+) : Rn → M, which advances the system state over a time increment τ > 0, i.e., Φτ(x(t )) = x(t + τ). We will use KRR to learn solution operators with either a direct-connection or a skip-connection scheme. Both frameworks are useful in practice; direct-connection often outperforms skip-connection when the underlying dynamics are stiff. Otherwise, the skip-connection scheme typically yields superior performance [ 65 ]. We employ both frameworks in our numerical examples. We now describe each learning framework in turn. 
+
+2.1.1 Direct-Connection Scheme 
+
+Let k(·, ·; ϵ) : Rn ×Rn → R denote a scalar-valued kernel function, where ϵ > 0 denotes a tunable bandwidth parameter. The key idea of the direct-connection scheme is to approximate each component of the flow map directly, 
+
+Φ(ℓ) 
+
+> τ
+
+(x) ≈
+
+> N
+
+X 
+
+> i=1
+
+k(x, ui ; ϵ)α(ℓ) 
+
+> i
+
+, (3) for reconstruction coefficients {α(ℓ) 
+
+> i
+
+}ℓ=1,..., n to be determined. To proceed, we collect the available data in snapshot pairs S = (X, Y). The input matrix X ∈ R(N −1) ×n is defined by 
+
+X = £u1 u2 . . . uN −1
+
+¤⊤ , (4) while the output matrix Y ∈ R(N −1) ×n is defined by 
+
+Y = £u2 u3 . . . uN
+
+¤⊤ . (5) Let K (·, X; ϵ) = [k(·, u1; ϵ), . . . , k(·, uN −1; ϵ)] : Rn → RN −1 be the kernel function evaluated over the input data X. In this notation, our goal is to model the flow map 
+
+ui +1 = Φ∆t (ui ) ≈ K (ui , X; ϵ)α, (6) where α ∈ R(N −1) ×n collects the reconstruction coefficients. With the goal of expressing (6) in matrix notation, define the Gram matrix K(ϵ) ∈ R(N −1) ×(N −1) whose ( i , j ) entry is k(ui , uj ; ϵ) for i , j = 1 , . . . , N − 1. We then arrive at a linear least squares problem which enforces pointwise consistency between the snapshot data pairs 
+
+Y = K(ϵ)α. (7) We remark that (7) is often ill-conditioned. In practice, a solution ˆα is determined by solving the related KRR problem ˆα = arg min 
+
+> α
+
+¡∥K(ϵ)α − Y∥2 
+
+> F
+
++ λα⊤K(ϵ)α¢ , (8) where λ is a user-specified regularization parameter. The problem (8) admits a unique solution ˆα = (K(ϵ) + λI)−1 Y, (9) where I denotes the ( N − 1) × (N − 1) identity matrix. Once ˆα has been determined, out-of-sample model forecasting can be achieved via ˜ui +1 = K ( ˜ ui , X; ϵ) ˆ α, (10) where ˜ ui is the kernel approximation to the given data. 3A PREPRINT - J ULY 2, 2026 
+
+2.1.2 Skip-Connection Scheme 
+
+Instead of directly modeling the flow map, a skip-connection scheme models each component of the residual map 
+
+Φ(ℓ) 
+
+> τ
+
+(x) − x(ℓ) ≈
+
+> N
+
+X 
+
+> i=1
+
+k(x, ui ; ϵ)α(ℓ) 
+
+> i
+
+. (11) We define X according to (4) as before, but now define the output matrix to be 
+
+Y = £∆u1 ∆u2 . . . ∆uN −1
+
+¤⊤ , ∆ui = ui +1 − ui . (12) In this setup, our goal is to model 
+
+ui +1 − ui = Φ∆t (ui ) − ui ≈ K (ui , X; ϵ)α. (13) In the same notation as above, we arrive at a least squares problem (7) , but with Y now defined according to (12) .Solving for the coefficients ˆ α proceeds as above, and forecasting is performed according to ˜ui +1 = ˜ui + K ( ˜ ui , X; ϵ) ˆ α. (14) Notice that both the direct- and skip-connection schemes require the user to specify a kernel function, a bandwidth parameter ϵ, and a regularization parameter λ. We discuss appropriate choices for the kernel function below. We defer the discussion of the tunable parameters ϵ and λ to §4.2, where we extend a previously developed validation strategy [65] to handle noisy data using a weak formulation. 
+
+2.2 Choice of Kernel Function 
+
+The choice of kernel function in the KRR approach described above is crucial to the success of the method. While any kernel function can be used, a specific choice of kernel may be more, or less, appropriate for a given problem. Suppose we are given a dataset U = {u1, . . . , uN } consisting of observations sampled from the forward invariant set 
+
+M ⊂ Rn . Unless otherwise stated, in this work we will consider a standard Gaussian kernel kRBF : M × M → R,
+
+kRBF (x, y; ϵ) = exp 
+
+Ã
+
+− ∥x − y∥22
+
+4ϵ
+
+!
+
+, (15) for any x, y ∈ M. The parameter ϵ > 0 is a scalar-valued bandwidth parameter that should be determined by the practitioner. We describe an approach to choose ϵ in §4.2 where we extend the KRR approach to noisy data. We also consider the Diffusion Maps (DM) kernel, a data-driven kernel function based on the Diffusion Maps algorithm [ 18 ] that has recently been employed with success over a wide range of datasets [ 65 ]. In particular, recent work has shown that the DM kernel can exhibit superior forecasting performance compared to the standard Gaussian kernel when applied to clean data, especially when the dimension of the invariant set M is much lower than its ambient dimension, n [65]. We will compare the Gaussian and DM kernels over two baseline examples in §5 when only noisy data is available. We will show numerically that both kernels have nearly identical performance for a low-dimensional chaotic system, but that the DM kernel exhibits superior performance on a high-dimensional chaotic system with low intrinsic dimension. These results suggest that systems with low intrinsic dimension or special geometry may benefit from the DM kernel, even when observational data is corrupted by noise. Otherwise, the Gaussian kernel may be more appropriate due to lower computational complexity and ease of implementation. We now describe the numerical implementation of the DM kernel. Following [ 65 ], we begin with the standard Gaussian RBF kernel (15) . We then normalize (15) in two stages to arrive at the DM kernel, kDM, N : M × M → R, by first writing 
+
+ks,N (x, y; ϵ) = kRBF (x, y; ϵ)
+
+sN (x; ϵ)sN (y; ϵ) , sN (x; ϵ) = 1
+
+N
+
+> N
+
+X 
+
+> j=1
+
+kRBF (x, uj ; ϵ), (16) and then writing 
+
+kDM, N (x, y; ϵ) = ks,N (x, y; ϵ)
+
+pqN (x; ϵ)qN (y; ϵ) , qN (x; ϵ) = 1
+
+N
+
+> N
+
+X 
+
+> j=1
+
+ks,N (x, uj ; ϵ), (17) for any x, y ∈ M. Note that the DM kernel is not the same as the DM matrix [18], 
+
+PN (x, y; ϵ) = ks,N (x, y; ϵ)
+
+PNj =1 ks,N (x, uj ; ϵ) , (18) 4A PREPRINT - J ULY 2, 2026 that approximates a Markov transition kernel of a reversible Markov chain on M. Observe that (18) defines a Markov matrix because the normalizing denominator term here is a summation, not an average as in (17). One can verify that pN q N (x; ϵ) PN (x, y; ϵ)
+
+pN q N (y; ϵ) = ks,N (x, y; ϵ)
+
+pN q N (x; ϵ)N q N (y; ϵ) = 1
+
+N kDM, N (x, y; ϵ), (19) which suggests that the Gram matrix P(ϵ) corresponding to PN is diagonally conjugate to the normalized Gram matrix K(ϵ)/ N corresponding to kDM, N /N . In particular, the eigenvalues of P(ϵ) and K(ϵ)/ N are the same. We refer to [34] for a theoretical discussion of the DM kernel in conjunction with KRR. 
+
+# 3 Filtering Noise Through a Weak Formulation 
+
+The key learning mechanism underlying classical KRR is to enforce pointwise consistency across snapshot pairs of data. While this strong formulation is often appropriate for clean data, its performance often noticeably worsens in the presence of noise because the regression may fit erroneous fluctuations instead of underlying dynamics. The weak formulation is a popular approach to address this lack of noise robustness. Weak approaches integrate noisy data over a family of test functions, relaxing pointwise consistency in favor of orthogonality constraints. While such approaches have recently been observed to offer increased robustness to noise [ 8 , 44 , 51 , 52 , 53 , 54 ], the connection to filtering was recently pointed out in [ 44 ] and [ 51 ]. Building on this intuition, the purpose of this section is to provide a brief overview of the filtering mechanism behind the weak formulation. 
+
+3.1 Problem Statement and Notation 
+
+A classical solution to the differential equation x′(t ) = f(x(t )) is a solution x(t ) which satisfies 
+
+R(x(t )) ≡ x′(t ) − f(x(t )) = 0. (20) In contrast, a weak formulation involves integrating the residual over smooth test functions ϕ(t )
+
+Z
+
+> R
+
+dt R(x(t )) ϕ(t ) = 0, (21) which may be interpreted as an L2 inner product enforcing the orthogonality of the residual with the test functions. This integral formulation, with appropriate choice of compactly supported test functions, has been observed to increase robustness to noise [8, 44, 51, 52, 53, 54]. In the following, we will study weak formulations applied to an arbitrary noisy signal u(t ), 
+
+Z
+
+> R
+
+dt u(t )ϕj (t ) = 0, (22) for an appropriate family of test functions {ϕj } . While we will ultimately employ the weak formulation in conjunction with KRR, the analysis in this section does not depend on a specific learning method. Let ϕ(t ) be a smooth test function with compact support on [0 , L], and define ϕj (t ) = ϕ(t − j h ) to be a family of uniformly translated test functions with compact support on [ L j , L j +1]. The parameter h determines the distance between the adjacent test functions, and together with L, describes the extent to which adjacent test functions overlap. For a dataset ui ≡ u(ti ) of finite length and fixed h, the indices j for which the support of ϕj (t ) lies in the sampling time is restricted. If the signal consists of N points sampled uniformly with step ∆t , we adhere to the convention that j ∈ [1, 2, . . . , k∗], where 
+
+k∗ =
+
+¹ N ∆t − Lh
+
+º
+
+. (23) In practice, the integral (22) must be computed with quadrature over the available data 
+
+c(ℓ) 
+
+> j
+
+=
+
+D
+
+ϕj (t ), u(ℓ)(t )
+
+E
+
+=
+
+Z L j +1 
+
+> Lj
+
+dt ϕj (t )u(ℓ)(t ) ≈
+
+> N
+
+X 
+
+> i=1
+
+wi ϕj (ti )u(ℓ) 
+
+> i
+
+, ℓ = 1, . . . , n, j = 1, . . . , k∗, (24) where wi are appropriate quadrature weights. We will find it convenient to express these quadrature approximations as a matrix product. To that end, collect the translated test functions into the rows of a matrix Ψ ∈ Rk∗×N whose ( j , i ) entry is ϕj (ti ). Note that Ψ is often sparse due to the compact support of the test functions. Further define 
+
+W = diag (w1, . . . , wN ) ∈ RN ×N to be a diagonal matrix of quadrature weights. We assume that W is invertible 5A PREPRINT - J ULY 2, 2026 throughout the manuscript. Note that ΨW is the matrix whose rows are test functions scaled by the quadrature weights. With this notation, we may discretize (24) as a linear system 
+
+C = ΨWU , (25) where C ∈ Rk∗×n is the matrix of inner product coefficients c(ℓ) 
+
+> j
+
+, and U = [u1, . . . , uN ]⊤ ∈ RN ×n collects the data at available sample times. Notice that in the typical case that k∗ < N , the coefficients C represent a compressed representation of the original signal U.
+
+3.2 The Weak Formulation as a Filter 
+
+To see the weak formulation as a filter, we consider the process of reconstructing a signal from a set of coefficients C.Let ˆu(t ) = ( ˆu(1) (t ) , . . . , ˆ u(n)(t )) denote the reconstructed signal, which we now express as a linear combination of the available test functions ˆu(ℓ)(t ) =
+
+> k∗
+
+X 
+
+> j=1
+
+a(ℓ) 
+
+> j
+
+ϕj (t ), ℓ = 1, . . . , n, (26) where a(ℓ) 
+
+> j
+
+are unknown coefficients to be determined. In the event that the ϕj (t ) are orthonormal, taking inner products on both sides of (26) is sufficient to isolate the coefficients. Without orthogonality, we may still recover the coefficients by requiring that the inner product of the reconstruction with test functions ϕq (t ) agree with the given coefficients, 
+
+Cq,ℓ = 〈 ˆu(ℓ)(t ), ϕq (t )〉 = 
+
+> k∗
+
+X 
+
+> j=1
+
+a(ℓ) 
+
+> j
+
+〈ϕj (t ), ϕq (t )〉. (27) We will find it useful to express (27) as a matrix equation. Let A ∈ Rk∗×n be the collection of unknown coefficients whose ( j , ℓ) entry is α(ℓ) 
+
+> j
+
+, and let G = ΨWΨ⊤ ∈ Rk∗×k∗
+
+be the matrix whose ( q, j ) entry is a quadrature approximation of the inner product 〈ϕq (t ), ϕj (t )〉. Under the assumption that the test functions are linearly independent and overlapping, G is invertible. We can then express (27) as the linear system C = GA . It follows that 
+
+A = G−1C. (28) Let ˆU = [ ˆu1, . . . , ˆ uN ]⊤ ∈ RN ×n denote the matrix collecting the reconstructed signal at the available discrete sample times. We can now express (26) in matrix notation to arrive at an expression for ˆ U,ˆU = Ψ⊤A = Ψ⊤G−1C = Ψ⊤G−1ΨWU = Ψ⊤(ΨWΨ⊤)−1ΨWU , (29) where the second equality follows from (28) and the third follows from (25) . Define P ≡ Ψ⊤(ΨWΨ⊤)−1ΨW ∈ RN ×N .Note that P is a projection matrix because P2 = P. Moreover, we see that 
+
+〈Pu , v〉W := (Pu )⊤Wv = u⊤P⊤Wv = u⊤WΨ⊤G−1ΨWv = u⊤W(Pv ) = 〈 u, Pv 〉W, (30) for any u, v ∈ RN , which implies that P is self-adjoint with respect to the inner-product weighted by the quadrature weight matrix W. In particular, we have 
+
+P⊤W = WP . (31) These observations imply that P is an orthogonal projection under the inner product ∥P∥2 
+
+> W
+
+= tr( P⊤WP ). The formulation above suggests that the weak-form reconstruction procedure can be interpreted as an orthogonal projection onto the span of a family of test functions, ˆU = PU , (32) which allows weak formulations to be interpreted in light of classical results in information theory and signal processing, such as Shannon’s sampling theorem and related results which use the language of orthogonal projection to study filtering [63, 67, 68]. 6A PREPRINT - J ULY 2, 2026 
+
+3.2.1 Choice of Test Function 
+
+In this section, we consider a specific choice of test function that was found to be successful in the literature [51], 
+
+ϕ(t ) =
+
+(
+
+Cp (t − a)p (b − t )p , a < t < b
+
+0, otherwise , Cp =
+
+μ 2
+
+L
+
+¶2p
+
+, (33) where L = b − a is the support length and p ∈ Z+ is a parameter which specifies the degree of the polynomial. Note that ϕ(t ) is smooth and compactly supported. We will use (33) in all of our numerical examples in §5. Recall that we construct the matrix ΨW by generating a family of linearly independent test functions, ϕj (t ) =
+
+ϕ(t − j h ), where h > 0 dictates the overlap between test functions. Consequently, the polynomial test functions depend on three key parameters: (i) the polynomial degree p, (ii) the support length L, and (iii) the overlap h.Appropriate values for the triple ( p, L, h) may vary significantly across datasets and noise levels. In practice, an appropriate choice of these parameter values should balance speed and reconstruction accuracy. There are many approaches to empirically measure the accuracy of the weak-form reconstruction. If clean or high-quality reference data is available, one could select parameters such that the reconstruction of the noisy data most closely aligns with the clean reference data under a suitable metric, e.g., RMSE. If no clean reference data is available, a common approach is to define a score metric that can be evaluated from only the observed data. Such metrics commonly measure whiteness, variance ratio, or smoothness ratio [ 9 , 39 , 44 , 46 , 50 , 61 ]. We refer to [ 44 ]for a discussion and numerical implementation of this approach. Meanwhile, the number of test functions k∗ is inversely proportional to the overlap parameter h. We will show in §4 that taking h large has the potential to greatly reduce computational complexity requirements. In this work, we select polynomial parameters that are observed to filter given noisy data across a range of error metrics. As a qualitative example, we consider here the Lorenz-63 system, discussed in more detail in §5, with 10% noise corruption. Figure 1 visualizes a typical filtering result for the x-component with ( p, L, h) = (5 , 0 . 5 , 0 . 1). We remark that filtering with appropriately chosen polynomials can provide competitive or superior results to standard approaches, such as wavelet-based filtering. We refer to Appendix A for a quantitative comparison of polynomial and wavelet filtering across a range of error metrics, noise levels, and model systems. The success of the filtering procedure justifies this choice of test function and explains the noise robustness of the weak formulation. 
+
+Figure 1: An illustration that appropriately chosen test functions can filter noisy data. A noisy signal (blue dots) is reconstructed (dashed red) via (32) using the test function (33) and compared to the ground truth (black). 
+
+3.3 Bias-Variance Decomposition 
+
+To analyze the error in the general reconstruction (32) , let E = ˆU − Uclean denote the difference between the underlying clean data and the reconstruction of the noisy signal. It follows from the decomposition ˆU = PU = P(Uclean + σξ), (34) 7A PREPRINT - J ULY 2, 2026 where ξ = [ξ1, . . . , ξN ]⊤ ∈ RN ×n is the collection of noise vectors, that we may write 
+
+E £∥E∥2
+
+> W
+
+¤ =
+
+> n
+
+X
+
+> ℓ=1
+
+B2 
+
+> ℓ
+
++ V 2 
+
+> ℓ
+
+, B2 
+
+> ℓ
+
+= ∥ (P − I)U(ℓ)clean ∥2 
+
+> W
+
+, V 2 
+
+> ℓ
+
+= σ2η2
+
+> ℓ
+
+tr( WP ), (35) which gives a bias-variance decomposition of the reconstruction error. The terms B2 
+
+> ℓ
+
+correspond to the “bias” of the reconstruction, which describe the fidelity with which a clean signal can be reconstructed. It measures how well the clean signal can be approximated in the span of the test functions. The terms V 2 
+
+> ℓ
+
+correspond to the “variance” of the signal, which describes additional error arising from noise corruption. The variance term admits significant simplification in the case of uniform quadrature, W = cI for c ∈ R,tr( WP ) = c · tr( P) = c · rank( P) = ck ∗, (36) which holds because P is a projection matrix. Equation (36) implies that filtering error due to noise is governed by the number of test functions, k∗, and is independent of the form of the test function. Notice that the bias term is similarly scaled by c in this case, so that a specific choice of this constant does not artificially inflate either the bias or variance error relative to the other. In contrast, the bias term generically depends on the choice of test function and is generally difficult to analyze. Performing computations in Fourier space has the potential to simplify the form of the bias. One can show that in the ideal case of periodic data and uniform quadrature, W = I, the bias and variance have the form 
+
+B2 
+
+> ℓ
+
+=
+
+°°°(H − I)F
+
+h
+
+U(ℓ)clean 
+
+i° °°2 
+
+> F
+
+, V 2 
+
+> ℓ
+
+= σ2η2
+
+> ℓ
+
+k∗. (37) where k∗ = N ∆t /h (due to the periodicity of the data) and F[·] denotes the Fourier transform. The matrix H ∈ RN ×N
+
+is a Fourier representation of P,
+
+Hmn =
+
+      
+
+> ˆϕmˆϕn
+> Ph−1
+> ℓ=0|ˆϕr+ℓk∗|2
+
+, m = n (mod k∗), 0, otherwise, (38) where r = m mod k∗ and ˆϕm is the mth component of the Fourier transform of the untranslated test function. Note that H is sparse with nonzero banded diagonal entries. The entries on the off-diagonal corresponding to aliasing artifacts. We remark that (38) holds for a general test function. However, further simplification for a specific test function is often difficult or impossible. We provide a brief derivation of (38) in Appendix B. Finally, we remark that approximation theory may be used to bound the bias under certain conditions in terms of the sampling step of the data. We refer to [3, 7, 67, 68] for further theoretical discussion of the bias reconstruction error. In the remainder of this section, we numerically study the bias and variance in (37) with the specific choice of test function (33) . We assume the ideal case of periodic data and uniform quadrature, W = I. Similarly to [ 51 ], we observe that in certain parameter regimes the bias term may act as an ideal low-pass filter and is well approximated by the tail of the Fourier modes of the underlying clean signal, 
+
+B2 
+
+> ℓ
+
+≈ X
+
+> m>k∗
+
+¯¯¯F[U(ℓ)clean ]
+
+¯¯¯2
+
+. (39) To perform numerical experiments, we consider a noisy dataset, U = [u1, . . . , uN ], and its clean counterpart, Uclean ,that have been generated from the Lorenz-63 system (51) (see §5). We take N = 1000, uniform timestep ∆t = 0 . 01, and σ = 0.1. To proceed, we numerically observe the total error, 
+
+E £∥E∥2
+
+> F
+
+¤ = E £∥PU − Uclean ∥2
+
+> F
+
+¤ , (40) and the bias error 
+
+E £∥Ebias ∥2
+
+> F
+
+¤ = E £∥PU clean − Uclean ∥2
+
+> F
+
+¤ . (41) The observed variance error is then computed according to 
+
+E £∥Evar ∥2
+
+> F
+
+¤ = E £∥E∥2 
+
+> F
+
+− ∥ Ebias ∥2
+
+> F
+
+¤ . (42) Above, the expectation is empirically approximated over 100 identical trials corrupted with independent noise. Results are reported in Figure 2 for different test-function parameters. We demonstrate that the form of V 2 
+
+> ℓ
+
+in (37) captures the scaling of the observed variance, and observe that the bias may be well-approximated by (39) for large 
+
+L and small h.8A PREPRINT - J ULY 2, 2026                        
+
+> (a) p=12 and L=150 (b) p=4and L=120 (c) p=10 and L=70
+
+Figure 2: Top: Plots of the observed variance (42) as a function of h with the theoretical expression for V 2 
+
+> ℓ
+
+= k∗ from (35) . In all cases, there is excellent agreement. Bottom: Plots of the observed bias (41) as a function of h with the approximation (39). There is good agreement for large L and small h. As h increases, the approximation worsens. 
+
+# 4 Proposed Approach: Weak-form Kernel Ridge Regression 
+
+In this section, we propose Weak-form Kernel Ridge Regression (WKRR) as a noise robust extension of the strong KRR approach. We will refer to this framework as the “weak” approach throughout the manuscript. 
+
+4.1 Weak-form Kernel Ridge Regression 
+
+To understand WKRR, we follow the formulation of the strong case as in §2.1 up to the formulation of the least squares problem (7) , which enforces pointwise consistency across the given data. In the context of a weak formulation, we will interpret the least squares problem as a residual, E = Y − K(ϵ)α with Y and K(ϵ) now depending on noisy data, and select α to enforce orthogonality of the residual E against a family of test functions. As in §3, let ϕj (t ) denote a family of smooth test functions, and let ΨW ∈ Rk∗×(N −1) be the matrix whose rows are the test functions scaled by quadrature weights. Notice here that ΨW has N − 1 rows to be consistent with the snapshot data S. The core idea behind WKRR is to enforce the constraint ΨWE = 0. In a literal sense, this procedure approximates the integral of the residual over test functions by a quadrature approximation. In the sense described in §3, this procedure amounts to projecting the noisy data onto the span of the test functions, which we interpret as filtering the noisy data. Accordingly, we consider the modified least squares problem 
+
+YW = KW(ϵ)α, (43) where YW = ΨWY ∈ Rk∗×n and KW(ϵ) = ΨWK (ϵ) ∈ Rk∗×(N −1) .Naively, classical KRR regularization would involve the term λα⊤KW(ϵ)α; however, this expression is not defined because the weak-form kernel matrix is no longer square. Instead, we regularize in the weak coefficient space in terms of the matrix eKW(ϵ) = ΨWK (ϵ)( ΨW)⊤ ∈ Rk∗×k∗
+
+, leading to the problem ˆαW = arg min 
+
+> αW
+
+¡∥eKW(ϵ)αW − YW∥2 
+
+> F
+
++ λα⊤ 
+
+> W
+
+eKW(ϵ)αW
+
+¢ . (44) 9A PREPRINT - J ULY 2, 2026 Note that αW ∈ Rk∗×n is a weak-form representation of the coefficients α ∈ R(N −1) ×n in the original coordinates. To obtain a solution in the original coordinates, we study (44) with the substitution α = (ΨW)⊤αW, which leads to the equivalent problem ˆα = arg min 
+
+> α
+
+¡∥KW(ϵ)α − YW∥2 
+
+> F
+
++ λα⊤K(ϵ)α¢ , (45) with unique solution given by ˆα = (ΨW)⊤(eKW(ϵ) + λI)−1YW. (46) Once ˆα is available, forecasting is performed via (10) or (14) . We emphasize that forecasting is performed in the original coordinates, not in the weak-coefficient space. Note that the weak least squares formulation arises from the strong formulation left-multiplied by the matrix ΨW.Although this procedure appears very simple, it grants a surprising number of benefits. In addition to filtering, we will find that performing KRR in the weak-coefficient space reduces computational complexity and may increase model robustness compared to a strong implementation. We remark that classically, a weak formulation involves integration-by-parts when integrating both sides of a differential equation over a family of test functions. Here, when learning discrete-time solution operators, we do not integrate by parts. Nevertheless, we continue to use the term “weak” due to the fact that these approaches enforce the differential equations in the integral or weak sense. We note that the approach described here can easily be extended to learn the vector field of a dynamical system, and emphasize that the interpretation of the weak form as a filter remains unaltered in a continuous-time context. The success of the WKRR approach hinges on the choice of test function used to construct the matrix ΨW, and the hyperparameters ϵ and λ. In this work, we consider only the test function (33) described in §3.2.1. Developing a systematic or optimal framework for choosing test function parameters ( p, L, h) is beyond the scope of the present work. Instead, our objective is to demonstrate the robustness of the WKRR approach across a representative range of parameter values. In the numerical experiments (see §5), we select fixed representative values of ( p, L, h)and demonstrate their success in the WKRR framework. Additional diagnostics are provided in Appendix A. The following section describes a validation procedure to choose the parameters ϵ and λ, which extends the methodology implemented in [65]. 
+
+4.2 Validation 
+
+The success of WKRR depends on appropriate selection of the bandwidth and regularization parameters ( ϵ, λ). In this section, we propose a validation procedure that we observe to be successful across a range of chaotic, high-dimensional, and experimental datasets; see §5. Typically, one reserves a portion of given observation data for use in validation. This validation data is not seen during training, and is used as a form of ground truth to select appropriate model hyperparameters. In this section we let utrain, i for i = 1 , . . . , N and uval, i for i = 1 , . . . , NV denote noisy training and validation data, respectively. While training and validation can be performed on the raw data, in practice we observe that filtering prior to training and validation yields marginally better performance. We refer to §4.3 for a more detailed discussion of our pre-processing procedure. We denote ˆutrain, i and ˆuval, i as filtered training and validation data, respectively. In the present discussion, we assume training and validation are performed on the filtered data. In our numerical experiments in §5, we consider training on both noisy and filtered data. We assume that the matrix ΨW is available. For a fixed ( ϵ, λ) pair, let K(ϵ) be the kernel Gram matrix formed over the filtered training data ˆutrain, i , and let ˆα be computed according to (46) . Denote ˜xi as the corresponding kernel forecast over the filtered validation data ˆuval, i via either (10) or (14) . We assume that ˜x1 = ˆuval,1 , i.e., that the forecast is initialized with the first step of known validation data. We now review two error metrics that we will use for validation in the numerical examples considered in this manuscript. 1. Valid Prediction Time (VPT): We consider the VPT metric for chaotic dynamical systems VPT = Λ · tI , I = max{ I | Ei ≤ γ for all 1 ≤ i ≤ I}, (47) where Λ is the maximal Lyapunov exponent of the system, γ is a user-defined threshold, and Ei is a normalized error metric 
+
+Ei =
+
+vuuut 1
+
+n
+
+> n
+
+X
+
+> ℓ=1
+
+ ˜x(ℓ) 
+
+> i
+
+− ˆu(ℓ)val, i
+
+ζℓ
+
+
+
+> 2
+
+, (48) where ζℓ is the standard deviation of the ℓth component of the filtered validation data. 10 A PREPRINT - J ULY 2, 2026 In words, VPT measures how long the normalized error between the kernel predication and the validation data stays below a given threshold γ. The VPT metric is ideal for chaotic systems because the forecast is expected to diverge after a short time. Normalization by the Lyapunov exponent Λ ensures the metric is unitless and enables fair comparison with other chaotic systems with faster or slower dynamics. 2. Normalized Mean Square Error (NMSE): For all other dynamical systems considered in this work, we use the NMSE metric 
+
+Ei =
+
+Pn 
+
+> ℓ=1
+
+| ˜x(ℓ) 
+
+> i
+
+− ˆu(ℓ)val, i |2
+
+Pn 
+
+> ℓ=1
+
+| ˆu(ℓ)val, i |2 . (49) Our goal now is to select appropriate hyperparameters ( ϵ, λ) for use in the weak KRR problem (45) . While systematic grid searches are possible, they are often computationally expensive. Instead, to save computation time, we follow a data-driven heuristic method, outlined in Appendix C, to compute a reference bandwidth ϵ∗ and a reference regularization parameter λ∗. These reference values are used to confine the parameter search to a grid H =
+
+[ϵ∗∆ϵ, ϵ∗/∆ϵ] × [λ∗, λ∗/∆λ], where ∆ϵ = 10 −4 and ∆λ = 10 −5.Apart from the grid, the length of data over which forecasts are performed also plays a crucial role. In the case of clean data, it is often sufficient to validate over a few long trajectories that match or exceed the expected forecast horizon, as in [ 65 ]. However, such a procedure may yield unstable results when the available data is noisy; predictions may diverge much more rapidly due to fluctuations, causing the model to fit noise instead of underlying dynamics. To address this concern, here we propose to validate over many short segments, and select parameters that optimize average error over all segments. To reduce computational complexity, we first select parameters from a coarse grid 
+
+Hc . We then zoom in on the optimal parameter choice from the coarse grid, and form a second refined grid H f .Validation over all ( ϵ, λ) ∈ H f yields an optimal parameter pair, which is subsequently used to form the final model. We now provide implementation details for the proposed validation procedure. 
+
+Coarse validation: 
+
+1. Form the coarse grid: Select reference parameters ( ϵ∗, λ∗), form the coarse grid Hc = [ϵ∗∆ϵ, ϵ∗/∆ϵ] ×
+
+[λ∗, λ∗/∆λ], and divide Hc into an Nmesh × Nmesh mesh with uniformly spaced gridpoints in log-space. 2. Divide validation data: Divide the given validation data into Nc (possibly overlapping) segments of length 
+
+νc , with initial conditions chosen uniformly and randomly from the full validation dataset. 3. Learn and forecast: For each ( ϵ, λ) pair in Hc , learn the kernel solution operator via equation (46) , forecast over the Nc validation segments, and compute the average error over each segment. 4. Select optimal coarse parameters: Select the hyperparameter pair ( ϵc , λc ) that results in the best error over the N 2mesh measurements. 
+
+Fine validation: 
+
+1. Form the fine grid: Define a zoom-in factor F and a fine grid H f = [ϵc /F, ϵc · F ] × [λc /F, λc · F ]. Break H f into an Nmesh × Nmesh mesh with uniformly spaced gridpoints in log-space. 2. Divide validation data: To prevent overfitting, divide the given validation data into N f (possibly overlap-ping) segments of length νf , with initial conditions chosen uniformly and randomly from the full validation dataset. This partition is independent from the previous partition in step 2. 3. Repeat steps 3-4 above using the fine mesh H f to extract final hyperparameters ( ϵf , λf ). Unless otherwise stated, we take Nmesh = 20, Nc = 20, N f = 30, F = 10 3/4 , and ν ≡ νc = νf . The lengths νc and νf
+
+depend on the available data and should be chosen on a problem specific basis. Notice that in the above procedure, the strong formulation requires inverting an N × N matrix for each parameter pair, which is computationally expensive when N is large. In contrast, WKRR involves inverting a k∗ × k∗ matrix, which greatly reduces computational cost in the typical case that k∗ ≪ N .
+
+4.3 Signal Pre-Processing 
+
+Application of a weak formulation applied to KRR can be interpreted as filtering prior to regression. As we will show numerically in §5, some form of filtering is essential prior to model training in the presence of noisy data, whether the filtering is accomplished via explicit pre-processing or implicitly via a weak formulation. In our numerical experiments, we compare three approaches: (i) a strong formulation trained on pre-processed (filtered) data, (ii) a 11 A PREPRINT - J ULY 2, 2026 weak formulation trained on noisy data (but implicitly filtered via projection), and (iii) a weak formulation trained on pre-processed data (and further filtered implicitly via projection). In all cases, we validate on filtered data for the sake of consistency with the training data. Because the weak formulation acts to filter data, it is natural to compare the proposed WKRR approach to a strong approach applied to filtered data. We now explain that WKRR grants several benefits beyond just filtering. • Accuracy: We will show numerically in §5 across several examples that WKRR exhibits similar or superior forecasting performance over strong methods when trained on identical filtered data. • Speed: WKRR leads to a compressed representation of observational data in the typical case of fewer test functions than samples, k∗ < N . Consequently, training and validation involve inverting matrices of size 
+
+k∗ × k∗, instead of N × N required for the strong formulation. • Validation robustness: In our numerical experiments, several strong models performed poorly during testing due to non-optimal validation. In contrast, WKRR models trained on identical data did not produce such outliers. This observation suggests that the weak-coefficient representation of the data may robustify the validation process, making specific hyperparameter choices less critical for success. These observations lead us to incorporate data pre-processing in the WKRR pipeline. We remark that increased performance due to filtering followed by a weak formulation has been reported in the literature for other learning methodologies and is not unique to WKRR [ 53 ]. However, we emphasize that while pre-processing often enhances WKRR forecasting performance, WKRR without pre-processing still performs robustly across a range of examples. 
+
+4.4 Summary 
+
+We summarize the implementation of the proposed WKRR approach in Algorithm 1. We assume that noisy observational data ui of the form (1) is given, which may be divided into training data utrain and validation data uval .
+
+Algorithm 1 WKRR implementation 
+
+Input: Training data utrain , and validation data uval . 
+
+> 1:
+
+Form the test function matrix ΨW. See §3.2.1 for discussion concerning test function selection.  
+
+> 2:
+
+Pre-process to obtain filtered data ˆ utrain and ˆ uval according to (32) or any other suitable method.  
+
+> 3:
+
+Use ˆ utrain to form X according to (4) and Y according to (5) or (12).  
+
+> 4:
+
+Using (15) or any appropriate kernel function, such as the DM kernel in (17) , and X, form the gram matrix K(ϵ).  
+
+> 5:
+
+Validate over ˆuval , using YW = ΨWY and eKW = ΨWK (ϵ)( ΨW)⊤, according to the procedure outlined in §4.2 to compute the optimal parameter pair ( ϵf , λf ).  
+
+> 6:
+
+Compute ˆ α via (46) using ( ϵf , λf ).  
+
+> 7:
+
+Perform out-of-sample forecasting via (10) or (14). 
+
+Output: Optimal parameters ( ϵf , λf ) and coefficients ˆ α for forecasting via (10) or (14). 
+
+# 5 Numerical Study 
+
+In this section, we apply the proposed WKRR method to two baseline systems: the 3-dimensional Lorenz-63 (L63) system, and a 64-dimensional discretization of the Kuramoto-Sivashinsky (KS) system. We compare the performance of the standard Gaussian kernel (15) with the DM kernel (17) . We also consider 15,000-dimensional experimental fluid data that corresponds to turbulent cavity flow (see Challenge 2.1 in [ 62 ]). When feasible, we compare WKRR with competitive baseline methods, such as strong KRR [65], RAFDA [31], and LSTM [35]. For the two baseline systems, we specify the signal-to-noise ratio of the given data (1) by selecting intensity 
+
+σ ∈ {0.01, 0.05, 0.1, 0.2}, (50) which corresponds to 1%, 5%, 10%, or 20% noise corruption. 
+
+5.1 Lorenz-63 
+
+We first consider the Lorenz-63 (L63) dynamics, which are governed by the following equations [48] 
+
+x′ = ρ1(y − x), 
+
+y′ = x(ρ2 − z) − y,
+
+z′ = x y − ρ3z.(51) 12 A PREPRINT - J ULY 2, 2026 Here, ρ1 = 10, ρ2 = 28, and ρ3 = 8/3, and (51) admits chaotic dynamics with Lyapunov exponent Λ ≈ 0 . 91 [ 10 , 44 , 65 ]. For data generation, we randomly generate an initial condition from the standard normal distribution. We integrate using MATLAB’s ode113 syntax with relative error tolerance 10 −10 , absolute error tolerance 10 −12 , and timestep 
+
+∆t = 0 . 01 to generate a trajectory consisting of N = 68 , 000 steps. Then, we corrupt the signal with a fixed intensity σ
+
+from (50) . The first 10 , 000 steps of the trajectory are pruned to eliminate transients and the resulting segment is divided into 2500 steps of noisy training data, 5500 steps of noisy validation data, and 50,000 of clean testing data. We save only the clean testing data as ground truth to gauge predictive performance. We repeat this procedure 100 times independently, which results in 100 segments consisting of training, validation, and testing data. We then pre-process the training and validation data separately by either: (i) leaving it unfiltered, (ii) filtering with wavelets, or (iii) filtering with the polynomial test functions {ϕj (t ) : = ϕ(t − j h )} as defined in (33) . To filter with wavelets, we use MATLAB’s wdenoise syntax with a sym12 wavelet. To filter with polynomials, we reconstruct the noisy signal via (32) using test functions generated from (33) . The polynomial parameters ( p, L, h) are fixed for each noise intensity. Appendix A contains diagnostics which empirically show that the selected parameters act as effective filters, justifying their use in this step. After filtering, we prune the first and last 250 steps to avoid boundary artifacts arising from the polynomial reconstruction. For each noise intensity and each filtering procedure, this process results in 100 segments consisting of 2000 steps of filtering training data, 5000 steps of filtered validation data, and 50,000 steps of clean testing data. We train, validate, and test a distinct WKRR model over each of the 100 trajectories using a skip-connection scheme (see §2). We show results obtained from both the Gaussian kernel (15) and the DM kernel (17) . For each model, validation is performed according to the process described in §4.2 using the VPT error metric with threshold γ = 0 . 3, and hyperparameters Nc = 20, N f = 30, and ν = 200. The reference parameters ( ϵ∗, λ∗) are computed according to the heuristic described in Appendix C. Typical validation landscapes are shown in Appendix D. For testing, we randomly select 500 integers in the interval [1 , 47 , 000] to be used across all models. We use these indices as starting points to extract 500 segments of length 3000 from each of the 100 testing trajectories. For each model, we forecast over each of these 500 segments. This process results in a mean VPT for each of the 100 models which are computed using 50,000 total VPTs. We show a typical forecasting result obtained with the Gaussian kernel at 5% noise in Figure 3. 
+
+Figure 3: Left: A comparison between ground truth (black) and a typical WKRR forecast (dashed purple) for the L63 system under 5% noise corruption. The VPT, marked with a green line, is approximately 2 . 18. Right: The butterfly attractor formed from the ground truth (black) and the WKRR reconstruction (dashed purple) over 5000 timesteps. We now compare the following frameworks across noise intensities: (i) strong KRR trained and validated on unfiltered data, (ii) RAFDA trained on unfiltered data, (iii) strong KRR trained and validated on wavelet filtered data, (iv) strong KRR trained and validated on polynomial filtered data, (v) proposed WKRR trained on unfiltered data and validated on polynomial filtered data, (vi) proposed WKRR trained and validated on polynomial filtered data, (vii) proposed WKRR with a DM kernel trained on unfiltered data and validated on polynomial filtered data, and (viii) proposed WKRR with a DM kernel trained and validated on polynomial filtered data. Note that RAFDA does not receive filtered data due to its predictive mechanism. Note that knowledge of the noise level σ is required for RAFDA, but is not needed for either weak or strong KRR. The case of strong KRR applied to unfiltered training and validation data is included as a baseline. Each framework is tested over 100 models with identical data. 13 A PREPRINT - J ULY 2, 2026 
+
+(a) 1% Noise (b) 5% Noise 
+
+(c) 10% Noise (d) 20% Noise Mean VPT Test Function Parameters (p, L, h)
+
+Method 1% 5% 10% 20% 1% 5% 10% 20% Strong (n/a) 1.83 ± 0.20 0.55 ± 0.09 0.24 ± 0.07 0.06 ± 0.02 — — — —RAFDA 3.11 ± 0.33 1.96 ± 0.24 1.28 ± 0.23 0.68 ± 0.14 — — — —Strong (Wavelet) 3.03 ± 0.42 1.92 ± 0.23 1.39 ± 0.25 0.83 ± 0.17 — — — —Strong (Poly) 3.21 ± 0.35 2.04 ± 0.32 1.49 ± 0.28 0.98 ± 0.19 (12, 0.6, 0.06) (5, 0.4, 0.08) (5, 0.5, 0.1) (5, 0.5, 0.1) Weak (n/a) 3.47 ± 0.37 2.22 ± 0.25 1.58 ± 0.25 1.04 ± 0.19 (12, 0.6, 0.06) (5, 0.4, 0.08) (5, 0.5, 0.1) (5, 0.5, 0.1) 
+
+Weak (Poly) 3.48 ± 0.39 2.24 ± 0.27 1.60 ± 0.26 1.09 ± 0.19 (12, 0.6, 0.06) (5, 0.4, 0.08) (5, 0.5, 0.1) (5, 0.5, 0.1) Weak DM (n/a) 3.43 ± 0.44 2.22 ± 0.25 1.58 ± 0.23 1.02 ± 0.19 (12, 0.6, 0.06) (5, 0.4, 0.08) (5, 0.5, 0.1) (5, 0.5, 0.1) 
+
+Weak DM (Poly) 3.46 ± 0.42 2.26 ± 0.27 1.60 ± 0.25 1.08 ± 0.19 (12, 0.6, 0.06) (5, 0.4, 0.08) (5, 0.5, 0.1) (5, 0.5, 0.1) 
+
+Figure 4: Empirical VPT densities for the L63 system (51) under various noise intensities. Median VPT is marked as a horizontal black line. “Strong” and “Weak” denote classical KRR and proposed WKRR frameworks, and parentheses indicate filtering applied to the training data, where (n/a) denotes unfiltered data. Validation data is filtered as the training data for strong formulations, while polynomials are used for the weak formulations. The bottom table provides statistics across the 100 mean VPTs and selected test function parameters. 14 A PREPRINT - J ULY 2, 2026 Figure 4 reports the empirical mean VPT density for each of the above frameworks in the top four panels, and reports the corresponding statistics and test function parameters in the table below. Across all noise levels, WKRR trained and validated on filtered data (Gaussian kernel - dark purple, DM kernel - dark red) consistently yields the best performance, while WKRR trained on unfiltered data (light purple and light red, respectively) is competitive or better than the strong approaches. Notice that several VPT density tails for strong KRR applied to filtered data (e.g., Figure 4, panel b) are quite long, indicating several models which produced VPTs well below the mean. In contrast, WKRR did not produce such outliers in any of our numerical experiments. This observation indicates that model validation may be more stable using a weak formulation. RAFDA exhibits strong performance for small noise, but its predictive performance worsens as noise increases. We observe that the Gaussian kernel and DM kernel give nearly identical results for the L63 system, which has an ambient dimension of three and an intrinsic dimension of roughly 2.06 on the buttefly attractor [ 42 ]. This result suggests that the RBF kernel may be appropriate for low-dimensional systems, or for systems with ambient and intrinsic dimension roughly equal. We remark that VPT measures short-term predictive capability, but does not capture long-term behavior. To study long-term forecasting fidelity, we train WKRR and RAFDA on identical data and forecast over a segment of length 40,000. We bin the forecasts and the ground truth in a histogram, which are shown in Figure 5 for each noise intensity. Both WKRR and RAFDA closely track the long-time marginal densities at small noise. However, while WKRR recovers most qualitative features of marginal densities at high noise, the performance of RAFDA deteriorates.   
+
+> (a) 1% Noise (b) 5% Noise
+> (c) 10% Noise (d) 20% Noise
+
+Figure 5: Invariant measure comparison for the learned Lorenz-63 system (51) under varying noise intensities comparing ground truth (black) to the proposed WKRR approach (purple) and RAFDA (green). 15 A PREPRINT - J ULY 2, 2026 
+
+5.2 Kuramoto-Sivashinsky 
+
+We now apply WKRR to the Kuramoto-Sivashinsky (KS) system 
+
+ut + uu x + uxx + uxxxx = 0, x ∈ [0, J ], t ≥ 0, (52) with periodic boundary conditions u(t , 0) = u(t , J ). Following [ 65 ], we take J = 22 and discretize (52) in space over a uniform grid consisting of 64 points. Accordingly, we view the KS system as a 64-dimensional ordinary differential equation. In this setup, the KS system admits chaotic dynamics with Lyapunov exponent Λ ≈ 0 . 043 and has Kaplan-Yorke dimension approximately 5.2 [22], much smaller than the ambient 64-dimensional space. To generate data we select u(0 , x) = sin (16 πx/J ) as an initial condition, and integrate in time using the Exponential Time Differencing with RK4 (ETDRK4) method [ 40 , 65 ] with stepsize ∆t = 0 . 01 for N = 3 . 05 · 10 7 steps. The data is then downsampled by a factor of 10, and the first 50,000 points are pruned to avoid transient behavior. We then divide the remainder into 50 consecutive segments of 60,000 points. Each of these 50 segments consists of 4500 steps of training data, 5500 steps of validation data, and 50,000 steps of testing data. This data is corrupted with independent noise as in the L63 case. The pre-processing step is performed identically to the L63 case, and results in 50 segments consisting of 4000 steps of filtered training data, 5000 steps of filtered validation data, and 50,000 steps of clean testing data. To validate and test, we employ a direct-connection scheme (see §2). Otherwise, the validation process is similar to the L63 case. We validate according to the procedure described in §4.2 using the VPT error metric (48) with 
+
+γ = 0 . 5, and hyperparameters Nc = 20, N f = 30, and ν = 200. The reference parameters ( ϵ∗, λ∗) were computed according to the method in Appendix C. We scale λ∗ by a factor of 1000 for 5%, 10%, and 20% noise to promote more stable validation. Typical validation landscapes are shown in Appendix D. Testing was performed as in the L63 case, resulting in 50 mean VPTs across 50 WKRR models. Figure 6 illustrates a typical forecast under 5% noise with Gaussian kernel. 
+
+Figure 6: Ground truth data (right) and a typical WKRR forecast (middle) with 5% noise corruption. The error (right) is defined to be Ei = | ui − ˜ui |/ max |ui |, where ui is the ground truth and ˜ui is the WKRR prediction. The VPT is approximately 0.65 and is marked with a green line. In our numerical experiments, we consider the same frameworks as for the L63 case, with the exception of RAFDA which was omitted due to prohibitively large computational time. Figure 7 depicts violin plots of the mean VPT densities across each of the frameworks and noise intensities. The table below provides the corresponding statistics and test function parameters. In all cases, WKRR with a Gaussian kernel applied to filtered data (dark purple) achieved comparable performance to the strong approaches. However, WKRR with a DM kernel applied to filtered data (dark red), achieved superior performance across noise levels. This result suggests that the DM kernel may be more appropriate for this problem. We suspect that the DM kernel exhibits superior performance because the flow map of the KS system is rather smooth, relating to a recent finding [ 34 ] that suggests the DM kernel is superior to the Gaussian kernel in identifying smooth labels, especially those spanned by lower-order eigenfunctions of the Laplace-Beltrami operator on a submanifold of Rn . For completeness, we provide results which show the superior performance of WKRR over KRR using the DM kernel in Appendix E. 16 A PREPRINT - J ULY 2, 2026 
+
+(a) 1% Noise (b) 5% Noise 
+
+(c) 10% Noise (d) 20% Noise Mean VPT Test Function Parameters (p, L, h)
+
+Method 1% 5% 10% 20% 1% 5% 10% 20% Strong (n/a) 0.75 ± 0.11 0.38 ± 0.06 0.25 ± 0.03 0.16 ± 0.02 — — — —Strong (Wavelet) 0.80 ± 0.11 0.55 ± 0.08 0.47 ± 0.06 0.39 ± 0.05 — — — —Strong (Poly) 0.79 ± 0.11 0.55 ± 0.08 0.46 ± 0.06 0.39 ± 0.04 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3) Weak (n/a) 0.78 ± 0.12 0.55 ± 0.07 0.46 ± 0.06 0.39 ± 0.05 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3) 
+
+Weak (Poly) 0.80 ± 0.11 0.55 ± 0.07 0.47 ± 0.06 0.39 ± 0.06 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3) Weak DM (n/a) 0.89 ± 0.17 0.67 ± 0.09 0.55 ± 0.07 0.44 ± 0.06 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3) 
+
+Weak DM (Poly) 0.95 ± 0.13 0.67 ± 0.09 0.55 ± 0.07 0.44 ± 0.06 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3) 
+
+Figure 7: Empirical VPT densities for the KS system (52) under various noise intensities. Median VPT is marked as a horizontal black line. “Strong” and “Weak” denote classical KRR and proposed WKRR frameworks, and parentheses indicate filtering applied to the training data, where (n/a) denotes unfiltered data. Validation data is filtered as the training data for strong formulations, while polynomials are used for the weak formulations. The bottom table provides statistics across the 50 mean VPTs and selected test function parameters. 17 A PREPRINT - J ULY 2, 2026 
+
+5.3 Validation Length Study 
+
+The validation procedure forms a substantial part of the WKRR framework. In this section, we perform a sensitivity analysis with respect to the validation segment length ν. Our goal is to demonstrate that the proposed method is robust across several validation strategies and does not require specific parameters to achieve good performance. Our previous experiments averaged Nc = 20 trajectories consisting of ν = 200 points over a coarse parameter grid, and subsequently averaged N f = 30 trajectories consisting of ν = 200 points over a fine parameter grid. This modeling choice provided consistent forecasting performance across noise levels for both the L63 and KS systems. Here, we compare this baseline validation strategy to four others: (i) Nc = 80, N f = 120, and ν = 50; (ii) Nc = 40, 
+
+N f = 60, and ν = 100; (iii) Nc = 10, N f = 15, and ν = 400; and (iv) Nc = 8, NF = 12, and ν = 500. Otherwise, the experimental procedure is identical to the baseline cases. These frameworks were considered to provide validation segments whose lengths are both larger and smaller than the expected model forecast. To enact a direct comparison, we define νLyap = ν · ∆t · Λ, which has VPT units and may be directly compared to mean VPT. Here, we only show results with the Gaussian kernel since the same conclusion is also valid for the DM kernel. Figure 8 (a) reports the mean and standard deviation of the mean VPTs at 1% noise (left) and 20% noise (right) over 100 models for the L63 system, while panel (b) reports these statistics over 50 models for the KS system. We remark that the mean VPT remains stable across the validation strategies, highlighting the robustness of the proposed validation procedure. We emphasize that comparable VPTs were achieved from validation segments which are both larger and smaller than the expected testing VPT. While validating on segments whose length exceeds the expected forecast horizon is a typical approach to support appropriate generalization, our results suggest that WKRR still achieves comparable generalization even if it uses shorter validation segments.  
+
+> (a) Lorenz-63: left: 1% noise, right: 20% noise (b) Kuramoto-Sivashinsky: left: 1% noise, right: 20% noise
+
+Length νLyap Mean VPT (1%) Mean VPT (20%) 
+
+0.46 3.25 ± 0.47 1.06 ± 0.18 0.91 3.40 ± 0.45 1.11 ± 0.17 1.82 3.48 ± 0.39 1.09 ± 0.19 3.64 3.52 ± 0.39 1.10 ± 0.20 4.55 3.46 ± 0.39 1.11 ± 0.22 
+
+Length νLyap Mean VPT (1%) Mean VPT (20%) 
+
+0.22 0.79 ± 0.11 0.36 ± 0.06 0.43 0.79 ± 0.11 0.40 ± 0.05 0.86 0.80 ± 0.11 0.39 ± 0.06 1.72 0.79 ± 0.11 0.39 ± 0.05 2.15 0.78 ± 0.11 0.39 ± 0.05 Figure 8: Mean VPT statistics as a function of validation length ν for (a) the L63 system and (b) the KS system at two noise levels. The tables present the quantitative values. The first column lists the validation length in Lyapunov time, νLyap = ν · ∆t · Λ.
+
+5.4 Clean Data Performance 
+
+In this section, we use WKRR and classical strong KRR to study the L63 system (51) and the KS system (52) as above, but with clean ( σ = 0) training and validation data. The training and validation data are not pre-processed, but are otherwise constructed identically to the above cases. The validation scheme used here differs from that described in §4.2 only in that we now utilize Nc = N f = 3 (possibly overlapping) validation segments consisting of ν = 1500 points, following the setup in [ 65 ]. Validating over longer segments improves performance because the expected forecast horizon under clean data is significantly longer than the noisy cases. For WKRR, we scale the reference regularization parameter λ∗ by a factor of 10 −6 to promote stable validation. 18 A PREPRINT - J ULY 2, 2026 Figure 9 reports the empirical VPT density over 100 models for the L63 system, and 50 models for the KS system, respectively. The tables below provide corresponding quantitative statistics. We remark that WKRR loses only a small amount of accuracy compared to the strong KRR approach, indicating its robustness across both clean and noisy data. We remark that WKRR with a DM kernel exhibits superior performance for both systems. Previous work showed that classic strong KRR with a DM kernel often exhibits superior performance compared to a Gaussian kernel over clean data [65]. The present results suggest the robustness of the DM kernel with a weak formulation. One might argue that selecting appropriate test functions for WKRR make the method difficult to use in practice. However, the selection is straightforward when clean data is available. One procedure is as follows. For a given family of test functions, reconstruct a portion of the given training data via (32) . Then, compare the available clean data to its reconstruction using a suitable error metric, and select the best-performing test function.                                   
+
+> (a) Lorenz-63 system Method Mean VPT Parameters (p,L,h)Strong 12.87 ±1.02 —Weak 12.80 ±1.10 (14, 0.2, 0.02) Weak DM 13.96 ±1.37 (14, 0.2, 0.02)
+> (b) Kuramoto-Sivashinsky system Method Mean VPT Parameters (p,L,h)Strong 1.39 ±0.21 —Weak 1.28 ±0.24 (14, 1.5, 0.15) Weak DM 1.58 ±0.22 (14, 1.5, 0.15)
+
+Figure 9: Empirical VPT densities over clean data for (a) the L63 system (51) and (b) the KS system (52) . Median VPT is marked as a horizontal black line. “Strong” and “Weak” denote classical KRR and proposed WKRR frameworks. The bottom tables provide selected test function parameters and statistics across 100 mean VPTs for the L63 system and 50 mean VPTs for the KS system, respectively. 
+
+5.5 Experimental Data: Fluid Dynamics 
+
+We now apply WKRR with both the Gaussian and DM kernel to experimental fluid data, made available by [ 62 ] as a Community Challenge. The data consists of streamwise velocity u and wall-normal velocity v measured on cavity flow. The dataset includes measurement noise as well as fluctuations due to the inherent turbulence in the flow. Furthermore, the flow is strongly convective and heavily depends on the time-varying inlet boundary condition on the left, that is time-varying and not precisely known due to the experimental setup. Due to the unknown inlet boundary condition during prediction, it is challenging to achieve long forecasting horizon in this setting. We refer to Problem 2.1 in [62] for details of the experimental procedure and data collection process. We set 
+
+U = £u v¤ ∈ RN ×n , (53) where n = 2 · 7854 = 15708 is the spatial dimension and N denotes the number of available data timeslices. We are given Ntrain = 12 , 800 samples as training data, and 32 segments consisting of Nseg = 70 of validation data. The original challenge as described in [ 62 ] is to forecasting 30 timesteps past the validation data for each of the segments. However, because this data is not available to us, we instead break apart the 32 segments into Nval = 40 for model validation, and Ntest = 30 for model testing. This procedure allows us to quantitatively analyze the performance of 19 A PREPRINT - J ULY 2, 2026 WKRR and compare it to other baseline methods. To fix notation, let Utrain = [utrain vtrain ] ∈ R12800 ×15708 denote the given training data, let U(q)val = [uval vval ] ∈ R40 ×15708 denote the validation data, and let U(q)test = [utest vtest ] ∈ R30 ×15708 
+
+denote the testing data for q = 1, . . . , 32. We do not directly apply WKRR to the given data, because its size makes computations prohibitively expensive. Instead, we adopt the following pre-processing procedure. Set μu , μv ∈ R1×7854 to be the time-average of utrain and 
+
+vtrain , respectively. Similarly set σu , σv ∈ R1×7854 to be the standard deviation of the training data. Then for both training and validation data u, v, we normalize ˆU =
+
+h u−μu
+
+> σu
+> v−μv
+> σv
+
+i
+
+, (54) where division is interpreted component-wise. We then implement a POD procedure by taking a truncated SVD ˆU = Ur Sr V⊤ 
+
+> r
+
+, (55) where r modes are retained. The normalized data is then projected onto the POD modes ˜U = ˆUV r = £ ˜u ˜v¤ . (56) Finally, we normalize per mode by writing 
+
+U† =
+
+h ˜u−uu
+
+> ςu
+> ˜v−uv
+> ςv
+
+i
+
+, (57) where uu , uv ∈ R1×r and ςu , ςv ∈ R1×r are the mean and standard deviation of the POD modes that arise from the training data. We emphasize that the mean and standard deviations are computed only from the training data, although these values are used to normalize both the training and validation data. Polynomial parameters are chosen according to the following procedure. We select a segment of training data consisting of 1000 timesteps. The data is normalized according to the above procedure. We then filter and reconstruct the normalized signals over a grid of parameter triples ( p, L, h). The reconstruction is the unnormalized per-mode, projected onto original coordinates by the action of V ⊤ 
+
+> r
+
+, and multiplied by the standard deviation. The result is a mean-subtracted signal. We then compare this signal to the ground truth (also mean-subtracted) using the NSME metric (49), and select the parameter pair which minimizes the error. We then apply WKRR to U†train . Both the training and validation data is normalized according to the above proce-dure. Validation is performed according to the procedure described in §4.2, but with the following modifications. The coarse grid is initialized to Hc = [10 2, 10 4] × [10 −16 , 10 −13 ], and NMSE (computed over the mode-normalized coefficients) is averaged over Nc = 3 and N f = 5 segments of length ν = 15 for the coarse and fine grids, respectively. To alleviate computational time, we validate on only one of the 32 validation segments. 1 The resulting model is tested on all 32 testing segments. This testing data is unnormalized to mean-subtracted physical coordinates and compared to the mean-subtracted ground truth using the NMSE metric. This metric is consistent with that considered in the Community Challenge paper [62]. We compare the performance of WKRR with LSTM, used as a baseline in the Community Challenge paper [ 62 ]. The LSTM implementation, provided by [ 62 ], was modified to use the same normalized data as WKRR. The baseline results in [ 62 ] using LSTM were computed with r = 25, noting that increasing r may destabilize the training of the LSTM networks. In the following, we will compare WKRR and LSTM with both r = 25 and r = 100. Figure 10 shows a typical forecast for each method with r = 25 over 30 timesteps. We observe that WKRR with the Gaussian and DM kernel gives visually indistinguishable results, and so we report only results using the Gaussian kernel for this case. The top block of four rows correspond to u data, while the last block of four rows corresponds to v data. In each of the two blocks, we compare the ground truth (first row) with the r = 25 POD representation (second row), the WKRR forecast (third row), and the LSTM forecast (fourth row) over one of the 32 testing segments. The error plots in Figure 11 report the NMSE for each of the 32 trials (light gray), the average error over all 32 trials (solid colored line), and the corresponding standard deviation (light shaded band). The dashed colored lines correspond to the trajectory represented in the two blocks. Both methods produce predictions that reasonably reproduce the POD representation of the data. Our results indicate that both methods are competitive in this regime. We now repeat the forecasting procedure taking r = 100 POD modes. In this case, we report both the Gaussian and DM kernel results. Figures 12 and 13 report the results in the same style as above. The Gaussian kernel results are 
+
+> 1Several validation segments were randomly chosen and forecasting results did not change significantly, indicating that the particular choice of validation segment does not greatly alter the outcome.
+
+20 A PREPRINT - J ULY 2, 2026 
+
+Figure 10: A visualization of the data and typical forecasts. The first four rows correspond to u data, and the bottom four rows correspond to v data. From top to bottom, the rows in each block correspond to: (i) ground truth, (ii) POD representation of the data with r = 25, (iii) WKRR prediction, and (iv) LSTM prediction. 
+
+Figure 11: NMSE plots for WKRR (left), LSTM (middle), and a comparison of the two (right). Light gray lines correspond to each of the 32 trials, dashed colored lines correspond to the trajectory chosen for visualize in the top panel, solid colored lines correspond to mean NMSE over all 32 trials, and the colored shaded region corresponds to the standard deviation over all 32 trials. shown in purple, while the DM kernel results are shown in red. We observe that WKRR with both kernels exhibits noticeably more consistent qualitative agreement and smaller mean error over short-term horizons. This improved performance for higher-dimensional data highlights a key advantage of WKRR. The performance of WKRR with the Gaussian and DM kernel differs in this regime. Over longer horizons, WKRR with the DM kernel has noticeably smaller quantitative error. However, this metric may be misleading. Qualitatively, forecasts with the DM kernel tend to produce overly smooth predictions which may fail to capture the long-term statistical behavior of the dynamics. In contrast, while predictions with the Gaussian kernel produce larger quantitative error, the forecasts appear to be qualitatively more consistent with the underlying dynamics over long time periods. Over short time periods, the two kernels perform similarly, with a slight edge to the DM kernel. 
+
+# 6 Discussion 
+
+In this paper, we propose Weak-form Kernel Ridge Regression (WKRR) as a data-driven, noise-robust learning framework. The proposed approach is computationally cheaper than classical strong-form KRR, and demonstrates competitive performance in the presence of noise over a range of chaotic, high-dimensional, and experimental 21 A PREPRINT - J ULY 2, 2026 
+
+Figure 12: Typical data and forecast. The first five rows correspond to u data, and the bottom five rows correspond to v data. From top to bottom, the rows in each block correspond to: (i) ground truth, (ii) POD representation of the data with r = 100, (iii) WKRR with a Gaussian kernel, (iv) WKRR with a DM kernel, and (v) LSTM prediction. 
+
+Figure 13: NMSE plots for WKRR (left), LSTM (middle), and a comparison of the two (right). Light gray lines correspond to each of the 32 trials, dashed colored lines correspond to the trajectory chosen for visualize in the top panel, solid colored lines correspond to mean NMSE over all 32 trials, and colored regions correspond to standard deviation over all 32 trials. We report results for WKRR with a Gaussian kernel (purple) and with a DM kernel (red). data-sets. While selecting appropriate model hyperparameters via validation is often a difficult task that may be sensitive to modeling assumptions, we perform sensitivity studies to demonstrate that WKRR can achieve robust performance with multiple strategies across several baseline systems and noise levels. Furthermore, we show that with appropriately chosen test functions, WKRR applied to clean data greatly reduces computational complexity with only marginal loss in predictive performance. This observation positions WKRR as a flexible framework across a range of datasets when the underlying noise level is unknown. Finally, the success of kernel-based learning frameworks depends strongly on the choice of kernel function. We demonstrate that WKRR achieves competitive performance with the standard Gaussian kernel over a range of baseline and experimental data, highlighting the method’s simple implementation. We also consider the Diffusion Maps (DM) kernel [ 18 , 65 ] as an alternative choice, and show that the DM kernel can lead to increased predictive performance for systems whose invariant set dimension is much lower than the ambient dimension, even with noisy observational data. The success of WKRR with multiple kernels broadens the applicability of the method and demonstrates that its noise robustness is not tied to a specific choice of kernel function. Moreover, these findings suggest that the practitioner has a modeling choice: a Gaussian kernel reduces runtime and appears to be effective for low-dimensional systems, while a DM kernel may lead to increased forecast horizon for systems with complicated geometry. We emphasize that 22 A PREPRINT - J ULY 2, 2026 the proposed WKRR approach has advantages over existing learning methods which have incorporated a weak formulation [ 8 , 44 , 51 , 53 , 54 ] because it (i) does not require a choice of dictionary functions that span the target vector field, and (ii) does not require precise parameter tuning common to many machine learning architectures. Despite the success of WKRR, several open questions remain. We observed that model validation using WKRR often produced fewer outliers with poor forecast horizons than strong KRR over pre-processed data. We hypothesize that validating over weak-form coefficients may lead to improved validation landscapes than using data in the original coordinates. It would be fruitful to pursue this observation, which may lead to more efficient validation strategies. Selecting appropriate test functions is a challenge common to all weak-form learning approaches. The bias-variance decomposition in §3.3 suggests that using a smaller family of test functions reduces error due to noise. In contrast, one generally expects that using a larger family of test functions reduces error due to signal reconstruction, although this analysis is complicated and typically depends on the specific choice of test function. Developing a systematic approach to balance reconstruction and noise error constitutes a challenging yet worthwhile goal. We demonstrated numerically that training over noisy observational data is significantly more effective with WKRR than with classical KRR. While we observed that pre-processing training data often leads to marginally improved forecast horizons, the role of pre-processing in training and validation is not yet well-understood. Incorporating multiple bandwidth parameters, as opposed to a single scalar considered in this work, may also influence training and validation. Establishing theoretical convergence results for WKRR in these contexts would strengthen the proposed framework. The present manuscript assumes that the given data captures all states of an underlying dynamical system. However, in practice, given data may be only partially observed. Additionally, many physical systems may depend on parameters or external non-autonomous forcings. Extending WKRR to handle partially observed data, time-dependent data, or data which depends on parameters would broaden the applicability of WKRR. 
+
+# Acknowledgment 
+
+This work is partially supported under the NSF grants DMS-2505605 and CMMI-2340266, and the ICDS Penn State seed grant. 
+
+# Data Availability 
+
+The code to produce the figures in this paper is publicly available at https://github.com/MaxKreider/WKRR .
+
+# A Test Function Parameters 
+
+In this section, we provide additional diagnostics for polynomial test functions as filters. We also compare with wavelet pre-processing as a standard baseline filter. In our numerical experiments in §5, we apply WKRR to both the L63 system (51) and the KS system (52) . In both cases, the training and validation data were corrupted with various noise intensities. In Figures 4 and 7, we demonstrated that both strong and weak forms applied to polynomial filtered data resulted in higher mean VPT than the unfiltered case for a specific set of polynomial parameters ( p, L, h). Here, we numerically demonstrate that the weak formulation with these parameters effectively filters the data, explaining the mechanism underlying the success of WKRR in these scenarios. For each of the 100 L63 models or 50 KS models, we explicitly reconstruct the noise-corrupted training data with polynomial test functions via (32) . We also filter this training data with wavelets using MATLAB’s wdenoise 
+
+syntax with a sym12 wavelet. In both cases, we prune the first and last 250 data points to avoid boundary artifacts. In this section, we denote the pruned ground truth data as ui = [u(1)  
+
+> i
+
+, . . . , u(n) 
+
+> i
+
+]⊤ and the pruned filtered data as 23 A PREPRINT - J ULY 2, 2026 ˆui = [ ˆ u(1)  
+
+> i
+
+, . . . , ˆ u(n) 
+
+> i
+
+]⊤ for i = 1, . . . , N. We measure the filter performance using three error metrics: 
+
+ERM SE = 1
+
+n
+
+> n
+
+X
+
+> ℓ=1
+
+vuut 1
+
+N
+
+> N
+
+X 
+
+> i=1
+
+¯¯¯u(ℓ) 
+
+> i
+
+− ˆu(ℓ)
+
+> i
+
+¯¯¯2
+
+,
+
+Eθ = 1
+
+N
+
+> N
+
+X 
+
+> i=1
+
+arccos 
+
+μ ui · ˆui
+
+∥ui ∥2∥ ˆui ∥2
+
+¶
+
+,
+
+ELSD = 1
+
+n
+
+> n
+
+X
+
+> ℓ=1
+
+vuut 1
+
+M
+
+> M
+
+X
+
+> m=1
+
+¯¯10 log 10 P[u(ℓ)]m − 10 log 10 P[ ˆ u(ℓ)]m
+
+¯¯2,(58) where P[·]m is the mth component of the power spectral density of the signal, assumed to be of length M.The metric ERM SE computes RMSE over time, and averages these errors over spatial dimensions. It provides a standard measure of pointwise error. The metric Eθ measures the angle between the truth and reconstruction at a fixed sample time, and averages the result over all available sample times. Loosely speaking, it provides a measure of correctness of direction. The metric ELSD computes the log-spectra distance between the components of the true and reconstructed signals, and averages these errors over spatial dimension. It provides a standard measure of spectral difference between two signals. We report the mean and standard deviation of these error metrics averaged over 100 trials for the L63 system in Figure 14 and averaged over 50 trials for the KS system in Figure 15. In all cases, the data ˆu is filtered with wavelets (blue), polynomial test functions (orange), or left unfiltered (gray). Across noise levels, both wavelets and polynomials give comparable results in terms of RMSE and angle differences. The polynomial filter produces filtered data with smaller LSD errors. The resulting error metrics are significantly improved relative to the unfiltered baseline, indicating that both wavelets and polynomials effectively filter the data. In particular, the success of the polynomials in filtering the data justifies the ( p, L, h) parameter selection used in our numerical experiments.    
+
+> (a) 1% noise (b) 5% noise (c) 10% noise (d) 20% noise
+
+Figure 14: A comparison of the filtering properties of wavelets (blue) and polynomial test functions (orange) with an unfiltered baseline (gray) for the L63 system over three error metrics: Top row: RMSE ERM SE , Middle row: Angle Eθ ,and Bottom row: Log-spectral distance ELSD (58). 24 A PREPRINT - J ULY 2, 2026    
+
+> (a) 1% noise (b) 5% noise (c) 10% noise (d) 20% noise
+
+Figure 15: A comparison of the filtering properties of wavelets (blue) and polynomial test functions (orange) with an unfiltered baseline (gray) for the KS system over three error metrics: Top row: RMSE ERM SE , Middle row: Angle Eθ ,and Bottom row: Log-spectral distance ELSD (58). 
+
+# B H Matrix 
+
+Suppose that data U = [u1, . . . , uN ]⊤ ∈ RN ×n , with corresponding clean data Uclean , is given. We assume that the underlying clean data is periodic, which implies that k∗ = N /( h/∆t ). We also assume that W = I.Our main goal in this section is to show that the general expression for the bias given in (35) , under the above ideal assumptions, can be expressed in the form 
+
+B2 
+
+> ℓ
+
+= ∥ (P − I)U(ℓ)clean ∥2 
+
+> F
+
+=
+
+°°°(H − I)F
+
+h
+
+U(ℓ)clean 
+
+i° °°2 
+
+> F
+
+, (59) in terms of the Fourier transform of the ℓth component of the true underlying signal, and the matrix H ∈ RN ×N
+
+as defined in (38) . This approach is inspired by the approach taken in [ 67 ], which performs computations in continuous time. We first observe that when W = I, we have that P = Ψ⊤(ΨΨ ⊤)−1Ψ. Notice that the entries of the term in parenthesis are quadrature approximations of the integral [( ΨΨ ⊤)] i j =
+
+Z
+
+> R
+
+dt ϕi (t )ϕj (t ) =
+
+Z
+
+> R
+
+dτ ϕ (τ)ϕ(τ − ( j − i )h), (60) which shows this matrix is Toeplitz, and leveraging periodicity, circulant. This observation is important because the discrete Fourier Transform (DFT) diagonalizes circulant matrices. Let 
+
+F ∈ RN ×N with entries Fmn = 1/ pN exp (−2πmni /N ). Notice that F∗F = IN ×N . Consider the frequency domain representation of the test functions ˆΨ = FΨ⊤ ∈ CN ×k∗
+
+. Leveraging periodicity and straightforward manipulations, one can show that the ( m, j ) entry of this object has the form ˆΨm j = 
+
+> N−1
+
+X
+
+> p=0
+
+1
+
+pN exp( −2πmpi /N )ϕ[p − j h ] = exp( −2πm j i /k∗) ˆ ϕm , (61) 25 A PREPRINT - J ULY 2, 2026 where ˆϕm is the mth component of the DFT applied to the mother polynomial function. Let E ∈ CN ×k∗
+
+be the matrix whose ( m, j ) entries are exp (−2πm j i /k∗), and let D ∈ CN ×N be the diagonal matrix whose mth entries is ˆϕm . Then, we have ˆΨ = FΨ⊤ = DE . (62) Moreover, note that the columns of E are k∗-periodic, so the matrix E is composed of h blocks of size k∗ ×k∗ stacked on top of each other. Each of these blocks is the k∗ × k∗ DFT matrix pk∗Fk∗×k∗ . Letting J be the block identity matrix of size N × k∗, we can write ˆΨ = FΨ⊤ = pk∗DJF k∗×k∗ , (63) Now that this setup is complete, we can perform several substitutions to recover the H matrix above. Consider (P − I) = (Ψ⊤(ΨΨ ⊤)−1Ψ − I)
+
+= (Ψ⊤(ΨF∗FΨ⊤)−1Ψ − F∗F)
+
+= (Ψ⊤(k∗F∗ 
+
+> k∗×k∗
+
+[J∗|D|2J]Fk∗×k∗ )−1Ψ − F∗F). (64) Let S = J∗|D|2J ∈ Rk∗×k∗
+
+. The mth entry of the diagonal matrix |D|2 is | ˆφm |2. The action of J on either side is to sum up the “blocks”, so S is a diagonal matrix whose mth entry is Ph−1 
+
+> ℓ=0
+
+| ˆφm+ℓk∗ |2. Continuing, we have (P − I) = 1
+
+k∗ (Ψ⊤F∗ 
+
+> k∗×k∗
+
+S−1Fk∗×k∗ Ψ − F∗F)
+
+= 1
+
+k∗ (F∗ ˆΨF∗ 
+
+> k∗×k∗
+
+S−1Fk∗×k∗ ˆΨ∗F − F∗F)
+
+= 1
+
+k∗ F∗ ³
+
+[pk∗DJF k∗×k∗ F∗ 
+
+> k∗×k∗
+
+]S−1[pk∗DJF k∗×k∗ F∗ 
+
+> k∗×k∗
+
+]∗ − I
+
+´
+
+F
+
+= F∗ ¡(DJ )S−1(J∗D∗) − I¢ F.(65) Define H = (DJ )S−1(J∗D∗) ∈ RN ×N . One can show, using the block structure of J, that the entries of H are of the form 
+
+Hmn =
+
+      
+
+> ˆϕmˆϕn
+> Ph−1
+> ℓ=0|ˆϕr+ℓk∗|2
+
+, m = n (mod k∗), 0, otherwise. (66) where r = m mod k∗. This computation recovers the form (59). 
+
+# C Validation Heuristic 
+
+In this section, we review a validation heuristic to compute reference bandwidth and regularization parameters (ϵ∗, λ∗) which was utilized in [ 65 ] for strong KRR applied to clean data. Here, we modify it slightly to improve robustness in the case of noisy data. We emphasize that the procedure described below is a heuristic which has been observed to provide reasonable results over a range of examples [ 36 , 65 ]. While it often provides a good starting point, it should not be interpreted as an optimal approach that is appropriate for all problems. Suppose that training data ui for i = 1 , . . . , N of the form (1) is given. This data could be filtered, but is not required to be. Let L∗ be the maximum pairwise L2 distance between these data points. Let 
+
+ρ(x, y; η) = exp( −∥ x − y∥22/( L2
+
+> ∗
+
+η) (67) be a standard Gaussian RBF kernel with bandwidth η. Further define 
+
+S(η) = 1
+
+N 2
+
+> N
+
+X   
+
+> i,j=1
+
+ρ(ui , uj ; η). (68) Following [19, 65], this fact leads one to consider 
+
+V (η) = 2 η
+
+S(η)dS(η)dη , (69) and to consider the problem 
+
+η∗ = arg max  
+
+> η
+
+V (η). (70) 26 A PREPRINT - J ULY 2, 2026 For clean data, V (η) is often uni-modal, and an appropriate choice of η∗ is unambiguous. For noisy data, we numerically observe that V (η) may admit multiple peaks with similar values. In practice, if η∗ 
+
+> r
+
+denotes the arguments at which the local maxima occur, we recommend selecting η∗ = max r η∗ 
+
+> r
+
+. The goal of this procedure is to avoid selecting an extremely small bandwidth, which could lead to poor generalization. Once η∗ has been computed, we use it to define a reference bandwidth ϵ∗ via the following formula 
+
+ϵ∗ = 250 L2
+
+> ∗
+
+η∗. (71) To select the reference regularization parameter λ∗, let k(x, y; ϵ) = exp (−∥ x − y∥22/ϵ) be the Gaussian RBF kernel, and let KRBF (ϵ) be the corresponding Gram matrix whose ( i , j ) entry is k(ui , uj ; ϵ). We choose λ∗ to be the minimum eigenvalue of KRBF (ϵ). 
+
+# D Validation Landscapes 
+
+In this section, we depict typical WKRR validation landscapes across noise levels for the L63 system (51) in Figure 16, for the KS system (52) in Figure 17, and for the experimental fluid data in Figure 18. Note that in the case of the experimental fluid data, over-regularizing may improve quantitative performance in terms of the error metric at the cost of qualitative fidelity, i.e., over-regularizing often causes WKRR to rapidly converge to a mean flow that does not capture important qualitative features of the data.   
+
+> (a) 1% Noise (b) 5% Noise
+> (c) 10% Noise (d) 20% Noise
+
+Figure 16: Typical coarse (left sub-columns) and fine (right sub-columns) validation landscapes for the L63 system (51) at various noise intensities. Color denotes VPT. The pink dots denote the chosen parameter pair. 27 A PREPRINT - J ULY 2, 2026   
+
+> (a) 1% Noise (b) 5% Noise
+> (c) 10% Noise (d) 20% Noise
+
+Figure 17: Typical coarse (left sub-columns) and fine (right sub-columns) validation landscapes for the KS system (52) at various noise intensities. Color denotes VPT. The pink dots denote the chosen parameter pair. 
+
+Figure 18: Typical coarse (left) and fine (right) validation landscapes for the Community Challenge fluid data with 
+
+r = 25 POD modes retained. Error values are thresholded at 10 to better visualize the landscape. 
+
+# E KS Diffusion Maps Kernel Data 
+
+Here, we repeat the experimental procedure for the KS system described in §5.2 with the DM kernel (17) instead of the Gaussian kernel (15) . The results are shown in Table 1, and demonstrate the superior performance of WKRR over the strong formulation across all noise levels.                                                                                             
+
+> Mean VPT Test Function Parameters (p,L,h)
+> Method 1% 5% 10% 20% 1% 5% 10% 20% Strong DM (n/a) 0.74 ±0.11 0.37 ±0.05 0.25 ±0.03 0.15 ±0.03 ————Strong DM (Wavelet) 0.87 ±0.13 0.62 ±0.08 0.51 ±0.07 0.40 ±0.05 ————Strong DM (Poly) 0.85 ±0.12 0.63 ±0.08 0.51 ±0.06 0.39 ±0.05 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3) Weak DM (n/a) 0.89 ±0.17 0.67 ±0.09 0.55 ±0.07 0.44 ±0.06 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3)
+> Weak DM (Poly) 0.95 ±0.13 0.67 ±0.09 0.55 ±0.07 0.44 ±0.06 (7, 5.5, 1.1) (5, 8, 1.6) (5, 9.5, 1.9) (6, 11.5, 2.3)
+
+Table 1: VPT statistics for the KS system (52) under various noise intensities using the DM kernel. “Strong” and “Weak” denote classical KRR and proposed WKRR frameworks, and parentheses indicate filtering applied to the training data, where (n/a) denotes unfiltered data. Validation data is filtered as the training data for strong formulations, while polynomials are used for the weak formulations. 28 A PREPRINT - J ULY 2, 2026 
+
+# References 
+
+[1] Lionel Agostini. Exploration and prediction of fluid dynamical systems using auto-encoder technology. Physics of Fluids , 32(6), 2020. [2] AA Masrur Ahmed, Ekta Sharma, S Janifer Jabin Jui, Ravinesh C Deo, Thong Nguyen-Huy, and Mumtaz Ali. Kernel ridge regression hybrid method for wheat yield prediction with satellite-derived predictors. Remote Sensing , 14(5):1136, 2022. [3] Akram Aldroubi, Michael Unser, and Akram Aldroubi. Sampling procedures in function spaces and asymptotic equivalence with Shannon’s sampling theory. Numerical functional analysis and optimization , 15(1-2):1–21, 1994. [4] Mumtaz Ali, Ramendra Prasad, Yong Xiang, and Zaher Mundher Yaseen. Complete ensemble empirical mode decomposition hybridized with random forest and kernel ridge regression model for monthly rainfall forecasts. 
+
+Journal of Hydrology , 584:124647, 2020. [5] Constantinos Antoniou, Haris N Koutsopoulos, and George Yannis. Dynamic data-driven local traffic state estimation and prediction. Transportation Research Part C: Emerging Technologies , 34:89–107, 2013. [6] Allan M Avila and Igor Mezi´ c. Data-driven analysis and forecasting of highway traffic dynamics. Nature communications , 11(1):2090, 2020. [7] Thierry Blu and Michael Unser. Approximation error for quasi-interpolators and (multi-) wavelet expansions. 
+
+Applied and Computational Harmonic Analysis , 6(2):219–251, 1999. [8] David M Bortz, Daniel A Messenger, and April Tran. Weak form-based data-driven modeling: computationally efficient and noise robust equation learning and parameter inference. In Handbook of Numerical Analysis ,volume 25, pages 53–82. Elsevier, 2024. [9] George EP Box, Gwilym M Jenkins, Gregory C Reinsel, and Greta M Ljung. Time series analysis: forecasting and control . John Wiley & Sons, 2015. [10] Eduardo L Brugnago, Jason AC Gallas, and Marcus W Beims. Predicting regime changes and durations in Lorenz’s atmospheric convection model. Chaos: An Interdisciplinary Journal of Nonlinear Science , 30(10), 2020. [11] Steven L Brunton and J Nathan Kutz. Data-driven science and engineering: Machine learning, dynamical systems, and control . Cambridge University Press, 2022. [12] Steven L Brunton, Joshua L Proctor, and J Nathan Kutz. Discovering governing equations from data by sparse identification of nonlinear dynamical systems. Proceedings of the national academy of sciences , 113(15):3932– 3937, 2016. [13] Steven L Brunton, Joshua L Proctor, and J Nathan Kutz. Sparse identification of nonlinear dynamics with control (SINDYc). IFAC-PapersOnLine , 49(18):710–715, 2016. [14] Oscar Castillo and Patricia Melin. An intelligent system for financial time series prediction combining dynami-cal systems theory, fractal theory, and statistical methods. In Proceedings of 1995 Conference on Computational Intelligence for Financial Engineering (CIFEr) , pages 151–155. IEEE, 1995. [15] Ricky TQ Chen, Yulia Rubanova, Jesse Bettencourt, and David K Duvenaud. Neural ordinary differential equations. Advances in neural information processing systems , 31, 2018. [16] Sibo Cheng, César Quilodrán-Casas, Said Ouala, Alban Farchi, Che Liu, Pierre Tandeo, Ronan Fablet, Di-dier Lucor, Bertrand Iooss, Julien Brajard, et al. Machine learning with data assimilation and uncertainty quantification for dynamical systems: a review. IEEE/CAA Journal of Automatica Sinica , 10(6):1361–1387, 2023. [17] Hannah M Christensen and Judith Berner. From reliable weather forecasts to skilful climate response: A dynamical systems approach. Quarterly Journal of the Royal Meteorological Society , 145(720):1052–1069, 2019. [18] Ronald R Coifman and Stéphane Lafon. Diffusion maps. Applied and computational harmonic analysis ,21(1):5–30, 2006. [19] Ronald R Coifman, Yoel Shkolnisky, Fred J Sigworth, and Amit Singer. Graph Laplacian tomography from unknown random projections. IEEE Transactions on Image Processing , 17(10):1891–1899, 2008. [20] Matthew J Colbrook. The mpedmd algorithm for data-driven computations of measure-preserving dynamical systems. SIAM Journal on Numerical Analysis , 61(3):1585–1608, 2023. [21] Matthew J Colbrook, Lorna J Ayton, and Máté Sz˝ oke. Residual dynamic mode decomposition: robust and verified Koopmanism. Journal of Fluid Mechanics , 955:A21, 2023. 29 A PREPRINT - J ULY 2, 2026 [22] Russell A Edson, Judith E Bunder, Trent W Mattner, and Anthony J Roberts. Lyapunov exponents of the Kuramoto–Sivashinsky PDE. The ANZIAM Journal , 61(3):270–285, 2019. [23] Oney Erge and Eric Van Oort. Combining physics-based and data-driven modeling in well construction: Hybrid fluid dynamics modeling. Journal of Natural Gas Science and Engineering , 97:104348, 2022. [24] Peter Exterkate, Patrick JF Groenen, Christiaan Heij, and Dick van Dijk. Nonlinear forecasting with many predictors using kernel ridge regression. International Journal of Forecasting , 32(3):736–753, 2016. [25] Daniel Floryan and Michael D Graham. Data-driven discovery of intrinsic dynamics. Nature Machine Intelli-gence , 4(12):1113–1120, 2022. [26] Daniel J Gauthier, Erik Bollt, Aaron Griffith, and Wendson AS Barbosa. Next generation reservoir computing. 
+
+Nature communications , 12(1):5564, 2021. [27] Amin Ghadami and Bogdan I Epureanu. Data-driven prediction in dynamical systems: recent developments. 
+
+Philosophical transactions. Series A, Mathematical, physical, and engineering sciences , 380(2229):20210213, 2022. [28] William Gilpin, Yitong Huang, and Daniel B Forger. Learning dynamics from large biological data sets: machine learning meets systems biology. Current Opinion in Systems Biology , 22:1–7, 2020. [29] Àlex Giménez-Romero. Theoretical and data-driven models in Ecology . PhD thesis, University of the Balearic Islands (UIB); Institute for Cross-Disciplinary Physics and Complex Systems, 2024. [30] Agathe Girard, Carl Rasmussen, Joaquin Q Candela, and Roderick Murray-Smith. Gaussian process priors with uncertain inputs application to multiple-step ahead time series forecasting. Advances in neural information processing systems , 15, 2002. [31] Georg A Gottwald and Sebastian Reich. Combining machine learning and data assimilation to forecast dynamical systems from noisy partial observations. Chaos: An Interdisciplinary Journal of Nonlinear Science ,31(10), 2021. [32] Georg A Gottwald and Sebastian Reich. Supervised learning from noisy observations: Combining machine-learning techniques with data assimilation. Physica D: Nonlinear Phenomena , 423:132911, 2021. [33] Pawan Goyal and Peter Benner. Neural ODEs with irregular and noisy data. arXiv preprint arXiv:2205.09479 ,2022. [34] John Harlim, Daning Huang, Jiwoo Song, and Alex Townsend. Diffusion maps kernel ridge regression. arXiv preprint, in preparation , 2026. [35] Sepp Hochreiter and Jürgen Schmidhuber. Long short-term memory. Neural computation , 9(8):1735–1780, 1997. [36] Daning Huang, Hanyang He, John Harlim, and Yan Li. Learning vector fields of differential equations on manifolds with geometrically constrained operator-valued kernels. In The Thirteenth International Conference on Learning Representations , 2025. [37] Abir Jaafar Hussain, Panos Liatsis, Mohammed Khalaf, Hissam Tawfik, and Haya Al-Asker. A dynamic neural network architecture with immunology inspired optimization for weather data forecasting. Big data research ,14:81–92, 2018. [38] Kadierdan Kaheman, J Nathan Kutz, and Steven L Brunton. SINDy-PI: a robust algorithm for parallel implicit sparse identification of nonlinear dynamics. Proceedings. Mathematical, physical, and engineering sciences ,476(2242):20200279, 2020. [39] Rudolph Emil Kalman. A new approach to linear filtering and prediction problems. Transactions of the ASME–Journal of Basic Engineering , 1960. [40] Aly-Khan Kassam and Lloyd N Trefethen. Fourth-order time-stepping for stiff PDEs. SIAM Journal on Scientific Computing , 26(4):1214–1233, 2005. [41] J Nathan Kutz, Steven L Brunton, Bingni W Brunton, and Joshua L Proctor. Dynamic mode decomposition: data-driven modeling of complex systems . SIAM, 2016. [42] NV Kuznetsov, TN Mokaev, OA Kuznetsova, and EV Kudryashova. The Lorenz system: hidden boundary of practical stability and the Lyapunov dimension. Nonlinear Dyn , 102:713–732, 2020. [43] Qianxiao Li, Felix Dietrich, Erik M Bollt, and Ioannis G Kevrekidis. Extended dynamic mode decomposition with dictionary learning: A data-driven adaptive spectral decomposition of the Koopman operator. Chaos: An Interdisciplinary Journal of Nonlinear Science , 27(10), 2017. 30 A PREPRINT - J ULY 2, 2026 [44] Xuyang Li, John Harlim, Dibyajyoti Chakraborty, and Romit Maulik. A weak penalty neural ODE for learning chaotic dynamics from noisy time series. arXiv preprint arXiv:2511.06609 , 2025. [45] Benjamin Lindemann, Timo Müller, Hannes Vietz, Nasser Jazdi, and Michael Weyrich. A survey on long short-term memory networks for time series prediction. Procedia Cirp , 99:650–655, 2021. [46] Greta M Ljung and George EP Box. On a measure of lack of fit in time series models. Biometrika , 65(2):297–303, 1978. [47] Yun Long, Xueyuan She, and Saibal Mukhopadhyay. Hybridnet: integrating model-based and data-driven learning to predict evolution of dynamical systems. In Conference on robot learning , pages 551–560. PMLR, 2018. [48] Edward N Lorenz. Deterministic nonperiodic flow 1. In Universality in Chaos, 2nd edition , pages 367–378. Routledge, 2017. [49] Yiqi Luo, Kiona Ogle, Colin Tucker, Shenfeng Fei, Chao Gao, Shannon LaDeau, James S Clark, and David S Schimel. Ecological forecasting and data assimilation in a data-rich era. Ecological Applications , 21(5):1429– 1442, 2011. [50] Peter S Maybeck. Stochastic models, estimation, and control , volume 3. Academic press, 1982. [51] Daniel A Messenger and David M Bortz. Weak SINDy for partial differential equations. Journal of Computational Physics , 443:110525, 2021. [52] Daniel A Messenger and David M Bortz. Weak SINDy: Galerkin-based data-driven model selection. Multiscale Modeling & Simulation , 19(3):1474–1497, 2021. [53] Daniel A Messenger and David M Bortz. Asymptotic consistency of the WSINDy algorithm in the limit of continuum data. IMA Journal of Numerical Analysis , 45(6):3264–3312, 2025. [54] Daniel A Messenger, April Tran, Vanja Dukic, and David M Bortz. The weak form is stronger than you think. 
+
+arXiv preprint arXiv:2409.06751 , 2024. [55] Igor Mezi´ c. On numerical approximations of the Koopman operator. Mathematics , 10(7):1180, 2022. [56] Kohei Nakajima and Ingo Fischer. Reservoir computing . Springer, 2021. [57] Elias David Nino-Ruiz and Felipe J Acevedo García. Data-driven methods for weather forecast. In International Conference on Computational Science , pages 326–336. Springer, 2021. [58] Joshua S North, Christopher K Wikle, and Erin M Schliep. A review of data-driven discovery for dynamic systems. International Statistical Review , 91(3):464–492, 2023. [59] YongKyung Oh, Seungsu Kam, Jonghun Lee, Dong-Young Lim, Sungil Kim, and Alex Bui. Comprehensive review of neural differential equations for time series analysis. arXiv preprint arXiv:2502.09885 , 2025. [60] Bartosz Prokop and Lendert Gelens. Data-driven discovery of dynamical models in biology. arXiv preprint arXiv:2509.06735 , 2025. [61] Abraham Savitzky and Marcel JE Golay. Smoothing and differentiation of data by simplified least squares procedures. Analytical chemistry , 36(8):1627–1639, 1964. [62] Oliver T Schmidt, Aaron Towne, Adrian Lozano-Duran, Scott Dawson, and Ricardo Vinuesa. Data-driven reduced-complexity modeling of fluid flows: A community challenge. arXiv preprint arXiv:2601.06183 , 2026. [63] Claude E Shannon. Communication in the presence of noise. Proceedings of the IRE , 37(1):10–21, 1949. [64] Jingwei Song, Bo Xiang, Xinyuan Wang, Li Wu, and Chun Chang. Application of dynamic data driven application system in environmental science. Environmental Reviews , 22(3):287–297, 2014. [65] Jiwoo Song, Daning Huang, and John Harlim. Learning solution operator of dynamical systems with diffusion maps kernel ridge regression. arXiv preprint arXiv:2512.17203 , 2025. [66] Gouhei Tanaka, Toshiyuki Yamane, Jean Benoit Héroux, Ryosho Nakane, Naoki Kanazawa, Seiji Takeda, Hidetoshi Numata, Daiju Nakano, and Akira Hirose. Recent advances in physical reservoir computing: A review. 
+
+Neural Networks , 115:100–123, 2019. [67] Michael Unser. Sampling-50 years after Shannon. Proceedings of the IEEE , 88(4):569–587, 2002. [68] Michael Unser and Akram Aldroubi. A general sampling theory for nonideal acquisition devices. IEEE Transactions on Signal Processing , 42(11):2915–2925, 2002. [69] Michael Unser, Akram Aldroubi, and Murray Eden. Polynomial spline signal approximations: filter design and asymptotic equivalence with Shannon’s sampling theorem. IEEE Transactions on Information Theory ,38(1):95–103, 2002. 31 A PREPRINT - J ULY 2, 2026 [70] Michael Unser and Josiane Zerubia. A generalized sampling theory without band-limiting constraints. IEEE transactions on circuits and systems II: analog and digital signal processing , 45(8):959–969, 2002. [71] Pantelis R Vlachas, Wonmin Byeon, Zhong Y Wan, Themistoklis P Sapsis, and Petros Koumoutsakos. Data-driven forecasting of high-dimensional chaotic systems with long short-term memory networks. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences , 474(2213):20170844, 2018. [72] Vladimir Vovk. Kernel ridge regression. In Empirical inference: Festschrift in honor of vladimir n. vapnik , pages 105–116. Springer, 2013. [73] Shamaila Waheed, Mubashir Qayyum, Omar Khan, and Gilbert Chambashi. Data-driven neural modeling and chaos control in fractional-order financial dynamical systems. AIP Advances , 16(1), 2026. [74] Jack Wang, Aaron Hertzmann, and David J Fleet. Gaussian process dynamical models. Advances in neural information processing systems , 18, 2005. [75] Matthew O Williams, Ioannis G Kevrekidis, and Clarence W Rowley. A data–driven approximation of the Koopman operator: Extending dynamic mode decomposition. Journal of Nonlinear Science , 25(6):1307–1346, 2015. [76] Aaron D Wyner and Shlomo Shamai. Introduction to ‘communication in the presence of noise’ by CE Shannon. 
+
+Proc. IEEE , 86(2):442–446, 1998. [77] Jianhua Xing. Reconstructing data-driven governing equations for cell phenotypic transitions: integration of data science and systems biology. Physical Biology , 19(6):061001, 2022. [78] Fengli Xu, Yuyun Lin, Jiaxin Huang, Di Wu, Hongzhi Shi, Jeungeun Song, and Yong Li. Big data driven mobile traffic understanding and forecasting: A time series approach. IEEE transactions on services computing ,9(5):796–805, 2016. [79] Min Yan, Can Huang, Peter Bienstman, Peter Tino, Wei Lin, and Jie Sun. Emerging opportunities and challenges for the future of reservoir computing. Nature Communications , 15(1):2056, 2024. [80] Weizhong Yan, Hai Qiu, and Ya Xue. Gaussian process for long-term time-series forecasting. In 2009 interna-tional joint conference on neural networks , pages 3420–3427. IEEE, 2009. [81] Shihao Yang, Samuel WK Wong, and SC Kou. Inference of dynamic systems from noisy and sparse data via manifold-constrained gaussian processes. Proceedings of the National Academy of Sciences ,118(15):e2020397118, 2021. [82] Hao Ye, Richard J Beamish, Sarah M Glaser, Sue CH Grant, Chih-hao Hsieh, Laura J Richards, Jon T Schnute, and George Sugihara. Equation-free mechanistic ecosystem forecasting using empirical dynamic modeling. 
+
+Proceedings of the National Academy of Sciences , 112(13):E1569–E1576, 2015. [83] Yin Yu, Daning Huang, Seho Park, and Herschel Pangborn. Learning networked dynamical system models with weak form and graph neural networks. Journal of Guidance Control and Dynamics , 2026. [84] Yong Yu, Xiaosheng Si, Changhua Hu, and Jianxun Zhang. A review of recurrent neural networks: LSTM cells and network architectures. Neural computation , 31(7):1235–1270, 2019. [85] Linan Zhang and Hayden Schaeffer. On the convergence of the SINDy algorithm. Multiscale Modeling & Simulation , 17(3):948–972, 2019. [86] Hongjue Zhao, Yuchen Wang, Hairong Qi, Zijie Huang, Han Zhao, Lui Sha, and Huajie Shao. Accelerating neural ODEs: a variational formulation-based approach. In The Thirteenth International Conference on Learning Representations , 2025. 32

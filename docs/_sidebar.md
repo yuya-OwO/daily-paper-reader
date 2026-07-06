@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-07-06 <!--dpr-date:20260706-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202607/06/2607.00257v1-learning-dynamical-systems-from-noisy-data-with-weak-form-kernel-ridge-regression" data-sidebar-item="{&quot;title&quot;: &quot;Learning dynamical systems from noisy data with Weak-form Kernel Ridge Regression&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2607.00257v1-learning-dynamical-systems-from-noisy-data-with-weak-form-kernel-ridge-regression&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;数据驱动动力学系统学习为李雅普诺夫函数发现提供基础&quot;}">Learning dynamical systems from noisy data with Weak-form Kernel Ridge Regression</a>
   * 2026-07-04 <!--dpr-date:20260704-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202607/04/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning" data-sidebar-item="{&quot;title&quot;: &quot;Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2606.31562v1-stabilization-learning-a-paradigm-transition-bridging-control-theory-and-machine-learning&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;稳定学习范式中的李雅普诺夫分析与设计&quot;}">Stabilization Learning: A Paradigm Transition Bridging Control Theory and Machine Learning</a>

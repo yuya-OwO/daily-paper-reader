@@ -1,0 +1,2534 @@
+Title: Data-driven Kernel-based Predictive Control with Stability and Robustness Guarantees
+
+URL Source: https://arxiv.org/pdf/2607.02851v1
+
+Published Time: Tue, 07 Jul 2026 00:34:10 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+> 1
+
+# Data-driven Kernel-based Predictive Control with Stability and Robustness Guarantees 
+
+Wenjie Liu, Yifei Li, Gang Wang, Senior Member, IEEE , and Lihua Xie, Fellow, IEEE 
+
+Abstract —In this paper, we provide a theoretical analysis of the closed-loop properties of a data-driven kernel-based predictive control (DDKPC) scheme developed solely from input-output data. The proposed formulation integrates a robust data-driven predictive control framework with a multi-step predictor for nonlinear systems constructed via kernel-based methods. This predictor implicitly captures the system’s nonlinear behavior using the representer theorem. For the nominal case with noise-free data, we prove that the DDKPC scheme guarantees recursive feasibility and closed-loop stability, provided that the prediction horizon is sufficiently long and the kernel representation error is sufficiently small. To facilitate real-time implementation, we introduce a penalty relaxation formulation to alleviate the computational burden inherently caused by nonconvex implicit constraints. Furthermore, the framework is robustified against measurement noise by aggregating the representation mismatch and the bounded noise into a unified uncertainty bound. Finally, we extend the DDKPC framework to slowly time-varying nonlinear systems by periodically reconstructing the kernel predictor from a fixed-budget online dictionary managed by the approximate linear dependency (ALD) criterion. Under suitable conditions on the rate of variation of the input-output evolution and the online prediction error, recursive feasibility and practical closed-loop stability are preserved. The effectiveness of the proposed approach is illustrated through numerical examples. 
+
+Index terms— Data-driven control, nonlinear control, kernel-based representation, predictive control I. I NTRODUCTION 
+
+Model predictive control (MPC) is widely used because it systematically computes control actions through online optimization while handling nonlinear dynamics, constraints, and closed-loop performance requirements [1], [2]. However, its effectiveness relies on an accurate predictive model, whose construction can be costly or infeasible for systems with high dimensionality, complex couplings, and significant unmodeled effects. This modeling burden remains a key obstacle to broader MPC deployment. The increasing volume of data available from modern sys-tems, combined with advances in computation, has motivated a shift toward data-driven predictive control frameworks that reduce or eliminate explicit model identification. For linear time-invariant (LTI) systems, Willems et al’s fundamental lemma [3] provides a direct data-based parametrization of admissible trajectories, which leads to recent advancement in data-driven 
+
+> This work was supported by the Ministry of Education, Singapore, under AcRF Tier 1 Grant RG64/23, and in part by the National Natural Science Foundation of China under Grant U23B2059. Wenjie Liu, Yifei Li, and Lihua Xie are with the Centre for Advanced Robotics Technology Innovation (CARTIN), School of Electrical and Electronic Engineering, Nanyang Technological University, Singapore (e-mail: (wenjie.liu, li.yifei, elhxie)@ntu.edu.sg). Gang Wang is with the State Key Lab of Au-tonomous Intelligent Unmanned Systems and the School of Automation, Beijing Institute of Technology, Beijing 100081, China (email: gangwang@bit.edu.cn).
+
+control [4]–[9]. In this category, data-driven predictive control (DDPC) frameworks have shown that stabilizing receding-horizon controllers can be synthesized purely from input-output data, even in settings involving disturbances and measurement noise [10]–[13], and network-induced issues [14]– [16]. However, these results lie in the category of LTI systems, while many emerging engineering systems operate in regimes where nonlinear effects are intrinsic and cannot be neglected. Recent research has therefore focused on extending DDPC framework to nonlinear settings. Efforts along this direction include data-driven MPC based on local linearization [17], feedback linearization [18], and nonlinear lifting using neural networks [19], kernels [20], [21], or Koopman operators [22]. While these methods demonstrate promising empirical performance and broaden applicability beyond LTI systems, existing kernel- and neural-network-based approaches generally lack guarantees such as recursive feasibility or closed-loop stability. This gap arises because terminal sets and terminal costs are typically not incorporated, and lower bounds on the prediction horizon ensuring stability remain unknown. To bridge these theoretical and practical gaps, this pa-per develops a DDKPC framework for unknown nonlinear systems equipped with formal closed-loop guarantees. At its core, the proposed approach leverages the representer theorem [23] to construct a multi-step implicit predictor directly from historical input-output trajectories. Based on this formulation, we establish the recursive feasibility and practical closed-loop stability of the nominal scheme without relying on conventional terminal ingredients. Recognizing the computational bottlenecks of nonconvex optimization and the inevitability of measurement noise, we subsequently extend the baseline framework. We adopt a penalty relaxation strategy to enable efficient first-order optimization, and encapsulate bounded noise and representation mismatches within a unified uncertainty bound to guarantee robustness. Ultimately, we consider slowly time-varying nonlinear systems, for which a predictor constructed from a fixed offline dataset may no longer capture the current input-output behavior. To address this issue, we maintain an ALD-managed fixed-budget dictionary along the closed-loop operation and periodically update the predictor components in the DDKPC formulation. We show that the recursive feasibility and practical stability arguments extend to this time-varying setting under suitable bounded-rate and prediction-error conditions. In summary, the main contribution of this work is threefold: c1) A nominal DDKPC framework is established for unknown nonlinear systems, providing provable recursive feasibility and practical stability without terminal ingredients, along-side a penalty relaxation strategy for efficient real-time computation; 
+
+> arXiv:2607.02851v1 [eess.SY] 3 Jul 2026 2
+
+c2) The closed-loop theoretical guarantees are systematically extended to accommodate measurement noise by aggre-gating data uncertainty and representation mismatch into a unified bound; and, c3) The DDKPC framework is extended to slowly time-varying nonlinear systems via an ALD-managed online dictionary and periodic updates of the implicit predictor components, with recursive feasibility and practical sta-bility retained under bounded-rate evolution and uniform online prediction-error conditions. The most relevant prior works lie in three categories: (i) kernelized or linearization-based DDPC schemes for nonlinear systems, e.g., [17], [20]; (ii) online data-driven control for time-varying systems, e.g., [24]; and (iii) Gaussian process-based MPC (GP-MPC), e.g., [25], [26]. Key distinctions from these studies are summarized below:  
+
+> •
+
+Compared with [20]. While [20] robustifies a kernelized DDPC formulation through a min-max design, our ap-proach introduces a slack variable to account for the mismatch between the kernel-based multi-step predictor and the true system evolution. More importantly, we establish recursive feasibility and practical closed-loop stability, and further extend the analysis to slowly time-varying nonlinear systems.  
+
+> •
+
+Compared with [17]. The method in [17] exploits online data to construct local linear approximations of input-affine nonlinear systems via Willems et al.’s fundamental lemma [3]. In contrast, our framework addresses general nonlinear input-output dynamics through a kernel-based implicit multi-step predictor, with the analysis relying on representer theory in [23] rather than local trajectory parametrization.  
+
+> •
+
+Compared with [24]. Although our online scheme also uses periodic updates, as in [24], the problem setting and analysis are different. Specifically, [24] considered un-known linear time-varying (LTV) state-space systems and periodically updates stabilizing feedback gains, whereas we consider slowly time-varying nonlinear input-output systems and periodically update the implicit predictor components entering the DDKPC problem.  
+
+> •
+
+Compared with GP-MPC. Since GP regression is also built on covariance kernels, our framework is conceptually related to GP-MPC [25], [26]. However, standard GP-MPC schemes typically learn probabilistic dynamics models and require uncertainty propagation across the prediction horizon. In contrast, we use deterministic kernel regression to construct a multi-step implicit input-output predictor, avoiding recursive propagation through unknown nonlinear dynamics. Moreover, the proposed formulation does not require full state measurements or conventional terminal ingredients, while still providing recursive feasibility and practical stability guarantees. A preliminary conference version of this paper was submitted to IFAC conference [27]. Compared with the conference version, this paper makes three substantial extensions. First, it provides a detailed proof of the nominal recursive feasibility and practical stability result, which was only outlined in the conference version due to space limitations. Second, it develops a computationally tractable robust DDKPC formulation for real-time and noisy-data implementation. Third, it extends the framework to slowly time-varying nonlinear systems via an ALD-managed fixed-budget online dictionary and periodic predictor updates, while preserving recursive feasibility and practical stability. 
+
+Notation. The set of real numbers is denoted by R, and 
+
+R>0 denotes the set of positive real numbers. The sets of non-negative and positive integers are denoted by N
+
+and N+, respectively. The sets of real symmetric positive semidefinite and positive definite matrices in Rn×n are written as Sn and Sn>0. For a vector x ∈ Rnx , ∥x∥ denotes its Euclidean norm, and for a matrix M , ∥M ∥ denotes its spectral norm. For matrices P1 ∈ Sn1 , . . . , P k ∈ Snk , we denote the smallest and largest eigenvalues among them by λmin (P1, . . . , P k) and λmax (P1, . . . , P k), respectively. For vectors V0 ∈ Rn0 , . . . , V k ∈ Rnk , we use col( V0, . . . , V k) to denote the stacked vector [ V ⊤    
+
+> 0··· V⊤
+> k
+
+]⊤. A stacked window of a sequence {xt}t2 
+
+> t=t1
+
+is written as x[t1,t 2] := [ x⊤   
+
+> t1··· x⊤
+> t2
+
+]⊤. For a vector x ∈ Rn, x[i] denotes its i-th component, and x[i:j] := [x[i] · · · x[j]]⊤. For a matrix A ∈ Rm×n, A[: ,i ] denotes its i-th column, A[i, :] its i-th row, and A[i,j ] its (i, j )-th entry. The vector 1a ∈ R1×n denotes the row vector whose a-th element is 1 and all other elements are zero. For functions f (·) and h(·),
+
+h ◦ f denotes the composition h(f (·)) , and f [k] := f ◦ · · · ◦ f
+
+| {z } 
+
+> ktimes
+
+denotes the k-fold composition of f . Given N, L ∈ N+, the Hankel matrix of order L of a length-N trajectory x[0 ,N −1] is denoted by HL(x[0 ,N −1] ) := 
+
+" x0 x1 ... xN −L
+
+... ... ... ...    
+
+> xL−1xL... xN−1
+
+#
+
+.II. P RELIMINARIES AND PROBLEM FORMULATION 
+
+This section begins with a brief review of kernel-based function representation, followed by the problem formulation and the development of a data-driven kernel-based predictor. 
+
+A. Kernels and their RKHS 
+
+We first recall the definition of a positive semidefinite kernel. 
+
+Definition 1. [28, Definition 1]. Let Ω ⊂ Rn be anonempty set, N ∈ N+, and consider pairwise distinct points {x0, . . . , x N −1} ⊆ Ω. A continuous function K :Ω × Ω → R is called a positive semidefinite kernel on Ω
+
+if PN −1
+
+> i=0
+
+PN −1 
+
+> j=0
+
+wiwj K(xi, x j ) ≥ 0 for any nonzero set of weights {w0, . . . , w N −1} ⊂ R.
+
+Next, we recall the notion of a reproducing kernel. 
+
+Definition 2. [29, p. 343]. Let H be a real Hilbert space of functions g : Ω → R. A function K : Ω × Ω → R is a 
+
+reproducing kernel of H if: i) For every y ∈ Ω, the function K(·, y ) belongs to H.ii) For every y ∈ Ω and every q ∈ H, q(y) =
+
+⟨q(·), K (·, y )⟩H, where ⟨· , ·⟩ H denotes the inner product in H. This property is called the reproducing property .
+
+The Moore-Aronszajn theorem [29, p. 344] states that any positive semidefinite and symmetric kernel K uniquely 3
+
+determines a Hilbert space for which K is the reproducing kernel. Such a space is called a reproducing kernel Hilbert space (RKHS). Hence, from Definition 2, for any y ∈ Ω
+
+the function K(·, y ) belongs to the RKHS H. Moreover, for any finite expansion q(·) = PN −1 
+
+> i=0
+
+wiK(·, x i) where 
+
+N ∈ N+, wi ∈ R and xi ∈ Ω, we have that q ∈ H and its RKHS function norm is ∥q∥H := p⟨q, q ⟩H. Furthermore, 
+
+∥q∥2 
+
+> H
+
+= PN −1
+
+> i=0
+
+PN −1 
+
+> j=0
+
+wiwj K(xi, x j ) = w⊤ ¯Kw where 
+
+w = [ w0 · · · wN −1]⊤ and ¯K ∈ SN ×N is the Gram matrix with ¯Ki,j = K(xi, x j ).
+
+B. Representer Theorem 
+
+The RKHS concepts introduced above show how kernels K
+
+induce structured function spaces for representing nonlinear mappings q(·). Building on this foundation, we now revisit the representer theorem, which plays an important role in this paper. Consider a continuous positive semidefinite reproducing kernel K : Ω × Ω → R with RKHS H, and let q : Ω → R be an unknown function belonging to H. Suppose q generates the data points (xi, y i), i = 0 , . . . , N − 1, where yi = q(xi). The goal is to compute an estimator qker that minimizes  
+
+> N−1
+
+X
+
+> i=0
+
+∥yi − qker (xi)∥2 + γ∥qker ∥2
+
+> H
+
+, (1) where γ > 0 is a regularization parameter. By the representer theorem [23, Theorem 1], the min-imizer takes the form qker (x) = wk(x) where k(x) := 
+
+K(x, x 0) K(x, x 1) · · · K(x, x N −1)⊤ and w ∈ R1×N
+
+is the coefficient row vector. The functions K(x, x i) are called kernel-based basis functions that are the kernels centered at the data points xi, i = 0 , · · · , N − 1. The number of kernel-based basis functions is equal to the number of data points, and when the dataset is fixed, determining qker (x) is equivalent to computing the coefficients w.It follows from [28] that 
+
+qker (x) = Y (γI + ¯K)−1k(x) (2) where Y = y0 y1 · · · yN −1
+
+ and ¯K is the Gram matrix. The estimator (2) admits the following deterministic finite-sample error bound. 
+
+Lemma 1. [30, Lemma 1]. Suppose q ∈ H , where H is the RKHS associated with a continuous positive semidefinite kernel 
+
+K : Ω × Ω → R, and assume an a priori bound ∥q∥H ≤ Γ.Then, for all x ∈ Ω,
+
+|qker (x) − q(x)| ≤ 
+
+q
+
+Γ2 − Y ( ¯K + γI )−1Y ⊤ (3) 
+
+×
+
+q
+
+K(x, x ) − k(x)⊤( ¯K + γI )−1k(x) .
+
+With these preliminaries in place, we are now ready to formulate the problem addressed in this paper. 
+
+C. Problem formulation 
+
+Consider the following nonlinear discrete-time system 
+
+xt+1 = f0(xt, u t) (4a) 
+
+yt = b0(xt) (4b) where x ∈ Rn, u ∈ Rm, and y ∈ Rp are the state, input, and output, respectively. Functions f0(·, ·) and b0(·) are unknown. We assume that (xs, u s) is a known unstable equilibrium of the system, and that its output satisfies ys = b0(xs). The objective is to design a DDPC framework, based only on input-output data, that stabilizes the system dynamics around the equilibrium. To this end, we first recharacterize system (4) in terms of its input-output behavior, leading to the following assumption. 
+
+Assumption 1. There exists a known integer η > 0 such that the state 
+
+ξt = [ u⊤      
+
+> t−η··· u⊤
+> t−1y⊤
+> t−η··· y⊤
+> t−1
+
+]⊤ ∈ Rnξ (5) 
+
+with dynamics 
+
+ξt+1 = f (ξt, u t) (6a) 
+
+yt = b(ξt) (6b) 
+
+has the same input-output behavior as the system (4) .Remark 1. When system (4) is a linear time-invariant (LTI) system, i.e., 
+
+xt+1 = Ax t + Bu t (7a) 
+
+yt = Cx t + Du t, (7b) Assumption 1 is satisfied with η ≥ η0 where η0 is the observability index of the system (7) . In the nonlinear case, a realization of the form (6) exists under suitable observability and finite relative degree conditions on system (4) , which ensure that the mapping from the state xt to a finite input-output segment is locally injective [31, Chapters 3-4]. Such finite-memory input-output representations are classical in nonlinear system theory and include, e.g., nonlinear autoregression with exogenous inputs (NARX) models and systems with well-defined relative degree. While these conditions do not hold universally, they are satisfied by a broad class of nonlinear systems encountered in practice. Apart from Assumption 1, our knowledge of (4) is based on data collected in an experiment on (4) . The experiment returns, for some integer N ≥ η, a sequence of input-output data D := {ud[0 ,N −1] , yd[0 ,N −1] } and their associated Hankel matrix HL+η (ud, y d). Here, the superscript “d” denotes data collected offline. Let L ∈ N+ be the prediction horizon, and 
+
+Nc := N −η−L+1 . Partition the Hankel matrix HL+η (ud, y d)
+
+into h Up
+
+> UF
+
+i
+
+:= Hη+L(ud),
+
+h Yp
+
+> YF
+
+i
+
+:= Hη+L(yd) (8) where UP ∈ Rmη ×Nc , UF ∈ RmL ×Nc , YP ∈ Rpη ×Nc , YF ∈
+
+RpL ×Nc . For the LTI system (7) , it has been shown by the fundamental lemma in [3] that if ud is persistently exciting with L+η+n order, then rank( HL+η (ud, y d)) = m(η+L)+ n
+
+is always satisfied. Under this condition, col( uini , ¯u, y ini , ¯y) ∈
+
+R(m+p)( η+L) is a trajectory of (4) if and only if there exists a vector g ∈ RNc , such that 
+
+" UP
+
+> YP
+> UF
+> YF
+
+#
+
+g =
+
+ uini 
+
+> yini
+> ¯u
+> ¯y
+
+
+
+. (9) 4
+
+According to Assumption 1, the initial trajectory ξini := col( uini , y ini ) ∈ R(m+p)η can be viewed as setting the initial condition for the future (to-be-predicted) trajectory 
+
+col(¯ u, ¯y) ∈ R(m+p)L. In other words, given (uini , y ini ), every future input trajectory ¯u uniquely determines the corresponding future output trajectory ¯y through (9) . We refer interested readers to [10], [11], [14] for detailed implementations of DDPC schemes for LTI systems. However, the fundamental lemma holds only for LTI systems, which limits the practical applicability of existing DDPC schemes, as real-world systems are typically nonlinear. Motivated by this limitation, our aim is to develop a new DDPC scheme based on the data (ud[0 ,N −1] , y d[0 ,N −1] ) that stabilizes the nonlinear system (4) while providing performance guarantees. To this end, we resort to the kernel-based representation reviewed in Sections II-A and II-B and replace (9) with a kernel-based representation. 
+
+D. Kernel-based multi-step predictor 
+
+Given an initial condition (uini , y ini ) and an input sequence 
+
+¯u ∈ RmL , we predict, for each a ∈ [1 , pL ], the a-th element of the future output sequence ¯y ∈ RpL generated by the nonlinear system (4) using the multi-step predictor 
+
+¯y[a] = q[a](uini , y ini , ¯u[1: mL ]). (10) Here, ¯y = ¯y[1] · · · ¯y[pL ]
+
+⊤ is the predicted output. We first justify the structure in (10) by showing that, when q[a] is chosen appropriately, ¯y[a] = y[a] holds for all a ∈ [1 , pL ].Specifically, by iterating the dynamics (6), one obtains 
+
+¯y[1: p] = b(ξini ), (11a) 
+
+¯y[p+1:2 p] = b ◦ f (ξini , ¯u[1: m]), (11b) 
+
+· · · 
+
+¯y[( L−1) p+1: pL ] = b ◦ f [L−1] (ξini , ¯u[1: mL ]). (11c) Under the standard causality assumption (the output at time t is independent of inputs ut+1 , u t+2 , . . . ), each element satisfies, for a ∈ [1 , p ],
+
+¯y[a] = 1ab(ξini , ¯u[1: mL ]) ≜ q[a](ξini , ¯u[1: mL ]), (12a) 
+
+¯y[a+p] = 1ab ◦ f (ξini , ¯u[1: mL ]) ≜ q[a+p](ξini , ¯u[1: mL ]),
+
+(12b) 
+
+· · · 
+
+¯y[a+( L−1) p] = 1ab ◦ f [L−1] (ξini , ¯u[1: mL ]) (12c) 
+
+≜ q[a+( L−1) p](ξini , ¯u[1: mL ]). (12d) Thus, the predictor (10) exactly reproduces the true output of (4) when the functions q[a] coincide with the compositions of f and h as in (12) . However, because f and h are unknown in our data-driven setting, directly constructing q[a] is infeasible. Therefore, we seek a data-driven multi-step predictor that maps col( ξini , ¯u[1: mL ]) to the future output sequence. For the subsequent closed-loop analysis, such a predictor should not only be computable from data, but also admit a tractable characterization of its approximation error. Motivated by these requirements, we adopt a kernel-based representation, since it yields a finite-dimensional predictor through the represen-ter theorem and admits an explicit estimation error bound. Specifically, we approximate the functions q[a] using kernel-based representations fitted to the observed data contained in 
+
+col( UP , Y P , U F , Y F ). To this end, we impose the following assumption, which is commonly used in, e.g., [32]. 
+
+Assumption 2 (Kernel representation) . For every a ∈ [1 , pL ],the function q[a] belongs to an RKHS H induced by acontinuous positive semidefinite kernel K : Ω × Ω → R with 
+
+Ω ⊂ R(m+p)η+mL . Moreover, ∥q[a]∥H ≤ Γ for some known constant Γ > 0.
+
+Letting ζ := col( uini , y ini , ¯u[1: mL ]) ∈ Ω and, for j ∈
+
+[1 , N c], ζd 
+
+> j
+
+:= col( UP [: ,j ], Y P [: ,j ], U F [: ,j ]), the kernel-based estimate of the output is given by 
+
+yker  
+
+> [1: pL ]
+
+= YF ( ¯K + γI )−1k(ζ), (13) where γ > 0 is a regularization parameter, k(ζ) = [ K(ζd1 , ζ )
+
+. . . K (ζd 
+
+> Nc
+
+, ζ )] ⊤, and the Gram matrix ¯K ∈ SNc×Nc satisfies 
+
+¯K[i,j ] = K(ζd 
+
+> i
+
+, ζ d 
+
+> j
+
+) constructed using purely offline data. Since the true output satisfies (10) under ζ, Assumption 2 together with Lemma 1 yields the estimation error bound 
+
+|yker  
+
+> [a]
+
+− y[a]| ≤ d(ζ):= 
+
+q
+
+Γ2 − YF [a, :] ( ¯K + γI )−1Y ⊤  
+
+> F[a, :]
+
+(14) 
+
+×
+
+q
+
+K(ζ, ζ ) − k(ζ)⊤( ¯K + γI )−1k(ζ).
+
+We further impose the following boundedness assumptions on the error term and the kernel. 
+
+Assumption 3. For all ζ ∈ Ω, there exists a known constant 
+
+¯d > 0 such that d(ζ) ≤ ¯d.
+
+Assumption 4. For any ζ1, ζ 2 ∈ Ω, there exists ¯k > 0 such that |K(ζ1, ζ 2)| ≤ ¯k.Remark 2. Assumption 3 is readily satisfied on any com-pact prediction domain. Specifically, if (uini , y ini ) remains in a compact set along the closed-loop operation and the predicted input sequence satisfies ¯u ∈ UL with compact 
+
+U, then ζ = col( uini , y ini , ¯u) belongs to a compact subset of Ω. Since d(ζ) is continuous under the regularized kernel predictor, it admits a finite upper bound on this compact set. Moreover, for bounded kernels such as the Gaussian kernel 
+
+K(ζi, ζ j ) = σ2 
+
+> f
+
+exp  − 12 (ζi − ζj )⊤Υ( ζi − ζj ), where σf and 
+
+Υ are hyperparameters, Assumptions 3 and 4 hold without requiring constraints on ¯u. Although Assumptions 2–4 are standard in the literature, obtaining the exact analytical values of 
+
+Γ and ¯d is generally intractable for unknown black-box systems. However, this does not hinder practical implementation. As shown in the subsequent theoretical analysis and the objective design, ¯d primarily serves as a scaling factor to balance the penalty terms ( λh/ ¯d and λg ¯d) when constructing feasible candidate solutions. Therefore, an exact analytical ¯d is not strictly required in practice; knowing its approximate order of magnitude is sufficient to maintain appropriate parameter separation, which can be readily achieved via numerical tuning. 5
+
+Building on this kernel-based interpolation method, system (6a) can be regarded as 
+
+ξt+1 = f (ξt, u t) = f ker (ξt, u t) + dker (ξt) (15) where f ker (ξt, u t) ≜ ξker t+1 is formulated using yker from (13) and dker (ξt) represents the interpolation error satisfying 
+
+∥dker (ξt)∥ = ∥ξt+1 − ξker t+1 ∥ =  u[t−η+1 ,t ]
+
+> y[t−η+1 ,t ]
+
+ −
+
+h u[t−η+1 ,t ]
+
+> yker
+> [t−η+1 ,t ]
+
+i
+
+=
+
+h 0
+
+> y[t−η+1 ,t ]−yker
+> [t−η+1 ,t ]
+
+i (14) 
+
+≤ pd (ζ) ≤ p ¯d. (16) So far, we have introduced the kernel-based multi-step predictor (13) . Before moving on to the controller design, we formalize several structural assumptions on the nonlinear system (4) . These conditions play a central role in establishing the stability and performance guarantees in the next section. 
+
+Assumption 5. There exists a continuous Lyapunov function 
+
+Vs(ξ), a Lipschitz continuous feedback κ(ξ), a compact set 
+
+I, and constants cs,l , c s,u , δ loc > 0, ρs ∈ (0 , 1) , such that for any ξ ∈ Xδ := {ξ|Vs(ξ) ≤ δloc } and d ∈ I , it holds that 
+
+f (ξ, κ (ξ)) + d ∈ Xδ and 
+
+cs,l ∥ξ∥2 ≤ Vs(ξ) ≤ cs,u ∥ξ∥2 (17a) 
+
+Vs(f (ξ, κ (ξ)) + d) ≤ ρsVs(ξ) + αs(∥d∥) (17b) 
+
+where αs(·) ∈ K ∞ 1. Moreover, when d = 0 , it holds that 
+
+Vs(f (ξ, κ (ξ))) ≤ ρsVs(ξ).
+
+The following assumption is adapted from the uniformly input-output-to-state stable (UIOSS) in [33, Definition 3.7]. 
+
+Assumption 6. There exists a continuous UIOSS Lyapunov function Vo(ξ), a compact set I, constants co,l , c o,u , ϵ o > 0,
+
+ρo ∈ (0 , 1) , matrices Q ∈ Sp and R ∈ Sm>0, such that for any 
+
+ξ and d ∈ I , it holds that 
+
+co,l ∥ξ∥2 ≤ Vo(ξ) ≤ co,u ∥ξ∥2, (18a) 
+
+Vo(f (ξ, u )+ d)− Vo(ξ) ≤ − ϵo∥ξ∥2 + 12 ∥y∥2 
+
+> Q
+
++∥u∥2
+
+> R
+
+. (18b) 
+
+Remark 3. Assumptions 5 and 6 are standard in the literature for learning-based and data-driven MPC (see, e.g., [17]). It is worth emphasizing that the local stabilizing feedback κ(ξ) in Assumption 5 is used only for theoretical analysis, and need not be explicitly calculated in practice. On the other hand, such local controllers κ(ξ) and the corresponding Lyapunov function Vs can be synthesized offline by several data-driven methods, e.g., Taylor expansion [34]. Nevertheless, even when such a controller is available, it is typically not designed to directly handle hard constraints or to provide the enlarged operating region targeted by MPC. This motivates the proposed DDKPC formulation, which incorporates these features at the optimization level. Furthermore, the terms 12 ∥y∥2 
+
+> Q
+
++ ∥u∥2
+
+> R
+
+on the right-hand side of (18b) are not essential and can be replaced by general K∞ functions of ∥y∥ and ∥u∥. The present quadratic form is adopted only for consistency with the stage cost used in the DDKPC formulation.                      
+
+> 1A function α: [0 ,∞)→[0 ,∞)is said to be of class Kif it is continuous, strictly increasing, and α(0) = 0 . A function α: [0 ,∞)→[0 ,∞)is said to be of class K∞if it is of class Kand also unbounded.
+
+III. D ATA -DRIVEN KERNEL -BASED PREDICTIVE CONTROL 
+
+In this section, we present a DDKPC scheme to control un-known nonlinear system (4) with stability guarantees, followed by its extension in the presence of measurement noise. 
+
+A. DDKPC scheme 
+
+At time t ≥ η, given offline collected input-output data 
+
+{ud, y d}, past input-output measurements u[t−η,t −1] , y [t−η,t −1] 
+
+of the nonlinear system (4) , we define the following open-loop optimal control problem. 
+
+JL(ξt) := (19a) 
+
+min 
+
+> g, ¯u, ¯y,h L−1
+
+X
+
+> i=0
+
+ℓ(¯ ui|t, ¯yi|t) + λh
+
+¯d ∥ht∥2 + λg ¯d∥gt∥2
+
+s.t.
+
+ ¯K + γI YF
+
+
+
+gt =
+
+k(uini , y ini , ¯u[0 ,L −1] |t)¯y[0 ,L −1] |t + h[0 ,L −1] |t
+
+
+
+, (19b) 
+
+uini 
+
+yini 
+
+
+
+=
+
+u[t−η,t −1] 
+
+y[t−η,t −1] 
+
+
+
+, (19c) 
+
+¯ui|t ∈ U , ∀i ∈ [0 , L − 1] . (19d) Here, ¯u ∈ RmL and ¯y ∈ RpL denote the input and output trajectories predicted at time t, with elements ¯ui|t ∈ Rm and 
+
+¯yi|t ∈ Rp corresponding to time i + t, respectively. Matrix ¯K
+
+is the Gram matrix as in (13) constructed using offline data 
+
+{ud, y d}. To maintain feasibility of the optimization problem, a slack variable ht = [ h0|t · · · hL−1|t]⊤ ∈ RpL is introduced to compensate for the kernel representation error d(ζ). Constraint (19b) provides an implicit form of the predictor (13) , adapted from [20, eq. (14)] to enhance the feasibility of Problem (19) .Constraint (19c) uses η input-output pairs to restrict the state 
+
+x at time t (cf. Assumption 1), while constraint (19d) enforces the general input constraints. The objective function (19a) includes a general quadratic stage cost given by ℓ(¯ ui|t, ¯yi|t) := 
+
+∥¯ui|t − us∥2 
+
+> R
+
++ ∥¯yi|t − ys∥2 
+
+> Q
+
+with Q ∈ Sp>0, R ∈ Sm>0, as well as regularization terms on gt and ht to account for model mismatches between the nonlinear system (4) and the kernel-based predictor (13) . The coefficient structures λg ¯d and λh/ ¯d
+
+are standard in the robust DDPC literature; see, e.g., [14], [17]. At time t, let the optimal solution of Problem (19) be 
+
+(¯ u∗
+
+> [0 ,L −1] |t
+
+, ¯y∗
+
+> [0 ,L −1] |t
+
+, g ∗ 
+
+> t
+
+, h ∗ 
+
+> t
+
+), with optimal cost J∗
+
+> L
+
+(ξt). As in standard MPC, Problem (19) is solved in a receding horizon fashion, summarized in Algorithm 1. 
+
+Algorithm 1 DDKPC.  
+
+> 1:
+
+Input: past data D = {u[0 ,N −1] , y [0 ,N −1] }, feasible input set U, prediction horizon L, matrices Q, R, and parameters 
+
+λh, λg , ¯d, γ. 
+
+> 2:
+
+Construct: matrices ¯K, YF , 
+
+> 3:
+
+At time t, take past η measurements (u[t−η,t −1] , y [t−η,t −1] )
+
+and solve Problem (19).  
+
+> 4:
+
+Apply the input ut = ¯ u∗ 
+
+> 0|t
+
+to system (4).  
+
+> 5:
+
+Set t = t + 1 and go back to 3. 
+
+Remark 4. Compared with the strictly convex quadratic DDPC schemes in [10], [11], [14], the proposed DDKPC in (19) is generally nonconvex in ¯u unless the kernel is linear in ¯u. This 6
+
+nonconvexity is an unavoidable consequence of addressing general nonlinear systems, and represents a necessary trade-off for achieving broader applicability. In practice, however, efficient nonlinear optimization methods, e.g., [20], [35], can be employed to solve (19) , making this computational challenge tractable. 
+
+B. Closed-loop guarantees 
+
+Without loss of generality, we assume for the analysis that 
+
+(us, x s, y s) = (0 , 0, 0) . Further, assume that Problem (19) is solvable at time t. The following lemma provides an important result for the cost function. 
+
+Lemma 2 ( [27, Lemma 2]) . Under Assumption 5, letting 
+
+δs := δloc  
+
+> cs,u
+
+, then for all ∥ξ∥2 < δ s, Problem (19) is feasible and there exist a constant γs > 0 and a function ˆαs(·) ∈ K ∞
+
+such that 
+
+J∗
+
+> L
+
+(ξ) ≤ γs∥ξt∥2 + ˆ αs( ¯d). (20) Leveraging this lemma, we are ready to present our main result. For the following theoretical analysis, we use the Lyapunov function candidate 
+
+YL(ξt) := J∗
+
+> L
+
+(ξt) + Vo(ξt). (21) 
+
+Theorem 1 (Nominal stability guarantees) . Let Assumptions 1–6 hold. Then, for any constant ¯Y > 0, there exist constants 
+
+L ¯Y , γ ¯Y , ¯d0 > 0 such that for YL(ξ0) ≤ ¯Y , L > L ¯Y , ¯d ≤ ¯d0,Problem (19) is feasible for all times t > 0, and the function 
+
+YL defined in (21) fulfills 
+
+ϵo∥ξt∥2 ≤ YL(ξt) ≤ γ ¯Y ∥ξt∥2 + ˆ αs( ¯d) (22a) 
+
+YL(ξt+1 ) − YL(ξt) ≤ − aLϵo∥ξt∥2 + αY ( ¯d) (22b) 
+
+with γ ¯Y , a L > 0, and αY (·) ∈ K ∞.Proof. The proof is conducted by first deriving lower and upper bounds for function YL. Then, assuming that the Problem (19) is feasible at time t, we construct a candidate solution to this problem at time t + 1 . Finally, practical Lyapunov inequality (22b) is established. For simplicity, let ℓ∗ 
+
+> i|t
+
+:= ℓ(¯ u∗
+
+> i|t
+
+, ¯y∗
+
+> i|t
+
+) = 
+
+∥¯u∗
+
+> i|t
+
+∥2 
+
+> R
+
++ ∥¯y∗
+
+> i|t
+
+∥2
+
+> Q
+
+.
+
+Step I. Note that YL(ξt) = J∗
+
+> L
+
+(ξt) + Vo(ξt) ≥ ℓ∗ 
+
+> i|t
+
++
+
+Vo(ξt) (18b) 
+
+≥ ϵo∥ξt∥2, where the last inequity holds because 
+
+Vo(ξt+1 ) > 0 and (18b) . Next, we derive an upper bound for YL(ξt). It follows from Lemma 2 and (18a) that for all 
+
+ξt ∈ Xδ , we have that YL(ξt) ≤ (γs + co,u )∥ξt∥2 + ˆ αs( ¯d). On the other hand, for ξt /∈ Xδ , i.e., ∥ξt∥2 > δ s, we have that 
+
+YL(ξt) ≤ ¯Y = ¯Y 
+
+> ∥ξt∥2
+
+∥ξt∥2 ≤ ¯Yδs ∥ξt∥2. Hence, the right inequal-ity in (22a) can be derived by setting γ ¯Y := max {γs +co,u , ¯Yδs }.
+
+Step II. Assume that Problem (19) is feasible at time t, and denote the optimal solution by (¯ u∗
+
+> [0 ,L −1] |t
+
+, ¯y∗
+
+> [0 ,L −1] |t
+
+, g ∗ 
+
+> t
+
+, h ∗ 
+
+> t
+
+).Denote the trajectory of the actual system (6) generated under input sequence ¯u∗ 
+
+> [0 ,L −1] |t
+
+by ξ[t+1 ,t +L] and y[t,t +L−1] .It follows from (18b) that 
+
+Vo(ξt+L) − Vo(ξt) = 
+
+> L−1
+
+X
+
+> i=0
+
+Vo(ξt+i+1 ) − Vo(ξt+i) (23) 
+
+≤
+
+> L−1
+
+X
+
+> i=0
+
+−ϵo∥ξi+t∥2 + 12 ∥yt+i∥2 
+
+> Q
+
++ ∥¯u∗
+
+> i|t
+
+∥2
+
+> R
+
+.
+
+Noting that Vo(ξt+L) > 0, it follows that 
+
+> L−1
+
+X
+
+> i=0
+
+ϵo∥ξi+t∥2
+
+≤ Vo(ξt) + 
+
+> L−1
+
+X
+
+> i=0
+
+∥¯u∗
+
+> i|t
+
+∥2 
+
+> R
+
++ ∥¯y∗
+
+> i|t
+
+∥2 
+
+> Q
+
++ ∥¯y∗ 
+
+> i|t
+
+− yt+i∥2
+
+> Q
+
+≤ Vo(ξt) + 
+
+> L−1
+
+X
+
+> i=0
+
+ℓ∗
+
+> i|t
+
++ 2 λmax (Q)∥(¯ y∗ 
+
+> i|t
+
++ h∗
+
+> i|t
+
+) − yt+i∥2 + 2 λmax (Q)∥h∗
+
+> i|t
+
+∥2
+
+≤ YL(ξt) + 2 λmax (Q)( Lp ¯d2 + ¯Y ¯d/λ h)
+
+| {z }
+
+> ≜α1( ¯d)
+
+(24) where the last inequality follows from the fact that PL−1 
+
+> i=0
+
+∥h∗
+
+> i|t
+
+∥2 ≤ ( ¯d/λ h)J∗(ξt) ≤ ( ¯d/λ h) ¯Y and ¯y∗ 
+
+> [0 ,L −1] |t
+
++
+
+h∗ 
+
+> [0 ,L −1] |t
+
+= YF g∗ 
+
+> t
+
+is a trajectory of the kernel-based estimator (13) , and hence the estimation error satisfies Assumption 4. Noting that YL(ξt) ≤ ¯Y , there exists at least one iξ ∈{1, · · · , L − 1} such that 
+
+∥ξiξ +t∥2 ≤
+
+h min { ¯Y +α1( ¯d),γ ¯Y ∥ξt∥2+α1( ¯d)+ ˆ αs ( ¯d)}
+
+> ϵo (L−1)
+
+i
+
+(25) 
+
+≤ ¯Y + θϵo(L − 1) 
+
+where θ > 0 is an arbitrary but fixed constant satisfying 
+
+θ ≥ α1( ¯d) + ˆ αs( ¯d). Hence, if L > L 0 := 1 + ¯Yδsϵo , then there exists a small enough constant θ > 0 such that (25) ensures ∥ξt+iξ ∥2 ≤ δs with δs from Lemma 2. Building on this result, for i ∈ [0 , i ξ − 2] , let ¯ui|t+1 := ¯ u∗
+
+> i+1 |t
+
+, and for 
+
+i ∈ [iξ − 1, L − 1] , let ¯ui|t+1 := κ(ξt+i+1 ). For i ∈ [0 , L − 1] ,let ¯yi|t+1 := yt+i+1 and h[0 ,L −1] |t+1 = yker  
+
+> [t+1 ,t +L]
+
+− y[t+1 ,t +L]
+
+where yker  
+
+> [t+1 ,t +L]
+
+is generated from (13) with uini = u[t−η+1 ,t ],
+
+yini = y[t−η+1 ,t ], and u[1: mL ] = ¯ u[0 ,L −1] |t+1 . Let gt+1 := ( ¯ K + γI )−1k(u[t−η+1 ,t ], y [t−η+1 ,t ], ¯u[0 ,L −1] |t+1 ). It can be observed from (16) that (¯ u[0 ,L −1] |t+1 , ¯u[0 ,L −1] |t+1 , g t+1 , h t+1 )
+
+is a candidate solution for Problem (19). 
+
+Step III. In the following, we derive a bound on the value function J∗
+
+> L
+
+(ξt+1 ) using the candidate solution defined in the Step II above. Building on the construction of (¯ u[0 ,L −1] |t+1 ,
+
+¯u[0 ,L −1] |t+1 , gt+1 , ht+1 ), we have that 
+
+J∗
+
+> L
+
+(ξt+1 )
+
+≤
+
+> L−1
+
+X
+
+> i=0
+
+∥¯ui|t+1 ∥2 
+
+> R
+
++ ∥yt+i+1 ∥2 
+
+> Q
+
++ λh/ ¯d∥ht+1 ∥2 + λg ¯d∥gt+1 ∥2
+
+≤ − ℓ∗ 
+
+> 0|t
+
++ 
+
+> iξ−2
+
+X
+
+> i=0
+
+ℓ∗ 
+
+> i|t
+
++ ∥yt+i+1 ∥2 
+
+> Q
+
+− ∥ ¯y∗
+
+> i+1 |t
+
+∥2 
+
+> Q
+
++ λg ¯d∥gt+1 ∥2
+
++
+
+> L−1
+
+X 
+
+> i=iξ−1
+
+∥¯ui|t+1 ∥2 
+
+> R
+
++ ∥yt+i+1 ∥2 
+
+> Q
+
++ λh/ ¯d∥ht+1 ∥2
+
+≤ − ℓ∗ 
+
+> 0|t
+
++ J∗
+
+> L
+
+(ξt) +  
+
+> iξ−2
+
+X
+
+> i=0
+
+∥yt+i+1 ∥2 
+
+> Q
+
+− ∥ ¯y∗
+
+> i+1 |t
+
+∥2
+
+> Q
+
+| {z }
+
+> ≜I17
+
++
+
+> L−1
+
+X 
+
+> i=iξ−1
+
+∥¯ui|t+1 ∥2 
+
+> R
+
++ ∥yt+i+1 ∥2
+
+> Q
+
+| {z }
+
+> ≜I2
+
++ λh/ ¯d∥ht+1 ∥2 + λg ¯d∥gt+1 ∥2
+
+| {z }
+
+> ≜I3
+
+. (26) Next, we derive upper bounds for I1, I2, and I3 separately. Let ei := yt+i+1 − ¯y∗
+
+> i+1 |t
+
+. For I1, it follows that 
+
+I1 = 
+
+> iξ−2
+
+X
+
+> i=0
+
+
+
+∥yt+i+1 ∥2 
+
+> Q
+
+− ∥ ¯y∗
+
+> i+1 |t
+
+∥2
+
+> Q
+
+
+
+= 
+
+> iξ−2
+
+X
+
+> i=0
+
+
+
+∥ei∥2 
+
+> Q
+
++ 2 e⊤ 
+
+> i
+
+Q¯y∗
+
+> i+1 |t
+
+
+
+≤ 
+
+> iξ−2
+
+X
+
+> i=0
+
+∥ei∥2 
+
+> Q
+
++ 2 
+
+ iξ −2
+
+X
+
+> i=0
+
+∥ei∥2
+
+> Q
+
+1/2 iξ −2
+
+X
+
+> i=0
+
+∥¯y∗
+
+> i+1 |t
+
+∥2
+
+> Q
+
+1/2
+
+.
+
+Moreover, since ei = yt+i+1 −(¯ y∗
+
+> i+1 |t
+
++h∗
+
+> i+1 |t
+
+)+ h∗
+
+> i+1 |t
+
+, the ker-nel estimation error bound and PL−1 
+
+> i=0
+
+∥h∗
+
+> i|t
+
+∥2 ≤ ¯dλh J∗
+
+> L
+
+(ξt) ≤  
+
+> ¯Y¯dλh
+
+imply Piξ −2 
+
+> i=0
+
+∥ei∥2 
+
+> Q
+
+≤ 2λmax (Q)(( iξ − 1) p ¯d2 + ¯Y ¯dλh ).Since Piξ −2 
+
+> i=0
+
+∥¯y∗
+
+> i+1 |t
+
+∥2 
+
+> Q
+
+≤ PL−1 
+
+> i=0
+
+∥¯y∗
+
+> i|t
+
+∥2 
+
+> Q
+
+≤ YL(ξt) ≤ ¯Y , we obtain I1 ≤ E1( ¯d) + 2 p ¯Y E 1( ¯d) =: α2( ¯d) ∈ K ∞, where 
+
+E1( ¯d) := 2 λmax (Q)(( iξ − 1) p ¯d2 + ¯Y ¯dλh ).In addition, it follows from (15) and (17b) that there exist a constant c0 > 0 and a function ˆαs(·) ∈ K ∞ such that 
+
+∥ ¯ξi|t∥2 ≤ c0ρis∥ξt∥2. (27) Therefore, 
+
+I2 ≤ λmax (R, Q )
+
+> L−1
+
+X 
+
+> i=iξ−1
+
+∥ξt+i+1 ∥2
+
+> (27)
+
+≤ λmax (R, Q )c0
+
+1 − ρs
+
+∥ξt+iξ ∥2 + ( L − iξ )αs( ¯d)
+
+> (25)
+
+≤ λmax (R, Q )c0γ ¯Y
+
+ϵo(L − 1)(1 − ρs) ∥ξt∥2
+
++ λmax (R, Q )c0
+
+ϵo(L − 1)(1 − ρs) (α1( ¯d) + ˆ αs( ¯d)) + ( L − iξ )αs( ¯d)
+
+| {z }
+
+> ≜α3( ¯d)
+
+.
+
+Furthermore, similar to the proof of Lemma 2, we have that 
+
+I3≤(λhLp 2 + λg cg ) ¯d. Therefore, (26) becomes 
+
+J∗
+
+> L
+
+(ξt+1 ) ≤ − ℓ∗ 
+
+> 0|t
+
++ J∗
+
+> L
+
+(ξt) + λmax (R, Q )c0γ ¯Y
+
+ϵo(L − 1)(1 − ρs) ∥ξt∥2
+
++ α2( ¯d) + α3( ¯d) + ( λhLp 2 + λg cg ) ¯d
+
+| {z }
+
+> ≜α4( ¯d)
+
+. (28) On the other hand, note from (18b) that 
+
+Vo(ξt+1 ) − Vo(ξt)
+
+≤ − ϵo∥ξt∥2 + ∥¯u∗
+
+> 0|t
+
+∥2 
+
+> R
+
++ 12 ∥yt − ¯y∗ 
+
+> 0|t
+
++ ¯ y∗
+
+> 0|t
+
+∥2
+
+> Q
+
+≤ − ϵo∥ξt∥2 + ℓ∗ 
+
+> 0|t
+
++ λmax (Q)p2 ¯d2.
+
+Combining this inequality with (28) yields 
+
+YL(ξt+1 )
+
+≤ JL( ¯ξt+1 )+ Vo(ξt) − ϵo∥ξt∥2 + ℓ∗ 
+
+> 0|t
+
++ λmax (Q)p2 ¯d2
+
+> (28)
+
+≤ J∗
+
+> L
+
+(ξt)+ Vo(ξt)− ϵo
+
+
+
+1− λmax (R, Q )c0γ ¯Y
+
+ϵ2
+
+> o
+
+(L−1)(1 −ρs)
+
+| {z }
+
+> ≜aL
+
+∥ξt∥2
+
++ α4( ¯d) + λmax (Q)p2 ¯d2
+
+| {z } 
+
+> ≜αY( ¯d)
+
+≤ YL(ξt) − aLϵo∥ξt∥2 + αY ( ¯d).
+
+To ensure that YL is a practical Lyapunov function, we need 
+
+aL > 0, which holds for a sufficiently long horizon L, i.e., 
+
+L > L 1 := 1 + λmax (R,Q )c0γ ¯Y 
+
+> ϵ2
+> o(1 −ρs)
+
+. Moreover, to show recursive feasibility, we need that YL(ξt) ≤ ¯Y holds for all t > 0.Based on (22b) , there exists a small enough constant ¯d0 ≤
+
+min {α−1 
+
+> Y
+
+( ¯Y a L), (α1 + ˆ αs)−1(θ)} such that YL ≤ ¯Y holds for all ¯d ≤ ¯d0. In summary, the prediction horizon length L must be such that 
+
+L > max {L0, L 1} := L ¯Y (29) and the interpolation error bound needs to satisfy ¯d ≤ ¯d0. This completes the proof. IV. D ISCUSSIONS 
+
+Previous sections established the DDKPC framework under noise-free data and provided closed-loop stability guarantees. However, practical online implementation of Algorithm 1 faces two major challenges: i) the nonlinear and nonconvex structure of the DDKPC problem (cf. (19b) ) results in significant computational burden, and ii) measurement noise is unavoidable during both offline data collection and online operation. In the following, we address these issues separately. 
+
+A. Computational feasibility via relaxation 
+
+The optimization problem (19) is inherently nonconvex due to the implicit kernel-based equality constraint (19b) . Direct application of general-purpose nonlinear programming (NLP) solvers may therefore lead to prohibitive computational cost, limiting real-time applicability. To enhance computational efficiency, the hard constraint in (19b) can be incorporated into the objective func-tion using quadratic penalty terms, as adopted in [20]. Specifically, by introducing a penalized objective similar to [20, eq. (29)], Problem (19) can be reformulated as 
+
+min u∈U , g t Jrelaxed (u, g t) = PL−1 
+
+> i=0
+
+ℓ(ui|t, Y F gt) + λg ∥gt∥2 +
+
+λk∥( ¯K + γI )gt − k(uini , y ini , u [0 ,L −1] |t)∥2, where λk > 0
+
+is the penalty parameter for the kernel constraint violation. The resulting problem admits efficient numerical treatment using gradient-based or first-order optimization methods, such as those developed in [35, Section III], thereby reducing the computational burden compared with general NLP solvers. It is worth noting that due to the nonconvex na-ture of the penalized objective (i.e., ∥( ¯K + γI )gt −
+
+k(uini , y ini , u [0 ,L −1] |t)∥2), convergence to a global minimizer cannot be guaranteed in general. Specifically, one must assume 8
+
+that the numerical solver is capable of finding a suboptimal solu-tion (¯ u, ¯gt) such that Jrelaxed (¯ u, ¯gt) − J∗
+
+> relaxed
+
+(ξt) ≤ δJ . Since the implicit kernel constraint is enforced through a penalty term, we further require the associated residual to be sufficiently small, i.e., ∥( ¯K + γI )¯ gt − k(uini , y ini , ¯u[0 ,L −1] |t)∥2 ≤ δK .Here δJ , δ K > 0 are problem-dependent tolerances determined by the available Lyapunov-decrease margin. The objective suboptimality δJ and the residual tolerance δK appear as additional additive terms in (22b) and can be absorbed into the resulting practical bound by choosing them sufficiently small. Such requirements are practically attainable by choosing a sufficiently large penalty weight λk and a sufficiently accurate solver tolerance. For instance, the methods proposed in [35] have demonstrated fast convergence, reaching a numerical precision of less than 10 −5 in a few iterations. 
+
+B. Robust DDKPC under noisy data 
+
+While Section III establishes theoretical guarantees under noise-free conditions, practical implementations must account for measurement noise during both offline data collection and online operation. Suppose the exact output yt = h0(xt)
+
+is corrupted by additive noise nt, yielding the available measurements ˜yt = h0(xt) + nt.
+
+Assumption 7. The measurement noise nt is uniformly bounded such that ∥nt∥ ≤ ¯n for all t ∈ N, where ¯n > 0
+
+is a known constant. 
+
+To maintain robustness, the offline data matrices are con-structed using the noise-corrupted data, denoted as ˜K and 
+
+˜YF . Furthermore, we aggregate the kernel approximation error and the measurement noise into a unified uncertainty bound 
+
+¯w := ¯ n + ¯d. To compensate for the initial condition mismatch induced by ˜yt, the nominal formulation (19) is robustified as: 
+
+JL( ˜ξt) := (30a) 
+
+min 
+
+> g, ¯u, ¯y,h L−1
+
+X
+
+> i=0
+
+ℓ(¯ ui|t, ¯yi|t) + λh
+
+¯w ∥ht∥2 + λg ¯w∥gt∥2
+
+s.t.
+
+ ˜K + γI 
+
+˜YF
+
+
+
+gt =
+
+k(uini , y ini , ¯u[0 ,L −1] |t)¯y[0 ,L −1] |t + h[0 ,L −1] |t
+
+
+
+, (30b) 
+
+ uini 
+
+yini + h[−η, −1] |t
+
+
+
+=
+
+u[t−η,t −1] 
+
+˜y[t−η,t −1] 
+
+
+
+, (30c) 
+
+¯ui|t ∈ U , ∀i ∈ [0 , L − 1] , (30d) where the slack variable vector is augmented as ht := h h[−η, −1] |t
+
+> h[0 ,L −1] |t
+
+i
+
+to penalize both the prediction mismatch and the initial condition discrepancy. Compared to the nominal formulation (19) , Problem (30) rescales the regularization weights via the unified bound ¯w to absorb the measurement noise. Since the kernel representation error bound (14) also holds for noise-corrupted data under regularized interpolation (cf. [30]), the closed-loop stability guarantees can be extended to this robustified framework. 
+
+Theorem 2 (Robust stability under noisy data) . Let Assump-tions 1–7 hold. Then, for any constant ˜Y > 0, there exist constants L ˜Y , γ ˜Y , ¯w0 > 0 such that for YL(ξ0) ≤ ˜Y , L > L ˜Y ,and ¯w ≤ ¯w0, Problem (30) is feasible for all times t > 0.Furthermore, the function YL defined in (21) fulfills: 
+
+ϵo∥ ˜ξt∥2 ≤ YL( ˜ξt) ≤ γ ˜Y ∥ ˜ξt∥2 + ˆ αs( ¯ w) (31a) 
+
+YL( ˜ξt+1 ) − YL( ˜ξt) ≤ − aLϵo∥ ˜ξt∥2 + αY ( ¯ w). (31b) 
+
+Proof. The proof follows a similar step as established in Theorem 1. The key modification lies in accommodating the initialization mismatch (30c) . Given a feasible solution at time 
+
+t, we construct the candidate solution at time t + 1 identically to Step II of Theorem 1, with the additional assignment of the initial slack candidate as h[−η, −1] |t+1 = −n[t−η+1 ,t ].Under Assumption 7, the norm of this candidate slack is strictly bounded by √η¯n ≤ √η ¯w. Consequently, the penalty term λh 
+
+> ¯w
+
+∥ht∥2 remains proportionately bounded by ¯w. By aggregating the measurement noise and the approximation error into the unified uncertainty bound ¯w, the upper bound derivations for the candidate cost scale symmetrically to those in Lemma 2. Substituting ¯d with ¯w throughout Step III of Theorem 1 directly yields the practical Lyapunov decrease inequality (31b), completing the proof. V. O NLINE DDKPC FOR SLOWLY TIME -V ARYING 
+
+NONLINEAR SYSTEMS 
+
+It can be observed from Algorithm 1 that the dataset D used to construct the matrices YF and ¯K is fixed offline and is not updated during closed-loop operation. Such a static design is appropriate when the effective multi-step input-output mapping seen by the controller remains approximately stationary over the operating regime of interest. In many practical applications, however, this mapping may drift over time due to e.g., changing operating conditions, actuator aging, payload variation, tire-road changes, or other unmodeled effects. As a result, a predictor constructed from a fixed offline dictionary may gradually lose relevance along the evolving closed-loop trajectory. This motivates the development of an online extension of the proposed DDKPC framework followed by closed-loop stability guarantees. For simplicity, we focus only on the noise-free case. The extension to noisy online measurements follows the same robustification principle as in Section IV-B. 
+
+A. Time-varying nonlinear systems 
+
+Consider a time-varying nonlinear system as follows 
+
+xt+1 = f 0 
+
+> t
+
+(xt, u t), (32a) 
+
+yt = b0 
+
+> t
+
+(xt), (32b) where functions f 0 
+
+> t
+
+(·, ·) and b0 
+
+> t
+
+(·) are unknown and may vary with time. Similar to Assumption 1, the following assumption is imposed to characterize the input-output behavior of (32). 
+
+Assumption 8. There exist a known constant η ∈ N+, sets 
+
+¯Ξ ⊂ R(m+p)η and ¯U ⊂ Rm such that for all (ξt, u t) ∈ ¯Ξ × ¯U,the extended state ξt defined in (5) satisfies 
+
+ξt+1 = ft(ξt, u t), (33a) 
+
+yt = bt(ξt), (33b) 9
+
+and reproduces the same input-output behavior as (32) .
+
+Building on Assumption 8, the time-varying version of the multi-step predictor in (10) is given by 
+
+¯yt, [a](ζ) = qt, [a](ζ). (34) In the following, we focus our attention on a class of slow time-varying system, i.e., we assume that functions ft(·, ·)
+
+and bt(·) have a bounded rate of variation, which is formally imposed in the following assumption. 
+
+Assumption 9. There exist Lf , L b ≥ 0 such that for all t1, t 2 ∈
+
+N, ξ ∈ ¯Ξ, ut2+i0 ∈ ¯U with i0 ∈ [0 , i − 1] , and i ∈ [0 , L − 1] ,the following inequalities hold: 
+
+Φt1
+
+> t1,i
+
+ ξ, u [t2,t 2+i−1] 
+
+ − Φt2,i 
+
+ ξ, u [t2,t 2+i−1] 
+
+
+
+≤ Lf i |t1 − t2| + i∥ξ∥, (35a) 
+
+bt1 ◦ Φt1
+
+> t1,i
+
+ ξ, u [t2,t 2+i−1] 
+
+ − bt2+i ◦ Φt2,i 
+
+ ξ, u [t2,t 2+i−1] 
+
+
+
+≤ Lb(i + 1)  |t1 − t2| + i∥ξ∥. (35b) 
+
+Here, Φt1
+
+> t1,0
+
+(ξ, ·) = Φt2,0(ξ, ·) = ξ, and for 
+
+i ≥ 1, Φt1
+
+> t1,i
+
+ ξ, u [t2,t 2+i−1] 
+
+ := f [i]
+
+> t1
+
+ ξ, u [t2,t 2+i−1] 
+
+,
+
+Φt2,i 
+
+ ξ, u [t2,t 2+i−1] 
+
+ := ft2+i−1 ◦ ft2+i−2 ◦ · · · ◦
+
+ft2
+
+ ξ, u [t2,t 2+i−1] 
+
+.Remark 5. Assumption 9 imposes a bounded-rate condition directly on the multi-step input-output evolution maps. It can be regarded as a nonlinear counterpart of the Lipschitz regularity commonly imposed on linear time-varying (LTV) matrix trajectories, e.g., ∥[A(t)−A(s) B(t)−B(s)] ∥ ≤ L|t−s| in [24, Assumption 1], which similarly controls the deviation between frozen and time-varying evolutions over a finite horizon. This viewpoint is also consistent with averaging-based analyses of nonlinear time-varying systems, where the behavior of the actual time-varying system is related to that of an associated averaged or frozen system; see, e.g., [36]. To capture the time-varying behavior of (34) , parameters YF ,
+
+¯K and k in Algorithm 1 should be updated online. To this end, the following subsections are conducted by first introducing a data update mechanism, followed by a parameter updating rule and the online DDKPC. 
+
+B. Online dictionary update via ALD 
+
+Adapting standard online data-updating schemes from linear data-driven control to the kernel-based setting requires addi-tional care. Unlike standard online DDPC [17], where updating data matrices relies on a straightforward mechanism of ap-pending and dropping columns, the extension to a kernel-based framework presents two primary challenges. First, incorporating new data necessitates the recalculation of the kernel Gram matrix ¯K, which introduces a significant computational burden as the dataset grows. Second, a conventional First-In-First-Out (FIFO) replacement rule [17] may discard samples that remain informative for previously visited nonlinear operating regions, thereby degrading the global representational quality of the predictor. To address these issues while preserving the mathematical consistency and stability guarantees of the overall framework, we adopt a fixed-budget online dictionary management strategy based on the ALD criterion [37]. Let Da 
+
+> t
+
+= {(ζ1, Y F, 1), . . . , (ζNt , Y F,N t )} denote the ac-tive data dictionary at time t, with a bounded capacity 
+
+Nt ≤ Mdict . During online operation, a candidate data point is formed only after the corresponding length-(η + L)
+
+input-output window becomes available. Specifically, after the pair (ut, y t) has been recorded, the completed window anchored at τ = t − L + 1 is used to construct ζnew := col  u[τ −η,τ −1] , y [τ −η,τ −1] , u [τ,τ +L−1] 
+
+ and YF,new := 
+
+y[τ,τ +L−1] . Then, its informational novelty is evaluated under the regularized model by calculating the ALD criterion 
+
+δt = K(ζnew , ζ new ) − kt(ζnew )⊤( ¯Kt + γI )−1kt(ζnew ) (36) where kt(ζnew ) = [ K(ζd 
+
+> 1
+
+, ζ new ), . . . , K (ζdNt , ζ new )] ⊤. Specif-ically, let ν > 0 be a pre-defined novelty threshold. If δt ≤ ν,the new data provides negligible information gain relative to the existing dictionary and the regularization level, and is thus discarded ( Dat+1 = Dat ). Conversely, if δt > ν , ζnew contains unmodeled dynamics and must be admitted. If the dictionary is unsaturated ( Nt < M dict ), ζnew is simply appended. However, if the dictionary operates at its maximum budget ( Nt = Mdict ), a pruning operation is triggered. To prevent severe deterioration of the prediction accuracy, we do not arbitrarily discard the oldest data, but seek to remove the most redundant element 
+
+ζj ∈ D at . This is achieved by identifying the element with the smallest regularized conditional contribution to the span of the remaining dictionary elements: 
+
+ι = arg max 
+
+> i∈[1 ,N t]
+
+( ¯Kt + γI )−1 
+
+> i,i
+
+. (37) Here, the ιth element is removed, and ζnew is inserted to form 
+
+Dat+1 .
+
+Remark 6. In practical implementations, the online dictionary update mechanism in (36) and (37) can be augmented with redundancy safeguards by e.g., retaining a small quota of recent samples, imposing a bounded maximum sample age, or avoiding the immediate removal of newly admitted informative points. Such engineering heuristics are not required for the theoretical development below, but may improve robustness of the online update mechanism in practice. 
+
+C. Online DDKPC and closed-loop guarantees 
+
+Using the current dataset Dat , the most direct way to formulate an online version of the kernel predictor in (13) is to let yker  
+
+> t, [1: pL ]
+
+= YF,t ( ¯Kt + γI )−1kt(ζ), where ¯Kt, YF,t 
+
+and kt(ζ) are constructed from the active dictionary Dt.Although updating these quantities at every sampling instant may improve the local prediction accuracy, it also changes the implicit predictor entering the DDKPC problem at every step, which may introduce undesirable fluctuations in the closed-loop optimization. To balance predictor adaptation and closed-loop consistency, we separate the online maintenance of the active dictionary from the periodic reconstruction of the predictor used in the DDKPC problem. The active dictionary Da 
+
+> t
+
+is maintained online by the ALD criterion: whenever a completed length-
+
+(η + L) input-output window becomes available, it is tested 10 
+
+by (36) and either discarded or inserted into Da 
+
+> t
+
+according to the fixed-budget rule in (37) . In contrast, the predictor used in the online DDKPC problem is reconstructed only periodically from a frozen snapshot of the active dictionary. Specifically, given an updating period T0 ∈ N+. For j ∈ N,let sj = jT 0 denote the jth controller update time instant. At 
+
+t = sj , j ∈ N, freeze the current active dictionary Dcsj = Dat
+
+and compute ¯Ksj , YF,s j , and ksj . Given ˆd > 0, for any t ∈
+
+[sj , s j+1 − 1] , the online DDKPC solves 
+
+ˆJL(ξt) := (38a) 
+
+min 
+
+> gt,¯u, ¯y,h t
+> L−1
+
+X
+
+> i=0
+
+ℓ(¯ ui|t, ¯yi|t) + λh
+
+ˆd ∥ht∥2 + λg ˆd∥gt∥2
+
+s.t.
+
+¯Ksj +γI YF,s j
+
+
+
+gt=
+
+ksj (uini , y ini , ¯u[0 ,L −1] |t)¯y[0 ,L −1] |t + h[0 ,L −1] |t
+
+
+
+, (38b) 
+
+uini 
+
+yini 
+
+
+
+=
+
+u[t−η,t −1] 
+
+y[t−η,t −1] 
+
+
+
+, (38c) 
+
+¯ui|t ∈ U , ∀i ∈ [0 , L − 1] . (38d) Here, constraint (38b) provides an implicit form of the predictor 
+
+yker  
+
+> t, [1: pL ]
+
+= YF,s j ( ¯Ksj + γI )−1ksj (ζ). (39) To ensure the accuracy of the kernel-based estimator in the online setting, we modify Assumption 3 as follows. 
+
+Assumption 10. There exists a constant ¯don ≥ 0 such that, for all sj = jT 0, j ∈ N, all ζ ∈ ¯Ω, and all a ∈ [1 , pL ],
+
+|yker sj ,[a](ζ) − qsj ,[a](ζ)| ≤ dsj (ζ) ≤ ¯don . (40) Combining Assumptions 9 and 10, we choose ˆd ≥ ¯don +
+
+Lf + Lb. The corresponding online execution procedure is summarized in Algorithm 2. The online optimization problem (38) is updated at each instant sj through the reconstructed kernel predictor 
+
+( ¯Ksj , Y F,s j , ksj ). To analyze the closed-loop behavior under these updates, we use the following uniform versions of Assumptions 5 and 6. 
+
+Assumption 11 (Uniform local stabilizability) . There exist a continuous Lyapunov function Vs,j (ξ), a feedback law κj (ξ),a compact set I, constants cs,l , c s,u , δ loc > 0, ρs ∈ (0 , 1) , and a function αs ∈ K ∞, all independent of j, such that, for all 
+
+sj = jT 0 with ξ ∈ Xδ,j := {ξ | Vs,j (ξ) ≤ δloc } and d ∈ I , it holds that fsj (ξ, κ j (ξ)) + d ∈ Xδ,j , and 
+
+cs,l ∥ξ∥2 ≤ Vs,j (ξ) ≤ cs,u ∥ξ∥2, (41a) 
+
+Vs,j 
+
+ fsj (ξ, κ j (ξ)) + d ≤ ρsVs,j (ξ) + αs(∥d∥). (41b) 
+
+Assumption 12 (Common robust UIOSS) . There exist a continuous function Vo, constants co,l , c o,u , ϵ o > 0, a compact set I , and a function αo ∈ K ∞ such that, for all sj = jT 0,
+
+(ξ, u ) ∈ ¯Ξ × ¯U, and d ∈ I , the following inequalities hold: 
+
+co,l ∥ξ∥2 ≤ Vo(ξ) ≤ co,u ∥ξ∥2, (42a) 
+
+Vo(fsj (ξ, u ) + d) − Vo(ξ) ≤ − ϵo∥ξ∥2 + 12 ∥bt(ξ)∥2 
+
+> Q
+
++ ∥u∥2
+
+> R
+
+.
+
+(42b) With these Assumptions in place, we first establish a local feasibility and cost bound for the online problem. 
+
+Algorithm 2 Online DDKPC.  
+
+> 1:
+
+Input: Initial active dictionary Da0 , budget Mdict , novelty threshold ν, update period T0, feasible set U, prediction horizon L, matrices Q, R, and parameters λh, λg , ˆd, γ. 
+
+> 2:
+
+Initialize: Given s0 = 0 , set Dc 
+
+> s0
+
+= Da0 . 
+
+> 3:
+
+Construct ¯Ks0 and YF,s 0 from Dc 
+
+> s0
+
+. 
+
+> 4:
+
+for t = 0 , 1, 2, . . . do  
+
+> 5:
+
+Set j = ⌊t/T 0⌋ and sj = jT 0. 
+
+> 6:
+
+if t = sj and t > 0 then  
+
+> 7:
+
+Freeze the current active dictionary Dc 
+
+> sj
+
+= Da 
+
+> t
+
+. 
+
+> 8:
+
+Construct ¯Ksj and YF,s j from Dc 
+
+> sj
+
+. 
+
+> 9:
+
+end if  
+
+> 10:
+
+Solve Problem (38) using ¯Ksj , YF,s j , ksj (·), and the most recent η measurements (u[t−η,t −1] , y [t−η,t −1] ). 
+
+> 11:
+
+Apply the input ut = ¯ u∗ 
+
+> 0|t
+
+to system (32).  
+
+> 12:
+
+Record the new input-output pair and update the data buffer.  
+
+> 13:
+
+if a completed length-(η + L) window is available then  
+
+> 14:
+
+Form (ζnew , Y F,new ). 
+
+> 15:
+
+Compute δt from (36) using Da 
+
+> t
+
+. 
+
+> 16:
+
+if δt > ν then  
+
+> 17:
+
+if |D a 
+
+> t
+
+| = Mdict then  
+
+> 18:
+
+Compute ι from (37) and remove (ζι, Y F,ι ) from 
+
+Da 
+
+> t
+
+. 
+
+> 19:
+
+end if  
+
+> 20:
+
+Insert (ζnew , Y F,new ) into Da 
+
+> t
+
+to obtain Da
+
+> t+1
+
+. 
+
+> 21:
+
+else  
+
+> 22:
+
+Set Da 
+
+> t+1
+
+= Da 
+
+> t
+
+. 
+
+> 23:
+
+end if  
+
+> 24:
+
+else  
+
+> 25:
+
+Set Da 
+
+> t+1
+
+= Da 
+
+> t
+
+. 
+
+> 26:
+
+end if  
+
+> 27:
+
+end for Lemma 3. Under Assumptions 8–12, Problem (38) is feasible for all ∥ξt∥2 ≤ δs, and there exist a constant ˆγs > 0 and a function ˆαon  
+
+> s
+
+(·) ∈ K ∞ such that 
+
+ˆJ∗
+
+> L
+
+(ξt) ≤ ˆγs∥ξt∥2 + ˆ αon s ( ˆd). (43) 
+
+Proof. For t ∈ [sj , s j+1 − 1] , consider a Lyapunov function 
+
+Vs,j (ξ) and its corresponding feedback κj (ξ) satisfying As-sumption 11. In the following, we use yj,t to represent the output generated from the time-invariant nonlinear system at time sj as follows 
+
+ξj,t +1 = fsj (ξt, u t) (44a) 
+
+yj,t = bsj (ξt). (44b) For ∥ξt∥ ≤ δs, Assumption 11 implies that Vs,j (ξt) ≤ δloc .Hence, we can let ¯u0|t = κj (ξt). Applying this feedback control input into (33) yields 
+
+ξt+1 = ft(ξt, κ j (ξt)) = fsj (ξt, κ j (ξt)) + ( ft(ξt, κ j (ξt)) − fsj (ξt, κ j (ξt)) 
+
+| {z }
+
+> ≜dj
+
+where ∥dj ∥ ≤ Lf |t − sj |∥ ξt∥ ≤ Lf T0δs. Hence, Assumption 11 implies that for small enough Lf , it holds that ∥ξt+1 ∥ ≤ 11 
+
+δs and we can construct ¯u1|t = κj (ξt+1 ). Recursively, for small enough Lf , we are able to construct our candidate input as ¯ui|t = κj (ξi+t), i ∈ [0 , L − 1] . In addition, based on Assumption 11, for j ∈ N, there exist constants ¯c0 > 0,
+
+ρs ∈ (0 , 1) , and a function ¯αs(·) ∈ K ∞ such that the resulting 
+
+ξt+i from (33) satisfying 
+
+∥ξt+i∥2 ≤ ¯c0ρis∥ξt∥2 + ¯ αs(Lf ). (45) Next, we construct candidate solutions (¯ y[0 ,L −1] |t, g t, h t) for Problem (38) . Let ¯yi|t be the resulting output from (33) , gt := ( ¯Ksj + γI )−1ksj (ξt, ¯u[0 ,L −1] |t), and h[0 ,L −1] |t = yker  
+
+> [0 ,L −1] |t
+
+−
+
+y[t,t +L−1] . Here, ∥gt∥2 ≤ cg according to Assumption 4 and 
+
+∥ht∥2 ≤ 2∥yker  
+
+> [0 ,L −1] |t
+
+− yj, [t,t +L−1] ∥2
+
++ 2 ∥yj, [t,t +L−1] − y[t,t +L−1] ∥2
+
+≤ 2Lp ¯d2 
+
+> on
+
++ 2( 
+
+> L−1
+
+X
+
+> i=0
+
+Lb(T0 + i)i)2∥ξt∥2. (46) Note that ˆd ≥ ¯don + Lf + Lb. It can be derived that 
+
+J∗(ξt) ≤
+
+> L−1
+
+X
+
+> i=0
+
+∥¯ui|t∥2 
+
+> R
+
++ ∥¯yi|t∥2 
+
+> Q
+
++ λh/ ˆd∥ht∥2 + λg ˆd∥gt∥2
+
+> (46)
+
+≤ λmax (Q, R )
+
+> L
+
+X
+
+> j=1
+
+∥ ¯ξi|t∥2 + 2 λhLp ˆd
+
++ 2( λh/ ˆd)( 
+
+> L−1
+
+X
+
+> i=0
+
+Lb(T0 + i)i)2∥ξt∥2 + λg cg ˆd
+
+> (45)
+
+≤ ˆγs∥ξt∥2 + ˆ αon s ( ˆd)
+
+where ˆγs := λmax (Q, R ) PLj=1 c0ρis+2( λh/ ˆd)( PL−1 
+
+> i=0
+
+Lb(T0+
+
+i)i)2 and ˆαon s ( ˆd) := λmax (Q, R )L¯αs( ˆd) + 2 λhLp ˆd + λg cg ˆd.This completes the proof. Building on this lemma, we are ready to show recursive feasibility and closed-loop stability. Define the Lyapunov candidate by 
+
+ˆYL(ξt) := ˆJ∗
+
+> L
+
+(ξt) + Vo(ξt). (47) 
+
+Theorem 3 (Practical stability of online DDKPC) . Suppose that Assumptions 8–12 hold. Then, for any constant ˆY > 0,there exist constants L ˆY , γ ˆY > 0 and ˆd0 > 0 such that, if 
+
+ˆYL(ξ0) ≤ ˆY , L > L ˆY , and ¯don + Lf + Lb ≤ ˆd ≤ ˆd0, Problem 
+
+(38) is feasible for all t ≥ 0. Moreover, the Lyapunov function candidate (47) satisfies 
+
+ϵo∥ξt∥2 ≤ ˆYL(ξt) ≤ γ ˆY ∥ξt∥2 + ˆ αon s ( ˆd), (48a) 
+
+ˆYL(ξt+1 ) − ˆYL(ξt) ≤ − ˆaLϵo∥ξt∥2 + ˆ α ˆY ( ˆd), (48b) 
+
+where ˆaL > 0 and ˆα ˆY (·) ∈ K ∞.Proof. The proof follows the same structure as that of Theorem 1. We only detail the additional estimates caused by the time-varying dynamics. First, by Lemma 3 and (42a) , there exists γ ˆY > 0 such that the upper bound in (48a) holds on the sublevel set {ξ :ˆYL(ξ) ≤ ˆY }. The lower bound follows from ˆJ∗
+
+> L
+
+(ξt) ≥ 0 and (42a) ; without loss of generality, ϵo is taken no larger than co,l .Next, assume that Problem (38) is feasible at time t, and denote its optimal solution by (¯ u∗
+
+> [0 ,L −1] |t
+
+, ¯y∗
+
+> [0 ,L −1] |t
+
+, g ∗ 
+
+> t
+
+, h ∗ 
+
+> t
+
+).Let j = ⌊t/T 0⌋ and sj = jT 0. Denote by ξ[t+1 ,t +L] and 
+
+y[t,t +L−1] the trajectory of the actual time-varying system (33) generated by the input sequence ¯u∗
+
+> [0 ,L −1] |t
+
+. For each i ∈
+
+[0 , L − 1] , define the time-variation-induced perturbation by 
+
+dj,t +i := ft+i(ξt+i, ¯u∗
+
+> i|t
+
+) − fsj (ξt+i, ¯u∗
+
+> i|t
+
+). By Assumption 9 and the choice of ˆd0, this perturbation belongs to the admissible compact set I along the considered trajectory. Hence, using (42b), we obtain 
+
+Vo(ξt+L) − Vo(ξt) = 
+
+> L−1
+
+X
+
+> i=0
+
+ Vo(ξt+i+1 ) − Vo(ξt+i)
+
+≤
+
+> L−1
+
+X
+
+> i=0
+
+
+
+−ϵo∥ξt+i∥2 + 12 ∥yt+i∥2 
+
+> Q
+
++ ∥¯u∗
+
+> i|t
+
+∥2
+
+> R
+
+
+
+. (49) Since Vo(ξt+L) ≥ 0, it follows that 
+
+> L−1
+
+X
+
+> i=0
+
+ϵo∥ξt+i∥2
+
+≤ Vo(ξt) + 
+
+> L−1
+
+X
+
+> i=0
+
+
+
+∥¯u∗
+
+> i|t
+
+∥2 
+
+> R
+
++ 12 ∥yt+i∥2
+
+> Q
+
+
+
+≤ ˆYL(ξt) + 2 λmax (Q)
+
+> L−1
+
+X
+
+> i=0
+
+∥(¯ y∗ 
+
+> i|t
+
++ h∗
+
+> i|t
+
+) − yt+i∥2
+
++ 2 λmax (Q)
+
+> L−1
+
+X
+
+> i=0
+
+∥h∗
+
+> i|t
+
+∥2 (50) where ℓ∗ 
+
+> i|t
+
+:= ℓ(¯ u∗
+
+> i|t
+
+, ¯y∗
+
+> i|t
+
+).It remains to bound the two additional terms in (50) . Let 
+
+yj,t +i denote the output at time t + i generated by the frozen system at sj (i.e. system (44) ) under the same initial condition 
+
+ξt and input sequence ¯u∗
+
+> [0 ,L −1] |t
+
+. Then, 
+
+∥(¯ y∗ 
+
+> i|t
+
++ h∗
+
+> i|t
+
+) − yt+i∥2
+
+≤ 2∥(¯ y∗ 
+
+> i|t
+
++ h∗
+
+> i|t
+
+) − yj,t +i∥2 + 2 ∥yj,t +i − yt+i∥2. (51) The first term on the right-hand side of (51) is bounded by Assumption 10, since ¯y∗ 
+
+> [0 ,L −1] |t
+
++ h∗ 
+
+> [0 ,L −1] |t
+
+= YF,s j g∗
+
+> t
+
+is generated by (39) . The second term is bounded, on the sublevel set {ξ : ˆYL(ξ) ≤ ˆY }, by a K∞ function of Lb due to Assumption 9. Moreover, PL−1 
+
+> i=0
+
+∥h∗
+
+> i|t
+
+∥2 ≤ ˆdλh
+
+ˆJ∗
+
+> L
+
+(ξt) ≤ ˆdλh
+
+ˆY .Consequently, there exists a function ˆα1(·) ∈ K ∞, depending on the fixed constants L, T0, and ˆY , such that 
+
+> L−1
+
+X
+
+> i=0
+
+ϵo∥ξt+i∥2 ≤ ˆYL(ξt) + ˆ α1( ˆd). (52) Inequality (52) is the online counterpart of (24) in the proof of Theorem 1, with the nominal kernel error bound ¯d replaced by the unified online perturbation scale ˆd. Thus, for sufficiently large L and sufficiently small ˆd0, (52) ensures the existence of an index iξ ∈ { 1, . . . , L − 1} such that ξt+iξ lies in the local region specified by Assumption 11. At time t + 1 , let j+ = ⌊(t + 1) /T 0⌋ and sj+ = j+T0. The candidate input sequence is constructed by shifting the optimal sequence at time t up to the index iξ − 1 and appending the 12 
+
+local controller κj+ afterwards. The corresponding gt+1 and 
+
+ht+1 are constructed using Dcsj+ . With this candidate solution, the same decomposition as in the proof of Theorem 1 gives 
+
+ˆJ∗
+
+> L
+
+(ξt+1 ) ≤ − ℓ∗ 
+
+> 0|t
+
++ ˆJ∗
+
+> L
+
+(ξt) + ˆI1 + ˆI2 + ˆI3, (53) where ˆI1 := Piξ −2
+
+> i=0
+
+
+
+∥yt+i+1 ∥2 
+
+> Q
+
+− ∥ ¯y∗
+
+> i+1 |t
+
+∥2
+
+> Q
+
+
+
+, ˆI2 := 
+
+PL−1 
+
+> i=iξ−1
+
+ ∥¯ui|t+1 ∥2 
+
+> R
+
++ ∥yt+i+1 ∥2
+
+> Q
+
+, and ˆI3 := λh 
+
+> ˆd
+
+∥ht+1 ∥2 +
+
+λg ˆd∥gt+1 ∥2. The term ˆI1 is bounded by a K∞ function of ˆd using Assumptions 9 and 10, since it measures the mismatch between the shifted predicted output and the actual time-varying output. For ˆI2, Lemma 3 and the choice of 
+
+iξ imply that ˆI2 ≤ λmax (Q,R )¯ c0γ ˆY 
+
+> ϵo(L−1)(1 −ρs)
+
+∥ξt∥2 + ˆ α2( ˆd) for some 
+
+ˆα2 ∈ K ∞. Moreover, by Assumptions 9 and 10, together with the boundedness of the kernel, there exists ˆα3 ∈ K ∞ such that 
+
+ˆI3 ≤ ˆα3( ˆd). Substituting these bounds into (53) yields 
+
+ˆJ∗
+
+> L
+
+(ξt+1 ) ≤ − ℓ∗ 
+
+> 0|t
+
++ ˆJ∗
+
+> L
+
+(ξt) + λmax (Q, R )¯ c0γ ˆY
+
+ϵo(L − 1)(1 − ρs) ∥ξt∥2 + ˆ α4( ˆd),
+
+(54) where ˆα4 ∈ K ∞.On the other hand, applying (42b) for one step gives 
+
+Vo(ξt+1 ) − Vo(ξt) ≤ − ϵo∥ξt∥2 + ℓ∗ 
+
+> 0|t
+
++ ˆ α5( ˆd) for some ˆα5 ∈K∞, where ˆα5 accounts for the mismatch between the predicted and the actual output at time t. Combining this inequality with (54) , we obtain ˆYL(ξt+1 ) − ˆYL(ξt) ≤ − ˆaLϵo∥ξt∥2 + ˆ α ˆY ( ˆd),where ˆaL := 1 − λmax (Q,R )¯ c0γ ˆY 
+
+> ϵ2
+> o(L−1)(1 −ρs)
+
+is positive for all sufficiently large L, and ˆα ˆY := ˆ α4 + ˆ α5 ∈ K ∞. Finally, for sufficiently small ˆd0, the above inequality implies that ˆYL(ξt) ≤ ˆY leads to ˆYL(ξt+1 ) ≤ ˆY . Recursive feasibility and (48b) then follow by induction. This completes the proof. 
+
+Remark 7 (Online DDKPC under noisy measurement) . When the available outputs are corrupted by bounded measurement noise (i.e., ∥nt∥ ≤ ¯n), the same robustification principle used in Section IV-B applies here as well. Specifically, one may choose ˆd ≥ ¯don + Lf + Lb + ¯ n. The resulting robustified online DDKPC formulation is obtained by modifying constraint (38c) with (30c) . Under this modification, Lemma 3 and Theorem 3 still holds. VI. N UMERICAL EXAMPLES 
+
+We evaluate the proposed DDKPC framework on two simulation examples. The first is a nonlinear one-dimensional vehicle benchmark, where the proposed schemes are tested in noise-free, noisy, and slowly time-varying settings. This example is also used to compare the closed-loop performance of different numerical solvers. The second example is a PyBullet simulation of an A1 quadruped robot carrying an off-center payload, which demonstrates the applicability of DDKPC to a nonlinear and contact-rich locomotion system. The one-dimensional vehicle simulations are implemented in MATLAB 2022a, whereas the quadruped simulations are implemented in Python using PyBullet. All experiments are conducted on a laptop equipped with a 14-core Intel i7-12700H processor at 2.3 GHz. 
+
+A. One-dimensional vehicle model 1) Simulation setup: We consider a one-dimensional vehicle model governed by the following continuous-time dynamics 
+
+m0 ¨d = u−c1 ˙d−fnl ( ˙d, d ), where m0 denotes the vehicle mass, 
+
+u is the control input, c1 is the viscous friction coefficient, and fnl ( ˙d, d ) represents the nonlinear frictional forces arising from aerodynamic drag and road resistance. For simplicity, we set fnl ( ˙d, d ) = c2 ˙d2, where c2 denotes the quadratic drag coefficient. For the nominal test in Section VI-A 2, c1 and c2 are kept constant, whereas the time-varying and noisy time-varying tests in Section VI-A3 replace them by c1,t and c2,t .Applying Euler discretization and defining the velocity v = ˙d
+
+yield the discrete-time state-space model 
+
+dt+1 = dt + Tsvt, (55a) 
+
+vt+1 = vt + Ts/m 0
+
+ ut − c1vt − c2v2
+
+> t
+
+, (55b) 
+
+yt = dt, (55c) where Ts = 0.02 s is the sampling period. The physical parameters are set to m0 = 1 kg, c1 = 0 .5, and c2 = 0 .1.These parameters and the state-space model (55) are used only to generate experimental input-output data and to simulate the true plant; they are not available to the data-driven controller. To obtain informative offline data, the open-loop system is excited by a combination of pulse signals and zero-mean white noise with variance 0.01 , and T = 600 samples are collected. Across all scenarios, for obtaining the best response, the controller hyperparameters are fixed as follows: the past trajectory length η = 3, the prediction horizon 
+
+L = 10 , and the output weighting matrix Q = 10 . In the simulations, rather than the separable per-stage input penalty used in the theoretical presentation, we adopt the stacked quadratic cost PL−1 
+
+> i=0
+
+∥¯yi|t − ys∥2 
+
+> Q
+
++ PL−1 
+
+> i=0
+
+∥¯ui|t − us∥2 
+
+> ru
+
++
+
+PL−1 
+
+> i=1
+
+∥¯ui|t − ¯ui−1|t∥2 
+
+> r∆u
+
+. Equivalently, the input-related terms are represented by ∥¯u[0 ,L −1] |t − 1L ⊗ us∥2
+
+> R
+
+, where R =
+
+ruIL +r∆uD⊤ 
+
+> L
+
+DL and DL := 
+
+   
+
+> 1−101−1
+
+... ...  
+
+> 01−1
+
+ ∈ R(L−1) ×L.The penalty scaling parameters are chosen as ¯d = 10 −3,
+
+λh/ ¯d = 10 4, and λg ¯d = 5 × 10 −3. The control input is constrained to U := {u | − 1 ≤ u ≤ 1}, and the regularization factor is γ = 0 .1624 . Unless otherwise specified, DDKPC uses a Gaussian kernel K(ζi, ζ j ) = σ2 
+
+> f
+
+exp( −∥ ζi − ζj ∥2/(2 ℓ2)) 
+
+with σf = 0 .62 and ℓ = 0 .8385 . For comparison, we also test a polynomial kernel K(ζi, ζ j ) = σ2 
+
+> f
+
+(0 .5ζ⊤ 
+
+> i
+
+ζj + 1) ℓ with 
+
+σf = 0 .05 and ℓ = 10 . In the following, we compare a general-purpose nonlinear programming (NLP) solver ( fmincon ) with two first-order alternatives: the projected gradient descent (GD) method in [20] and the accelerated GD method in [35, eqns. (43)–(45)], referred to as FastGD. 
+
+2) Nominal DDKPC: We first verify Algorithm 1 using noise-free data. The closed-loop system is simulated for 20 sto track the constant reference ys = 0 .5. We compare the linear DDPC baseline (yellow dotted line) with Gaussian-kernel DDKPC (green dashed, orange dashed, and blue solid lines) and polynomial-kernel DDKPC (purple dash-dotted line). For 13     
+
+> Fig. 1. Closed-loop input and output trajectories under Algorithm 1, comparing different predictors and numerical solvers.
+> Fig. 2. Time-varying parameters c1(t)and c2(t).
+
+the standard linear DDPC, the kernel-based constraint (19b) is replaced by the standard Hankel matrix formulation: 
+
+h Hη+L(ud)
+
+> Hη+L(yd)
+
+i
+
+gt =
+
+h ¯u[0 ,L −1] |t
+
+> ¯y[0 ,L −1] |t+h[0 ,L −1] |t
+
+i
+
+. (56) Fig. 1 shows that the standard linear DDPC fails to stabilize the nonlinear vehicle dynamics. In contrast, both DDKPC variants stabilize the system and track the desired reference, consistent with the theoretical guarantees in Section III. Although the nonlinearity in (55) is polynomial, the Gaussian-kernel DDKPC attains slightly better steady-state tracking accuracy than the polynomial-kernel variant, possibly because multi-step prediction amplifies small fitting errors. For the Gaussian-kernel DDKPC, the closed-loop tracking accuracy also depends on the optimization solver, with the ordering NLP ( fmincon ) > FastGD [35] > GD [20]. This trend is consistent with Section IV-A : higher numerical precision leads to improved closed-loop performance. 
+
+3) Online DDKPC under time-varying systems: We next evaluate Algorithm 2 on a slowly time-varying variant of  
+
+> Fig. 3. Closed-loop output trajectories for the time-varying system under Algorithm 2. Top: static offline DDKPC vs. online DDKPC with GD and FastGD. Middle: FastGD online DDKPC with different update periods. Bottom: noisy-data test comparing static offline DDKPC with online FastGD DDKPC.
+
+(55) , obtained by replacing c1 and c2 with unknown coef-ficients c1,t = max {c1,min , ¯c1 + a1 sin(2 πt/P 1)} and c2,t =max {c2,min , ¯c2 + a2 sin(2 πt/P 2 + ϕ2)}, where c1,min = 0 .8,
+
+a1 = 0 .25 , P1 = 3000 , c2,min = 0 .05 , a2 = 0 .05 , P2 = 4000 ,and ϕ2 = π/ 6. Fig. 2 depicts the offline and online evolutions of c1(t) and c2(t). The online trajectories are separated from the nominal offline values, producing a gradual mismatch between the static offline predictor and the current input-output behavior. This mismatch motivates the periodic ALD-based update. Since Section VI-A 2 shows that the Gaussian kernel gives better tracking performance than the polynomial kernel, and since GD and FastGD attain closed-loop performance com-parable to the NLP solver with substantially lower runtime, Algorithm 2 is evaluated using the Gaussian kernel with the GD and FastGD solvers. Because the computational complexity of kernel methods grows rapidly with the dictionary size, we use a sparsified dictionary of 265 elements selected from the full 600 -sample dataset used in Section VI-A 2. This offline sparsification reduces the mean FastGD runtime from 
+
+55 .10 ms to 23 .63 ms. Activating the online dictionary update increases the mean FastGD runtime to 85 .86 ms because of dictionary maintenance and periodic predictor reconstruction, while preserving a substantial computational advantage over the NLP baseline. Fig. 3 compares the closed-loop output trajectories under the time-varying dynamics. In the top panel, the static offline configurations exhibit a steady-state tracking bias because the sparsified dictionary is fixed after offline data collection. With periodic online updates, FastGD reduces this bias and brings the output closer to the reference. In contrast, the online GD configuration does not improve upon its static counterpart. This behavior is consistent with the lower numerical accuracy of 14  
+
+> Fig. 4. Velocity control architecture and PyBullet simulation of the payload-carrying A1 quadruped.
+
+standard GD, for which the perturbations introduced by online predictor updates may offset the benefit of using fresher data. The middle panel of Fig. 3 compares FastGD online DDKPC under different update periods T0. All tested periods 
+
+T0 ∈ { 1, 5, 10 , 20 , 30 } preserve closed-loop stability, but the tracking performance does not vary monotonically with T0.This indicates that a shorter update period is not necessarily preferable. Therefore, the choice of T0 reflects a nontrivial trade-off among tracking accuracy, predictor variation, and computational cost, and its systematic selection remains an important implementation issue. The bottom panel of Fig. 3 evaluates the noisy-data case with ¯n = 0 .001 . The online FastGD trajectory remains stable and tracks the reference despite measurement noise, indicating that the robustified online DDKPC can tolerate noisy data while adapting the dictionary to the slowly time-varying plant. 
+
+B. Velocity control of a quadruped robot 
+
+We next consider a quadruped locomotion scenario in PyBullet to evaluate the proposed DDKPC on a nonlinear, contact-rich system. As illustrated in Fig. 4(a), DDKPC is incorporated as an outer-loop residual velocity controller around an existing nominal whole-body locomotion system, while Fig. 4(b) shows the corresponding PyBullet simulation environment. A rigid payload mounted away from the trunk center changes the closed-loop velocity response and produces persistent tracking errors. DDKPC generates residual velocity commands for the nominal controller using only measured input-output data. 
+
+1) Simulation setup: The A1 is driven by an existing whole-body locomotion stack that maps desired body velocities to joint commands [38]. As shown in Fig. 4(b), the reference velocity 
+
+vrt = [vrx,t , v ry,t ]⊤ is augmented by the DDKPC residual command ∆vt = [∆ vx,t , ∆vy,t ]⊤, yielding vcmd  
+
+> t
+
+= vrt + ∆ vt
+
+for the nominal locomotion controller. From the viewpoint of DDKPC, the nominal controller, state estimator, robot dynamics, intermittent ground contacts, and payload constitute the unknown closed-loop plant; no rigid-body or contact model is used. For forward-velocity control, the DDKPC input and output are ut = ∆ vx,t , yt = vx,t − vrx,t . For planar-velocity control, they are extended to ut =
+
+h ∆vx,t 
+
+> ∆vy,t
+
+i
+
+, yt =
+
+h vx,t −vrx,t 
+
+> vy,t −vry,t
+
+i
+
+.A 2 kg box payload is rigidly attached 0.08 m behind and 
+
+0.14 m above the trunk center, with no lateral offset. The 0 4 8 12 20 28 36 44 52                  
+
+> −0.05
+> 0.00
+> 0.10
+> 0.20
+> Input  𝑢  [m s −1]
+> Data Collection Closed-loop Control a
+> Nominal GP +NLP GP +GD
+> 04812 20 28 36 44 52
+> Time [s]
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 𝑣 𝑥  [m s −1]
+> b
+> Fig. 5. Forward-velocity tracking with a fixed 2kg payload under the nominal whole-body controller, GD-DDKPC, and NLP-DDKPC. The reference velocity is represented by black dashed line.
+
+resulting rearward and upward shift of the overall center of mass modifies the closed-loop velocity response of the nominal locomotion controller. The DDKPC sampling period is Ts =0.1 s. For each input-output interface, the fixed data dictionary is constructed from two 90 s records obtained under the same reference profile, one without the payload and one with the payload. This provides data from both nominal and payload-loaded operating conditions without requiring a model of either condition. The past trajectory length is η = 3 , and the first 3 sof each closed-loop test are excluded from the performance evaluation. We adopt the same Gaussian kernel formulation as that used in Section VI-A . The dictionary and K are constructed offline and kept fixed during the closed-loop tests. 
+
+2) Forward-velocity tracking: The forward-velocity refer-ence is 0.4 m/s for 0 ≤ t < 12 s, 0.6 m/s for 12 ≤ t < 28 s, and 0.4 m/s thereafter. We first solve the nonlinear program in Algorithm 1 using scipy.optimize.minimize with 
+
+method=’L-BFGS-B’ in Python. The prediction horizon is 
+
+L = 3 , the dictionary contains 60 elements, and (σf , ℓ 2, γ ) = (1 , 1.6, 10 −6). Here, the kernel hyperparameters are selected empirically to balance multi-step prediction accuracy, closed-loop tracking performance, and numerical conditioning. The residual command is constrained to [−0.2, 0.2] m/s, with 
+
+Q = 10 , ru = 0 .2, and r∆u = 0 .05 . Similar to Section VI-A 2, we also use GD to reduce the online computation. As shown in Fig. 5, the payload causes a persistent velocity deficit under the nominal controller. The tracking RMSE, computed after excluding the first 3s of closed-loop operation, is 0.1133 m/s for the nominal controller, 0.0351 m/s for NLP-DDKPC, and 0.0567 m/s for GD-DDKPC. Thus, NLP-DDKPC and GD-DDKPC reduce the RMSE by approximately 69 .1% 
+
+and 49 .9% , respectively. NLP-DDKPC achieves the highest tracking accuracy, whereas the GD implementation reduces the mean solution time from 82 .66 ms to 23 .43 ms. We further compared Algorithms 1 and 2 under a payload-switching condition, where the reference velocity is fixed at 0.8m/s and the payload changes from 0 to 2kg at t = 10 s and is removed at t = 30 s. For this test, unlike the fixed-payload case above, the initial offline dictionary is constructed exclusively from 15 
+
+Fig. 6. Forward-velocity tracking under a payload-switching condition: static offline DDKPC vs. online DDKPC. 0 4 8 12 20 28 36 44 52              
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 𝑣 𝑥  [m s −1]
+> aData Collection Closed-loop Control
+> Nominal GP +GD
+> 04812 20 28 36 44 52
+> Time [s]
+> −0.1
+> 0.0
+> 0.2
+> 0.4
+> 𝑣 𝑦  [m s −1]
+> b
+
+Fig. 7. Planar body-velocity tracking with a fixed 2 kg payload under the nominal whole-body controller and GD-DDKPC. 
+
+payload-free data, so that the 2kg condition is not represented in the training data. As shown in Fig. 6, the online DDKPC adapts more effectively to the payload variation. Over the complete test, the RMSEs of the nominal controller, offline DDKPC, and online DDKPC are 0.1128 , 0.1011 , and 0.0626 m/s, respectively. During the payload-loaded interval, the online scheme reduces the RMSE by 51 .6% and 38 .1% relative to the nominal controller and offline DDKPC, respectively. 
+
+3) Planar-velocity tracking: We next consider simultaneous forward- and lateral-velocity tracking. The reference (vrx, v ry ) is 
+
+(0 .45 , 0.15) m/s for the first 12 s, (0 .60 , 0.30) m/s for the next 
+
+16 s, and (0 .45 , 0.15) m/s for the final 12 s. Since the compu-tational cost of the nonlinear program increases substantially with the input-output dimension, the planar test uses GD with 
+
+L = 6 and a 300 -element dictionary selected by offline ALD. The kernel parameters are (σf , ℓ 2, γ ) = (0 .9, 1.2, 0.1624) , and the residual commands satisfy |∆vx|, |∆vy | ≤ 0.1 m/s. Fig. 7 shows that GD-DDKPC reduces the payload-induced tracking errors in both channels. The raw RMSE of vx decreases from 
+
+0.1179 to 0.0624 m/s, while that of vy decreases from 0.1313 
+
+to 0.1173 m/s. The corresponding planar RMSE decreases from 
+
+0.1248 to 0.0939 m/s, representing a reduction of 24 .7% . These results show that Algorithm 1 can compensate for payload-induced velocity mismatch in a quadruped locomotion system. VII. C ONCLUSION 
+
+This paper proposed a DDKPC of unknown nonlinear systems, relying exclusively on input-output trajectories. By integrating a robust predictive control architecture with an implicit multi-step predictor derived via the representer theorem, the proposed method effectively circumvents the need for explicit parametric modeling. Theoretical analysis established that, under nominal conditions, the scheme guarantees recursive feasibility and practical closed-loop stability, provided that the prediction horizon is adequately long and the initial kernel approximation error is bounded. To bridge the gap between theoretical formulations and practical implementation, the framework was extended to address the computational demands of real-time deployment and the presence of measurement noise. Furthermore, the proposed DDKPC framework was extended to slowly time-varying nonlinear systems by letting the data-dependent predictor in DDKPC evolve online. The recursive feasibility and practical stability guarantees were shown to carry over under suitable regularity and prediction-error conditions. Promising directions for future research include developing real-time adaptation mechanisms for the kernel hyperparameters and investigating theoretical approaches to relax the bounded perturbation assumption during online data updates. REFERENCES [1] J. B. Rawlings, D. Q. Mayne, and M. M. Diehl, Model Predictive Control: Theory and Design , 2nd ed. Nob Hill Publishing, 2019. [2] Z. Zhou, G. Wang, J. Sun, J. Wang, and J. Chen, “Efficient and robust time-optimal trajectory planning and control for agile quadrotor flight,” 
+
+IEEE Robot. Autom. Lett. , vol. 8, no. 12, pp. 7913–7920, 2023. [3] J. C. Willems, I. Markovsky, P. Rapisarda, and B. L. M. De Moor, “A note on persistency of excitation,” Syst. Control Lett. , vol. 56, no. 4, pp. 325–329, May, 2005. [4] C. De Persis and P. Tesi, “Formulas for data-driven control: Stabilization, optimality, and robustness,” IEEE Trans. Autom. Control , vol. 65, no. 3, pp. 909–924, Mar. 2020. [5] F. Zhao, F. D ¨orfler, A. Chiuso, and K. You, “Data-enabled policy optimization for direct adaptive learning of the LQR,” IEEE Trans. Autom. Control , vol. 70, no. 11, pp. 7217–7232, 2025. [6] X. Wang, M. Shen, L. Li, X. Zhao, Q.-G. Wang, and Z. H. Zhu, “Koopman-based data-driven control of networked nonlinear system under an event-triggered communication,” IEEE Trans. Consum. Electron. ,vol. 72, no. 1, pp. 938–944, 2026. [7] Z. Yuan, G. Chen, T. Yang, J. Xia, and J. H. Park, “Data-driven control for multi-input systems with partly unknown models under aperiodic sampling,” IEEE Internet Things J. , vol. 13, no. 12, pp. 27 130–27 141, 2026. [8] Z.-J. Wei, K.-Z. Liu, P. Lin, and X.-M. Sun, “Data-driven tracking control design with noisy data and its application in DC microgrid control,” IEEE Trans. Power Electron. , vol. 40, no. 12, pp. 17 776–17 788, 2025. [9] J. Eising, S. Liu, S. Mart ´ınez, and J. Cort ´es, “Data-driven mode detection and stabilization of unknown switched linear systems,” IEEE Trans. Autom. Control , vol. 70, no. 6, pp. 3830–3845, 2024. [10] J. Coulson, J. Lygeros, and F. D ¨orfler, “Data-enabled predictive control: In the shallows of the DeePC,” in Proc. Eur. Control Conf. , Naples, Italy, Italy, June, 25-28 2019, pp. 307–312. [11] J. Berberich, J. K ¨ohler, M. A. M ¨uller, and F. Allg ¨ower, “Data-driven model predictive control with stability and robustness guarantees,” IEEE Trans. Autom. Control , vol. 66, no. 4, pp. 1702–1717, Apr. 2021. [12] K. Hu and T. Liu, “Robust data-driven predictive control for unknown linear systems with bounded disturbances,” IEEE Trans. Autom. Control ,vol. 70, no. 10, pp. 6529–6544, 2025. [13] T. Shinohara, H. Sandberg, and K. H. Johansson, “Data-driven control from poisoned data: Fundamental limitations and secure DeePC,” arXiv preprint arXiv:2606.20301 , 2026. [14] W. Liu, J. Sun, G. Wang, F. Bullo, and J. Chen, “Data-driven resilient predictive control under denial-of-service,” IEEE Trans. Autom. Control ,vol. 68, no. 8, pp. 4722–4737, Aug. 2023. 16 
+
+[15] ——, “Data-driven self-triggered control via trajectory prediction,” IEEE Trans. Autom. Control , vol. 68, no. 11, pp. 6951–6958, Nov. 2023. [16] G. Wang, W. Liu, Y. Li, X. Wang, J. Sun, and J. Chen, “Data-driven control of network systems: Accounting for communication adaptivity and security,” Sci. China Inf. Sci. , vol. 69, no. 2, p. 121201, 2026. [17] J. Berberich, J. K ¨ohler, M. A. M ¨uller, and F. Allg ¨ower, “Linear tracking MPC for nonlinear systems—part II: The data-driven case,” IEEE Trans. Autom. Control , vol. 67, no. 9, pp. 4406–4421, 2022. [18] M. Alsalti, V. G. Lopez, J. Berberich, F. Allg ¨ower, and M. A. M ¨uller, “Data-driven nonlinear predictive control for feedback linearizable systems,” IFAC-PapersOnLine , vol. 56, no. 2, pp. 617–624, 2023. [19] M. Lazar, “Neural data–enabled predictive control,” IFAC-PapersOnLine ,vol. 58, no. 15, pp. 91–96, 2024. [20] L. Huang, J. Lygeros, and F. D ¨orfler, “Robust and kernelized data-enabled predictive control for nonlinear systems,” IEEE Trans. Control Syst. Technol. , vol. 32, no. 2, pp. 611–624, 2023. [21] A. Azarbahram, M. Al Khatib, V. K. Mishra, and N. Bajcinca, “Data-driven predictive control for a class of nonlinear systems with polynomial terms,” IFAC-PapersOnLine , vol. 58, no. 21, pp. 226–231, 2024. [22] Z. Xiong, Z. Yuan, K. Miao, H. Wang, J. Cort ´es, and A. Pa-pachristodoulou, “Data-enabled predictive control for nonlinear systems based on a koopman bilinear realization,” in Proc. IEEE Conf. Decis. Control , Rio de Janeiro, Brazil, Dec. 09-12 2025, pp. 6498–6503. [23] B. Sch ¨olkopf, R. Herbrich, and A. J. Smola, “A generalized representer theorem,” in Proc. Int. Conf. Comput. Learn. Theory . Cham, Switzerlend: Springer, 2001, pp. 416–426. [24] S. Liu, K. Chen, and J. Eising, “Online data-driven adaptive control for unknown linear time-varying systems,” in Proc. IEEE Conf. Decis. Control , Singapore, Singapore, Dec. 13-15 2023, pp. 8775–8780. [25] M. Maiworm, D. Limon, and R. Findeisen, “Online learning-based model predictive control with Gaussian process models and stability guarantees,” 
+
+Int. J. Robust Nonlin. Control , vol. 31, no. 18, pp. 8785–8812, 2021. [26] A. Scampicchio, E. Arcari, A. Lahr, and M. N. Zeilinger, “Gaussian processes for dynamics learning in model predictive control,” Annu. Rev. Control , vol. 60, p. 101034, 2025. [27] W. Liu, Y. Li, G. Wang, and L. Xie, “Data-driven kernel-based predictive control with closed-loop guarantees,” in Proc. IFAC WC , Busan, Republic of Korea, Aug. 23-28 2026. [28] E. T. Maddalena, P. Scharnhorst, and C. N. Jones, “Deterministic error bounds for kernel-based learning techniques under bounded noise,” 
+
+Automatica , vol. 134, p. 109896, 2021. [29] N. Aronszajn, “Theory of reproducing kernels,” Trans. Am. Math. Soc. ,vol. 68, no. 3, pp. 337–404, 1950. [30] A. Lahr, J. K ¨ohler, A. Scampicchio, and M. N. Zeilinger, “Optimal kernel regression bounds under energy-bounded noise,” arXiv preprint arXiv:2505.22235 , 2025. [31] A. Isidori, Nonlinear control systems . London, UK: Springer, 1995. [32] Z. Hu, C. De Persis, and P. Tesi, “Learning controllers from data via kernel-based interpolation,” in IEEE Conf. Decision Control . IEEE, 2023, pp. 8509–8514. [33] C. Cai and A. R. Teel, “Input–output-to-state stability for discrete-time systems,” Automatica , vol. 44, no. 2, pp. 326–336, Sept. 2008. [34] M. Guo, C. De Persis, and P. Tesi, “Data-driven stabilizer design and closed-loop analysis of general nonlinear systems via Taylor’s expansion,” 
+
+arXiv:2209.01071 , 2022. [35] H. Wang, Y. Xu, Z. Guo, and H. Zhang, “Optimization algorithms with superlinear convergence rate,” IEEE Trans. Autom. Control , vol. 71, no. 1, pp. 684–691, 2026. [36] D. Ne ˇsi ´c and A. R. Teel, “Input-to-state stability for nonlinear time-varying systems via averaging,” Math. Control Signals Systems , vol. 14, no. 3, pp. 257–280, Sep. 2001. [37] X. Xu, D. Hu, and X. Lu, “Kernel-based least squares policy iteration for reinforcement learning,” IEEE Trans. Neural. Netw. , vol. 18, no. 4, pp. 973–992, 2007. [38] X. Da, Z. Xie, D. Hoeller, B. Boots, A. Anandkumar, Y. Zhu, B. Babich, and A. Garg, “Learning a contact-adaptive controller for robust, efficient legged locomotion,” in Proc. Conf. robot learning . PMLR, 2021, pp. 883–894.

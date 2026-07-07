@@ -1,0 +1,817 @@
+Title: Differentiate the Evaluator, Not the Program: An Efficient Runtime Representation for Neuro-Symbolic Learning
+
+URL Source: https://arxiv.org/pdf/2607.03574v1
+
+Published Time: Tue, 07 Jul 2026 01:17:25 GMT
+
+Number of Pages: 30
+
+Markdown Content:
+# DIFFERENTIATE THE EVALUATOR , N OT THE PROGRAM :AN EFFICIENT RUNTIME REPRESENTATION FOR 
+
+# NEURO -S YMBOLIC LEARNING 
+
+A P REPRINT 
+
+Lucas Sheneman 
+
+Institute for Interdisciplinary Data Sciences University of Idaho 
+
+sheneman@uidaho.edu 
+
+July 7, 2026 
+
+# ABSTRACT 
+
+AI systems are beginning to propose executable scientific models whose value depends not only on their symbolic or mechanistic structure, but also on the continuous parameters that must be calibrated against observations. This creates a central bottleneck for scientific co-search: an outer loop can generate thousands of candidate model programs, but each candidate may require an expensive inner optimization before its scientific promise can be assessed. The challenge is especially acute for models that combine interpretable mechanistic structure with rich quantitative parameterization, where both the form of the model and its fitted constants matter. Existing implementation strategies force an undesirable tradeoff. Staging each candidate program into its own differentiable graph can make individual models fast, but sacrifices the program-as-data property needed for fluid search over many structurally distinct candidates. Interpreter-based approaches preserve programs as runtime data, but the cost of representing and walking the interpreter can dominate the actual numerical work. As a result, parameter calibration becomes the limiting factor in co-search rather than model generation or scientific evaluation. We present the Native Differentiable Virtual Machine (NDVM), an efficient runtime representation for differentiating executable programs without compiling each candidate into a separate graph. NDVM separates symbolic structure from differentiable numeric state: tags, symbols, environments, and control remain native runtime data, while numeric payloads live in dense batched buffers with exact reverse-mode gradients recorded along the realized execution trace. This allows one evaluator walk to be amortized across large populations of parameter vectors, enabling efficient gradient-based calibration while preserving programs as first-class search objects. A locked cost model of a real differentiable self-hosted Scheme interpreter motivates the design, showing that execution is dominated by interpreter representation and traversal rather than arithmetic. We realize NDVM as a native runtime and demonstrate forward and gradient equivalence to the base-line backend across a diverse program suite, including matrix-valued Kalman filter models. NDVM reduces per-lane calibration cost by approximately 60 × through batch amortization, scales near-linearly across CPU cores, and generalizes across multiple front ends, including both a differentiable Scheme interpreter and a differentiable stack-bytecode virtual machine. In fixed-budget co-search experiments over LLM-proposed programs, NDVM reaches high-quality solutions approximately 24 × sooner in wall-clock time and enables substantially deeper exploration of candidate model space. These results suggest that efficient runtime differentiation can make parameter calibration fast enough to keep pace with AI-generated model proposals, providing a practical systems foundation for scientific discovery workflows that jointly search over mechanistic structure and quantitative parameterization. 
+
+> arXiv:2607.03574v1 [cs.LG] 3 Jul 2026
+
+Differentiate the Evaluator, Not the Program A P REPRINT 
+
+# 1 Introduction 
+
+A growing body of work differentiates through the execution of a program rather than through a single static numeric graph. Program-and-parameter co-search calibrates the continuous constants of machine-proposed programs against data (Sheneman, 2026; Novikov et al., 2025; Romera-Paredes et al., 2024); neurosymbolic methods learn through discrete program structure (Chaudhuri et al., 2021; Manhaeve et al., 2018; Li et al., 2023); and differentiable interpreters make program behavior trainable (Gaunt et al., 2016; Bošnjak et al., 2017; Feser et al., 2016; Macfarlane et al., 2026). In each case a fixed interpreter consumes a program as runtime data and gradients flow to numeric quantities embedded in that program. Two implementation routes dominate, and each pays a representational tax. The first stages every program into its own differentiable graph, as a tracing or partial-evaluation step. This is fast once staged, but it gives up the property that makes program-and-parameter search tractable: the program stays runtime data, so that a search loop can propose, mutate, and discard thousands of candidate programs without recompiling anything. The second route keeps the program as data and runs it through an interpreter implemented in an eager tensor framework, where every interpreter value, a tag, a symbol, a heap address, a number, is carried as a small tagged tensor. This preserves program-as-data but spends most of its time allocating and tearing down those tensors. This paper makes one claim and supports it with one measurement. The claim is that for tensorized interpreter-level differentiation of the kind studied here, the dominant bottleneck is representational rather than arithmetic : the cost is in how interpreter values and control are represented, not in the floating-point work. The measurement is a locked, reproducible cost model of a real differentiable self-hosted Scheme interpreter, the Differentiable Meta-Circular Interpreter (DMCI) (Sheneman, 2026), running on its baseline eager PyTorch backend (hereafter, the baseline backend). Across programs that span a 2300 × range of cost, forward time is 85% to 90% value boxing plus evaluator walking and about 1% or less arithmetic, and it is essentially independent of how many parameter vectors are evaluated at once. From this we propose a runtime representation that we name the Native Differentiable Virtual Machine (NDVM). NDVM separates discrete structure from differentiable numbers: tags, heap addresses, interned symbols, closures, and environments are native scalar values, while numbers live in dense payload buffers that carry the batch dimension. Control flow is the exact realized trace, and reverse-mode differentiation is a compact native tape recorded over numeric payloads only. The unifying slogan is differentiate the evaluator, not the program : compile and differentiate one evaluator, then run arbitrary programs through it as data, with no per-program staging. NDVM is a reusable runtime representation, not an accelerator for one system: we validate it on two independent clients, the DMCI evaluator and a separate stack-bytecode VM, and DMCI serves below only as the first, measured client. 
+
+Status. This paper introduces a new runtime representation motivated by empirical measurements of an existing bottleneck. The contribution is not merely conceptual: NDVM is fully realized as a native runtime supporting exact reverse-mode differentiation, batched execution, and divergent control flow for executable programs represented as runtime data. We report three categories of measured results. First, Section 5 presents a locked Phase-0 cost model of the baseline backend, identifying interpreter representation and traversal as the dominant performance bottleneck. Second, Section 6 validates the native runtime by demonstrating forward equivalence and exact reverse-mode gradient equivalence to the baseline backend across the program suite, including the noise-covariance gradients of an 80-step Kalman filter. Third, we measure the performance consequences of the new representation, including batch amortization, structural caching, allocation pooling, and multicore execution. These projected speedups become measured results in the realized system. Batch-native execution amortizes a single structural walk across a population of parameter vectors, reducing per-lane calibration cost by approximately 60 × at 
+
+B=256 . Structural caches and allocation pooling reduce the flagship interpreter evaluation by approximately 3.2×,while a multicore scheduler exploits the absence of shared mutable state between candidate evaluations to achieve near-linear scaling across CPU cores (approximately 15 × on 16 cores). All reported interpreter measurements are CPU-based. Appendix A reports only a specialized forward-only GPU kernel that estimates the dense-numeric performance ceiling and should not be interpreted as a GPU implementation of NDVM. Remaining future work includes a complete GPU interpreter, optional MLIR or Enzyme lowering, and a machine-checked proof of gradient correctness. To separate algorithmic improvements from implementation effects, we decompose the native runtime’s speedup using a tuned-eager baseline. The structural/numeric representation alone yields approximately a 4–5× improvement within eager Python, while native execution contributes an additional 8× to 2133 × depending on workload. Accordingly, the primary claims of this paper are exact gradient equivalence, measured batch amortization, and a principled 2Differentiate the Evaluator, Not the Program A P REPRINT 
+
+decomposition of the observed performance gains. Throughout the paper, the locked Phase-0 baseline serves as a contract: it identifies precisely where the existing implementation spends its time, and every NDVM measurement is performed on the same workloads and hardware platform. 
+
+When NDVM is the right tool. NDVM is intended for workloads with three characteristics: (1) many structurally distinct candidate programs are evaluated by one fixed evaluator, (2) each candidate is optimized for only a small number of gradient steps before it is mutated or discarded, and (3) interpreter representation and control dominate the computational cost. In our baseline backend, value boxing and evaluator traversal account for 85 –90% of forward execution time, while arithmetic contributes about 1% or less. NDVM is not the right tool, and we do not claim it is, when any of the following holds. (i) Long optimization of a fixed program. When the same program is reused for thousands of gradient steps, the one-time cost of staging amortizes and eventually outperforms the unstaged runtime; our measured crossover occurs between 213 and approximately 42 ,000 optimization steps per candidate against hand-written JAX (Section 6). (ii) Numeric computation dominates. When dense numeric kernels dominate execution rather than interpreter traversal, the workload becomes throughput-bound and an accelerator, rather than this CPU representation, is the appropriate execution engine (Appendix A). (iii) Heavy control-flow divergence. Lane masking preserves correctness, but branches that diverge across the population reduce structural sharing; as divergence increases, the benefit of a single shared evaluator walk approaches per-lane execution cost, so the about 60 × batch multiplier reported here applies to populations that largely share the same control path. (iv) Unsupported language features. The object language may need constructs outside the supported surface: mutation and aliasing (the heap is a write-once arena because the modeled subset excludes mutation), exceptions, first-class continuations, dynamic shapes, and effectful input or output. Our differential tester documents the precise supported boundary (Section 6). (v) Cacheable, reusable staging. If a search repeatedly reuses the same compiled template rather than recompiling each candidate, the per-candidate staging cost largely disappears and the comparison shifts back toward staged execution; we measure this crossover at about 80 constant-only reuses per skeleton (Section 6), so it favors staging only under heavy template reuse, not co-search’s structurally distinct stream. 
+
+Contributions. 
+
+1. Runtime-representation thesis. We introduce a runtime representation for differentiable symbolic computation: a structural/numeric split with exact-trace control and a native payload-only reverse-mode tape, with batching as a first-class axis. The thesis is not specific to Scheme: we realize and validate it for the DMCI client end to end and reproduce its benefits on a second small bytecode VM, with broader front ends left to future work. 2. Defining invariant. We establish a defining invariant that distinguishes NDVM from specialization: make the interpreter fast without compiling away the interpreted program. Programs remain runtime data and inherit gradients from one compiled evaluator, with no per-program residualization; the runtime memoizes decoding and variable lookups but never residualizes a program, so the invariant holds in the implementation. 3. Locked Phase-0 cost model. We measure a locked Phase-0 cost model of a real differentiable interpreter, showing forward time is batch-independent (under about 4% from B=1 to B=1024 ) and overhead-bound. 4. The cost is representation, not FLOPs. We demonstrate that the bottleneck is representation rather than arithmetic, and that this holds across regimes: value boxing is 49–61% of forward time and boxing plus walking is 85–90% across a 2300 × range, while raw arithmetic, including 2 × 2 inverse, determinant, and matrix products, is about 1% or less. 5. Native runtime, implemented and validated. We implement a native CPU runtime (scalar-tagged values, arena heap, dense payload table, direct-threaded evaluation with proper tail calls, and a native payload-only reverse-mode tape) and validate that it reproduces the baseline backend’s forward outputs and exact per-parameter reverse-mode gradients for the realized trace across the program suite, from scalar and transcendental expressions through closures, recursion, lists, a recursive loop, and an 80-step Kalman-filter matrix rollout whose noise-covariance gradients match through the matrix-adjoint path. A PyTorch autograd.Function boundary makes the runtime a differentiable tensor op that an external optimizer drives end to end. 6. Measured speedups. We measure the predicted speedups in the realized system. Batch-native execution keeps the structural walk scalar and widens only the payloads, so one walk fits a population of parameter vectors with per-lane gradients and per-lane cost falls about 60 × from B=1 to B=256 ; control that diverges across the population is handled by lane-masked execution, validated by lane decomposition against single-member runs; structural caches plus allocation pooling cut the flagship matrix-rollout evaluation about 3.2×; and a multicore scheduler fans an independent candidate population across cores near-linearly (about 15 × on 16 cores, byte-identical to serial and data-race-free). 7. Representation isolated from native execution. We isolate the representation from native execution with a tuned-eager baseline: a payload-only encoding, the same interpreter with native-integer tags and a tensor only for 3Differentiate the Evaluator, Not the Program A P REPRINT 
+
+a gradient-carrying numeric payload, removes the boxing in eager Python and is about 4 to 5× faster than the tagged backend across the suite, validated to agree to float32. The native runtime is then a further 8× to 2133 ×
+
+over it, so the structural/numeric split (eager-achievable) and native execution (the residual, growing with rollout depth) are disentangled and reported. A native interpreter that keeps boxed values further localizes that residual: in native code the split is only a 1.5 to 1.8× single-lane factor, so the residual is overwhelmingly the host change rather than the representation, whose primary payoff is the batch amortization below. 8. Generality on a second client. We demonstrate generality on a second client: a differentiable stack-bytecode VM, a different dispatch model with no DMCI parser or evaluator code, reuses the same value box and inherits the same benefits, with gradients bit-identical to autodiff and finite difference, a 1.8 to 3.3× speedup of the split over a naive fused-tensor encoding, and the same batch amortization. It adds 219 lines on a 120 -line shared interface, so the generality is runtime reuse across two clients. 9. External baselines and randomized correctness. We compare against hand-written JAX and staged-graph baselines (all matching the oracle to float32): the pay-nothing-to-stage native runtime outperforms staging in the search regime, since staging amortizes only after hundreds to tens of thousands of gradient steps per candidate, far beyond co-search’s handful, and a structure-cached staging baseline that reuses a compiled skeleton across constant-only variants overtakes the batched runtime only above about a hundred reuses per skeleton, far beyond co-search’s structurally distinct stream. A randomized differential tester passes 600 forward, gradient, and finite-difference checks over the supported surface (and 1500 on a second seed), and turned up the precise unsupported-form boundary between the two backends. 10. End-to-end co-search improvements. We demonstrate end-to-end improvements in program-and-parameter co-search. On a flagship-class Kalman maximum-likelihood calibration, NDVM completes a full parameter fit about 8100 × faster than the baseline backend at bit-identical fit quality ( 17 versus ≈139 ,000 calibrations per CPU-hour). Since the inner fit is 96 .8% of per-candidate co-search cost on that backend in this matrix-heavy (inner-fit-maximizing) regime, NDVM removes calibration as the bottleneck and exposes the model-proposal step as the next one, an Amdahl-bounded end-to-end picture rather than an unbounded claim. A fixed-budget end-to-end co-search on a symbolic-regression task, over an offline-cached stream of LLM-proposed programs, shifts the discovery frontier by about 24 ×: NDVM calibrates 23 .8× more candidates in the budget and reaches good held-out fits about 24 × sooner in wall-clock. A second, recurrence-heavy task (deep iterated maps) shifts the frontier about 340 ×, where the baseline backend never reaches a successful fit in the budget. 
+
+# 2 Problem: program-as-data versus the static graph 
+
+We call the setting interpreter-level differentiation . A fixed evaluator E walks a program P supplied as runtime data together with numeric parameters θ, producing an output y = E(P, θ ), and we want ∂y/∂θ . The evaluator is the same for every P ; the program is an argument, not a compilation target. This is different from differentiating one staged numeric graph. The staged approach takes a specific P and produces a specialized graph GP (θ) that computes the same y, then differentiates GP . When P is fixed and reused millions of times, staging is the right answer, and it is what tracing frameworks and partial evaluators do well. 
+
+Why program-as-data is worth keeping. The workloads driving interpreter-level differentiation do not fix P . In program-and-parameter co-search, an outer loop, an evolutionary search (Novikov et al., 2025; Romera-Paredes et al., 2024; Sharma, 2025) or a language model (Sheneman, 2026), proposes and discards a stream of structurally distinct candidate programs, and each candidate needs its continuous constants calibrated against data. If every candidate must be staged into its own graph before it can be differentiated, the staging cost is paid per candidate and the search cannot keep the program fluid. Keeping P as runtime data means the differentiable object, the evaluator, is built and verified once, and any program the search proposes inherits gradients immediately. The same property matters for neurosymbolic systems that treat programs as first-class data (Chaudhuri et al., 2021; Ellis et al., 2021) and for differentiable scientific modeling, where the model is a program rather than a hand-written numeric kernel (Innes et al., 2019). 
+
+The tension. Program-as-data conflicts with both dominant routes. Staging forfeits it by construction. Eager tensorization preserves it but pays a per-value representational cost, because an interpreter that keeps the program as data must represent, at runtime, every intermediate value the program produces: not just numbers, but the tags, symbols, pairs, and closures that carry the program’s structure. In an eager tensor framework the natural encoding is a tagged tensor per value, and Section 5 shows that this encoding, not the arithmetic, is where the time goes. 4Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Explicit non-goal: NDVM is not a specializer. NDVM deliberately does not residualize each program into its own graph or generate program-specific code as its default execution model. That route is the classical first Futamura projection, specializing an interpreter to a source program to obtain a compiled program (Futamura, 1971; Jones et al., 1993), and it is exactly the route NDVM declines, because it gives up program-as-data and reintroduces per-program compilation. NDVM compiles the evaluator once and runs programs through it as data. Hot-path specialization may later exist as an optional cache tier, but the baseline semantics must work without it. We make this non-goal sharp here because it is what separates the design from a large body of partial-evaluation and tracing work that would otherwise look adjacent. 
+
+# 3 The representation 
+
+NDVM is, first, a choice of runtime representation. This section describes the design; it is the core conceptual contribution, and Section 6 reports the native runtime that implements it. Figure 1 sketches it. 
+
+3.1 The structural/numeric split 
+
+The baseline eager implementation represents every runtime value uniformly as a tagged tensor, a one-hot type tag concatenated with a numeric payload. This uniform representation simplifies the tensor implementation and makes correctness easier to reason about. However, it also allocates a tensor for values that carry no numeric data, such as symbols and heap addresses, and propagates the batch dimension to every runtime value. NDVM splits the representation along the line that matters for differentiation. Discrete structure is never differentiated, so it becomes native scalar data; numbers are the only differentiable quantities, so they get dense buffers. 
+
+Definition 1 (Structural value) . A runtime value is a compact scalar record ⟨tag , aux , pid ⟩, where tag is a small integer type discriminator, aux holds an immediate (a symbol id, heap address, closure id, or small integer), and pid 
+
+indexes the numeric payload table when the value is numeric and is otherwise a sentinel. No tensor is allocated for non-numeric values. 
+
+Definition 2 (Payload table) . Numeric payloads live in a structure-of-arrays table with separate dense primal and adjoint buffers. A payload entry records dtype, shape, and offsets into those buffers. The leading axis of a payload is the batch axis B, so one scalar structural value can point at a batched numeric payload of shape [B] or [B, . . . ].
+
+The consequence is the representation change that motivates the whole design. Instead of carrying B copies of a full tagged value for every runtime object, NDVM carries one scalar structural object plus B numeric elements, and only when the value is numeric. Tags, symbols, and heap addresses stay scalar; only numbers pay for the batch. 
+
+3.2 Heap, environments, and symbols 
+
+Because the relevant language subset excludes mutation, the heap is a write-once arena: cons appends a pair cell and returns a PAIR value whose aux is the cell address, and car /cdr are direct arena loads. Closures store a code entry and a captured environment; vectors store a slice into an element arena. Environments may be the interpreter’s own association lists, with optional inline caches keyed by an environment shape and a symbol so that repeated lookups skip the search. All symbols are interned to integers, so no string comparison occurs on a hot path. None of these operations are differentiable; they shape the realized trace but do not propagate gradients. 
+
+3.3 Control flow as exact realized trace 
+
+NDVM executes the evaluator as a native instruction stream, by switch dispatch or direct threading, with lazy con-ditionals, data-dependent dispatch, variable-length loops, and trampolined tail calls implemented as virtual-machine primitives rather than host recursion. Crucially, NDVM unrolls the evaluator’s instruction stream, never the object program: the program remains data in the heap. This is the operational form of the defining invariant. 
+
+3.4 Reverse-mode AD as a payload-only tape 
+
+Differentiation is define-by-run reverse mode, recorded as a compact native tape. The forward pass appends a tape node only for a differentiable numeric primitive (add, multiply, exp, log, matmul, reduce, and so on); structural operations such as symbol lookup, tag tests, pair allocation, car /cdr , closure construction, and branch dispatch emit nothing. The backward pass replays the tape in reverse, accumulating adjoints into the dense adjoint buffer with vectorized loops over the batch axis. Because the tape touches payloads only, its size tracks the number of numeric operations actually executed, not the size of the program or the depth of the interpreter’s own recursion. 5Differentiate the Evaluator, Not the Program A P REPRINT                 
+
+> Runtime values Payload storage
+> structure of arrays
+> FLOAT ·pid=17
+> SYMBOL id=211 pid= ⊥
+> numeric value
+> non-numeric value
+> θ1θ2· · · θBprimal [B]
+> g1g2· · · gBadjoint [B]
+> batch dimension B
+> no tensor allocation
+
+Native reverse-mode tape 
+
+> one node per numeric primitive only
+> tag tests • heap operations • symbol lookup • dispatch
+> emit no tape nodes
+
+Figure 1: Structural/numeric split in NDVM. Runtime values are fixed-size native records ⟨tag , aux , pid ⟩. Only numeric values carry a payload index into dense batched primal and adjoint buffers, allowing one structural value to address B parameter vectors simultaneously. Non-numeric values allocate no tensor storage. Reverse-mode differentiation records tape nodes only for numeric primitives; structural operations emit no tape nodes. 
+
+3.5 Batching as a first-class axis 
+
+Batching is an execution axis, not an afterthought. A single evaluator walk operates over many parameter vectors, restarts, cells, or input points at once, because the structural walk is shared and only the payloads are wide. NDVM supports named axes (data, restart, cell, population) that flatten into one batch dimension, lane masks for data-dependent numeric branches, and trace bucketing that groups lanes sharing a control path when branches diverge. The intended payoff is population fitting: load the program once, walk the evaluator once, and let the numeric payloads carry every restart and cell. 
+
+3.6 The compile-target contract 
+
+Stated as an interface rather than a theorem, NDVM offers the following contract to a front end. If a symbolic or bytecode runtime lowers its values to NDVM structural values and its numeric primitives to NDVM tape operations, and keeps its programs as heap data walked by a fixed evaluator, then it inherits reverse-mode gradients, along the realized trace, to the numeric inputs of any program it runs, with no per-program staging and no hand-written adjoints. DMCI is the first front end to target this contract; Section 7 realizes and measures a second, non-DMCI one, a differentiable stack-bytecode VM, to show the contract is not specific to Scheme. 
+
+# 4 Why discrete-and-exact, not soft 
+
+A defining choice of the design is that control stays discrete and gradients are exact on the realized trace, rather than relaxed. NDVM differentiates the trace that actually executed: branch predicates, tag tests, symbol comparisons, and dispatch are discrete routing decisions, and only the numeric payloads on the taken path carry gradients. 
+
+Property 1 (Trace-constant gradients, intended semantics) . For inputs that do not change which branches are taken, NDVM’s output is a composition of differentiable numeric primitives over the realized trace, and reverse-mode replay computes its exact gradient. A parameter that appears only in a branch predicate receives no gradient through that predicate; a parameter that appears in a numeric primitive on the taken path receives ordinary gradients. At inputs where a branch flips, the output inherits the source program’s nondifferentiability. 
+
+We state this as the intended semantics, not a proved theorem; a formal operational semantics and a gradient-correctness proof are planned, not done (Section 9). These are the same semantics that eager reverse-mode autodiff over an interpreter already provides, and the contribution of NDVM is not new semantics but making those semantics cheap. Rather than smoothing discontinuities away, NDVM exposes them: a parameter that only influences a predicate receives no gradient through it, and control that diverges across batch lanes is detected rather than blended. Turning these signals into debugging tools for a co-search candidate whose loss landscape is piecewise, such as a branch-flip log or a trace-instability score, is a natural use of the representation that we leave to future work. 6Differentiate the Evaluator, Not the Program A P REPRINT 
+
+This is the sharp contrast with the nearest neighbors. Differentiable interpreters such as TerpreT (Gaunt et al., 2016) and differentiable Forth (Bošnjak et al., 2017), and neural program machines more broadly (Feser et al., 2016; Gaunt et al., 2017; Graves et al., 2014; Reed and de Freitas, 2016; Kaiser and Sutskever, 2016), make control itself soft or differentiable, typically to enable program induction over a restricted instruction set, and pay for it with relaxed semantics and small toy languages. Smoothing approaches such as smooth interpretation (Chaudhuri and Solar-Lezama, 2010) and DiscoGrad (Kreikemeyer and Andelfinger, 2023) deliberately relax discontinuities to obtain useful surrogate gradients. NDVM takes the opposite stance: keep symbolic control exact and discrete, differentiate only the numbers, and accept the resulting piecewise structure as the honest gradient of the program that ran. The benefit is exact gradients, support for arbitrary runtime programs in a full language rather than a synthesis subset, and no relaxation parameter to tune. The cost is that gradients carry no information across a branch boundary, which is a property of the problem rather than of the representation. 
+
+# 5 Phase-0 evidence: a locked cost model 
+
+This section reports the locked baseline cost model; the native-runtime measurements follow in Section 6. We profile the baseline backend, the eager PyTorch implementation of DMCI that NDVM is designed to replace, to establish where the cost of differentiable symbolic computation actually lives. We do not report a speedup here; we report a diagnosis. 
+
+Setup and protocol. We profile DMCI on a single CPU core of an HPC compute node (Python 3.11.10, PyTorch 2.12.0), over five programs chosen to span regimes: two scalar closed-form expressions, one with transcendental functions, one recursive loop, and one matrix-heavy rollout (an 80-step 2 × 2 Kalman-filter negative log-likelihood (NLL) with per-step inverse, determinant, and matrix products). Each program is supplied to the compiled evaluator as data; only its parameters are differentiated. For each program we record clean forward and backward wall-clock per iteration with no profiler attached (averaged over 30 iterations after warmup), and a per-bucket decomposition via a separate cProfile pass that attributes time to cost buckets by function (value boxing, evaluator graph-walking, heap, dispatch, tagged-op wrappers, raw arithmetic and linear algebra, and autograd). We sweep the payload batch size 
+
+B ∈ { 1, 8, 64 , 256 , 1024 }. All artifacts and the harness are released and version-pinned so the baseline is reproducible and fixed. 
+
+Finding 1: forward time is batch-independent. Figure 2 shows forward wall-clock normalized to B=1 as a function of batch size. Increasing B from 1 to 1024, a 1024 × payload, raises forward time by under about 4% across all four programs in the sweep (3.6% at the median of three runs), and by about 1.0% for the recursive loop. The implied marginal cost of one additional batch lane is about 0.1 μs , which is the dense payload arithmetic and nothing else. The multi-millisecond bulk of each forward pass is per-walk interpreter overhead that is paid once regardless of B. The interpreter walk, not the math, is the cost. 
+
+Finding 2: the cost is representation, not FLOPs, and it is regime-invariant. Figure 3 decomposes forward time by bucket for all five programs. Tagged-value boxing accounts for 49–61% of forward time and evaluator graph-walking for a further 25–40%, so the two together account for 85–90%, and this combined share barely moves across a 2300 ×
+
+range of absolute cost, from a 3.1 ms scalar expression to a 7.0 s Kalman rollout (the transcendental program shifts the most time from boxing to walking). Raw arithmetic, including the 2 × 2 inverse, determinant, and matrix products inside the Kalman filter, is about 1% or less of forward time. Table 2 gives the per-program wall-clock. The cost of differentiable symbolic computation in this backend is the representation of values and the walk over the evaluator, not the floating-point work. 
+
+Finding 3: the backward pass is not the problem. In Table 2 the backward pass ranges from about 6% of total time on the scalar expression down to 0.4% on the matrix rollout, where the forward-to-backward ratio reaches 257 ×.Reverse-mode autodiff is already cheap here; the cost is on the forward pass. 
+
+The tax, in call counts and in allocations. Table 3 makes the boxing tax concrete in cProfile call counts: a single forward of the 80-step Kalman likelihood issues about two million value-boxing calls, against thirty-five thousand evaluator-walk calls and three thousand arithmetic calls. Because cProfile counts calls rather than allocations and can distort small-call-heavy programs, we also measure the allocation traffic directly, by counting tagged-value constructors and peak transient memory; this is bias-free and is the instrument the cost claim should rest on (hardware performance counters are unavailable on our cluster, so allocation counts are the reported evidence). Counted directly, the same Kalman forward allocates about 273 thousand [14] -element tagged tensors, about 1.9 MB of peak transient memory, with the remaining boxing calls being tag and payload reads rather than allocations. The native runtime carries the identical numbers in a dense payload buffer using 972 object-free slots, a 281 × reduction in allocations (Table 1); 7Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 1: Representation allocation traffic per forward. For each program, we directly count the number of boxed 
+
+[14] -element tagged tensor values constructed by the baseline backend and compare that count with the number of dense numeric payload slots required by NDVM for the same arithmetic trace. The reduction column is the ratio of eager boxed value constructions to NDVM payload slots; it measures representational object traffic, not total memory footprint. Eager peak transient memory is reported separately as a baseline-backend diagnostic; NDVM peak memory is not reported here. The structural/numeric split reduces representational allocation traffic by 26 to 281 ×.
+
+program eager boxed 
+
+[14] tensors eager peak (KiB) NDVM payload slots object-traffic reduction scalar expression 128 36 .3 5 26 ×
+
+Michaelis–Menten 180 37 .6 6 30 ×
+
+damped oscillator 429 74 .8 12 36 ×
+
+logistic-map loop (16 steps) 6,037 162 .0 133 45 ×
+
+Kalman rollout (80 step) 273 ,238 1,922 .5 972 281 ×
+
+1 8 64 256 1024 
+
+1
+
+1.02 
+
+1.04    
+
+> B=1 baseline
+> Same interpreter walk
+> 1024 ×more parameter vectors
+> ≈same wall-clock time
+
+1024 × payload → only +3.6% runtime 
+
+Payload batch size B (log scale)   
+
+> Forward time (normalized to  B=1 )
+> scalar Michaelis–Menten
+> damped oscillator logistic-map loop
+
+Figure 2: Forward runtime changes by only 1 to 4% across a 1024 × increase in payload batch size. Here B is the number of parameter vectors, restarts, or cells evaluated simultaneously on the current eager backend; the median rise is +3 .6% across scalar, transcendental, and recursive programs ( +1 .0% for the logistic-map loop). The additional cost is only the dense payload arithmetic; the multi-millisecond interpreter walk is paid once regardless of B. This demonstrates that execution is overhead-bound rather than arithmetic-bound and motivates NDVM’s structural/numeric split: a single structural walk can be amortized across large populations of parameter vectors, making batching the primary throughput multiplier. Measured on one CPU core using PyTorch 2.12 (median of three runs). across the suite the reduction is 26 to 281 ×, growing with program size. This allocation count, not the arithmetic, is the quantity the structural/numeric split drives toward zero, and it is established by counting rather than by timing. 8Differentiate the Evaluator, Not the Program A P REPRINT 
+
+scalar 
+
+> (3 ms)
+
+Michaelis 
+
+> (4 ms)
+
+damped 
+
+> (10 ms)
+
+logistic 
+
+> (161 ms)
+
+Kalman 
+
+> (7012 ms)
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100   
+
+> Numeric compute ≲1%
+> (0.2% for Kalman)
+> 86% 86% 90% 86% 86%
+
+Representation + traversal account for 85–90% of runtime across all workloads     
+
+> Share of forward runtime (%)
+> Value representation Interpreter traversal Heap operations
+> Dispatch Wrapper overhead Numeric compute
+
+Figure 3: Forward runtime decomposition of the eager DMCI backend across five programs spanning a 2300 × range of execution cost ( 3.1 ms to 7.0 s). Value representation and interpreter traversal account for 85 to 90% of runtime across all workloads, while numeric computation remains ≲ 1% , including just 0.2% for the matrix-heavy 80-step Kalman rollout. These results indicate that the dominant bottleneck is interpreter representation rather than floating-point computation, directly motivating NDVM’s structural/numeric split and shared evaluator walk. Table 2: Per-program wall-clock in the baseline backend at B=1 on one CPU core using PyTorch 2.12; entries are medians of 3 runs. forward is evaluator execution, backward is the reverse-mode gradient pass, steps is the number of loop or rollout steps, and fwd ms/step is reported only for multi-step programs. Ratios are computed from unrounded medians. Forward execution dominates across all regimes: the forward/backward ratio rises from 16 .6× on a scalar expression to 256 .8× on the 80-step Kalman rollout, whose forward pass alone takes 7.0 s. Together with Figure 3, this identifies NDVM’s target as the representation-heavy forward interpreter walk rather than reverse-mode gradient propagation. 
+
+Program Regime forward (ms) backward (ms) steps fwd ms/step forward/ backward 
+
+(+ (* a x) b) scalar 3.08 0.19 1 n/a 16.6 ×
+
+Michaelis–Menten scalar 4.49 0.21 1 n/a 21.1 ×
+
+damped oscillator transcendental 10.16 0.38 1 n/a 27.1 ×
+
+logistic-map loop recursive 160.81 2.04 16 10.1 78.8 ×
+
+Kalman NLL ( T =80 ) matrix rollout 7012.39 27.31 80 87.7 256.8 ×
+
+Table 3: Representation activity per forward pass, as cProfile function-call counts (counts, not timings; deterministic across runs). Value boxing dominates: it issues 104 to 580 × as many calls as arithmetic and reaches about two million for the 80-step Kalman forward, and evaluator walking too is far above arithmetic. This call-count view complements the time-share decomposition of Figure 3 and the allocation counts of Table 1, and shows why NDVM’s structural/numeric split targets the representation (boxing and walking), not arithmetic. 
+
+Program boxing calls evaluator-walk calls arithmetic calls boxing / arith. 
+
+(+ (* a x) b) 828 27 8 104 ×
+
+logistic-map loop (16 steps) 43,214 719 258 168 ×
+
+Kalman NLL (80 steps) 1,994,674 35,095 3,442 580 ×
+
+9Differentiate the Evaluator, Not the Program A P REPRINT 
+
+# 6 From buckets to phases to measured results 
+
+The cost model does more than motivate the representation in the abstract; it told the design exactly what to attack and in what order, and we then built the realization and measured the outcome. Each measured bucket maps to a design response, the realization is staged so that the parts targeting the largest measured cost come first, and we report below what each phase achieved against the frozen baseline backend on the same programs and single CPU core as the baseline. 
+
+Boxing and walking (85–90% of forward) come first. The structural/numeric split removes value boxing: a scalar tag plus a payload index replaces the per-value tensor allocation that Figure 3 attributes 49–61% of forward time to. A native direct-threaded evaluator with interned symbols, proper tail calls, and a decoded-form cache then walks the program without re-parsing tokens or re-dispatching by string on each visit. These are the native forward runtime, and they target the measured majority of the cost. 
+
+The native tape is a correctness task, and it is done. Because the backward pass is a small share of total time, from about 6% on the cheapest scalar program down to 0.4% on the dominant matrix rollout (Table 2), the native reverse-mode tape did not need to be fast to win; it needed to be correct and to not regress. It is built: the runtime records a compact define-by-run tape over numeric payloads only (structural operations record nothing) and replays it to per-parameter gradients that match the baseline backend exactly, including the 80-step Kalman filter’s noise-covariance gradients through the matrix-adjoint path for determinant, log-determinant, and inverse. A PyTorch 
+
+autograd.Function boundary exposes the native runtime as a differentiable tensor op, and an Adam optimizer drives a Kalman maximum-likelihood fit through it end to end. 
+
+Batch-native payloads, the throughput multiplier, measured. Figure 2 shows the evaluator walk is amortizable in the baseline backend: batch rides nearly free. The native runtime turns that property into raw throughput. It keeps the structural walk, the heap, the environment, and the tape scalar and shared, and widens only the payload buffers with a batch axis, so a single walk fits a population of parameter vectors (restarts, cells, data points) and returns per-lane gradients. On the 80-step Kalman negative-log-likelihood with gradients, per-lane cost falls from 2.96 ms at B=1 to 0.049 ms at B=256 in the native runtime, about 60 ×, because the structural walk is paid once and the batch rides the dense payloads. Measured end to end through the cached PyTorch autograd.Function boundary the deployed per-lane amortization is smaller, about 21 × (0.63 to 0.029 ms from B=1 to B=256 ), because caching and tensor marshaling at the boundary shrink the per-walk overhead the batch amortizes; we report both, the native runtime’s intrinsic 60 × and the deployed 21 × through the optimizer boundary. This was the claim most clearly marked as unproven in the earlier statement of this design; it is now measured natively, lane by lane, against the baseline backend. 
+
+Divergent control, and a faster interpreter. Population members can take different control-flow paths. The runtime handles this with lane-masked execution: a branch whose test diverges across the population evaluates each side under its active lane subset and merges per lane, with adjoints gated to the lanes that took each path, so a terminated lane’s stale value can never corrupt another lane’s gradient. We validate it by decomposing a batched divergent run into independent single-member runs and checking forward outputs and per-lane gradients agree. Finally, structural caches (a decoded-form cache and an inline lexical-address cache) and allocation pooling (frame and argument-vector pools), all of which memoize work without compiling any program into its own graph, cut the flagship matrix-rollout evaluation about 3.2× from the un-optimized native runtime and roughly halve small co-search programs that are allocation-bound. 
+
+Across cores. The structural/numeric split gives a second, orthogonal throughput axis. Because each candidate evaluation owns all of its mutable state (its arena, heap, environment, and tape), a population of independent candidates (parameter restarts, cells, or different programs) shares nothing and is embarrassingly parallel. A thread pool with one thread-local interpreter per worker fans the population across cores; results placed by candidate index are byte-identical to a serial run for any thread count and free of data races (ThreadSanitizer-clean under a contention stress). On a 32-core, 64-thread node it scales near-linearly, about 15 × on 16 cores ( 93% efficiency, Figure 4). All NDVM interpreter results here are CPU. A specialized forward-only kernel, separate from the interpreter, estimates only the dense-numeric ceiling on GPU and is reported in Appendix A; the full GPU interpreter is future work. 
+
+What the representation is worth, and what native execution adds. The native runtime gains over the baseline backend in two ways at once: it drops the tagged-tensor representation, and it does not run the interpreter in Python. We separate them with a tuned-eager baseline, the same interpreter with a payload-only value encoding in which the type tag is a native integer and a tensor is allocated only for a gradient-carrying numeric payload, so structural values (symbols, pairs, environments, addresses) allocate nothing. This is the strongest fair eager encoding, and it isolates 10 Differentiate the Evaluator, Not the Program A P REPRINT          
+
+> 124816 32 64
+> 1
+> 2
+> 4
+> 8
+> 16
+> 32
+> 64
+> 14.9 ×(93%)
+> 30.2 ×(SMT)
+> Candidate evaluations share no mutable state: one thread-local NDVM per worker
+> Worker threads ( log 2scale)
+> Speedup over serial ( log 2)
+> ideal linear ( y=x)
+> measured
+
+Figure 4: Strong scaling of NDVM candidate-level parallelism. Independent candidate evaluations (each a complete NDVM forward and reverse pass over a separate (program, bindings) pair) share no mutable state, allowing one thread-local interpreter per worker and deterministic parallel execution. Speedup is near-linear through 16 cores ( 14 .9×,
+
+93% efficiency), reaches 28 .2× on the node’s 32 physical cores, and increases to 30 .2× on 64 logical threads via simultaneous multithreading. Results are byte-identical to serial execution and ThreadSanitizer reports zero data races. Measured as the median of five runs on one compute node using an 80-step Kalman NLL workload with gradients and 16,000 candidate evaluations. Table 4: Decomposition of the NDVM forward speedup into representation and execution effects. The tuned-eager payload-only baseline isolates the structural/numeric split while retaining eager Python execution; the native runtime isolates the additional benefit of native execution. Entries are ratios of median forward time on the program suite, with all three implementations validated to agree to float32. Representation gains stay roughly constant ( ≈ 4–5×), while native-runtime gains grow rapidly with interpreter depth and control-flow complexity (evaluator traversal dominates the forward pass), giving total speedups of 37 × to 10821 × (per-program absolute times in Appendix B).                       
+
+> program representation gain (tagged →tuned-eager) native-runtime gain (tuned-eager →NDVM) total gain (tagged →NDVM) scalar expression 4.7×8.0×37 ×
+> Michaelis–Menten 4.4×13 .2×58 ×
+> damped oscillator 5.0×24 .4×122 ×
+> logistic-map loop (16 steps) 4.7×415 ×1964 ×
+> Kalman rollout (80 step, matrix) 5.1×2133 ×10821 ×
+
+the representation: it removes the boxing in eager Python, without the native runtime. Table 4 and Figure 5 report forward time three ways, the tagged backend, the tuned-eager encoding, and native NDVM, validated to agree to float32 on every program including the 80-step Kalman rollout. The tuned-eager encoding alone is about 4 to 5× faster than the tagged backend, so that factor is the representation, realizable in eager Python; this confirms the cost diagnosis and answers directly whether the baseline backend is merely naive. The native runtime is then a further 8× to 2133 ×
+
+over tuned-eager, the residual that native execution earns by removing the Python evaluator. The residual grows with control-flow and rollout depth, from a flat scalar expression to the matrix rollout where the interpreted walk dominates. The representation and native execution are complementary, not redundant: the split removes the boxing, and native execution removes the interpreter. 
+
+Representation versus leaving Python: a native boxed baseline. The tuned-eager baseline isolates the representation 
+
+within the eager host. To separate the representation from the host change itself, we built a native interpreter that keeps the boxed value representation: a forward-only tree-walking evaluator that reuses the same reader and macro expander, and walks the identical program, but allocates a tagged box for every value, structural and numeric alike. It differs from NDVM only in keeping boxed values, and from the baseline backend only in not running in Python. Both are pure C++ command-line drivers, timed as the median of five runs on one CPU core; their forward outputs match the baseline backend on every program, including the Kalman rollout, whose forward output of 831 .22 matches the 11 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+> scalar
+> Michaelis
+> damped
+> logistic
+> Kalman
+
+10 0
+
+10 1
+
+10 2
+
+10 3
+
+10 4  
+
+> representation gain remains ∼4–5×
+> total NDVM gain grows with rollout depth
+> 37
+> 58
+> 122
+> 1,964
+> 10,821
+> Forward speedup vs. tagged eager backend ( ×) Representation-only gain: tuned eager / tagged eager
+> Total gain: native NDVM / tagged eager
+
+Figure 5: Decomposed forward speedup over the tagged eager backend. Teal bars show the representation-only gain of a tuned eager payload-only encoding over the tagged eager baseline; this remains nearly constant at about 4–5× across all workloads. Red bars show the total gain of native NDVM over the tagged eager baseline; this grows with rollout depth, from 37 × on a scalar expression to 10 ,821 × on the 80-step Kalman rollout. The ratio between the red and teal bars represents the native-execution contribution beyond representation alone. Representation removes tagged-tensor boxing overhead, while native execution removes the depth-dependent interpreter-walk cost. All implementations use float32; medians are measured on one CPU core, with PyTorch 2.12 used for the eager baselines. Table 5: Native boxed-value C++ baseline versus NDVM, forward only. Both implementations execute the same programs as runtime data and match the baseline backend to float32. Ratios report boxed C++ forward time divided by NDVM forward time, so values above 1 indicate an NDVM advantage. The structural/numeric split is not beneficial for tiny scalar programs, where NDVM carries additional runtime machinery, but becomes beneficial for recursive and matrix-rollout workloads where interpreter traversal dominates. 
+
+program boxed C++ fwd (ms) NDVM fwd (ms) boxed ÷ NDVM  
+
+> (>1: NDVM faster)
+
+scalar expression 0.0017 0.0069 0.25 
+
+Michaelis–Menten 0.0022 0.0073 0.30 
+
+damped oscillator 0.0048 0.0102 0.47 
+
+logistic-map loop (16 steps) 0.0333 0.0216 1.54 
+
+Kalman rollout (80 step) 0.986 0.554 1.78 
+
+reference to float32 (Table 5). Because both drivers re-parse the program on each evaluation, the NDVM forward times reported there are not directly comparable to the residual-run NDVM times behind Table 4. The comparison locates the speedup. In native code the structural/numeric split is a modest single-lane factor, about 1.5× on the recursive loop and 1.8× on the matrix rollout; on the small scalar programs the boxed forward interpreter is in fact faster than NDVM, because the split runtime also carries the batch and reverse-mode machinery the forward-only baseline omits. The representation’s larger 4 to 5× value in the tuned-eager decomposition is thus specific to the eager-tensor host, where boxing a value allocates a tensor; once execution is native, boxing is cheap. So the bulk of the native runtime’s advantage over the baseline backend, the 8× to 2133 × residual of Table 4, is the host change, leaving Python and per-value tensor allocation, with the representation a small factor on top. This locates rather than diminishes the contribution: the structural/numeric split is not primarily a single-lane forward optimization but the property that lets one structural walk serve a batch of numeric lanes through a payload-only tape, the about 60 × batch amortization measured above that a boxed per-value representation cannot provide. The boxed baseline measures the single-lane forward case, where the split’s benefit is smallest by design. 
+
+Hand-written JAX and staged-graph baselines. A natural objection is “why not transcribe the model directly into a fast autodiff framework, or stage it once into a compiled graph?” We answer both. For each of the five 12 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 6: Staged JAX is faster after compilation, but NDVM avoids per-candidate staging in the low-reuse co-search regime. Times are medians in ms on one CPU core. JAX columns report hand-written compiled execution and one-time staging cost; DMCI and NDVM report per-step forward-plus-gradient time. All forward values match the DMCI oracle to float32. The crossover n⋆ is the number of gradient steps per candidate after which JAX staging amortizes; values below 1 mean staging pays off within one step. n⋆ is computed from the amortization model’s steady-state marginal slopes (Figure 6), not by dividing the displayed columns.                                              
+
+> JAX compiled call per-step fwd+grad one-time JAX staging crossover n⋆
+> program fwd fwd+grad DMCI NDVM vs NDVM vs DMCI scalar expression 0.010 0.013 3.29 0.159 34.7 229 10.6 Michaelis–Menten 0.011 0.013 4.72 0.157 30.3 213 6.4 damped oscillator 0.011 0.014 10.61 0.171 38.4 249 3.6 logistic-map loop 0.010 0.014 163.07 0.150 54.5 403 0.33 Kalman ( T=80 )0.291 0.614 7133.55 0.730 3412.1 42185 0.48
+
+representative programs we hand-wrote the identical math in JAX ( jax.grad /jit /vmap ) and, separately, staged a forward-plus-gradient graph two ways: XLA compilation (all programs) and sympy.lambdify of the closed-form scalar programs. Every staged forward value matched the DMCI tagged oracle to float32 (Table 6). As expected, a hand-written JAX program is far faster than any interpreter on a known program: once compiled, the four scalar/loop programs run forward-plus-gradient in 0.013 to 0.014 ms and the Kalman NLL ( T =80 ) in 0.61 ms at B=1 . This sharpens, rather than weakens, the program-as-data argument. The JAX and staged numbers are the upper bound you reach only after you already know the model and have paid a one-off staging cost ( 30 to 55 ms of XLA compilation for the scalar/loop programs, 3412 ms for the Kalman program). Co-search never enjoys that condition: each candidate program is proposed and revised inside the search loop, so there is nothing to hand-write and nothing to amortize a compile over. NDVM consumes the program as data and pays zero staging cost per candidate, producing exact gradients immediately at 0.15 to 0.73 ms per step. The amortization crossover makes the regime precise. Solving stage + n t staged < n t unstaged for n⋆, staged JAX overtakes the unstaged NDVM runtime only after n⋆ ∈ [213 , 4.2×10 4] gradient steps per candidate (and sympy after 45 to about 
+
+2900 ), whereas against the slow PyTorch DMCI oracle it overtakes almost immediately ( n⋆ ∈ [0 .33 , 10 .6] ). Because each candidate in co-search is fitted for only a handful of steps before being mutated or discarded, n stays far below the NDVM crossover (Figure 6) and the pay-nothing-to-stage runtime wins. Staging is the right choice once a single model is fixed; the unstaged native runtime is the right choice while the program itself is still being searched. Thus, Table 6 does not claim NDVM beats fully amortized compiled graphs; it shows why NDVM is useful when candidate programs remain runtime data and are not reused long enough to justify per-program staging. The crossover above is the per-candidate-stage regime, in which each structurally distinct candidate pays its own compile. A staging system can do better when structure repeats: a compilation cache keyed on program structure reuses a compiled graph across candidates that share a skeleton and differ only in constants, paying the stage once per distinct structure rather than once per candidate. That regime favors staging in proportion to how repetitive the proposal stream is, and it is the right tool when a few skeletons dominate; the unstaged runtime is the right tool in the opposite regime, where the search keeps proposing new structure. We measure this cached-structure regime directly. On a synthetic benchmark of six closed-form skeleton families, each instantiated with r varying constant-settings (reuse rate r =candidates per skeleton), we compare four conditions, all agreeing to float32: per-candidate staging (compile every candidate), structure-cached staging (compile once per skeleton, reuse across its r settings), NDVM program-as-data, and NDVM batched lanes (one structural walk over the r settings as payload lanes, since varying constants within a skeleton is exactly a parameter batch). In the co-search regime, where each proposed program is a structurally distinct skeleton ( r=1 ), NDVM batched is about 4× faster than even structure-cached staging because the per-skeleton compile (here 70 to 96 ms) is unamortized; the crossover where cached staging overtakes NDVM batched is at about 80 
+
+reuses per skeleton (NDVM batched leads through r=64 and is overtaken by r=128 ). A search must therefore reuse each skeleton on the order of a hundred times before structure-cached staging pays off against NDVM, which is the heavy-template-reuse regime rather than the new-structure-per-candidate regime co-search occupies. This crossover is for the small per-candidate numeric work of these programs (low-dimensional, few steps); a larger per-candidate compute or more gradient steps per candidate would lower it and favor staging sooner. The other staged baselines we measure are hand-written JAX with XLA compilation and sympy.lambdify ; an automatic stager that lowers the same object-program representation, and torch.compile , TorchScript, or Numba lowerings are not measured, and an MLIR or Enzyme lowering is future work (Section 9). 13 Differentiate the Evaluator, Not the Program A P REPRINT       
+
+> 10 010 110 210 3
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> 10 4
+> co-search regime: few gradient steps per candidate JAX–NDVM crossover
+> n⋆≈229
+> gradient steps per candidate ( n)
+> per-candidate wall-clock time (ms)
+> PyTorch DMCI reference
+> staged JAX
+> NDVM
+
+Figure 6: Amortization regime for unstaged NDVM versus per-program staging. Total per-candidate wall-clock time is modeled as compile cost plus per-step runtime for a scalar calibration task. NDVM pays no per-program staging cost, so it is fastest in the low-step co-search regime, where candidates are fitted briefly before being mutated or discarded. Staged JAX pays a 34 .7 ms compile cost but has a lower per-step cost, overtaking NDVM only after n⋆ ≈ 229 gradient steps per candidate. The PyTorch DMCI reference is dominated by NDVM throughout and is never the fastest method. The shaded region marks the illustrative low-step co-search regime. 
+
+The native compiled ceiling. JAX and XLA stage a known program into fast kernels, but a hand-coded native function is faster still, because it fuses the small operations XLA dispatches separately. To bound the floor, we hand-coded the 80-step Kalman objective directly in C++ and differentiated it by hand with forward-mode dual numbers over the two noise parameters, an exact analytic gradient and the right method for so few inputs. It is program-as-code: no interpreter, no parser, and no program kept as data. Its forward value matches the baseline backend ( 831 .22 ) and its gradient matches NDVM’s reverse-mode gradient to float32 (about 10 −6 relative). On one CPU core it runs the forward in 0.9 μs and forward-plus-gradient in 3.5 μs , about 200 × below the NDVM interpreter and about 175 × below staged JAX on the same forward-plus-gradient task, the absolute native ceiling for this program. The ceiling completes the picture of where the baseline backend’s cost goes. From the tagged PyTorch interpreter to a native interpreter that keeps boxed values (Table 5) is about 7000 ×, which is leaving Python and per-value tensor allocation; the structural/numeric split adds about 1.8×; and hand-compiling the program away adds a further roughly 600 ×. NDVM deliberately forgoes that last factor, because reaching it means compiling each specific program, which co-search cannot amortize across a stream of distinct candidates (the crossover above). The unstaged interpreter that keeps the program as data is the right tool while the program is still being searched, and the compiled ceiling is what a single settled program could later be lowered to. 
+
+Correctness and differential testing. To validate the native runtime beyond the hand-written conformance cases, we built a randomized differential testing suite. A typed generator emits well-typed, scalar-valued, parameter-dependent programs over the scalar fragment of the DMCI-supported surface: numeric literals, bound parameters and locals, the binary operators + − ∗ /, the unary operators sin , cos , exp , √, log , | · | , let /let* scalar bindings, if with a comparison guard ( =, <, >, ≤, ≥), and bounded loop /recur rollouts with a compile-time-constant trip count. The randomized suite deliberately covers this scalar control-and-arithmetic core; the matrix primitives DMCI also supports (determinant, log-determinant, inverse, matrix product) are not generated and are exercised instead by the hand-written 80-step Kalman conformance case, whose noise-covariance gradients through the matrix-adjoint path match the baseline backend to about 3 × 10 −6, and randomized generation over matrix-shaped, list, and closure programs is future work. Domains are kept smooth and in-range (division denominators and √/ log arguments are wrapped to 1 + x2 ≥ 1, and 
+
+exp arguments are squashed) so that a NaN or infinity never defeats the gates; the runtime’s behavior on NaN, infinity, singular matrices, and out-of-domain log inputs is inherited from the underlying floating-point and linear-algebra primitives and is not separately characterized here. The generator is deterministic given a seed and freezes its corpus to disk for reproducibility. Each program is checked through three gates: G1 compares the NDVM forward value against the DMCI oracle to a float32 tolerance ( atol = rtol = 10 −4); G2 compares the per-parameter NDVM reverse-mode gradient against the oracle’s autograd gradient ( atol = rtol = 2 × 10 −3); and G3 compares the NDVM gradient against a central finite difference of the NDVM forward ( atol = 10 −2, rtol = 5 × 10 −2). G2 cross-validates the native tape against an independent reverse-mode engine, and G3 self-validates it against the runtime’s own forward. On the canonical corpus of 200 programs the suite passes all 600 differential checks, 100% across every feature family (Table 7), and an independent corpus of 500 programs passes all 1500 checks. An initial run surfaced a genuine cross-backend hazard rather than an NDVM defect: the generator occasionally produced a let* nested inside another 14 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 7: Randomized differential-testing coverage for NDVM on a frozen corpus of 200 generated programs (seed 
+
+1234 , PyTorch 2.12, float32). Rows are overlapping feature families; n is the number of corpus programs exercising that feature. Each program is checked by three gates: G1, NDVM forward output vs. the DMCI oracle; G2, NDVM reverse-mode gradient vs. the oracle gradient; and G3, NDVM gradient vs. central finite difference at sampled inputs away from branch boundaries, kinks, and singularities. All 200 programs pass all three gates within tolerance, for 
+
+600 /600 total checks. These tests provide randomized evidence that the NDVM implementation preserves DMCI forward outputs and realized-trace gradients over the supported language surface.                                                     
+
+> feature family nprograms G1 fwd G2 grad G3 fd literal 173 100.0% 100.0% 100.0% param 200 100.0% 100.0% 100.0% binop ( +− ∗ /)200 100.0% 100.0% 100.0% unary transcendental 137 100.0% 100.0% 100.0% unary nonsmooth ( | · | )60 100.0% 100.0% 100.0% guarded division 98 100.0% 100.0% 100.0%
+> let 81 100.0% 100.0% 100.0%
+> let* 75 100.0% 100.0% 100.0%
+> if /compare 98 100.0% 100.0% 100.0% bounded loop /recur 57 100.0% 100.0% 100.0%
+> all programs 200 100.0% 100.0% 100.0%
+
+Table 8: From measured bottlenecks to NDVM mechanisms. Each row links a Phase-0 forward-cost bucket from Section 5 to the NDVM mechanism that targets it and the measured result on the same programs and single CPU core.                 
+
+> Measured bucket NDVM mechanism Measured outcome
+> Value boxing, 49–61% Scalar tags; dense payload table Tagged-tensor boxing removed Evaluator walking, 25–40% Direct-threaded evaluator; decoded-form cache Repeated decoding memoized; cache gives
+> ∼1.5 ×alone Heap/frame allocation, 4–7% Write-once arena; frame/argument pools Allocations reused across evaluator calls Dispatch, 3–5% Decoded forms; inline lexical-address caches Syntactic dispatch and lookup memoized Backward pass, 0.4–6% Payload-only reverse-mode tape Exact gradients match oracle; correctness, not speed Batch-independent walk Batch-native payload buffers ∼60 ×lower per-lane cost at B=256
+
+let* ’s binding right-hand side, a shape the DMCI compiler rejects (the minimal witness is (let* ((a (let* ((b 1.0)) b))) a) ) while the native runtime silently evaluates the inner binding to zero. We confirmed the exact rule and added a structural filter that keeps the corpus inside the surface both runtimes agree on, so the suite both certifies the runtime and documents the precise boundary of the supported language. 
+
+Remaining work. The full GPU interpreter and an optional MLIR or Enzyme lowering for dense numeric re-gions (Lattner et al., 2021; Moses et al., 2021) are future work. Validation at every built phase is forward and gradient equivalence against the frozen baseline backend, plus a lane-decomposition check for divergent batches and a thread-count-independence check for the parallel scheduler; this oracle protocol is run. Table 8 states the bucket-to-phase mapping and the measured outcome. 
+
+# 7 Generality 
+
+NDVM is presented as a general runtime representation, not as a faster DMCI. The representation is not specific to Scheme or to meta-circular evaluation, and we demonstrate this concretely: a second client, a stack-bytecode VM with a different dispatch model, reuses the same value representation and reproduces its benefits (below). 
+
+The criterion. The structural/numeric split applies to any differentiable symbolic or bytecode runtime with three features: it represents intermediate values with discrete tags and references alongside numbers; it walks a fixed evaluator over programs supplied as runtime data; and it wants gradients to the numeric quantities those programs touch. Any such runtime can lower its values to NDVM structural values, its numeric primitives to NDVM tape operations, and its programs to heap data, and then inherit reverse-mode gradients without per-program staging. DMCI satisfies the 15 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 9: NDVM’s structural/numeric split transfers to a second front end. A differentiable stack-bytecode VM reuses the same split value representation under a different dispatch model than the DMCI tree-walking evaluator. Tim-ings are forward-plus-backward median wall time on one CPU node. The fused-eager and split-payload columns report single-lane costs at B=1 ; split per-lane reports the amortized split-payload cost at B=256 . The split representation gives a 1.77 to 3.34 × single-lane speedup while preserving forward outputs and gradients: both backends reproduce an independent plain-tensor reference, including reverse-mode gradients, to 10 −5 and agree with central finite differences within truncation error on every leaf.                        
+
+> workload fused eager VM (B=1 , ms) split payload VM (B=1 , ms) split per-lane (B=256 ,μs)
+> B=1 split speedup correctness (fwd, AD, FD) W1 scalar expression 0.297 0.124 0.512 2.39 ×✓
+> W2 counted loop 1.387 0.430 1.775 3.23 ×✓
+> W3 branch 0.136 0.076 0.308 1.77 ×✓
+> W4 matrix-vector 0.668 0.200 0.824 3.34 ×✓
+
+criterion, which is why it is the first client, but nothing in the representation is specific to Scheme or to meta-circular evaluation. 
+
+A second client, measured. To show that the speedup the paper attributes to the value representation, rather than to one interpreter, we build a second front end that consumes the same value contract but uses a different dispatch model. Whereas DMCI is a tree-walking evaluator, this second client is a small differentiable stack-bytecode VM with a linear instruction stream and an explicit operand stack (15 instructions: PUSH , LOAD , ADD , SUB , MUL , DIV , NEG , EXP , LOG , SIN ,
+
+COS , DUP , a counted LOOP , a conditional BRANCH , and DOT ). It contains no parser or evaluator code from DMCI; it imports only the structural/numeric-split value box (a native integer tag plus a payload that carries gradients only for numeric values; structural and control values stay plain Python) and rides reverse-mode autodiff directly. The VM is offered with two interchangeable value backends that run identical instruction semantics and control flow: the split representation, and a naive baseline in which every stack value, including purely structural ones such as loop counters and branch selectors, is fused into a single [tag, payload] tensor on the tape. The only difference measured between them is the value box. We evaluate four workloads expressed as bytecode: W1, a scalar closed-form expression; W2, a counted loop; W3, a data-independent conditional branch; and W4, a small summed matrix-vector product. On every workload both backends reproduce a plain-tensor oracle in the forward pass, and their gradients are bit-identical to reverse-mode autodiff on every leaf (absolute tolerance 10 −5) and agree with a central finite-difference estimate within its truncation error (Table 9). The split backend is 1.8 to 3.3× faster than the fused-tensor baseline at batch size one, reproducing on a different dispatch model the benefit the representation gives the tree-walking evaluator. Because the structural walk over the instruction stream is paid once while the numeric payload may be a batched tensor, one walk evaluates B lanes and per-lane cost falls about 240 × from B=1 to B=256 (a ratio of about 1/B ), so the batch-amortization property transfers too. The VM is a deliberate second consumer of the same runtime, not an independently motivated system that happens to converge: it adds 219 source lines of VM-specific code on top of the 120 -line value and autodiff interface it shares verbatim with DMCI. The claim is runtime reuse across two dispatch models, which is what turns generality from a design property into a measured one; this is evidence of reuse across a second client, not a proof of generality to arbitrary languages. 
+
+The driving application. The application that motivates the whole effort is program-and-parameter co-search, where an outer search proposes discrete program structure and an inner step calibrates continuous parameters by exact gradients (Sheneman, 2026; Novikov et al., 2025; Romera-Paredes et al., 2024; Sharma, 2025), extending symbolic regression (Cranmer, 2023; Udrescu and Tegmark, 2020) from closed-form expressions to executable, stateful programs. The Phase-0 cost model is what connects NDVM to this application: the inner calibration is dominated by forward interpreter overhead that batches for free, which is precisely the regime the representation targets. 
+
+The inner loop, measured: NDVM removes the calibration bottleneck. We make the application concrete on a flagship-class calibration: a Kalman/linear-inverse-model maximum-likelihood fit (Penland and Sardeshmukh, 1995; Penland, 1996), the matrix-heavy regime, where an Adam optimizer calibrates the model’s noise parameters against an observation sequence by folding an 80-step filter through the interpreter each step. Because NDVM’s gradients are exact, the calibration driven by NDVM and the one driven by the baseline backend follow the same Adam trajectory: over a 30-step fit on a representative seed the per-step NLL is bit-identical and both converge to the same likelihood and the same (clamp-bounded) parameters, so this is the same optimization run faster, an equal-quality comparison. At 16 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 10: NDVM runs the same calibration about 8100 × faster; the language-model proposal then becomes the bottleneck. Inner-loop calibration of a Kalman/LIM maximum-likelihood model on one CPU core using a 30 -step Adam fit. PyTorch DMCI and NDVM reach bit-identical fit quality, with the same per-step NLL trajectory and converged parameters. NDVM cuts calibration from 211 s to 25 .9 ms, increasing throughput from 17 to ≈139 ,000 
+
+calibrations per CPU-hour. Here f is the calibration share of per-candidate cost excluding live proposal. On PyTorch, calibration dominates per-candidate cost ( f =0 .968 ); on NDVM, calibration is no longer the bottleneck ( f ≈0.65 ), and fixed screening, forecast, and framework overheads become visible. With a 0.5 to 2 s live language-model proposal, proposal time becomes the limiting cost.                     
+
+> PyTorch DMCI NDVM per calibration 211 s25 .9ms calibrations / CPU-hour 17 ≈139 ,000
+> inner-fit share f0.968 ≈0.65
+> per-candidate, no proposal in loop 218 s40 ms per-candidate, live LLM 0.5–2s219 –220 s≈0.5–2s
+
+equal quality, this calibration takes 211 s on the baseline backend and 25 .9 ms on NDVM, a speedup of about 8100 ×,which is 17 versus about 139 ,000 calibrations per CPU-hour. This is the robust, schedule-independent headline: how many candidate programs a fixed compute budget can calibrate. The end-to-end consequence follows from where the time goes (Table 10). We measure it on this matrix-heavy model deliberately, because it is the regime that maximizes the inner-fit share f : the f =0 .968 below is an upper endpoint, and a low-arithmetic scalar candidate, where the fixed screening and forecast costs dominate a millisecond fit, is the adversarial low-f case in which the inner fit is a smaller part of the loop. In this favorable regime the inner fit is 96 .8% of the per-candidate cost (screen, fit, forecast) on the baseline backend, so it is the co-search bottleneck; NDVM removes it. In the calibration-service regime, a fixed stream of candidates with no model proposal in the loop, per-candidate wall-clock collapses from 218 s to 40 ms ( 5500 ×). With a live language model proposing each candidate, a cost of seconds, the proposal becomes the floor: per-candidate time drops from about 218 s to 0.5 to 2 s ( 108 to 405 ×)and the inner fit falls below 5% of the loop. We therefore report the calibration throughput as the headline and the end-to-end speedup as Amdahl-bounded by whatever else remains in the loop, rather than claiming an unbounded discovery speedup: NDVM removes calibration as the bottleneck and exposes the model-proposal step as the next one. 
+
+The frontier shift, measured end to end. The Amdahl picture above is a per-candidate decomposition; we also ran the search itself, on a symbolic-regression task complementary to the matrix calibration. We took a fixed stream of 
+
+247 candidate programs, each with a distinct structural skeleton (so the cached-template staging of Section 6 would have to restage every one), proposed by a language model (qwen3.6-27b) and compile-validated on both backends offline so the model is out of the timed loop, and replayed the same stream through each backend under an equal wall-clock budget: recover a damped oscillator from noisy data by calibrating each candidate’s constants with Adam and scoring it on held-out points. In 900 seconds per backend (Figure 7) NDVM calibrates 42 ,289 candidate fits to the baseline backend’s 1,778 , a 23 .8× throughput shift, and turns it directly into search progress: NDVM finds its first held-out fit above R2=0 .9 at 12 .2 s versus 288 s for the baseline backend ( 23 .6× sooner), recovers 5 distinct successful structures to its 4, and converges toward the noise-floor model, reaching R2≈0.99 within about a minute and R2≈0.996 
+
+by the budget’s end, while the baseline backend is still improving ( R2=0 .969 ) there. Because the gradients are exact, a candidate fits to the same parameters on either backend, so this is the inner-loop speedup turned into a left-shifted discovery curve, not a change in what each fit finds. The shift is measured on this task’s scalar candidates, where the per-candidate speedup is modest; a rollout-heavier candidate class shifts the frontier by a far larger factor, which we measure next, a matrix-heavy class would shift it further still by the factors of Table 4, and a live model proposing each candidate would bound it as the Amdahl analysis above describes. 
+
+A second task: the recurrence-heavy regime. The scalar regression above is the regime where the per-candidate speedup is smallest , so we ran a second end-to-end co-search whose candidate class is rollout-heavy. The same language model proposed 80 candidate programs, each with a distinct structural skeleton and each built around a deep bounded iterated map (a discrete recurrence of 8 to 12 steps here), compile-validated on both backends offline as before, and we replayed the stream against a target ( sin(1 .2x) + 0 .3x) under the same 900 -second budget per backend. Because every candidate is a deep rollout, the per-candidate interpreter cost is far higher than the mostly-flat scalar expressions of the first task ( 7.7 s per calibration on the baseline backend versus 23 ms on NDVM), and the frontier shift grows with it: NDVM calibrates 39 ,759 candidate fits to the baseline backend’s 117 , a 339 .8× throughput shift against the scalar task’s 23 .8×. The shift turns into discovery: NDVM recovers 2 distinct successful structures (held-out R2 up 17 Differentiate the Evaluator, Not the Program A P REPRINT     
+
+> 10 010 110 2
+> 0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1
+> 12.2 s
+> 288 s
+> ≈24 ×sooner
+> wall-clock budget (s)
+> best held-out  R2
+> PyTorch DMCI
+> NDVM
+
+Figure 7: End-to-end co-search frontier. A fixed offline stream of 247 LLM-proposed, structurally distinct candidate programs is replayed through PyTorch DMCI and NDVM under identical wall-clock budgets on a symbolic-regression task (recovering a damped oscillator from noisy data; single CPU core). The LLM proposal and compile-validation steps are outside the timed loop, so only backend calibration is timed. Each curve is the best held-out R2 found so far; the dashed line is the R2=0 .9 success threshold, which NDVM reaches at 12 .2 s and DMCI at 288 s (marked), about 
+
+24 × sooner. NDVM approaches the noise-floor fit within the budget, while DMCI is still improving at 900 s, showing that higher calibration throughput directly becomes faster search progress. to 0.989 , first success at 18 s), while the baseline backend completes only 117 calibrations in the budget and never reaches a successful fit (best R2 0.49 ). The order-of-magnitude-larger shift tracks the much larger native-execution residuals Table 4 reports for loop-heavy programs, and it repeats the scalar task’s lesson in the regime where the inner loop dominates: throughput becomes discovery. This is one additional task, still with scalar-valued candidates and a cached proposal stream; a matrix-heavy candidate class and a model in the timed loop remain future work. 
+
+What the evidence does and does not support. The measured evidence is two clients (the DMCI tree-walking evaluator and the stack-bytecode VM) on one platform (CPU, float32). It supports the diagnosis that the cost is representational and batch-independent, and that the representation, not the interpreter, is what carries the benefit, since the same value box helps a second dispatch model. The two clients share the value and autodiff interface deliberately, so this is runtime-reuse evidence across two dispatch models, not two independently motivated systems converging. The second client exercises branch, counted-loop, and matrix-vector regimes but not heap allocation or closures, which the first client (DMCI) does; a third client in a different language family, an object-program suite that stresses allocation and closures under the second dispatch model, and a second platform are the obvious next validations, which we flag in Section 9. 
+
+# 8 Related work 
+
+NDVM draws on several traditions and occupies a point none of them does. We organize the comparison as a design-space grid over how a system differentiates code, then sharpen the contrast against the two neighbors a systems reader will reach for first: partial-evaluation virtual machines and operator-overloading reverse-mode autodiff. The thesis to keep in view throughout is narrow and concrete: NDVM is a fast interpreter that differentiates arbitrary programs supplied as runtime data , without compiling or specializing the program away. 
+
+IR-level AD over static programs. Enzyme differentiates known programs at the LLVM IR level after optimiza-tion (Moses et al., 2021; Maleki et al., 2021), with excellent performance for a fixed program. It has no notion of a program supplied as runtime data to a fixed evaluator, which is exactly the property NDVM preserves. NDVM is compatible with this line as a later lowering path for dense numeric regions, not as a replacement for its execution model. 
+
+Staged tensor graphs. JAX and XLA (Bradbury et al., 2018) compile traceable, mostly static control into fast kernels, and are the right tool when control is static and the program is fixed. A dynamic evaluator with data-dependent dispatch, variable-length recursion, and runtime heap allocation resists tracing, and the batch-independence measurement (Figure 2) explains why a traced numeric graph would capture the wrong thing here: the cost is the walk, not the arithmetic the trace would specialize. We make this quantitative in Section 6: against hand-written JAX and staged graphs, the one-off staging cost amortizes only after hundreds to tens of thousands of gradient steps per candidate, 18 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+whereas a co-search candidate is fitted for a handful of steps before it is mutated or discarded, so the unstaged runtime is the right tool while the program is still being searched. 
+
+Eager tensor frameworks. PyTorch (Paszke et al., 2019) is the measured baseline. Its per-value tensor-object and tiny-operation overhead is precisely the 49–61% boxing tax of Figure 3. NDVM keeps PyTorch’s define-by-run flexibility while removing the per-value tensor. 
+
+Partial-evaluation and tracing virtual machines (the closest systems neighbor). The Lisp and meta-circular tradition (McCarthy, 1960; Abelson et al., 1996; Shinn et al., 2013) supplies the tagged values, interned symbols, trampolined tail calls, and tiered dispatch that NDVM’s structural interpreter inherits. The high-performance descendants of that tradition are partial-evaluation and tracing virtual machines: Truffle/Graal self-optimizes an abstract-syntax-tree interpreter by first-Futamura-projection partial evaluation, compiling the interpreter loop specialized to the hot program into native code (Würthinger et al., 2017, 2013); PyPy’s RPython toolchain meta-traces the interpreter to emit a tracing JIT (Bolz et al., 2009); and production tracing JITs such as LuaJIT exploit the same idea of specializing toward the observed execution. These machines are world-class at making a single, settled program fast, and they are not reverse-mode differentiable. The contrast with NDVM is not incidental but by construction: their mechanism is to specialize the interpreter toward a settled program, partial-evaluating or trace-specializing it so the hot path runs as native code compiled for that program rather than as a walk over it. The abstract syntax tree persists and deoptimization can fall back to it, but the performance comes from compiling against a program that stays put long enough to get hot. NDVM’s purpose is the opposite. A bilevel search loop proposes, mutates, and discards thousands of candidate programs, so per-program specialization is a cost to avoid, not a benefit to chase; NDVM keeps the program as runtime data, pays interpretation overhead deliberately, and instead recovers performance by amortizing one structural walk across a batch of numeric lanes. We claim a fast interpreter that does not compile the program away, which is the design point Truffle, PyPy, and LuaJIT are engineered to leave. 
+
+Operator-overloading and source-transform reverse-mode AD. Recording a tape over the executed trace and re-playing it backward is the standard construction of reverse-mode AD by operator overloading, realized in Adept (Hogan, 2014), CppAD (Bell, 2024), Stan Math (Carpenter et al., 2015), and Python autograd (Maclaurin, 2016), and by source transformation in Tapenade (Hascoët and Pascual, 2013) and at the IR level in Enzyme (Moses et al., 2021). NDVM claims no novelty in how a single trace is differentiated. Its adjoint tape over numeric payloads is textbook tape-over-trace AD, and that is intentional, because the differentiation method is exactly the part that should be boring and correct. The novelty is not batched reverse-mode AD itself, which vectorized autodiff such as JAX’s vmap-over-grad (Frostig et al., 2018) already provides, nor masked divergence, which SIMT execution has long used (Fung et al., 2007) and which auto-batching of control-intensive programs across lanes also exploits (Radul et al., 2020); it is relocated to two places those systems do not reach, because they differentiate one statically structured host computation at a time. First, the structural/numeric split lets a single structural walk over an interpreter that consumes a program as runtime data 
+
+serve B independent numeric payload lanes at once, so one taping pass produces a batched adjoint for a whole candidate population without staging any program. Second, that one shared walk carries divergence over the interpreter’s exact symbolic branches with lane masks, so lanes that take different program paths still share one structural traversal and one tape. The contrast with Adept, CppAD, Stan Math, Tapenade, and Enzyme is that their taping is per-execution of a fixed program; the contrast with vectorized host autodiff is that the structure shared across lanes here is an interpreter over a program kept as data, not a static host trace. Related differentiable-array efforts such as Dex (Paszke et al., 2021), Swift for TensorFlow (Saeta et al., 2021), and Julia/Zygote (Innes, 2018) push AD into expressive host languages, but they too differentiate a host-language program, not a program delivered as runtime data to a fixed evaluator. 
+
+Vectorized and columnar execution. Separating control and metadata from numeric arrays, and amortizing per-record interpreter overhead by processing many values per dispatch, is long established in analytical database engines. The Volcano model formalized operator-at-a-time query evaluation (Graefe, 1994), and MonetDB/X100 and the VectorWise line replaced tuple-at-a-time interpretation with vectorized execution over columnar, structure-of-arrays storage, so each operator runs over a batched block of a column rather than over individual records (Boncz et al., 2005; Zukowski and Boncz, 2012). NDVM’s structural/numeric split and its per-lane payload buffers are the same amortization in spirit, one structural dispatch over a batch of numeric lanes, and we claim no novelty in the batching principle itself. What differs is the object batched: an interpreter walking a program kept as runtime data, with a reverse-mode tape over the numeric lanes, rather than a relational query plan over stored columns, and the lanes here carry independent gradient computations. 
+
+Probabilistic programming with trace-based AD. Probabilistic programming systems run a model program, record an execution trace of the realized random choices, and differentiate that trace by reverse mode for gradient-based inference, for example Pyro on PyTorch (Bingham et al., 2019) and Gen on Julia (Cusumano-Towner et al., 2019). This 19 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+is mechanically adjacent to NDVM’s tape over a realized numeric trace. The difference is the one we draw against operator-overloading AD generally: these systems differentiate a model written and executed in the host language, recovering speed by staging or compiling that model, whereas NDVM differentiates an evaluator that consumes the program as runtime data and shares one structural walk across a batch of lanes. We borrow the trace-AD construction and claim no novelty in it. 
+
+Two things NDVM is not . First, NDVM is not just a custom AD interpreter. An AD interpreter differentiates the program it is handed by treating that program as the computation to be traced; partial-evaluation and source-transform systems then specialize to it. NDVM’s contribution is not the act of differentiating an interpreter, which prior work has done (Maleki et al., 2021), but doing so while keeping the program as inert data over a batch, so a search procedure pays no per-candidate compilation and still receives exact batched gradients. Second, NDVM is not just a tagged virtual machine with a tape bolted on. A tagged VM plus a tape would give per-value boxing back, which is exactly the 49–61% overhead we remove (Figure 3); the structural/numeric split is what makes the tape live over dense per-lane payload buffers instead of over boxed scalar objects, and that representation choice, not the presence of a tape, is what turns interpretation into a batch-amortized operation. 
+
+Differentiable interpreters and smoothing. TerpreT (Gaunt et al., 2016), differentiable Forth (Bošnjak et al., 2017), and neural program machines (Feser et al., 2016; Gaunt et al., 2017; Graves et al., 2014; Reed and de Freitas, 2016; Kaiser and Sutskever, 2016) make control soft or differentiable, usually for program induction over a restricted instruction set, and accept relaxed semantics and small languages. Smoothing methods (Chaudhuri and Solar-Lezama, 2010; Kreikemeyer and Andelfinger, 2023) relax discontinuities for surrogate gradients, as do continuous relaxations of discrete choice (Jang et al., 2017; Maddison et al., 2017; Liu et al., 2019), in contrast to NDVM’s exact-discrete control. NDVM keeps symbolic control discrete and exact and differentiates only numeric payloads, supporting arbitrary runtime programs in a full language. Tracr (Lindner et al., 2023) compiles programs into transformer weights, an adjacent compile-into-weights contrast that, like staging and like partial evaluation, fixes the program rather than keeping it as data. 
+
+Foundations and applications. The native tape rests on standard automatic-differentiation and differentiable-programming theory (Pearlmutter and Siskind, 2008; Siskind and Pearlmutter, 2008; Elliott, 2018; Sherman et al., 2021; Huot et al., 2023; Wang et al., 2019; Abadi and Plotkin, 2020), and the program-as-data workload is the one studied in neurosymbolic and program-synthesis research (Chaudhuri et al., 2021; Shah et al., 2020; Manhaeve et al., 2018; Li et al., 2023; Ellis et al., 2021) and in differentiable programming for science (Innes et al., 2019). The motivating client is DMCI (Sheneman, 2026), used inside program search (Novikov et al., 2025; Romera-Paredes et al., 2024; Sharma, 2025) and symbolic regression (Cranmer, 2023; Udrescu and Tegmark, 2020). 
+
+The unoccupied point. Each ingredient above has prior art on its own; separating discrete structure from numeric arrays is itself standard practice, in vectorized database execution and in SIMT hardware. What no cited neighbor combines is all of them at once for differentiable interpretation: a high-performance symbolic virtual-machine repre-sentation; native reverse-mode AD over numeric payloads only; programs kept as runtime data rather than staged or specialized; an evaluator compiled once rather than per program; and one batch-native structural walk with lane-masked divergence shared across a population. The contribution is that combination, and specifically the structural/numeric split that makes it batch-amortized, not any single element. 
+
+# 9 Limitations and status 
+
+The gap between what is measured and what remains designed is the most important thing for a reader to calibrate. 
+
+What is measured. The cost model of Section 5: a profile of the baseline backend on one CPU core, in float32, for one client (DMCI), which establishes where cost lives in that backend. And the native runtime that realizes the representation, scalar-tagged values, an arena heap, a dense payload table, direct-threaded evaluation with proper tail calls, and a native payload-only reverse-mode tape. It runs object programs as data and reproduces the backend’s forward outputs and exact per-parameter reverse-mode gradients for the realized trace across the program suite (scalar and structural programs to zero or about 10 −10 ; the 80-step 2 × 2 Kalman rollout’s forward to about 2 × 10 −7 and its noise-covariance gradients through the matrix-adjoint path to about 3 × 10 −6). Batch-native execution returns per-lane gradients from one structural walk and lowers per-lane cost about 60 × from B=1 to B=256 ; divergent control across the population is handled by lane-masked execution validated by lane decomposition; and structural caches plus allocation pooling cut the flagship evaluation about 3.2×. These per-evaluation results are single-core CPU, float32, validated under two independent compilers. A native interpreter that keeps the boxed value representation, built to 20 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+separate the representation from the host change, shows the structural/numeric split is only a 1.5 to 1.8× single-lane forward factor once execution is native, so the large residual over the baseline backend is the host change rather than the representation; the split’s primary payoff is the batch amortization, which a boxed per-value representation cannot provide. A multicore scheduler fans independent candidates across cores near-linearly (about 15 × on 16 cores), byte-identical to a serial run for any thread count and ThreadSanitizer-clean. All interpreter results are CPU; a specialized forward-only kernel, separate from the interpreter, estimates only the dense-numeric ceiling on GPU and is reported in Appendix A. 
+
+What remains designed and unbuilt. The full GPU interpreter (the persistent-kernel evaluator that runs the struc-tural walk on the device under warp-ballot lane masks) and an optional MLIR or Enzyme lowering are design, not implementation. Our GPU evidence is a proof-of-concept that measures the dense-numeric ceiling (Appendix A), a specialized forward-only kernel; the interpreted backend, whose branchy structural-walk overhead on the device the cost structure says is the real risk, is unmeasured, and we gate it behind that measurement rather than claim it. The compile-target contract of Section 3 is given as interfaces and intended semantics; Property 1 is stated as intended semantics, and a formal operational semantics with a machine-checked gradient-correctness proof is future work. The gradient validation we report is empirical, forward and gradient equivalence against the frozen baseline backend across the suite, not a proof. We run fixed-budget end-to-end co-search on two tasks and measure the frontier shift directly (Section 7, Figure 7): on a scalar symbolic-regression task NDVM calibrates about 24 × more candidates under an equal wall-clock budget and reaches good held-out fits about 24 × sooner, and on a recurrence-heavy iterated-map task the shift grows to about 340 × as the per-candidate rollout cost rises, with NDVM recovering successful structures the baseline backend never reaches in the budget. Those are two tasks with scalar-valued candidates and offline-cached proposal streams; matrix-heavy candidate classes and a model in the timed loop remain future work. 
+
+What is implemented, at a glance. Table 11 consolidates the per-feature build and test status so a reader can see at once what is built and how it is validated, rather than inferring it from prose. The fuzzer covers the scalar surface only; closures, recursion, lists, and matrix primitives are conformance-tested against the frozen oracle, not randomly generated, and the GPU entry is a forward-only numeric-ceiling kernel with no interpreter dispatch, heap, tape, or gradient. 
+
+Why CPU is the right engine, not a deferral. That the realization is CPU is a property of the workload. The cost this paper measures is representational: value boxing, evaluator walking, heap and environment traffic, and a tape over small payloads, with arithmetic about 1% or less across a 2300 × cost range. That profile is allocation- and control-bound rather than throughput-bound, and it is exactly the regime in which a latency-optimized core with warm caches and good branch prediction beats a throughput-optimized accelerator: the interpreter’s branchy structural walk is what must run fast, and there are too few dense floating-point operations to amortize a device launch. A GPU helps only once the per-candidate numeric work is large enough to dominate that walk, which is the high-dimensional regime the ceiling experiment of Appendix A bounds and which the workloads here are not. We therefore treat CPU as the engine the representation calls for, and a GPU interpreter as future work for a different, dense-numeric workload class. 
+
+The one number, decomposed. A measured forward speedup of the native runtime over the baseline backend exists and is large. It conflates two effects, removing the tagged-tensor representation and not running the interpreter in Python at all. A tuned-eager baseline now disentangles them (Section 6, Table 4): the representation alone, realized as a payload-only encoding in eager Python, is about 4 to 5×, and native execution is the residual of about 8× to 2133 × on top. This also answers the skeptic’s objection that the baseline is merely naive: the 49 –61% boxing share is a property of this tensorized-tag encoding, and a competent eager encoding (the tuned-eager column) removes a good part of it without the native runtime at all, so the representation rather than the native runtime accounts for that factor. The other clean claims are unchanged: exact-gradient equivalence, the ∼60 × batch multiplier, and the ∼3.2 × internal speedup from the native runtime’s own caches and pools (NDVM versus NDVM, the value of the caches and pooling). 
+
+Scope of the platform. The measurements are single-node, CPU, float32, for two clients that share the value and autodiff interface (the DMCI evaluator and the stack-bytecode VM of Section 7); the second client covers branch, counted-loop, and matrix-vector regimes but not the allocation-heavy or closure-heavy programs the first client does, so a third client in a different language family, a broader object-program suite under the second dispatch model, and a second platform remain future validations. The multicore scaling is on one 32-core, 64-thread node and the GPU numeric ceiling on one RTX 4090. Multi-socket NUMA behavior, and the interpreted (rather than numeric-ceiling) GPU performance, are not measured. We offer the locked baseline as a contract: it is the number the NDVM runtime is measured against, on the same programs and platform. 21 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Timing methodology and variance. All reported timings are medians of N ≥ 12 measured repetitions taken on a single pinned CPU core (PyTorch 2.12); the first few repetitions per cell are discarded as warmups, and we use the 
+
+perf_counter bare wall clock. Across the four scalar and recursive baseline programs and all three forward backends (tagged DMCI, tuned eager, native NDVM) the observed coefficient of variation is a few percent for the tagged and tuned-eager cells and for the larger native cells, and rises to about 6% on the sub-millisecond native cells, whose microsecond scale makes them the noisiest, with the inter-quartile range under 1% of the median in most cases; the one large outlier (tuned-eager on logistic_map_loop ) has a tight inter-quartile range ( ∼ 0.2% of the median) but a heavier tail that inflates its CV to roughly 16 to 18% , so we rely on the median and IQR rather than the mean for that cell. These fluctuations are far smaller than the decomposition ratios they qualify: across these four programs the smallest native-execution ratio (NDVM over tuned-eager) is about 8× and the largest exceeds 400 ×, all at least two orders of magnitude above the worst-case variance, so the ordering of the backends is unambiguous and is reproduced across independent re-runs. The cProfile instrumentation is used only to attribute the decomposition shares across cost buckets, never for the headline ratios, which are bare wall-clock; the allocation counts in Table 1 are a bias-free cross-check independent of any profiler overhead. 
+
+Reproducibility. The code, the native runtime, the profiling and baseline harnesses, the differential tester, and the second-client demonstrations are released at github.com/sheneman/ndvm (frozen at tag v1.0 ); REPRODUCE.md 
+
+at the repository root is the artifact guide. Every reported number comes from a single compute node, an AMD Ryzen Threadripper PRO 5975WX (32 cores, 125 GiB; Rocky Linux 8.10; GCC 12.1.0, -O3 ; PyTorch 2.12.0; performance governor); no timing is taken on the cluster’s shared, heterogeneous nodes. One command, 
+
+ndvm/profiling/env_manifest.sh , captures the full environment (commit, CPU, cache, NUMA, compiler and flags, BLAS, thread counts, OS, and perf access) on the measurement node. REPRODUCE.md provides a figure/table-to-script map regenerating every paper element, the srun run protocol (the login node lacks PyTorch), and the gate tolerances, seeds, and run counts: float32 forward ( atol = 10 −4), gradient ( 2 × 10 −3), and central finite-difference (10 −2) checks over 200 programs at seed 1234 and an independent 500 at seed 7. We are explicit about instrument limits: cProfile time is used only for cost-bucket shares, direct allocation counts are the bias-free cross-check, and hardware performance counters are unavailable on the cluster ( perf_event_paranoid = 2 , no perf ), so allocation counts are the reported evidence for the cost claim. 22 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 11: What NDVM implements, how each feature is validated, and what remains future work. Built :implemented in the released artifact (native C++ runtime unless marked †). Validation evidence : conformance 
+
+(matched to the frozen DMCI oracle), fuzz (randomized differential testing, Section 6), lane-decomposition (batched run equals independent single-lane runs), determinism (byte-identical across thread counts), or a byte-identical ablation 
+
+(performance mechanism toggled off). Used in main results : exercised by the five-program decomposition (Table 4), the batch/multicore results, the Kalman calibration, or the second client (Table 9). The table shows that NDVM’s central promise, exact-gradient runtime execution with batching and no per-program staging, is implemented and tested, while the compiler, GPU, and proof extensions remain future work. 
+
+Feature Built Validation evidence Used in main results Known limitation / boundary 
+
+Core runtime features 
+
+Scalar primitives (+ − ∗ /,comparisons) 
+
+✓ conformance + fuzz (200 prog.) 
+
+✓ none Transcendentals ( sin ,
+
+cos , exp , log , sqrt, pow) 
+
+✓ conformance + fuzz (137 prog.) 
+
+✓ sqrt/log clamp inputs; pow conformance-only Matrix primitives (matmul, det, logdet, inv, . . . ) 
+
+✓ conformance (logdet, trace, Kalman) 
+
+✓ not fuzzed; small fixed shapes Closures ✓ conformance (higher-order) 
+
+× not fuzzed; not in timing suite Recursion (letrec/define) 
+
+✓ conformance (factorial via letrec) 
+
+× not fuzzed; define-recursion NDVM-only (oracle rejects free-var define) Proper tail calls ✓ conformance (loop, recursion) 
+
+✓ via programs, not a stack-depth stress Lists / pairs (cons, car, cdr) 
+
+✓ conformance (list program) 
+
+× not fuzzed; write-once heap, no mutation Environments (interned symbols, inline cache) 
+
+✓ exercised by all programs 
+
+✓ assoc-list frames; no mutation 
+
+Differentiation and batching 
+
+Divergent control (per-lane branch) 
+
+✓ lane-decomposition (D1–D6) 
+
+× timing programs are lane-uniform Lane masking ✓ lane-decomposition (gated adjoints) 
+
+× numeric/vector merge; structural divergence raises Batch gradients ✓ self-consistency + vs oracle 
+
+✓ per-lane; structurally identical lanes 
+
+Performance mechanisms 
+
+Structural caches (decode + inline) 
+
+✓ byte-identical ablation ✓ memoize decoding/lookup; no residualization Allocation pooling (frame + args) 
+
+✓ byte-identical ablation ✓ combined with caches; no isolated contribution reported Multicore scheduler ✓ determinism +
+
+ThreadSanitizer 
+
+✓ single node; no NUMA tuning 
+
+Integration / generalization 
+
+PyTorch autograd boundary 
+
+✓ conformance grad +
+
+Adam Kalman fit 
+
+✓ none stated Second VM client (stack bytecode) 
+
+✓† grad vs AD + finite diff ✓ 15 instructions; Python demo reusing the payload value box (PyTorch autograd) 
+
+Future work / not implemented 
+
+GPU interpreter × forward-only ceiling POC (App. A) 
+
+× no dispatch/heap/tape/grad; interpreter unmeasured MLIR / Enzyme lowering 
+
+× none × named as future work; not designed (out of scope) Formal gradient-correctness proof 
+
+× empirical equivalence only 
+
+× Property 1 stated as intended semantics 
+
+> †
+
+Python demonstration reusing the payload representation via PyTorch autograd, not the native C++ runtime. 
+
+23 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+# 10 Conclusion 
+
+The cost of differentiable symbolic computation, as it is built today, is representational and it is paid on the forward pass. A locked cost model of a real differentiable interpreter shows that value boxing and evaluator walking account for 85% to 90% of forward time across a 2300 × range of program cost, that raw arithmetic is about 1% or less, that the backward pass is under 1% on the matrix rollout, and that forward time is essentially independent of how many parameter vectors are evaluated at once. The diagnosis points to a single design response: separate discrete structure from differentiable numbers, keep control as the exact realized trace, confine reverse-mode differentiation to a compact native tape over numeric payloads, and make batching a first-class axis. We call this representation the Native Differentiable Virtual Machine, and its slogan is to differentiate the evaluator, not the program, so that any program handed to one compiled evaluator inherits gradients as runtime data. The representation is the contribution of this paper, and the measured baseline is its justification. The native runtime that turns the design into speedups is now built and measured on that baseline’s programs and platform: it executes object programs as runtime data, differentiates them through one compiled evaluator to gradients that match the baseline backend exactly, fits a population of parameter vectors through a single structural walk so that per-lane cost falls about 60 ×, handles control that diverges across the population by lane masking, and is made fast by structural caches and allocation pooling rather than by compiling any program away. Because candidate evaluations share nothing, a multicore scheduler fans a population across cores near-linearly (about 15 × on 16 cores). Every interpreter result here is CPU; a full GPU interpreter is the remaining frontier. The realization is evidence that the representation is right: a high-performance differentiable virtual machine becomes a reusable target, a single compiled evaluator over which arbitrary runtime programs are both executed and differentiated, batched across a population, without compiling away the programs that make the approach worth taking. 
+
+# References 
+
+Martín Abadi and Gordon D. Plotkin. A simple differentiable programming language. Proceedings of the ACM on Programming Languages , 4(POPL):38:1–38:28, 2020. doi: 10.1145/3371106. Harold Abelson, Gerald Jay Sussman, and Julie Sussman. Structure and Interpretation of Computer Programs . MIT Press, Cambridge, MA, 2nd edition, 1996. ISBN 9780262011532. Bradley M. Bell. CppAD: A package for differentiation of C++ algorithms. https://github.com/coin-or/CppAD ,2024. COIN-OR software package. Eli Bingham, Jonathan P. Chen, Martin Jankowiak, Fritz Obermeyer, Neeraj Pradhan, Theofanis Karaletsos, Rohit Singh, Paul Szerlip, Paul Horsfall, and Noah D. Goodman. Pyro: Deep universal probabilistic programming. Journal of Machine Learning Research , 20(28):1–6, 2019. URL https://jmlr.org/papers/v20/18-403.html .Carl Friedrich Bolz, Antonio Cuni, Maciej Fijałkowski, and Armin Rigo. Tracing the meta-level: PyPy’s tracing JIT compiler. In Proceedings of the 4th Workshop on the Implementation, Compilation, Optimization of Object-Oriented Languages and Programming Systems (ICOOOLPS) , pages 18–25. ACM, 2009. doi: 10.1145/1565824.1565827. Peter A. Boncz, Marcin Zukowski, and Niels Nes. MonetDB/X100: Hyper-pipelining query execution. In Second Biennial Conference on Innovative Data Systems Research (CIDR) , pages 225–237, 2005. URL https://www. cidrdb.org/cidr2005/papers/P19.pdf .Matko Bošnjak, Tim Rocktäschel, Jason Naradowsky, and Sebastian Riedel. Programming with a differentiable Forth interpreter. In Proceedings of the 34th International Conference on Machine Learning (ICML) , volume 70 of 
+
+Proceedings of Machine Learning Research , pages 547–556. PMLR, 2017. URL https://proceedings.mlr. press/v70/bosnjak17a.html .James Bradbury, Roy Frostig, Peter Hawkins, Matthew James Johnson, Yash Katariya, Chris Leary, Dougal Maclaurin, George Necula, Adam Paszke, Jake VanderPlas, Skye Wanderman-Milne, and Qiao Zhang. JAX: composable transformations of Python+NumPy programs. http://github.com/jax-ml/jax , 2018. Version 0.3.13. Bob Carpenter, Matthew D. Hoffman, Marcus A. Brubaker, Daniel D. Lee, Peter Li, and Michael Betancourt. The Stan math library: Reverse-mode automatic differentiation in C++. arXiv preprint arXiv:1509.07164 , 2015. doi: 10.48550/arXiv.1509.07164. Swarat Chaudhuri and Armando Solar-Lezama. Smooth interpretation. In Proceedings of the 31st ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI) , pages 279–291. ACM, 2010. doi: 10.1145/1806596.1806629. Swarat Chaudhuri, Kevin Ellis, Oleksandr Polozov, Rishabh Singh, Armando Solar-Lezama, and Yisong Yue. Neurosymbolic programming. Foundations and Trends in Programming Languages , 7(3):158–243, 2021. doi: 10.1561/2500000049. 24 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Miles Cranmer. Interpretable machine learning for science with PySR and SymbolicRegression.jl. arXiv preprint arXiv:2305.01582 , 2023. doi: 10.48550/arXiv.2305.01582. URL https://arxiv.org/abs/2305.01582 .Marco F. Cusumano-Towner, Feras A. Saad, Alexander K. Lew, and Vikash K. Mansinghka. Gen: A general-purpose probabilistic programming system with programmable inference. In Proceedings of the 40th ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI) , pages 221–236, 2019. doi: 10.1145/ 3314221.3314642. Conal Elliott. The simple essence of automatic differentiation. Proceedings of the ACM on Programming Languages , 2 (ICFP):70:1–70:29, 2018. doi: 10.1145/3236765. Kevin Ellis, Catherine Wong, Maxwell Nye, Mathias Sablé-Meyer, Lucas Morales, Luke Hewitt, Luc Cary, Armando Solar-Lezama, and Joshua B. Tenenbaum. DreamCoder: Bootstrapping inductive program synthesis with wake-sleep library learning. In Proceedings of the 42nd ACM SIGPLAN International Conference on Programming Language Design and Implementation (PLDI) , pages 835–850. Association for Computing Machinery, 2021. doi: 10.1145/3453483.3454080. John K. Feser, Marc Brockschmidt, Alexander L. Gaunt, and Daniel Tarlow. Differentiable functional program interpreters. arXiv preprint arXiv:1611.01988 , 2016. doi: 10.48550/arXiv.1611.01988. URL https://arxiv.org/ abs/1611.01988 .Roy Frostig, Matthew James Johnson, and Chris Leary. Compiling machine learning programs via high-level trac-ing. In Machine Learning and Systems (SysML) , 2018. URL https://cs.stanford.edu/~rfrostig/pubs/ jax-mlsys2018.pdf .Wilson W. L. Fung, Ivan Sham, George Yuan, and Tor M. Aamodt. Dynamic warp formation and scheduling for efficient GPU control flow. In Proceedings of the 40th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO) , pages 407–420. IEEE, 2007. doi: 10.1109/MICRO.2007.30. Yoshihiko Futamura. Partial evaluation of computation process: An approach to a compiler-compiler. Systems, Computers, Controls , 2(5):45–50, 1971. Alexander L. Gaunt, Marc Brockschmidt, Rishabh Singh, Nate Kushman, Pushmeet Kohli, Jonathan Taylor, and Daniel Tarlow. TerpreT: A probabilistic programming language for program induction. arXiv preprint arXiv:1608.04428 ,2016. doi: 10.48550/arXiv.1608.04428. Alexander L. Gaunt, Marc Brockschmidt, Nate Kushman, and Daniel Tarlow. Differentiable programs with neural libraries. In Proceedings of the 34th International Conference on Machine Learning (ICML) , volume 70 of 
+
+Proceedings of Machine Learning Research , pages 1213–1222. PMLR, 2017. URL https://proceedings.mlr. press/v70/gaunt17a.html .Goetz Graefe. Volcano: An extensible and parallel query evaluation system. IEEE Transactions on Knowledge and Data Engineering , 6(1):120–135, 1994. doi: 10.1109/69.273032. Alex Graves, Greg Wayne, and Ivo Danihelka. Neural Turing machines. arXiv preprint arXiv:1410.5401 , 2014. doi: 10.48550/arXiv.1410.5401. URL https://arxiv.org/abs/1410.5401 . cs.NE. Laurent Hascoët and Valérie Pascual. The Tapenade automatic differentiation tool: Principles, model, and specification. 
+
+ACM Transactions on Mathematical Software (TOMS) , 39(3):1–43, 2013. doi: 10.1145/2450153.2450158. Robin J. Hogan. Fast reverse-mode automatic differentiation using expression templates in C++. ACM Transactions on Mathematical Software (TOMS) , 40(4):1–16, 2014. doi: 10.1145/2560359. Mathieu Huot, Alexander K. Lew, Vikash K. Mansinghka, and Sam Staton. ωPAP spaces: Reasoning denotationally about higher-order, recursive probabilistic and differentiable programs. In 2023 38th Annual ACM/IEEE Sympo-sium on Logic in Computer Science (LICS) , pages 1–14. IEEE, 2023. doi: 10.1109/LICS56636.2023.10175739. arXiv:2302.10636; LICS 2023 Distinguished Paper. Michael Innes. Don’t unroll adjoint: Differentiating SSA-form programs. arXiv preprint arXiv:1810.07951 , 2018. doi: 10.48550/arXiv.1810.07951. URL https://arxiv.org/abs/1810.07951 . Introduces the Zygote AD tool for Julia. Mike Innes, Alan Edelman, Keno Fischer, Chris Rackauckas, Elliot Saba, Viral B. Shah, and Will Tebbutt. A differen-tiable programming system to bridge machine learning and scientific computing. arXiv preprint arXiv:1907.07587 ,2019. doi: 10.48550/arXiv.1907.07587. Eric Jang, Shixiang Gu, and Ben Poole. Categorical reparameterization with Gumbel-Softmax. In 5th International Conference on Learning Representations (ICLR) , 2017. URL https://openreview.net/forum?id=rkE3y85ee .arXiv:1611.01144. 25 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Neil D. Jones, Carsten K. Gomard, and Peter Sestoft. Partial Evaluation and Automatic Program Generation . Prentice Hall, 1993. Łukasz Kaiser and Ilya Sutskever. Neural GPUs learn algorithms. In 4th International Conference on Learning Representations (ICLR) , 2016. URL https://arxiv.org/abs/1511.08228 . arXiv:1511.08228. Justin N. Kreikemeyer and Philipp Andelfinger. Smoothing methods for automatic differentiation across conditional branches. IEEE Access , 11:143190–143211, 2023. doi: 10.1109/ACCESS.2023.3342136. The DiscoGrad tool; arXiv:2310.03585. Chris Lattner, Mehdi Amini, Uday Bondhugula, Albert Cohen, Andy Davis, Jacques Pienaar, River Riddle, Tatiana Shpeisman, Nicolas Vasilache, and Oleksandr Zinenko. MLIR: Scaling compiler infrastructure for domain specific computation. In 2021 IEEE/ACM International Symposium on Code Generation and Optimization (CGO) , pages 2–14. IEEE, 2021. doi: 10.1109/CGO51591.2021.9370308. Ziyang Li, Jiani Huang, and Mayur Naik. Scallop: A language for neurosymbolic programming. Proceedings of the ACM on Programming Languages , 7(PLDI):1463–1487, 2023. doi: 10.1145/3591280. David Lindner, János Kramár, Sebastian Farquhar, Matthew Rahtz, Thomas McGrath, and Vladimir Mikulik. Tracr: Compiled transformers as a laboratory for interpretability. In Advances in Neural Information Processing Systems 36 (NeurIPS 2023) , 2023. doi: 10.48550/arXiv.2301.05062. URL https://arxiv.org/abs/2301.05062 .Hanxiao Liu, Karen Simonyan, and Yiming Yang. DARTS: Differentiable architecture search. In International Conference on Learning Representations (ICLR) , 2019. URL https://openreview.net/forum?id=S1eYHoC5FX .arXiv:1806.09055. Matthew V. Macfarlane, Clément Bonnet, Herke van Hoof, and Levi H. S. Lelis. Gradient-based program synthesis with neurally interpreted languages. In The Fourteenth International Conference on Learning Representations (ICLR) ,2026. doi: 10.48550/arXiv.2604.18907. URL https://openreview.net/forum?id=NAORIWBaoO .Dougal Maclaurin. Modeling, Inference and Optimization with Composable Differentiable Procedures . PhD thesis, Har-vard University, 2016. URL https://dash.harvard.edu/handle/1/33493599 . Introduces the HIPS autograd Python package (with David Duvenaud and Matthew Johnson). Chris J. Maddison, Andriy Mnih, and Yee Whye Teh. The concrete distribution: A continuous relaxation of discrete random variables. In 5th International Conference on Learning Representations (ICLR) , 2017. URL https: //openreview.net/forum?id=S1jE5L5gl . arXiv:1611.00712. Mehrdad Maleki, Barak A. Pearlmutter, and Jeffrey Mark Siskind. Adding Automatic Differentiation to Scheme by differentiating the interpreter. In Scheme and Functional Programming Workshop (Scheme 2021), co-located with ICFP 2021 , 2021. URL https://icfp21.sigplan.org/details/scheme-2021-papers/7/ Adding-AD-to-Scheme-by-Differentiating-the-Interpreter .Robin Manhaeve, Sebastijan Dumancic, Angelika Kimmig, Thomas Demeester, and Luc De Raedt. Deepproblog: Neural probabilistic logic programming. In NeurIPS , pages 3753–3763, 2018. John McCarthy. Recursive functions of symbolic expressions and their computation by machine, Part I. Communications of the ACM , 3(4):184–195, 1960. doi: 10.1145/367177.367199. William S. Moses, Valentin Churavy, Ludger Paehler, Jan Hückelheim, Sri Hari Krishna Narayanan, Michel Schanen, and Johannes Doerfert. Reverse-mode automatic differentiation and optimization of GPU kernels via Enzyme. In 
+
+SC ’21: Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis . ACM, 2021. doi: 10.1145/3458817.3476165. Alexander Novikov, Ngân V ˜u, Marvin Eisenberger, Emilien Dupont, Po-Sen Huang, Adam Zsolt Wagner, Sergey Shirobokov, Borislav Kozlovskii, Francisco J. R. Ruiz, Abbas Mehrabian, M. Pawan Kumar, Abigail See, Swarat Chaudhuri, George Holland, Alex Davies, Sebastian Nowozin, Pushmeet Kohli, and Matej Balog. AlphaEvolve: A coding agent for scientific and algorithmic discovery. arXiv preprint arXiv:2506.13131 , 2025. doi: 10.48550/arXiv. 2506.13131. Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban Desmaison, Andreas Köpf, Edward Yang, Zachary DeVito, Martin Raison, Alykhan Tejani, Sasank Chilamkurthy, Benoit Steiner, Lu Fang, Junjie Bai, and Soumith Chintala. PyTorch: An imperative style, high-performance deep learning library. In Advances in Neural Information Processing Systems 32 (NeurIPS 2019) , pages 8024–8035, 2019. Adam Paszke, Daniel D. Johnson, David Duvenaud, Dimitrios Vytiniotis, Alexey Radul, Matthew J. Johnson, Jonathan Ragan-Kelley, and Dougal Maclaurin. Getting to the point: Index sets and parallelism-preserving autodiff for pointful array programming. Proceedings of the ACM on Programming Languages , 5(ICFP):1–29, 2021. doi: 10.1145/3473593. 26 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Barak A. Pearlmutter and Jeffrey Mark Siskind. Reverse-mode AD in a functional framework: Lambda the ultimate backpropagator. ACM Transactions on Programming Languages and Systems (TOPLAS) , 30(2):7:1–7:36, 2008. doi: 10.1145/1330017.1330018. Cécile Penland. A stochastic model of IndoPacific sea surface temperature anomalies. Physica D: Nonlinear Phenomena ,98(2–4):534–558, 1996. doi: 10.1016/0167-2789(96)00124-8. Cécile Penland and Prashant D. Sardeshmukh. The optimal growth of tropical sea surface temperature anomalies. 
+
+Journal of Climate , 8(8):1999–2024, 1995. doi: 10.1175/1520-0442(1995)008<1999:TOGOTS>2.0.CO;2. Alexey Radul, Brian Patton, Dougal Maclaurin, Matthew D. Hoffman, and Rif A. Saurous. Automatically batching control-intensive programs for modern accelerators. In Proceedings of Machine Learning and Sys-tems 2 (MLSys 2020) , 2020. URL https://proceedings.mlsys.org/paper_files/paper/2020/hash/ 39945d578f616735572174bf5e8f155d-Abstract.html . arXiv:1910.11141. Scott Reed and Nando de Freitas. Neural programmer-interpreters. In ICLR , 2016. arXiv 1511.06279 cs.LG. Bernardino Romera-Paredes, Mohammadamin Barekatain, Alexander Novikov, Matej Balog, M. Pawan Kumar, Emilien Dupont, Francisco J. R. Ruiz, Jordan S. Ellenberg, Pengming Wang, Omar Fawzi, Pushmeet Kohli, and Alhussein Fawzi. Mathematical discoveries from program search with large language models. Nature , 625(7995):468–475, 2024. doi: 10.1038/s41586-023-06924-6. Brennan Saeta, Denys Shabalin, Marc Rasi, Brad Larson, Xihui Wu, Parker Schuh, Michelle Casbon, Daniel Zheng, Saleem Abdulrasool, Aleksandr Efremov, Dave Abrahams, Chris Lattner, and Richard Wei. Swift for TensorFlow: A portable, flexible platform for deep learning. In Proceedings of Machine Learning and Sys-tems 3 (MLSys 2021) , 2021. URL https://proceedings.mlsys.org/paper_files/paper/2021/hash/ 1d781258d409a6efc66cd1aa14a1681c-Abstract.html . arXiv:2102.13243. Ameesh Shah, Eric Zhan, Jennifer J. Sun, Abhinav Verma, Yisong Yue, and Swarat Chaudhuri. Learning differentiable programs with admissible neural heuristics. In Advances in Neural Information Processing Systems 33 (NeurIPS 2020) , 2020. doi: 10.48550/arXiv.2007.12101. URL https://proceedings.neurips.cc/paper/2020/hash/ 342285bb2a8cadef22f667eeb6a63732-Abstract.html . arXiv:2007.12101. Asankhaya Sharma. OpenEvolve: An open-source evolutionary coding agent. GitHub repository, https://github. com/codelion/openevolve , 2025. Open-source implementation of AlphaEvolve; now at https://github.com/ algorithmicsuperintelligence/openevolve .Lucas Sheneman. The neural compiler: Program-to-network translation for hybrid scientific machine learning. arXiv preprint arXiv:2605.22498 , 2026. Benjamin Sherman, Jesse Michel, and Michael Carbin. λS : Computable semantics for differentiable programming with higher-order functions and datatypes. Proceedings of the ACM on Programming Languages , 5(POPL):1–31, 2021. doi: 10.1145/3434284. Alex Shinn, John Cowan, and Arthur A. Gleckler. Revised 7 report on the algorithmic language Scheme. Technical report, Scheme Steering Committee. https://small.r7rs.org/attachment/r7rs.pdf , 2013. R7RS-small; finalized 6 July 2013. Jeffrey Mark Siskind and Barak A. Pearlmutter. Nesting forward-mode AD in a functional framework. Higher-Order and Symbolic Computation , 21(4):361–376, 2008. doi: 10.1007/s10990-008-9037-1. Silviu-Marian Udrescu and Max Tegmark. AI Feynman: A physics-inspired method for symbolic regression. Science Advances , 6(16):eaay2631, 2020. doi: 10.1126/sciadv.aay2631. Fei Wang, Daniel Zheng, James M. Decker, Xilun Wu, Grégory M. Essertel, and Tiark Rompf. Demystifying differentiable programming: Shift/reset the penultimate backpropagator. Proceedings of the ACM on Programming Languages , 3(ICFP):96:1–96:31, 2019. doi: 10.1145/3341700. Thomas Würthinger, Christian Wimmer, Andreas Wöß, Lukas Stadler, Gilles Duboscq, Christian Humer, Gregor Richards, Doug Simon, and Mario Wolczko. One VM to rule them all. In Proceedings of the 2013 ACM International Symposium on New Ideas, New Paradigms, and Reflections on Programming & Software (Onward! 2013) , pages 187–204. ACM, 2013. doi: 10.1145/2509578.2509581. Thomas Würthinger, Christian Wimmer, Christian Humer, Andreas Wöß, Lukas Stadler, Chris Seaton, Gilles Duboscq, Doug Simon, and Matthias Grimmer. Practical partial evaluation for high-performance dynamic language runtimes. In Proceedings of the 38th ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI) , pages 662–676. ACM, 2017. doi: 10.1145/3062341.3062381. Marcin Zukowski and Peter A. Boncz. Vectorwise: Beyond column stores. IEEE Data Engineering Bulletin , 35(1): 21–27, 2012. 27 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+# Appendices A GPU numeric-ceiling experiment 
+
+We do not claim a GPU NDVM implementation. All NDVM interpreter results in the main text are CPU results. We include one specialized forward-only kernel here, separate from the interpreter, only to estimate the dense-numeric ceiling of the persistent-kernel design and to guide future work. The kernel evaluates a population of independent D-dimensional Kalman-filter negative log-likelihoods, the dense-numeric rollout that would run on the device in a persistent-kernel design, one block per candidate with threads cooperating on the D × D linear algebra; candidates differ in their fitted noise parameters, with shared dynamics, observation map, and observation sequence. It carries no interpreter dispatch, no heap, and no reverse-mode tape, and it runs forward only. A CPU reference performs the identical computation, and the GPU result matches it to float32 tolerance (about 3 × 10 −7). On an RTX 4090 against a 64-thread CPU running the same specialized kernel, the GPU is faster by 2 to 11 × as the state dimension sweeps D=2 to 64 , and up to 19 × at smaller populations. This is a specialized-to-specialized upper bound: the CPU side is itself an equally specialized Kalman kernel, roughly 55 × faster than the interpreted NDVM Kalman, so the number is not a GPU-versus-CPU-interpreter result and must not be read as one. The full persistent-kernel interpreter, which would run the branchy structural walk on the device under warp-ballot lane masks, is not built; whether it retains this ceiling once the structural walk is paid is exactly what this experiment does not establish, and it is gated behind a committed high-dimensional client. For the low-dimensional, control-flow-heavy workloads this paper measures, the CPU runtime is the engine. 
+
+# B Reproducibility artifact 
+
+This appendix is the in-paper artifact summary; REPRODUCE.md at the repository root is the full guide. The goal is that a reader can locate the code, rebuild the runtime, and regenerate every table and figure from a committed script. Table 12 gives the regeneration command for each result in the paper. 
+
+Channel and commit. Code is released at github.com/sheneman/ndvm . The exact tree behind this paper is frozen at the git tag v1.0 ; we cite the tag name rather than a commit hash so this text can name the release that contains it. The default branch stays live, so the exact commit of any individual run is also captured next to its numbers by 
+
+ndvm/profiling/env_manifest.sh , and a reader recovers the working-tree commit with git rev-parse HEAD .
+
+Hardware and software. Every reported number was taken on one compute node: an AMD Ryzen Threadripper PRO 5975WX (32 cores, 64 threads, one socket, one NUMA node, AVX2/FMA), 125 GiB, performance governor, Rocky Linux 8.10 (kernel 4.18.0), GCC 12.1.0 with -O3 , PyTorch 2.12.0, NumPy 2.4.6, torch.get_num_threads() =32 
+
+(timing runs pin a single core). All interpreter results are CPU; the GPU numeric-ceiling kernel of Appendix A additionally needs one RTX 4090. No timing is taken on the cluster’s shared, heterogeneous nodes. 
+
+Build. The C++ runtime builds with CMake in Release mode ( -O3 ); the differentiable PyTorch op builds with 
+
+cd ndvm/python && python setup.py build_ext –inplace (a CppExtension, no ninja required). Build on a compute node, because the login node lacks PyTorch and the prebuilt extension. Equivalence is validated under both 
+
+g++ and clang++ ; g++ is the deployment compiler and is the one used for the reported numbers. 
+
+Expected outputs and limits. A committed reference result accompanies every measured table: the median-of-three Phase-0 baselines, the per-lane sweep, the allocation counts, the JAX and staged baselines, the sec-ond client, the co-search budget, the timing-variance summary, the multicore scaling (median of five sweeps), the native boxed baseline, the compiled-C++ Kalman ceiling, the recurrence-heavy second co-search task, and the structure-cached staging crossover (all under ndvm/profiling/results/ ); the three-backend decom-position of Table 4 is recorded in ndvm/profiling/THESIS_GATE_FINDINGS.md (the source median for-ward times, in ms: tagged 3.08 /4.51 /10 .29 /160 .13 /7062 .7, tuned-eager 0.66 /1.03 /2.05 /33 .83 /1392 .2, native 
+
+0.082 /0.078 /0.084 /0.082 /0.653 ; the tagged column matches Table 2 to within 1.3% ), and the differential-testing report and frozen corpus are under ndvm/tests/results/ . These are reference runs on the measurement node: we do not publish byte-level checksums of the timing outputs because the wall-clock values are non-deterministic and reproduce only within run-to-run variance, whereas the allocation counts of Table 1 and the gate booleans of Table 7 are bit-reproducible. A one-command smoke test, bash ndvm/smoke_test.sh , builds the native runtime and checks forward values and a reverse-mode gradient against known answers in a few seconds with no Python dependency; we 28 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 12: Mapping from each paper result to the command that reproduces it. All commands run under srun on the 
+
+sheneman partition using .venv/bin/python (absolute path) after module load gcc/12.1.0 . Unless otherwise noted, verification uses forward atol=rtol=10 −4, gradient 2 × 10 −3, and finite-difference 10 −2/5 × 10 −2 tolerances (step 10 −3), over a 200 -program differential corpus at seed 1234 and an independent 500 at seed 7.
+
+Paper element Regeneration command 
+
+Core benchmarks 
+
+Table 2, Fig. 2, Fig. 3, Table 3 ndvm/profiling/profile_dmci_baseline.py –iters 30 –batches 1 8 64 256 1024 –decompose 
+
+Table 1 ndvm/profiling/alloc_counters.py 
+
+Table 4, Fig. 5 ndvm/profiling/residual_e2e.py 
+
+Table 6, Fig. 6 ndvm/profiling/jax_baseline.py + staged_baseline.py 
+
+Structure-cached staging crossover (§6) ndvm/profiling/cosearch_cached_staging.py (writes 
+
+results/cached_staging_n128.json )
+
+Validation / differential testing 
+
+Table 7 ndvm/tests/run_fuzz.py –n 200 –seed 1234 (and –n 500 –seed 7 )Table 9 ndvm/profiling/bytecode_vm_e2e.py 
+
+Native implementations 
+
+Table 5 ndvm/profiling/boxed_baseline.sbatch (builds 
+
+tools/boxed_run.cpp )Native compiled Kalman ceiling (§6) ndvm/profiling/compiled_kalman.sbatch (builds 
+
+tools/compiled_kalman.cpp )
+
+Co-search experiments 
+
+Table 10 ndvm/profiling/cosearch_budget.py 
+
+Figure 7 ndvm/profiling/cosearch_propose.py →
+
+cosearch_e2e.py –run (propose offline; replay timed) Second co-search task (recurrence-heavy, §7) 
+
+ndvm/profiling/cosearch_rec_propose.py →
+
+cosearch_rec_e2e.py –run (writes 
+
+results/cosearch_rec_e2e_n128.json )
+
+Scaling studies 
+
+Figure 4 ndvm/profiling/multicore.sbatch (builds 
+
+tools/ndvm_par.cpp )
+
+∼60 × / ∼21 × per-lane sweep ndvm/profiling/perlane_sweep.py (deployed ∼21 ×; native 
+
+∼60 × via the runtime’s batch harness) 
+
+do not ship a single full-artifact driver, so each table and figure is regenerated by its own command in Table 12, and the 
+
+srun time bounds in REPRODUCE.md are allocation caps, not measured runtimes. 
+
+# C Implemented numeric primitives and their adjoints 
+
+The native tape records one node per differentiable numeric primitive on the realized trace and replays it in reverse. Table 13 lists the implemented primitives and their vector-Jacobian products, transcribed from the runtime’s backward pass. Structural operations (symbol lookup, tag tests, pair allocation, car /cdr , closure construction, branch dispatch) record nothing and appear in no row. These are the standard tape-over-trace reverse-mode adjoints; each matches the PyTorch autograd of the corresponding primitive, which is the part of the design we intend to be unremarkable and correct. We write g for the incoming adjoint of a node’s output and z for the output primal; the listed contribution is accumulated into each input’s adjoint. 29 Differentiate the Evaluator, Not the Program A P REPRINT 
+
+Table 13: Numeric primitives implemented by NDVM and their reverse-mode adjoints. Each row corresponds to one native tape node; structural interpreter operations emit no tape nodes. A−1 for det /logdet is the inverse cached during the forward LU factorization; for inv , B = A−1 is the recorded output. The 1 × 10 −8 clamp on sqrt /log 
+
+passes zero gradient below the clamp, matching the forward fold. Single-argument sub and div are negation and reciprocal, with adjoints x −= g and x −= g/x 2.
+
+Primitive Forward Adjoint contribution (per input) 
+
+Arithmetic 
+
+add z = P 
+
+> i
+
+xi xi += g
+
+sub z = x0 − P 
+
+> i≥1
+
+xi x0 += g, xi≥1 −= g
+
+mul z = Q 
+
+> i
+
+xi xi += g Q  
+
+> j̸=i
+
+xj
+
+div z = x0/ Q 
+
+> i≥1
+
+xi x0 += g/ Q 
+
+> i≥1
+
+xi, xi≥1 −= g z/x i
+
+Elementary functions 
+
+sin z = sin x x += g cos x
+
+cos z = cos x x −= g sin x
+
+exp z = ex x += g z 
+
+sqrt z = √x x += g/ (2 z) (if x > 10 −8)
+
+log z = ln x x += g/x (if x > 10 −8)
+
+pow z = ae a += g e z/a , e += g z ln a
+
+abs z = |x| x += g sign( x)
+
+Vector operations 
+
+dot z = a · b a += g b , b += g a 
+
+matvec z = Av A += g v ⊤, v += A⊤g
+
+outer Z = ab ⊤ a += g b , b += g⊤a
+
+Matrix operations 
+
+matmul Z = AB A += g B ⊤, B += A⊤g
+
+transpose Z = A⊤ A += g⊤
+
+trace z = tr A A += g I 
+
+det z = det A A += g z (A−1)⊤
+
+logdet z = ln det A A += g (A−1)⊤
+
+inv B = A−1 A −= B⊤g B ⊤
+
+30

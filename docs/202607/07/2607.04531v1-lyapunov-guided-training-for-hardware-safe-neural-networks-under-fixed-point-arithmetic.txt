@@ -1,0 +1,486 @@
+Title: Lyapunov-Guided Training for Hardware-Safe Neural Networks Under Fixed-Point Arithmetic
+
+URL Source: https://arxiv.org/pdf/2607.04531v1
+
+Published Time: Tue, 07 Jul 2026 02:51:28 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Lyapunov-Guided Training for Hardware-Safe Neural Networks Under Fixed-Point Arithmetic 
+
+Anis Hamadouche 
+
+The School of Engineering & Physical Sciences Heriot-Watt University 
+
+Edinburgh EH14 4AS, UK anis.hamadouche@hw.ac.uk 
+
+Amir Hussain 
+
+SDAIA-KFUPM Joint Research Centre for Artificial Intelligence King Fahd University of Petroleum and Minerals 
+
+Dhahran, Saudi Arabia amir.hussain@kfupm.edu.sa 
+
+Abstract —Low-precision neural networks are attractive for resource-constrained hardware, but fixed-point arithmetic in-troduces failure modes that are often hidden by idealised quantisation models. In particular, two’s-complement overflow wrapping can corrupt hidden activations by changing both their magnitude and sign, leading to unstable numerical error prop-agation and severe accuracy degradation. This paper proposes a Lyapunov-stabilised quantisation framework for low-precision neural networks operating under hardware-style wrapping arith-metic. The hidden-state energy is monitored through a layer-wise Lyapunov function, and a monotone projection is applied to enforce bounded and non-increasing state evolution across depth. The method is evaluated on MNIST using a compact patch-based transformer under post-training quantisation and quantisation-aware training with fixed-point bit-widths from 4 to 
+
+16 bits. Monte Carlo results show that unconstrained wrapped quantisation-aware training collapses to near-chance accuracy across 6–16 bits, with activation overflow rates exceeding 11% . In contrast, the proposed monotone Lyapunov projection suppresses activation overflow to below 0.012% and restores stable low-precision learning, achieving 86 .55% ± 0.65% accuracy at 12 
+
+bits. These results demonstrate that Lyapunov-based state control can act as a hardware-aware stabilisation mechanism for reliable fixed-point neural inference and training. 
+
+Index Terms —Low-precision neural networks, quantisation-aware training, fixed-point arithmetic, overflow wrapping, Lya-punov stability, neural network safety, hardware-aware machine learning, transformer networks. 
+
+I. I NTRODUCTION 
+
+The deployment of deep neural networks on edge devices, embedded processors, field-programmable gate arrays, and custom accelerators has made low-precision arithmetic a cen-tral topic in hardware-aware machine learning. Quantisation reduces memory footprint, bandwidth, arithmetic cost, and energy consumption by representing weights, activations, or accumulators using fewer bits than conventional floating-point arithmetic. These benefits are particularly important for real-time and resource-constrained applications, where full-precision inference may be too expensive in terms of la-tency, silicon area, or power consumption. Consequently, post-training quantisation (PTQ) and quantisation-aware training (QAT) have become standard techniques for mapping neural networks onto efficient low-precision hardware [8, 11, 15]. Most quantisation studies focus on rounding error, clipping error, calibration, mixed precision, or the accuracy degradation caused by reducing the number of representable values. How-ever, practical fixed-point hardware introduces an additional failure mode: arithmetic overflow. In saturating arithmetic, an overflowed value is clipped to the largest or smallest repre-sentable value. In wrapping arithmetic, which follows two’s-complement behaviour, an overflowed value wraps around the finite integer range. This means that a large positive value may become negative, and a large negative value may become positive. Such behaviour is efficient in hardware but can be numerically destructive. In quantised neural networks, overflow in activations or accumulators can corrupt hidden-state trajectories and produce abrupt changes in the represented computation [4, 14]. This issue is especially important for deep residual and transformer-like architectures. These models can be interpreted as depth-indexed dynamical systems, where each layer updates a hidden state through a nonlinear transformation. In such a view, unstable hidden-state growth across depth is not merely a numerical inconvenience; it is a dynamical instability. If the hidden-state energy grows beyond the representable fixed-point range, overflow wrapping can produce discontinuous sign and magnitude errors. These errors may then propagate through subsequent layers, producing catastrophic degradation even when the nominal bit-width appears sufficiently large. Therefore, robust low-precision learning requires not only quantisation-aware optimisation, but also explicit control of the internal state trajectory. Lyapunov methods provide a natural framework for analysing and controlling such layerwise dynamics. A Lya-punov function assigns a non-negative scalar energy to the system state and can be used to certify boundedness or monotonic decrease along the system trajectory. Recent work has explored connections between residual networks, stability, and dynamical systems, suggesting that depth-wise stability can influence optimisation, generalisation, and robustness [2]. This motivates the use of Lyapunov-inspired constraints for low-precision neural networks: if the hidden-state energy can be kept inside a safe set, the network is less likely to enter overflow-prone regions of the fixed-point state space. In this paper, we propose a Lyapunov-stabilised quantisation framework for neural networks operating under hardware-style fixed-point wrapping arithmetic. The key idea is to monitor 1
+
+> arXiv:2607.04531v1 [cs.LG] 5 Jul 2026
+
+the normalised hidden-state energy at each layer and apply a monotone projection that enforces 
+
+V (hℓ+1 ) ≤ min {V (hℓ), V max }, (1) where V (hℓ) denotes the layerwise Lyapunov energy and Vmax 
+
+defines a safe energy threshold. Unlike a soft regularisation term alone, the projection directly constrains the hidden state and prevents the network from entering regions where fixed-point wraparound is likely to occur. In quantised models, the projection is applied after fixed-point write-back, so that quantisation-induced overflow is explicitly accounted for. The proposed method is evaluated on MNIST using acompact patch-based transformer. We compare full-precision training, PTQ, QAT, and their Lyapunov-projected counter-parts across fixed-point bit-widths from 4 to 16 bits. The experiments use signed fixed-point arithmetic with two’s-complement wrapping, rather than idealised clipping. Monte Carlo results show that unconstrained wrapped QAT collapses to near-random accuracy across 6–16 bits, with activation over-flow rates exceeding 11% . In contrast, QAT with monotone Lyapunov projection suppresses overflow to approximately zero and recovers stable low-precision learning, achieving 
+
+86 .55% ± 0.65% accuracy at 12 bits. The main contributions of this work are as follows. First, we formulate fixed-point neural-network quantisation with overflow wrapping as a hidden-state stability problem. Second, we introduce a monotone Lyapunov projection mechanism that enforces bounded and non-increasing layerwise energy. Third, we demonstrate that the proposed projection significantly improves PTQ and QAT robustness under hardware-style wrapping arithmetic. Finally, we provide empirical evidence that activation overflow, rather than bit-width alone, can be a dominant failure mode in low-precision neural networks. II. R ELATED WORK 
+
+A. Neural Network Quantisation 
+
+Quantisation is one of the main techniques for deploying neural networks on resource-constrained hardware. By re-ducing the precision of weights, activations, and sometimes intermediate accumulators, quantisation can reduce memory footprint, bandwidth, arithmetic cost, and energy consumption. Existing methods are commonly divided into PTQ (post-training quantisation) and QAT (quantisation-aware training). PTQ applies quantisation to a trained full-precision model, usually with calibration data but without full retraining. QAT, by contrast, simulates quantisation during training or fine-tuning, often using a straight-through estimator to approximate gradients through non-differentiable rounding operations. Sur-veys such as [8, 10, 11, 13] provide comprehensive overviews of uniform and non-uniform quantisation, calibration, clipping, mixed precision, and hardware-aware deployment. A particularly influential direction is integer-only inference. Jacob et al. [1] proposed a quantisation scheme that en-ables inference using integer arithmetic, showing that low-precision execution can preserve accuracy while improving hardware efficiency. This line of work has strongly influenced deployment pipelines for mobile and edge devices, where integer arithmetic is typically more efficient than floating-point computation. Subsequent work extended these ideas to more complex networks, including transformer-based models, where integer-only or mixed-precision execution is used to reduce inference cost. Most quantisation methods focus primarily on quantisation noise, rounding error, scale selection, clipping thresholds, and the mismatch between full-precision and low-precision representations. In these settings, saturation or clipping is often assumed when values exceed the representable range. However, practical fixed-width arithmetic may instead use two’s-complement wrapping, where overflowed values re-enter the representable range with altered sign and magnitude. This distinction is important because wrapping is not merely a bounded approximation error; it can introduce discontinuous state corruption. Therefore, fixed-point neural inference under wrapping arithmetic requires stability analysis beyond standard quantisation-error models. 
+
+B. Overflow-Aware and Accumulator-Aware Quantisation 
+
+Overflow has received increasing attention in low-precision neural-network deployment. In integer-based accelerators, the output of multiply–accumulate operations may require more bits than the input operands. If the accumulator width is insufficient, overflow can corrupt the computation even when weights and activations are individually representable. De Bruin et al. [6] studied quantisation for integer platforms with-out wide accumulators, highlighting the practical importance of accumulator constraints. More recently, Colbert et al. proposed A2Q (accumulator-aware quantisation), an accumulator-aware quantisation method with guaranteed overflow avoidance [14]. Their ap-proach constrains the ℓ1-norm of model weights according to derived accumulator bit-width bounds, thereby preventing accumulator overflow during inference. This work is closely related in motivation to the present paper, because both ap-proaches treat overflow as a first-order hardware failure mode rather than a minor numerical artefact. However, our focus differs in two ways. First, A2Q primar-ily targets accumulator overflow through weight constraints, whereas the present work studies activation-state overflow and hidden-state dynamics across network depth. Second, we explicitly consider two’s-complement wrapping behaviour, where overflowed values can change sign and corrupt the state trajectory. The proposed Lyapunov projection therefore acts directly on the hidden state, enforcing a safe energy set after quantised write-back. 
+
+C. Fixed-Point Arithmetic and Sound Quantised Implementa-tions 
+
+Fixed-point arithmetic is attractive for hardware because it offers predictable area, latency, and power characteristics. Nevertheless, choosing a fixed-point format requires balancing integer range, fractional precision, and overflow risk. Formal 2and verification-oriented work has studied fixed-point arith-metic from the perspective of soundness and implementa-tion correctness. Baranowski et al. [5] developed an SMT (satisfiability modulo theories) theory of fixed-point arith-metic, supporting formal reasoning about finite-word-length computations. Other work has considered mixed fixed-point quantisation with explicit overflow-freedom constraints, often using optimisation or verification methods to choose precision assignments automatically. These approaches are complementary to the proposed method. Formal methods can prove that a given implemen-tation satisfies certain numerical constraints, while mixed-precision search can allocate bit-widths across layers. In con-trast, our method modifies the network dynamics by projecting the hidden state into a Lyapunov-safe set. The goal is not only to choose a sufficient precision, but also to prevent unstable hidden-state evolution from entering overflow-prone regions of the fixed-point state space. 
+
+D. Stability Views of Deep Neural Networks 
+
+Deep residual networks and transformer-like architectures can be interpreted as depth-indexed dynamical systems. In this interpretation, each layer applies a nonlinear update to a hidden state, and the network output is obtained after a finite number of state transitions. This viewpoint has motivated the use of tools from dynamical systems, numerical analysis, and control theory to study deep-network stability. Nar and Sastry [2] analysed residual networks from a Lyapunov-stability perspective and connected residual parametrisation to stable gradient-based optimisation and gen-eralisation behaviour. Related work on neural ordinary differ-ential equations and stable neural dynamical systems has also explored how stability constraints can improve robustness and long-horizon behaviour [9, 12]. In control-oriented settings, neural Lyapunov functions have been used to certify stability or safety of learned controllers [3, 7]. The present paper adopts a similar stability viewpoint, but applies it to low-precision hardware execution. Instead of using Lyapunov functions only to analyse continuous-time dynamics or closed-loop control systems, we use a layerwise Lyapunov energy to constrain the hidden-state trajectory of a quantised neural network. This is particularly useful under fixed-point wrapping arithmetic, where unstable energy growth can lead directly to overflow-induced state corruption. 
+
+E. Positioning of This Work 
+
+Existing quantisation methods mainly address how to ap-proximate full-precision weights and activations using fewer bits. Overflow-aware methods, such as accumulator-aware quantisation, explicitly address numerical range limits but pri-marily focus on accumulator safety. Stability-oriented neural-network methods study boundedness, robustness, or conver-gence, but usually not under realistic fixed-point wrapping arithmetic. This work connects these directions by treating low-precision neural inference and training as a dynamical sta-bility problem. The proposed monotone Lyapunov projection enforces 
+
+V (hℓ+1 ) ≤ min {V (hℓ), V max }, (2) thereby bounding the layerwise hidden-state energy before overflow wrapping can dominate the computation. Unlike clipping-based quantisation, the proposed method does not simply saturate individual scalar values. Instead, it constrains the full hidden-state energy and therefore controls the state trajectory of the network across depth. The resulting framework is hardware-aware because it ex-plicitly models fixed-point write-back and two’s-complement wrapping. It is also stability-aware because it constrains the hidden-state dynamics rather than only the quantisation error. This combination distinguishes the proposed method from conventional PTQ, standard QAT, and accumulator-only overflow-avoidance techniques. III. S YSTEM MODEL AND PROPOSED METHOD 
+
+A. Depth-Indexed Neural Dynamics 
+
+Consider a neural network with L hidden layers. Let hℓ ∈
+
+RT ×D denote the hidden state at layer ℓ, where T is the number of tokens and D is the embedding dimension. For a residual or transformer-like block, the layerwise update can be written as 
+
+hℓ+1 = hℓ + Fℓ(hℓ; θℓ), ℓ = 0 , . . . , L − 1, (3) where Fℓ(·; θℓ) denotes the nonlinear transformation imple-mented by the ℓ-th block and θℓ contains the associated trainable parameters. The final prediction is obtained from 
+
+ˆy = g(hL; θg ), (4) where g(·) is the classification head. This representation treats depth as a discrete-time dynamical axis. Under this viewpoint, the hidden states 
+
+h0, h 1, . . . , h L
+
+form a state trajectory. Stability of this trajectory is important for low-precision hardware because excessive hidden-state growth can push activations outside the representable fixed-point range. In wrapping arithmetic, such an overflow does not merely clip the value; it can change the sign and magnitude of the represented state. 
+
+B. Fixed-Point Quantisation with Overflow Wrapping 
+
+We consider signed fixed-point quantisation with B total bits. The format consists of one sign bit, I integer bits, and F
+
+fractional bits, such that 
+
+B = 1 + I + F. (5) For a real-valued scalar x, the corresponding fixed-point integer is 
+
+q = round  2F x . (6) The signed integer range is 
+
+qmin = −2B−1, qmax = 2 B−1 − 1. (7) 3In saturation arithmetic, q would be clipped to the interval 
+
+[qmin , q max ]. In this work, however, we explicitly model two’s-complement wrapping. The wrapped integer is given by 
+
+qwrap =  (q − qmin ) mod 2 B  + qmin . (8) The dequantised fixed-point value is then 
+
+QB (x) = qwrap 
+
+2F . (9) Equation (8) captures hardware-style overflow. For example, in signed 8-bit integer arithmetic, 127+1 wraps to −128 , while 
+
+−128 − 1 wraps to 127 . Therefore, overflow may introduce a large discontinuity in the represented value. This moti-vates controlling the hidden-state trajectory before it enters overflow-prone regions. For a tensor hℓ, quantisation is applied elementwise: 
+
+ehℓ = QB (hℓ). (10) During quantisation-aware training, the forward pass uses 
+
+QB (·), while the backward pass uses the straight-through estimator, ∂QB (x)
+
+∂x ≈ 1. (11) 
+
+C. Layerwise Lyapunov Energy 
+
+To monitor the internal state trajectory, we define the normalised layerwise Lyapunov energy 
+
+V (hℓ) = 1
+
+T D ∥hℓ∥2 
+
+> F
+
+. (12) This energy measures the average hidden-state magnitude per token and feature dimension. A stable low-precision trajectory should remain inside a safe set 
+
+S = {h : V (h) ≤ Vmax } , (13) where Vmax > 0 is a prescribed energy threshold. The threshold is estimated from the initial token energy distribution on the training set. Let V (h0 
+
+> i
+
+) denote the initial energy of the i-th training sample. We set 
+
+Vmax = γ Quantile p
+
+ {V (h0 
+
+> i
+
+)}Ni=1 
+
+ , (14) where p ∈ (0 , 1) is a high quantile and γ > 1 is a safety margin. In the experiments, p = 0 .99 and γ = 1 .20 .
+
+D. Monotone Lyapunov Projection 
+
+The proposed method constrains the hidden-state trajectory using a monotone Lyapunov projection. Given an uncon-strained updated state zℓ+1 , we project it onto the energy ball 
+
+V (hℓ+1 ) ≤ min {V (hℓ), V max }. (15) Define the target energy 
+
+¯V ℓ+1 = min {V (hℓ), V max }. (16) The projected state is 
+
+hℓ+1 = Π ¯V ℓ+1 (zℓ+1 ) = 
+
+
+
+zℓ+1 , V (zℓ+1 ) ≤ ¯V ℓ+1 ,zℓ+1 
+
+q ¯V ℓ+1   
+
+> V(zℓ+1 )+ ϵ
+
+, V (zℓ+1 ) > ¯V ℓ+1 ,
+
+(17) where ϵ > 0 is a small numerical constant. The projection in (17) enforces 
+
+V (hℓ+1 ) ≤ ¯V ℓ+1 = min {V (hℓ), V max }. (18) Therefore, the projected trajectory satisfies 
+
+V (hℓ+1 ) ≤ V (hℓ), V (hℓ+1 ) ≤ Vmax . (19) Thus, the layerwise energy is both bounded and non-increasing across depth. 
+
+E. Quantised Lyapunov-Stabilised Forward Pass 
+
+The order of operations is important under wrapping arith-metic. If projection is applied before quantisation, then fixed-point write-back may reintroduce overflow and violate the safe-set constraint. Therefore, the proposed quantised forward pass applies projection after quantised write-back. For each layer, the unconstrained full-precision update is first computed as 
+
+zℓ+1 = hℓ + Fℓ(hℓ; θℓ). (20) The state is then quantised using wrapping arithmetic: 
+
+ezℓ+1 = QB (zℓ+1 ). (21) The Lyapunov projection is applied to the wrapped state: 
+
+hℓ+1 = Π ¯V ℓ+1 
+
+ ezℓ+1  . (22) If the projected state is written back to fixed-point memory, it is quantised again: 
+
+bhℓ+1 = QB (hℓ+1 ). (23) A repair projection may then be applied: 
+
+hℓ+1 = Π ¯V ℓ+1 
+
+bhℓ+1 
+
+, (24) which ensures that fixed-point write-back does not break the Lyapunov constraint. 
+
+F. Training Objective 
+
+Let D = {(xi, y i)}Ni=1 denote the training set. The standard task loss is the cross-entropy loss 
+
+LCE (θ) = − 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+log pθ (yi|xi). (25) For full-precision training with Lyapunov regularisation, we may use the penalised objective 
+
+L(θ) = LCE (θ) + λ
+
+> L
+
+X
+
+> ℓ=1
+
+max {0, V (hℓ) − Vmax }2 , (26) where λ ≥ 0 controls the penalty strength. For the projected models, the hard Lyapunov constraint is enforced directly by (17). In this case, the optimisation objective remains 
+
+min  
+
+> θ
+
+LCE (θ), (27) subject to the layerwise projected dynamics 
+
+hℓ+1 = Π ¯V ℓ+1 
+
+ QB
+
+ hℓ + Fℓ(hℓ; θℓ) . (28) 4Algorithm 1 Quantised Monotone Lyapunov Forward Pass 
+
+Require: Input h0, parameters {θℓ}L−1 
+
+> ℓ=0
+
+, bit-width B, safe threshold Vmax  
+
+> 1:
+
+for ℓ = 0 , . . . , L − 1 do  
+
+> 2:
+
+Compute unconstrained update: 
+
+zℓ+1 = hℓ + Fℓ(hℓ; θℓ) 
+
+> 3:
+
+Apply fixed-point wrapping: 
+
+ezℓ+1 = QB (zℓ+1 ) 
+
+> 4:
+
+Set target energy: 
+
+¯V ℓ+1 = min {V (hℓ), V max } 
+
+> 5:
+
+Project onto the Lyapunov-safe set: 
+
+hℓ+1 = Π ¯V ℓ+1 
+
+ ezℓ+1  
+
+> 6:
+
+Quantise projected state for write-back: 
+
+bhℓ+1 = QB (hℓ+1 ) 
+
+> 7:
+
+Repair projection: 
+
+hℓ+1 = Π ¯V ℓ+1 
+
+bhℓ+1  
+
+> 8:
+
+end for  
+
+> 9:
+
+return hL
+
+G. Overflow and Stability Metrics 
+
+To quantify the behaviour of each model, we report ac-curacy, loss, maximum layerwise energy, mean state change, projection rate, and activation overflow rate. The maximum energy is 
+
+V obs max = max  
+
+> ℓ
+
+V (hℓ). (29) The mean layerwise state change is 
+
+∆mean = 1
+
+L
+
+> L−1
+
+X
+
+> ℓ=0
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+r 1
+
+T D ∥hℓ+1  
+
+> i
+
+− hℓi ∥2 
+
+> F
+
+. (30) The projection rate at layer ℓ is the fraction of samples for which 
+
+V (ezℓ+1 ) > ¯V ℓ+1 .
+
+The activation overflow rate is the fraction of fixed-point activation values for which 
+
+q < q min or q > q max 
+
+before wrapping is applied. IV. E XPERIMENTAL RESULTS 
+
+We evaluate the proposed Lyapunov-stabilised low-precision transformer on the MNIST classification task. The network is a compact patch-based transformer in which each 28 × 28 
+
+image is divided into non-overlapping 7 × 7 patches, pro-ducing 16 tokens per image. Each token is embedded into a 64 -dimensional representation and processed by a 4-layer transformer-like stack. The classifier is applied to the mean-pooled final token representation. The experiments compare full-precision training, post-training quantisation, and quantisation-aware training under signed fixed-point arithmetic. The fixed-point format uses B
+
+total bits, consisting of one sign bit, a fixed number of integer bits, and the remaining fractional bits. Unless otherwise stated, the weight format uses one integer bit and the activation format uses two integer bits. The quantised integer is computed as 
+
+q = round  x2F  , (31) where F is the number of fractional bits. To emulate hardware overflow, signed two’s-complement wrapping is used: 
+
+qwrap =  (q − qmin ) mod 2 B  + qmin , (32) where qmin = −2B−1. The dequantised value is then 
+
+ˆx = qwrap 
+
+2F . (33) This differs from idealised clipping or saturation because overflow may change both the magnitude and sign of the represented value. For Lyapunov monitoring, we define the normalised hidden-state energy 
+
+V (hℓ) = 1
+
+T D ∥hℓ∥2 
+
+> F
+
+, (34) where T is the number of tokens and D is the embedding dimension. The monotone Lyapunov projection enforces 
+
+V (hℓ+1 ) ≤ min V (hℓ), V max , (35) where Vmax is estimated from the 0.99 -quantile of the initial training-set token energy with a safety margin of 1.20 . In the quantised projected models, the state is first quantised using wrapping arithmetic and then projected. An additional repair projection is applied after quantised write-back to prevent fixed-point write-back from violating the Lyapunov constraint. All reported results are averaged over three Monte Carlo runs with different random seeds. The training set contains 
+
+10 ,000 images, the validation set 2,000 images, and the test set 2,000 images. The full-precision models are trained for 
+
+5 epochs using AdamW with learning rate 2 × 10 −3, while quantisation-aware fine-tuning uses learning rate 5 × 10 −4.The bit-width sweep considers 
+
+B ∈ { 4, 6, 8, 10 , 12 , 16 }.
+
+5TABLE I MNIST M ONTE CARLO RESULTS UNDER FIXED -POINT WRAPPING ARITHMETIC . R ESULTS ARE REPORTED AS MEAN ± STANDARD DEVIATION OVER THREE RUNS .Model Bits Accuracy (%) Test Loss Max. Energy Projection Rate (%) Activation Overflow (%) FP32 – 89 .15 ± 0.64 0.3491 6.2634 0.00 0.000 FP32 + Monotone – 86 .95 ± 0.85 0.4363 0.3595 99.98 0.000 PTQ Wrap 4 11 .35 ± 1.55 2.2798 0.1417 0.00 0.000 PTQ Wrap 6 64 .65 ± 5.03 1.0080 3.8393 0.00 0.832 PTQ Wrap 8 74 .77 ± 4.09 0.7783 3.7592 0.00 0.796 PTQ Wrap 12 75 .37 ± 3.49 0.7656 3.7467 0.00 0.793 PTQ Wrap + Monotone 4 12 .50 ± 1.78 2.2659 0.1233 99.78 0.000 PTQ Wrap + Monotone 6 80 .83 ± 0.84 0.6709 0.3800 99.98 0.041 PTQ Wrap + Monotone 8 84 .10 ± 2.18 0.5420 0.3602 99.95 0.039 PTQ Wrap + Monotone 12 84 .02 ± 1.95 0.5408 0.3587 99.96 0.040 QAT Wrap 4 10 .25 ± 1.54 2.3037 0.0023 0.00 0.000 QAT Wrap 6 11 .60 ± 0.79 2.4504 5.5541 0.00 11.719 QAT Wrap 8 10 .88 ± 1.26 2.4365 5.4734 0.00 13.922 QAT Wrap 12 9.87 ± 0.39 2.5169 5.4968 0.00 13.638 QAT Wrap + Monotone 4 10 .25 ± 1.54 2.3037 0.0023 0.05 0.000 QAT Wrap + Monotone 6 82 .40 ± 4.32 0.5482 0.4585 100.00 0.012 QAT Wrap + Monotone 8 85 .80 ± 2.24 0.4694 0.3907 99.97 0.008 QAT Wrap + Monotone 12 86 .55 ± 0.65 0.4426 0.3714 99.99 0.009 
+
+A. Results and Discussion 
+
+Table I summarises the Monte Carlo test results. The full-precision baseline achieves the highest accuracy, 89 .15% ±
+
+0.64% , but its hidden-state energy grows substantially, reach-ing a maximum normalised energy of 6.2634 . By contrast, the full-precision model with monotone Lyapunov projection achieves 86 .95% ± 0.85% , while reducing the maximum energy to 0.3595 . Hence, the Lyapunov constraint introduces a modest accuracy cost of approximately 2.2 percentage points, but reduces the maximum hidden-state energy by about 17 .4×.The post-training quantisation results show that wrapping arithmetic degrades the unconstrained model, especially at low precision. At 4 bits, PTQ collapses to 11 .35% ± 1.55% ,close to random guessing. Increasing the precision to 6 bits improves accuracy to 64 .65% ± 5.03% , while 8–16 bits reach approximately 75% . However, even at high precision, unconstrained PTQ remains well below the FP32 baseline and exhibits nonzero activation overflow of approximately 0.79% .Adding monotone Lyapunov projection significantly im-proves PTQ robustness. At 6 bits, PTQ with monotone pro-jection increases accuracy from 64 .65% to 80 .83% , while re-ducing the maximum energy from 3.8393 to 0.3800 . At 8 and 
+
+12 bits, the projected PTQ models reach approximately 84% 
+
+accuracy and suppress activation overflow to about 0.04% .This indicates that energy-bounded state evolution reduces the probability of entering overflow-prone regions of the fixed-point dynamic range. The most important behaviour appears in the QAT exper-iments. Unconstrained wrapped QAT fails across 6–16 bits, remaining close to chance-level accuracy despite increasing precision. For example, QAT Wrap at 8 bits achieves only 
+
+10 .88% ± 1.26% accuracy and exhibits 13 .922% activation overflow. Similar behaviour occurs at 10 , 12 , and 16 bits. This shows that the failure is not simply insufficient bit-width; rather, the learned dynamics enter regions where fixed-point wrapping corrupts the sign and magnitude of hidden activations. In contrast, QAT with monotone Lyapunov projection re-mains stable and trainable. At 6 bits, QAT Wrap + Monotone achieves 82 .40% ± 4.32% accuracy while reducing activation overflow to 0.012% . At 8 bits, it reaches 85 .80% ± 2.24% ,and at 12 bits it achieves the best projected QAT result of 
+
+86 .55% ±0.65% , with only 0.009% activation overflow. These results demonstrate that monotone Lyapunov projection acts as a hardware-aware stabilisation mechanism: it prevents the hidden state from entering overflow-prone regions and thereby avoids catastrophic two’s-complement wraparound. The 4-bit case behaves differently. Both QAT Wrap and QAT Wrap + Monotone remain near chance accuracy, but their activation overflow is essentially zero and the maximum energy is only 0.0023 . This indicates representation collapse rather than overflow instability. In other words, 4-bit precision is too coarse for the chosen fixed-point format and model configuration; the hidden states are quantised into a near-degenerate representation before overflow becomes the domi-nant failure mode. Overall, the results support three conclusions. First, stan-dard FP32 training provides the best unconstrained accuracy but allows substantial hidden-state energy growth. Second, hardware-style wrapping is a severe failure mode for low-precision transformer dynamics; unconstrained wrapped QAT collapses to chance-level accuracy even at high bit-widths 64 6 8 10 12 14 16 
+
+Total fixed-point bits 
+
+> 10 1
+> Test accuracy (%)
+> PTQ Wrap
+> PTQ Wrap + Monotone
+> QAT Wrap
+> QAT Wrap + Monotone
+
+Fig. 1. MNIST test accuracy versus fixed-point bit-width under hardware-style wrapping. Monotone Lyapunov projection substantially improves both PTQ and QAT robustness, particularly in the 6–12 -bit range. 4 6 8 10 12 14 16 
+
+Total fixed-point bits 
+
+> 10 0
+> 4 × 10 −1
+> 6 × 10 −1
+> 2 × 10 0
+> Test loss  PTQ Wrap
+> PTQ Wrap + Monotone
+> QAT Wrap
+> QAT Wrap + Monotone
+
+Fig. 2. Test loss versus fixed-point bit-width. Unconstrained wrapped QAT remains close to chance-level loss, whereas monotone projection restores stable optimisation. 
+
+because overflow corrupts the hidden states. Third, monotone Lyapunov projection restores stable fixed-point learning by bounding the hidden-state energy and suppressing activation overflow. The best projected QAT result is obtained at 12 bits, where the model achieves 86 .55% ±0.65% accuracy with only 
+
+0.009% activation overflow. V. C ONCLUSION 
+
+This paper investigated the stability of low-precision neural networks under realistic fixed-point arithmetic with two’s-complement overflow wrapping. Unlike idealised clipping or saturation models, wrapping arithmetic can map large positive values to negative values, and vice versa, thereby corrupting the hidden-state dynamics of a neural network. To address this problem, we introduced a Lyapunov-based monitoring and projection mechanism that constrains the normalised hidden-state energy across network depth. In particular, the monotone projection enforces 
+
+V (hℓ+1 ) ≤ min {V (hℓ), V max },4 6 8 10 12 14 16 
+
+Total fixed-point bits 
+
+> 10 −2
+> 10 −1
+> 10 0
+> Maximum energy  Vmax
+> PTQ Wrap
+> PTQ Wrap + Monotone
+> QAT Wrap
+> QAT Wrap + Monotone
+
+Fig. 3. Maximum layerwise Lyapunov energy versus bit-width. The proposed monotone projection keeps the hidden-state energy bounded across the quan-tisation sweep. 4 6 8 10 12 14 16 
+
+Total fixed-point bits 
+
+> 10 −9
+> 10 −7
+> 10 −5
+> 10 −3
+> 10 −1
+> 10 1
+> Activation overflow (%)
+> PTQ Wrap
+> PTQ Wrap + Monotone
+> QAT Wrap
+> QAT Wrap + Monotone
+
+Fig. 4. Activation overflow rate versus fixed-point bit-width. Unconstrained wrapped QAT exhibits severe overflow, while monotone Lyapunov projection suppresses overflow to near-zero levels. 
+
+thereby ensuring bounded and non-increasing layerwise en-ergy. The MNIST experiments demonstrate that hidden-state en-ergy growth is a major source of failure in low-precision wrapped arithmetic. The unconstrained full-precision model achieved 89 .15% ± 0.64% accuracy, but exhibited a maximum normalised hidden-state energy of 6.2634 . Applying monotone Lyapunov projection reduced the maximum energy to 0.3595 ,with a modest accuracy reduction to 86 .95% ± 0.85% . This confirms that the proposed constraint provides a meaningful stability–accuracy trade-off. The most significant gains were observed under quantisation-aware training with wrapping arithmetic. Without Lyapunov projection, wrapped QAT collapsed to near-chance performance across 6–16 bits, with activation overflow rates between approximately 11 .7% and 13 .9% . This shows that increasing bit-width alone does not necessarily prevent failure when the internal dynamics remain unconstrained. By contrast, QAT with monotone Lyapunov projection suppressed activation overflow to almost zero and restored 74 6 8 10 12 14 16      
+
+> Total fixed-point bits
+> 10 −9
+> 10 −7
+> 10 −5
+> 10 −3
+> 10 −1
+> 10 1
+> Projected samples (%)
+> PTQ Wrap
+> PTQ Wrap + Monotone
+> QAT Wrap
+> QAT Wrap + Monotone Fig. 5. Projection rate across the quantisation sweep. The high projection rate indicates that the Lyapunov constraint is actively enforcing a safe hidden-state set throughout the network. 01234
+> Layer / state index
+> 10 −1
+> 10 0
+> Normalised energy  V(hℓ) FP32
+> FP32 + Monotone
+> PTQ 4b
+> PTQ+Mono 4b
+> PTQ 8b
+> PTQ+Mono 8b
+> PTQ 16b
+> PTQ+Mono 16b
+> Fig. 6. Representative layerwise Lyapunov energy curves. The unconstrained models permit energy growth across depth, whereas monotone projection enforces bounded depth-wise dynamics.
+
+stable learning. The best result was obtained at 12 bits, where the projected model achieved 86 .55% ± 0.65% accuracy with only 0.009% activation overflow. These findings suggest that Lyapunov-based projection can serve as a hardware-aware safety mechanism for low-precision neural networks. Rather than treating quantisation error only as a numerical approximation problem, the proposed approach views low-precision inference and training as a dynamical stability problem. By constraining the hidden-state trajectory, the method prevents the network from entering overflow-prone regions of the fixed-point state space. Future work will extend the analysis to larger datasets, deeper transformer architectures, and hardware-in-the-loop FPGA or ASIC implementations. Further work will also investigate adaptive thresholds, layer-dependent safe sets, and joint optimisation of accuracy, energy consumption, overflow probability, and Lyapunov stability margins. 1.0 1.5 2.0 2.5 3.0 3.5 4.0  
+
+> Layer transition
+> 10 −1
+> 10 0
+> Mean state change  ‖hℓ + 1  − hℓ‖
+> FP32
+> FP32 + Monotone
+> PTQ 4b
+> PTQ+Mono 4b
+> PTQ 8b
+> PTQ+Mono 8b
+> PTQ 16b
+> PTQ+Mono 16b
+> Fig. 7. Representative layerwise state-change curves. Projection reduces the magnitude of inter-layer perturbations, indicating more controlled hidden-state evolution under fixed-point arithmetic.
+
+REFERENCES 
+
+[1] Benoit Jacob et al. “Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference”. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition . 2018, pp. 2704–2713. [2] Kamil Nar and Shankar Sastry. “Residual Networks: Lyapunov Stability and Convex Decomposition”. In: 
+
+arXiv preprint arXiv:1803.08203 (2018). [3] Spencer M. Richards, Felix Berkenkamp, and Andreas Krause. “The Lyapunov Neural Network: Adaptive Sta-bility Certification for Safe Learning of Dynamical Systems”. In: Proceedings of the Conference on Robot Learning . 2018, pp. 466–476. [4] Marek Baranowski et al. “An SMT Theory of Fixed-Point Arithmetic”. In: International Joint Conference on Automated Reasoning . 2020. [5] Marek Baranowski et al. “An SMT Theory of Fixed-Point Arithmetic”. In: International Joint Conference on Automated Reasoning . Springer. 2020, pp. 13–31. [6] Bas de Bruin, Zoran Zivkovic, and Henk Corpo-raal. “Quantization of Deep Neural Networks for Accumulator-Constrained Processors”. In: Journal of Systems Architecture 105 (2020), p. 101716. [7] Hongkai Dai et al. “Lyapunov-Stable Neural-Network Control”. In: arXiv preprint arXiv:2109.14152 (2021). [8] Amir Gholami et al. “A Survey of Quantization Meth-ods for Efficient Neural Network Inference”. In: arXiv preprint arXiv:2103.13630 (2021). [9] Qiyu Kang et al. “Stable Neural ODE with Lyapunov-Stable Equilibrium Points for Defending Against Ad-versarial Attacks”. In: Advances in Neural Information Processing Systems . Vol. 34. 2021, pp. 14925–14937. [10] Markus Nagel et al. “A White Paper on Neural Network Quantization”. In: arXiv preprint arXiv:2106.08295 
+
+(2021). 8[11] Olivia Weng. “Neural Network Quantization for Ef-ficient Inference: A Survey”. In: arXiv preprint arXiv:2112.06126 (2021). [12] Ivan Dario Jimenez Rodriguez, Aaron D. Ames, and Yisong Yue. “LyaNet: A Lyapunov Framework for Training Neural ODEs”. In: International Conference on Machine Learning . 2022, pp. 18687–18703. [13] Babak Rokh, Arash Azarpeyvand, and Alireza Khantey-moori. “A Comprehensive Survey on Model Quanti-zation for Deep Neural Networks”. In: arXiv preprint arXiv:2205.07877 (2022). [14] Ian Colbert et al. “A2Q: Accumulator-Aware Quanti-zation with Guaranteed Overflow Avoidance”. In: Pro-ceedings of the IEEE/CVF International Conference on Computer Vision . 2023, pp. 16989–16998. [15] L. Wei et al. “Advances in the Neural Network Quan-tization”. In: Applied Sciences 14.17 (2024), p. 7445. 9

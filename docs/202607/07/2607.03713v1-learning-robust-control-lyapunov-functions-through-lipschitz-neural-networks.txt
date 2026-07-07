@@ -1,0 +1,2233 @@
+Title: Learning Robust Control Lyapunov Functions through Lipschitz Neural Networks
+
+URL Source: https://arxiv.org/pdf/2607.03713v1
+
+Published Time: Tue, 07 Jul 2026 01:27:43 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+> IEEE TRANSACTIONS AND JOURNALS TEMPLATE 1
+
+# Learning Robust Control Lyapunov Functions through Lipschitz Neural Networks 
+
+Shiqing Wei, Graduate Student Member, IEEE, Prashanth Krishnamurthy, Member, IEEE, 
+
+and Farshad Khorrami, Fellow, IEEE 
+
+Abstract — This work presents a novel framework for learning robust control Lyapunov functions and stabilizing controllers for nonlinear dynamical systems subject to ad-ditive disturbances upper bounded by a state-dependent function. We leverage recent advances in Lipschitz neural networks to jointly learn both the Lyapunov functions and state-feedback controllers. We establish explicit bounds on the Hessian and third-order derivatives of these neu-ral networks in the spectral norm, and introduce a GPU-friendly branch-and-bound algorithm that utilizes higher-order bounds to significantly accelerate the verification of the Lyapunov conditions. Finally, we validate the proposed approach through extensive simulations on six different dynamical systems. 
+
+Index Terms — Stability of nonlinear systems, neural net-works, robust control, computer-aided control design 
+
+I. I NTRODUCTION 
+
+# STABILITY analysis of dynamical systems is crucial for controlling nonlinear systems where linear approxima-tions are insufficient. In many scenarios, model mismatch or external disturbances may exist and necessitate robust control strategies, e.g., a robotic manipulator operating in an environment with unpredictable loads and friction variations. Lyapunov functions are a foundational tool in the stability analysis of dynamical systems [1]. They offer a sufficient condition for the stability of a nonlinear system by designing a positive definite scalar function that decreases along solution trajectories, which enables characterization of the forward invariant region (or region of attraction) and robustification of control designs. While converse theorems guarantee the existence of a suitable Lyapunov function given certain sta-bility properties of the system [2], these results are typically non-constructive in nature. Consequently, extensive research has focused on constructing Lyapunov functions using both analytical [3] and computational methods [4]. Numerous computational methods have been investigated since the 1950s. Zubov introduced a specific Lyapunov func-tion as the solution to a first-order partial differential equa-
+
+This work was supported in part by ARO grants W911NF-21-1-0155 and W911NF-22-1-0028 and by the New York University Abu Dhabi (NYUAD) Center for Artificial Intelligence and Robotics (CAIR), funded by Tamkeen under the NYUAD Research Institute Award CG010. Shiqing Wei, Prashanth Krishnamurthy, and Farshad Khorrami are with Control/Robotics Research Laboratory, Electrical and Com-puter Engineering Department, Tandon School of Engineering, New York University, Brooklyn, NY 11201, USA. E-mail: {shiqing.wei, prashanth.krishnamurthy, khorrami }@nyu.edu. 
+
+tion (now known as Zubov’s equation) whose solutions are computed using series expansions and other techniques [5], [6]. Later, Linear Programming (LP) methods were used to compute Lyapunov functions, first for switched linear systems [7] and subsequently for nonlinear systems [8]. Since the 1990s, significant effort has been dedicated to Linear Matrix Inequality (LMI) methods [9] for nonlinear systems, which paved the way for a variety of techniques based on sums-of-squares (SOS) approaches [10]–[12]. However, the automatic construction of Lyapunov functions for general nonlinear systems remains an open question [4]. Advances in computational hardware and deep learning frameworks have led many researchers to construct (control) Lyapunov functions for nonlinear systems using neural net-works—a line of inquiry that also allows the joint learning of a state-feedback controller for a control system. Unlike earlier computational methods, this approach requires a for-mal verification of the Lyapunov conditions. Since Lyapunov functions are not necessarily convex [13], this verification gen-erally involves solving nonconvex optimization problems. For continuous-time systems, recent work has utilized Satisfiability Modulo Theories (SMT) solvers such as dReal [14]–[16] and Z3 [17]. Some other works use specific parameterization of the dynamics to bypass the verification of the Lyapunov function [18], [19]. In the discrete-time setting, optimization-based techniques have been employed [20], [21]. In these studies, the neural networks use ReLU or leaky ReLU activation functions, which enable mixed-integer linear programming (MILP). In [22], bound propagation techniques such as α, β -CROWN [23] are adopted to verify the learned Lyapunov function and controller without considering external disturbances. Although recent research has shown that neural networks can effectively compute Lyapunov functions and feedback controllers, their robustness to external disturbances remains largely unexplored. For example, the studies in [14], [16], [20], [21] assume exact dynamics without disturbances. In the following, we highlight some closely related works. In [24], the authors develop a learning framework to learn Lyapunov-barrier functions for control-affine systems with affine dependence in the uncertain parameters, although with-out formal verification. In [15], the authors tackle a scenario with partially known dynamics by first learning the system dynamics before proceeding to learn the Lyapunov function and controller. The work [25] considers input-to-state stabil-ity (ISS) Lyapunov functions and qualitatively examines the  
+
+> arXiv:2607.03713v1 [eess.SY] 4 Jul 2026 2IEEE TRANSACTIONS AND JOURNALS TEMPLATE
+
+robustness of the learned controller to Gaussian noise. In contrast, we learn a robust Lyapunov function and a state-feedback controller for nonlinear control systems with additive disturbances upper bounded by a function of the state in continuous time. Accounting for such disturbances introduces additional challenges. First, the Lyapunov condition must be reformulated, which complicates the verification process. Sec-ond, the Lyapunov function must decrease uniformly across all admissible disturbances, making both training and verification significantly more demanding. We also notice that the choice of neural networks in existing works relies heavily on the capability of the verification method. For instance, the works [14]–[16] use neural networks of two layers. Since Lyapunov functions can be scaled by a positive constant without affecting the stability analysis, we employ Lipschitz neural networks (LNNs) [26]–[28] to learn both Lyapunov functions and state-feedback controllers. In our approach, we derive bounds on the Hessian and third-order derivatives of LNNs with respect to their input. The key motivation is that Lyapunov conditions involve nonlinear expressions, and methods based only on zeroth- or first-order information typically lead to overly conservative bounds. By incorporating Hessian and third-order derivative bounds through higher-order Taylor expansions, we obtain tighter bounds on the network output, which directly enhances the precision and effectiveness of the verification process. Building on this insight, we introduce a branch-and-bound (BnB) algorithm to verify the Lyapunov functions. Compared to dReal [29], which uses only zeroth-order infor-mation and runs solely on CPUs, our BnB algorithm supports higher-order bounds and batch evaluation on GPUs. 
+
+Our contributions: (1) We propose a novel framework to learn robust control Lyapunov functions and stabilizing state-feedback controllers for nonlinear control systems through LNNs. (2) We establish bounds on the input Hessian and third-order derivative of LNNs in the spectral norm, pro-viding tighter bounds than zeroth- or first-order information. (3) Building on these higher-order bounds, we develop a GPU-friendly branch-and-bound-based verification algorithm that significantly reduces the verification time of the learned Lyapunov functions. We establish the worst-case time com-plexity and validate our approach through simulations on six different dynamical systems, including the inverted pendulum, the unicycle path following example, a third-order system, the cartpole, the 2D quadrotor, and the SCARA arm. 
+
+II. N OTATIONS 
+
+Let R denote real numbers and Dn 
+
+> ++
+
+the set of n×n positive definite diagonal matrices. ∥·∥ p is the ℓp norm of a vector or the induced norm of a matrix. I is the identity matrix. diag( ·)
+
+takes a vector as input and returns a diagonal matrix with that vector on the diagonal. A class Ck function is a function that has a continuous k-th order derivative. A class K function 
+
+α : [0 , a ) → [0 , ∞) is a continuous strictly increasing function with α(0) = 0 . For a C1 function h : Rn → R, its gradient 
+
+∇h is a column vector while the partial derivative ∂h ∂x is a row vector. For a C1 function f : Rn → Rm, ∂f ∂x is an m×n matrix. For a set A, ∂A denotes the boundary of A, and int( A) the interior of A. Denote by Bp(a, r ) ⊂ Rn the ℓp ball centered at 
+
+a ∈ Rn with a radius of r > 0. 1A(·) is the indicator function, and 1A(x) = 1 if x ∈ A and 1A(x) = 0 otherwise. For two matrices A and B of the same dimension, ⊙ represents the Hadamard product and (A ⊙ B)ij = Aij Bij . For x ∈ R, ⌈x⌉
+
+returns the least integer greater than or equal to x.
+
+III. P RELIMINARIES 
+
+Many neural networks can be seen as a sequential compo-sition of different layers. We briefly introduce a generalized class of neural network layers with a prescribed Lipschitz constant. First, recall the definition of Lipschitz continuity. 
+
+Definition 1: A function ϕ : Rn → Rm is Lipschitz continuous (or γ-Lipschitz), if there exists a positive real constant γ such that for all x1, x 2 ∈ Rn
+
+∥ϕ(x1) − ϕ(x2)∥2 ≤ γ∥x1 − x2∥2. (1) The smallest γ such that (1) holds is called the Lipschitz constant of ϕ, which is denoted by Lip( ϕ).Denote by hin ∈ Rnin and hout ∈ Rnout the input and output of a certain layer, respectively. A generalized neural network layer can be formulated as 
+
+hout = U σ (W h in + b) (2) where U ∈ Rnout ×nout and W ∈ Rnout ×nin are weight matrices, b is the bias vector, and σ : R → R is a C0 activation function (applied element-wise) with slope restricted to [0 , 1] .Examples of such activation functions include the softplus 
+
+σ(x) = log(1 + ex), the sigmoid σ(x) = 1 /(1 + e−x), the hyperbolic tangent σ(x) = tanh( x), the rectified linear unit (ReLU) σ(x) = max(0 , x ), etc. Several representative parameterizations have been proposed in the literature to rigorously enforce this 1-Lipschitz property during training:  
+
+> •
+
+Spectral Normalization [26]: Sets U = I and W =
+
+fW / ∥fW ∥2, where fW ∈ Rnout ×nin is a standard weight matrix and ∥fW ∥2 is its spectral norm;  
+
+> •
+
+Orthogonal Layers [27]: Sets U = I and parameterizes 
+
+W to be semi-orthogonal (i.e., W ⊤W = I or W W ⊤ =
+
+I, yielding ∥W ∥2 = 1 ) through the Cayley transform;  
+
+> •
+
+Sandwich Layers [28]: Sets U = √2A⊤Ψ and W =√2Ψ −1B, where Ψ = diag([ ev1 , . . . , e vnout ]) ∈ Dnout  
+
+> ++
+
+is a learnable diagonal scaling matrix, A ∈ Rnout ×nout and 
+
+B ∈ Rnout ×nin parameterized also through the Cayley transform in [27] such that AA ⊤ + BB ⊤ = I.Building upon this generalized layer, we consider the fol-lowing LNN with L ≥ 2 layers: 
+
+h(0) = √γx, (3a) 
+
+h(ℓ) = U (ℓ)σ(ℓ)
+
+W (ℓ)h(ℓ−1) + b(ℓ)
+
+| {z }
+
+> z(ℓ)
+
+
+
+, ℓ = 1 , ..., L − 1,
+
+(3b) 
+
+F (x) def 
+
+= h(L) = √γW (L)h(L−1) (3c) where γ > 0 defines the global Lipschitz bound of the net-work. The L − 1 hidden layers defined in (3b) are 1-Lipschitz layers parameterized via any of the methods discussed above, AUTHOR et al. : TITLE 3
+
+and the final linear layer defined in (3c) satisfies ∥W (L)∥2 ≤ 1.Denote by nℓ the dimension of h(ℓ) (for ℓ = 0 , ..., L ) with 
+
+n0 = nx. Note that x and h(L) are the input and output of this neural network, respectively, and we have omitted the dependence of h(ℓ) (for ℓ = 0 , ..., L ) on x in (3) for brevity. The shorthand notation z(ℓ) is used for later analysis. To enforce the equilibrium condition required for Lyapunov analysis, we define the final network output as: 
+
+ˆF (x) def 
+
+= F (x) − F (0) . (4) Because F (x) is constructed to be γ-Lipschitz [30, Sec-tion 3.2], it trivially follows that the shifted network ˆF (x)
+
+is also γ-Lipschitz and satisfies ˆF (0) = 0 .
+
+IV. L EARNING OF ROBUST CONTROL LYAPUNOV 
+
+FUNCTIONS 
+
+A. Robust Control Lyapunov Functions 
+
+Consider the following dynamical system 
+
+˙x = f (x, u ) + Gd (t, x ) (5) where x ∈ X ⊂ Rnx is the state, u ∈ U ⊂ Rnu the control input, and X and U are compact subsets of Rnx and Rnu ,respectively. We assume that f : Rnx × Rnu → Rnx is a 
+
+C2 function in x and u, and there exists u0 ∈ U such that 
+
+f (0 , u 0) = 0 . The function d : R × Rnx → Rnd represents a disturbance signal that can be time- and state-dependent, and we assume that ∥d(t, x )∥2 ≤ ϵ(x) where ϵ : Rnx → R+ is known and Lipschitz continuous in x. The matrix G ∈ Rnx×nd
+
+specifies the channel of the disturbance signal d(t, x ). We are interested in finding a state-feedback controller π : Rnx →
+
+Rnu that stabilizes (5). The closed-loop system is 
+
+˙x = f (x, π (x)) + Gd (t, x ) def 
+
+= fcl (t, x ). (6) Recall the definition of uniform ultimate boundedness: 
+
+Definition 2 (Definition 4.6 [31]): The solution to (6) is said to be uniformly ultimately bounded (UUB) if there exist two positive constants b and c (both independent of t0) such that, for any a ∈ (0 , c ), there exists T = T (a, b ) ≥ 0
+
+(independent of t0) such that 
+
+∥x(t0)∥2 ≤ a ⇒ ∥ x(t)∥2 ≤ b, ∀t ≥ t0 + T. (7) In addition, b is referred to as the ultimate bound. Next, we introduce the definition of robust control Lyapunov functions used in this work. 
+
+Definition 3: Let D ⊂ Rnx be a domain containing the origin and V : D → R a C1 function. V is a robust control Lyapunov function (RCLF) for the system (6) if there exists 
+
+μ > 0 such that: 1) there exists Vr > 0 such that B2(0 , μ ) ⊂ ΩVr ⊂ D
+
+where ΩVr = {x ∈ Rnx | V (x) ≤ Vr }.2) there exist class K functions α1 and α2, and a Lipschitz continuous positive definite function ω such that for all 
+
+t ≥ t0 and x ∈ Dα1(∥x∥2) ≤ V (x) ≤ α2(∥x∥2), (8a) 
+
+˙V (t, x ) def 
+
+= ∂V ∂x (x)fcl (t, x ) ≤ − ω(x), ∀∥ x∥2 ≥ μ. 
+
+(8b) The following properties hold for an RCLF. 
+
+Property 1: If V is an RCLF for system (6), then ΩVr =
+
+{x ∈ Rnx | V (x) ≤ Vr } is forward invariant. 
+
+Proof: As ˙V (t, x ) < 0 on D\B2(0 , μ ) by (8b) and 
+
+B2(0 , μ ) ⊂ ΩVr (by the first condition of Definition 3), we know that ˙V (t, x ) < 0 on ∂ΩVr . Therefore, ΩVr is forward invariant by Nagumo’s Theorem [32, Theorem 4.7]. 
+
+Property 2: If V is an RCLF for system (6), then the solution to (6) is UUB with c = α−12 (Vr ) and 
+
+b =
+
+(
+
+α−11 (α2(μ)) , if c > α −11 (α2(μ)) ,α−11 (Vr ), otherwise . (9) 
+
+Proof: Let x(t0) be the initial state of (6), and define c =
+
+α−12 (Vr ), b1 = α−11 (α2(μ)) , and b2 = α−11 (Vr ). From (8a), we have α1(μ) ≤ α2(μ), which implies μ ≤ α−11 (α2(μ)) = b1.Moreover, (8a) ensures that V (x) ≤ α2(c) = Vr for all 
+
+∥x∥2 ≤ c, so B2(0 , c ) ⊂ ΩVr . If c > b 1, then μ ≤ b1 < c , and thus B2(0 , μ ) ⊂ B2(0 , b 1) ⊂ B2(0 , c ) ⊂ ΩVr . Next, we dis-tinguish two cases. If V (x(t0)) ≤ α2(μ), then (7) holds with 
+
+T = 0 and b = b1, because {x ∈ Rnx | V (x) ≤ α2(μ)}, which contains B2(0 , μ ), is forward invariant by (8b). Consequently, 
+
+∥x(t)∥2 ≤ b1 for all t ≥ t0. Otherwise, V (x(t0)) > α 2(μ).Take k = min x∈A ω(x) with A = {x ∈ ΩVr | ∥ x∥2 ≥ μ}.Then, V (x(t)) ≤ V (x(t0)) − k(t − t0) holds on A by (8b), which shows that V (x(t)) must decrease to α2(μ) within the time interval [t0, t 0 + T ] with T = ( V (x(t0)) − α2(μ)) /k . On the other hand, if c ≤ b1, then from the forward invariance of 
+
+ΩVr by Property 1, (7) holds with T = 0 and b = b2. This concludes the proof. 
+
+Property 3: If V is an RCLF for system (6), then κV is also an RCLF for system (6) for any κ > 0.
+
+Proof: It suffices to replace Vr with κV r in the first condition of Definition 3, and α1, α2, and ω with κα 1, κα 2,and κω , respectively, in the second condition. Property 3 implies that, on a bounded domain, it is possible to limit the Lipschitz constant of an RCLF. In the following, we will use neural networks to learn an RCLF and a stabilizing state-feedback controller. 
+
+Remark 1: In the absence of disturbances, setting μ = 0 
+
+in Definition 3 reduces our formulation to the standard CLF. In this case, the UUB result in Property 2 strengthens to asymptotic stability, thereby recovering the classical CLF framework (e.g., [33], [31, Theorem 4.8]) and connecting directly to prior neural CLF approaches (e.g., [14]). 
+
+B. Learning Algorithm  
+
+> 1) Setup:
+
+We use LNNs to train an RCLF and a stabilizing controller. Let Vθ1 be a shifted LNN defined in (4) for the RCLF, and denote by LV and γV the number of layers and Lipschitz bound of Vθ1 , respectively. The activation functions of Vθ1 are chosen such that Vθ1 is C3. Let πθ2 also be an LNN for the controller and denote by Lπ and γπ the number of layers and Lipschitz bound of πθ2 , respectively. We only require the activation functions of πθ2 to be C0. In addition, we consider box constraints on the control inputs for the rest of this work, i.e., U = {u ∈ Rnu | ui ≤ ui ≤ ui, i = 1 , ..., n u},and the final outputs of πθ2 are clipped between ui and ui4 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+(which does not increase its Lipschitz bound). θ1 and θ2 are the trainable parameters of Vθ1 and πθ2 , respectively. LNNs are adopted in this work because a predefined Lipschitz constant enables explicit bounds on higher-order derivatives, which yield tighter bounds and significantly ac-celerate verification of the Lyapunov function and controller. In addition, the Lipschitz constraint serves as a natural regu-larizer that improves generalization during training. Although this choice reduces expressivity compared with unconstrained networks, the trade-off is justified since the derivative bounds are essential for efficient verification. Moreover, an RCLF can always be scaled so its Lipschitz constant falls within a pre-scribed bound (Property 3), and for state-feedback controllers, larger Lipschitz bounds can be used to mitigate potential conservatism. 
+
+2) Training Process: We consider a bounded state space X .Define the training set D1 = {x(1) , ..., x (N1)} that is sampled from X and the boundary set D2 = {x(1) , ..., x (N2)} that is sampled from ∂X . In the following, we define different loss terms in order to train Vθ1 and πθ2 to be a valid RCLF and a stabilizing controller, respectively. 
+
+Positive definiteness: To encourage Vθ1 to be positive definite (i.e., condition (8a)), we define the following loss: 
+
+L1 = 1
+
+N1
+
+X
+
+> x(i)∈D 1
+
+max 
+
+
+
+−Vθ1 (x(i)) + ε1, 0
+
+
+
+. (10) where ε1 > 0 is intended to create some margin as we only train on a finite number of data samples. 
+
+Decrease condition: For condition (8b), we first upper bound ˙V (t, x ) by 
+
+˙Vθ1 (t, x ) = ∂V θ1
+
+∂x (f (x, π θ2 (x)) + Gd (t, x )) 
+
+≤ ∂V θ1
+
+∂x f (x, π θ2 (x)) + ∂V θ1
+
+∂x G
+
+> 2
+
+ϵ(x) def 
+
+= H(x). (11) Then, to encourage H(x) + ω(x) ≤ 0 for ∥x∥2 ≥ μ (which is a stronger condition than the original condition (8b)), we define the loss: 
+
+L2 = 1
+
+P 
+
+> x(i)∈D 1
+
+1{∥ x∥2≥μ}(x(i)) ×
+
+X
+
+> x(i)∈D 1
+
+max 
+
+
+
+H(x(i)) + ω(x(i)) + ε2, 0
+
+
+
+1{∥ x∥2≥μ}(x(i))
+
+(12) where ε2 > 0 is used to create some margin. We use bVr = min x∈D 2 Vθ1 (x) (an estimate of Vr ) to identify the largest possible forward invariant region entirely contained in X (which will be verified later in Section V). The next two losses are designed to increase the size of this region. 
+
+Boundary value: To encourage that a ball B2(0 , μ ) can be contained within a sublevel set of Vθ1 , we define 
+
+L3 = 1
+
+N2
+
+X
+
+> x(i)∈D 2
+
+max 
+
+
+
+−Vθ1 (x(i)) + Vl + ε3, 0
+
+
+
+(13) where Vl > 0 serves as an intended lower bound of Vθ1 on 
+
+∂X and ε3 > 0 creates some margin. 
+
+Algorithm 1 Training of Vθ1 and πθ2
+
+Require: Dynamical system f , bound on the disturbance signal ϵ, state space X , neural networks Vθ1 and πθ2 ,hyperparameters Vl, μ, c 1, c 2, c 3, c 4, ε 1, ε 2, ε 3, and number of epochs Ne. 
+
+> 1:
+
+Pretrain Vθ1 and πθ2 to LQR solutions;  
+
+> 2:
+
+Sample X and ∂X to obtain D1 and D2; 
+
+> 3:
+
+for epoch i = 1 , . . . , N e do  
+
+> 4:
+
+Update θ1 and θ2 via gradient descent to minimize the loss L over mini-batches of D1 and D2; 
+
+> 5:
+
+Evaluate empirical losses L′ 
+
+> 1
+
+and L′ 
+
+> 2
+
+on D1 by setting margins ε1 = ε2 = 0 ; 
+
+> 6:
+
+if L′ 
+
+> 1
+
+= 0 and L′ 
+
+> 2
+
+= 0 then  
+
+> 7:
+
+Calculate bVr = min x∈D 2 Vθ1 (x); 
+
+> 8:
+
+Store θ⋆ 
+
+> 1
+
+, θ⋆ 
+
+> 2
+
+, and bV ⋆r if the current parameters yield the largest empirical forward invariant region com-puted so far;  
+
+> 9:
+
+end if  
+
+> 10:
+
+end for  
+
+> 11:
+
+return θ⋆ 
+
+> 1
+
+, θ⋆ 
+
+> 2
+
+, and bV ⋆r .
+
+Maximal coverage: To encourage a larger coverage of X
+
+by a sublevel set of Vθ1 , we define the following loss 
+
+L4 =
+
+vuut 1
+
+N2 − 1
+
+X
+
+> x(i)∈D 2
+
+ Vθ1 (x(i)) − V 2 (14) where V = 1
+
+> N2
+
+P 
+
+> x(i)∈D 2
+
+Vθ1 (x(i)) to reduce the standard deviation of Vθ1 on ∂X . Intuitively, if Vθ1 has a small variation on ∂X , then {x ∈ X | Vθ1 (x) ≤ bVr } is more likely to cover a larger portion of X and bVr will be less conservative. The overall loss function is a weighted sum of these losses: 
+
+L = c1L1 + c2L2 + c3L3 + c4L4 (15) with c1, c 2, c 3, c 4 > 0. The detailed training algorithm is given in Algorithm 1. It first initializes Vθ1 and πθ2 using the LQR (Linear Quadratic Regulator) solution based on a linearization of the system, then trains Vθ1 and πθ2 to satisfy conditions (8a) and (8b), and keeps the optimal parameters that yield the largest forward invariant region. Algorithm 1 is most likely to yield a valid RCLF when (i) the architecture of Vθ1 is expressive enough to approximate a Lyapunov function and the Lipschitz bound of πθ2 is sufficiently large to provide control authority, (ii) the training dataset adequately covers the relevant state space, and (iii) conservative offsets ε1, ε 2
+
+are used initially. Since Algorithm 1 minimizes the loss L
+
+in (15) only on a finite set of sampled states, eliminating all violation points requires parameter tuning. A common strategy is to begin with conservative values of ε1 and ε2, and then gradually reduce them to prevent overfitting of Vθ1 and πθ2 .
+
+Remark 2: We emphasize that our framework does not certify stability for an unknown model: as is well known, formal certification over a domain requires reliable knowledge of the dynamics. What the disturbance-robust formulation provides is tolerance to a bounded, certified model mismatch .Suppose the true dynamics ˙x = f (x, u ) are not known exactly, AUTHOR et al. : TITLE 5Dynamical system Algorithm 1 
+
+> Initial RCLF
+> and controller
+> Algorithm 2
+> Veri fi ed controller
+> Trained RCLF
+> and controller
+
+Training 
+
+Veri fi cation 
+
+Deployment 
+
+Fig. 1 : Overall control-design workflow. 
+
+but a nominal model ˆf (x, u ) is available together with a known, rigorous error bound on f − ˆf over the domain D
+
+(e.g., from robust system identification, or Gaussian-process regression with high-probability confidence bounds). Writing the closed loop as ˙x = ˆf (x, π θ2 (x)) + d(x) with mismatch 
+
+d(x) = f (x, π θ2 (x)) − ˆf (x, π θ2 (x)) , any certified bound 
+
+∥d(x)∥2 ≤ ϵ(x) allows d to be treated as the state-dependent disturbance of (5) (with G = I), so that Algorithm 1 can be applied to the nominal ˆf . For instance, if Lipschitz constants 
+
+Kx, K u of f − ˆf in x and u are known on D and f (0 , π θ2 (0)) −
+
+ˆf (0 , π θ2 (0)) = 0 , then ∥d(x)∥2 ≤ (Kx + Kuγπ )∥x∥2
+
+> def
+
+= ϵ(x).The resulting guarantee is exactly as strong as the model-error bound itself: deterministic when ϵ is a hard bound, and high-probability when ϵ holds with a given confidence. Quantifying such a bound is a separate identification problem and is beyond the scope of this paper. 
+
+Remark 3: Condition (8a) requires class K functions α1
+
+and α2 such that α1(∥x∥2) ≤ V (x) ≤ α2(∥x∥2) for all x ∈ D.Because the neural network parameterization ensures that V is continuous and the verification domain D ⊂ Rnx is compact and contains the origin, explicitly enforcing positive definite-ness ( V (0) = 0 and V (x) > 0 for x ∈ D \ { 0}) guarantees, by extending [31, Lemma 4.3] from a ball B2(0 , r ) ⊂ D to all of D via compactness, that valid class K bounding functions exist a posteriori for all x ∈ D.
+
+V. V ERIFICATION OF ROBUST CONTROL LYAPUNOV 
+
+FUNCTIONS 
+
+In this section, we develop an algorithm to verify the trained state-feedback controller and RCLF. The complete workflow—from training to verification and deployment—is illustrated in Fig. 1. The conditions in Definition 3 are gener-ally nonlinear and nonconvex, so tighter bounds are needed to reduce conservatism and improve efficiency. Leveraging the structure and explicit Lipschitz bounds of LNNs, we can compute higher-order derivative bounds in a tractable way. 
+
+A. Bounds on the Hessian and Third-Order Derivative of LNNs 
+
+Lemma 1: Consider the LNN F (x) defined in (3). If each activation function σ(ℓ) is C1 for ℓ = 1 , ..., L − 1, then the Jacobian of F (x) w.r.t. x is 
+
+∂F (x)
+
+∂x = ∂F (x)
+
+∂h (L−1) 
+
+∂h (L−1) 
+
+∂h (L−2) · · · ∂h (1) 
+
+∂h (0) 
+
+∂h (0) 
+
+∂x (16) where ∂h (0)  
+
+> ∂x
+
+= √γI , ∂F (x) 
+
+> ∂h (L−1)
+
+= √γW (L), and ∂h (ℓ) 
+
+> ∂h (ℓ−1)
+
+=
+
+U (ℓ) diag( σ(ℓ)′(z(ℓ))) W (ℓ) for ℓ = 1 , ..., L − 1. Furthermore, the shifted network satisfies ∂ ˆF (x) 
+
+> ∂x
+
+= ∂F (x) 
+
+> ∂x
+
+.
+
+Proof: This is a direct application of the chain rule. 
+
+Lemma 2: Consider the LNN F (x) defined in (3). If σ(ℓ)
+
+is C2 for ℓ = 1 , ..., L − 1, then the Hessian of Fi(x) (the i-th component of F (x)) w.r.t. x is 
+
+∂2Fi(x)
+
+∂x 2 =
+
+> L−1
+
+X
+
+> ℓ=1
+
+
+
+W (ℓ) ∂h (ℓ−1) 
+
+∂x 
+
+⊤
+
+diag 
+
+
+
+σ(ℓ)′′ (z(ℓ))
+
+⊙
+
+ ∂F i(x)
+
+∂h (ℓ) U (ℓ)⊤
+
+W (ℓ) ∂h (ℓ−1) 
+
+∂x . (17) 
+
+Proof: The proof is given in Appendix B. From Lemma 2, we are ready to establish a Hessian bound of the LNNs in the spectral norm. 
+
+Theorem 1: Consider the LNN F (x) defined in (3). If σ(ℓ)
+
+is C2 for ℓ = 1 , . . . , L − 1, then the spectral norm of the Hessian ∂2Fi(x) 
+
+> ∂x 2
+
+satisfies 
+
+∂2Fi(x)
+
+∂x 2 2
+
+≤
+
+> L−1
+
+X
+
+> ℓ=1
+
+γ 32 sup σ(ℓ)′′ diag  c(U (ℓ))1/2W (ℓ) 22
+
+(18) where [c(U (ℓ))] k = ∥U (ℓ):,k ∥2.
+
+Proof: By Lemma 2, ∂2Fi(x) 
+
+> ∂x 2
+
+= PL−1 
+
+> ℓ=1
+
+Θ(ℓ)⊤
+
+diag( λ(ℓ))Θ (ℓ), where Θ(ℓ) = W (ℓ) ∂h (ℓ−1)  
+
+> ∂x
+
+and λ(ℓ) =
+
+σ(ℓ)′′ (z(ℓ)) ⊙   ∂F i(x) 
+
+> ∂h (ℓ)
+
+U (ℓ)⊤. Given a fixed ℓ and any unit vector v, |v⊤Θ(ℓ)⊤ diag( λ(ℓ))Θ (ℓ)v| = |P 
+
+> k
+
+λ(ℓ) 
+
+> k
+
+(Θ (ℓ)v)2
+
+> k
+
+| ≤ 
+
+P
+
+> k
+
+|λ(ℓ) 
+
+> k
+
+|(Θ (ℓ)v)2
+
+> k
+
+, hence ∥Θ(ℓ)⊤ diag( λ(ℓ))Θ (ℓ)∥2 ≤∥Θ(ℓ)⊤ diag( |λ(ℓ)|)Θ (ℓ)∥2. By the Cauchy–Schwarz inequality and ∂F i(x)  
+
+> ∂h (ℓ)2
+
+≤ √γ, we have |λ(ℓ) 
+
+> k
+
+| ≤√γ sup |σ(ℓ)′′ | [c(U (ℓ))] k, so ∥Θ(ℓ)⊤ diag( |λ(ℓ)|)Θ (ℓ)∥2 ≤√γ sup |σ(ℓ)′′ | ∥ Θ(ℓ)⊤ diag( c(U (ℓ)))Θ (ℓ)∥2. Finally, using   
+
+> ∂h (ℓ−1)
+> ∂x 2
+
+≤ √γ, we obtain the desired result. 
+
+Theorem 2: Consider the LNN F (x) defined in (3). If σ(ℓ)
+
+is C3 for ℓ = 1 , . . . , L − 1, then the spectral norm of ∂3Fi(x)
+
+> ∂x 2∂x j
+
+satisfies 
+
+∂3Fi(x)
+
+∂x 2∂x j 2
+
+≤
+
+> L−1
+
+X
+
+> ℓ=1
+
+h
+
+γ β (ℓ) sup |σ(ℓ)′′ |
+
+ ∂2Fi(x)
+
+∂x j ∂h (ℓ) 2
+
++ 2 ∂2h(ℓ−1) 
+
+∂x j ∂x 2
+
+
+
++ γ2 sup |σ(ℓ)′′′ | τ (ℓ)i
+
+, (19) where β(ℓ) = ∥diag( c(U (ℓ))) 1/2W (ℓ)∥22, τ (ℓ) =
+
+∥W (ℓ)⊤ diag( c(U (ℓ)) ⊙ r(W (ℓ))) W (ℓ)∥2, [c(U (ℓ))] k =
+
+∥U (ℓ):,k ∥2, [r(W (ℓ))] k = ∥W (ℓ) 
+
+> k, :
+
+∥2, and the inner recursive Hessian bounds are given by: 
+
+∂2h(ℓ)
+
+∂x j ∂x 2
+
+≤
+
+> ℓ
+
+X
+
+> k=1
+
+γ∥c(U (k))∥∞∥W (k)∥22 sup |σ(k)′′ |, (20) 6 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+∂2Fi(x)
+
+∂x j ∂h (ℓ) 2
+
+≤
+
+> L−1
+
+X
+
+> k=ℓ+1
+
+γ∥c(U (k))∥∞∥W (k)∥22 sup |σ(k)′′ |.
+
+(21) 
+
+Proof: The proof is given in Appendix C. 
+
+Remark 4: Many common nonlinear activation functions satisfy the conditions of Theorems 1 and 2. Some classic examples include: (1) Softplus: σ(x) = log(1 + ex), 0 ≤
+
+σ′(x) ≤ 1, 0 ≤ σ′′ (x) ≤ 0.25 , −0.097 ≤ σ′′′ (x) ≤ 0.097 ;(2) Sigmoid: σ(x) = 11+ e−x , 0 ≤ σ′(x) ≤ 0.25 , −0.097 ≤
+
+σ′′ (x) ≤ 0.097 , −1/8 ≤ σ′′′ (x) ≤ 0.042 ; (3) Hyperbolic tangent: σ(x) = tanh( x), 0 ≤ σ′(x) ≤ 1, −0.77 ≤ σ′′ (x) ≤
+
+0.77 , −2 ≤ σ′′′ (x) ≤ 2/3.
+
+Remark 5: We characterize the asymptotic growth of these bounds in L. For a Sandwich Layer [28] with Ψ(ℓ) = κI 
+
+(κ > 0), we have ∥U (ℓ)∥2 ≤ √2κ and ∥W (ℓ)∥2 ≤ √2/κ ;with identical activations σ, Theorems 1 and 2 simplify to   
+
+> ∂2Fi(x)
+> ∂x 22
+
+≤ 1 
+
+> κ
+
+(2 γ) 32 sup |σ′′ | (L − 1) and ∂3Fi(x)  
+
+> ∂x 2∂x j2
+
+≤
+
+> 4γ2
+> κ2
+
+3(sup |σ′′ |)2(L − 2)( L − 1) + sup |σ′′′ | (L − 1) , i.e., linear and quadratic in L, respectively. The same rates hold for Spectral Normalization [26] and Orthogonal Layers [27], with ∂2Fi(x)  
+
+> ∂x 22
+
+≤ γ 32 sup |σ′′ | (L − 1) and ∂3Fi(x)  
+
+> ∂x 2∂x j2
+
+≤
+
+γ2[ 32 (sup |σ′′ |)2(L − 1)( L − 2) + sup |σ′′′ | (L − 1)] .Figure 2(a) compares this Hessian bound of LNNs against that of standard fully connected networks (FCNs) computed using the result in [34, Theorem 4]. We consider the setup 
+
+nx = 2 , nL = 1 , nℓ = 16 (for ℓ = 1 , . . . , L − 1), and vary 
+
+L from 2 up to 5, using tanh( ·) as the activation function. For each value of L, we randomly initialize the network parameters 20 times and plot the mean and standard deviation of the resulting Hessian bounds for both architectures (where the LNNs use Orthogonal Layers [27]). We observe that the unconstrained FCN bounds grow much faster than those of the LNNs. Figure 2(b) visualizes the third-order bound of these randomly initialized LNNs. Furthermore, we note that Theorems 1 and 2 present global, closed-form, layer-separable upper bounds, and the empirical bars merely lower-bound this global supremum. Although strict equality is only attained in degenerate worst-case networks, this theoretical looseness is reclaimed during the BnB process in Section V-B: the bounding constants appear only in higher-order remainders that vanish rapidly as the search rectangles shrink. 
+
+Remark 6: Beyond Lyapunov verification, Hessian bounds have also been applied in robustness certification [34], ad-versarial training [35], and neural certificates for dynamical systems [36], underscoring their broader role as a fundamental tool for tighter characterizations of neural network behavior. 
+
+B. Branch-and-Bound Scheme 
+
+Verification has been the main challenge in training neural network Lyapunov functions. Although positive definite, Lya-punov functions are not necessarily convex [13]. Existing neu-ral network verification approaches include interval methods [37], [38], convex relaxations [39], [40], SMT solvers [29], etc. Interval methods often give vacuous bounds on large domains, convex relaxations focus on input–output robustness rather than Lyapunov conditions, and SMT solvers face scalability 2 3 4 5            
+
+> Number of layers
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> Hessian bound
+> γ= 0 .2
+> γ= 0 .4
+> γ= 0 .6FCN
+> (a) LNN and FCN Hessian bounds. 2345
+> Number of layers
+> 10 −2
+> 10 −1
+> 10 0
+> LNN third-order bound  γ= 0 .2
+> γ= 0 .4
+> γ= 0 .6(b) LNN third-order bound.
+
+Fig. 2 : (a): Comparison of Hessian bounds for FCNs and LNNs as the number of layers increases. Theoretical bounds are denoted by solid lines, while empirical bounds are shown as bars. (b): Third-order bound of LNNs w.r.t. the number of layers. 
+
+limits. We propose a novel high-order verification scheme. The core idea is to use the smoothness of the network and explicitly construct and incorporate analytical first- and second-order bounds through Taylor expansions. These high-order bounds create significantly tighter bounds of the network output compared with zeroth-order bounds, which in turn drastically prunes the search space at the cost of slightly more expensive per-node evaluations. Let Q = [ xlb , x ub ] ⊂ Rnx be a hyperrectangle. We seek to verify that a target function Φ ∈ C 3 satisfies Φ( x) ≥ 0 to a prescribed accuracy δ > 0 on Q\E where E ⊂ Rnx is an excluded set. We extract the midpoint xm(Q) = 12 (xub + xlb )
+
+and the half-width vector v(Q) = 12 (xub − xlb ) of Q, and we omit the dependency of xm and v on Q for brevity. The goal is to find lower and upper bound functions Φlb and Φub 
+
+satisfying Φlb (Q) ≤ min x∈Q Φ( x) ≤ Φub (Q) for a given Q.In the following, we propose three options for Φlb and Φub .
+
+Zeroth-order bounds: Let KΦ ≥ Lip(Φ) . By the definition of Lipschitz continuity, we have: 
+
+Φ(0) lb (Q) = Φ( xm) − KΦ∥v∥2, (22a) 
+
+Φ(0) ub (Q) = Φ( xm). (22b) 
+
+First-order bounds: Because Φ ∈ C 2, applying the second-order Taylor expansion with the Lagrange remainder yields: 
+
+Φ( x) = Φ( xm)+ ∂Φ 
+
+> ∂x
+
+(xm)( x−xm)+ 12 (x−xm)⊤ ∂2Φ 
+
+> ∂x 2
+
+(x′)( x−
+
+xm) where x′ = xm +λ(x−xm) for some λ ∈ (0 , 1) . Defining the spectral bound HΦ ≥ sup x∈Rnx  
+
+> ∂2Φ
+> ∂x 2
+
+(x) 2, we establish tighter first-order bounds: 
+
+Φ(1) lb (Q) = Φ( xm) − ∂Φ
+
+∂x (xm) v − 12 HΦ∥v∥22, (23a) 
+
+Φ(1) ub (Q) = Φ( xm) − ∂Φ
+
+∂x (xm) v + 12 HΦ∥v∥22. (23b) 
+
+Second-order bounds: Similarly, as Φ ∈ C 3, we define 
+
+TΦ ≥ sup x∈Rnx  
+
+> ∂3Φ
+> ∂x 2∂x j
+
+(x) 2
+
+for j = 1 , ..., n x. By the third-AUTHOR et al. : TITLE 7
+
+Algorithm 2 High-Order Branch-and-Bound Verification 
+
+Require: Target function Φ, bounds Φlb and Φub , initial rectangle Qinit , excluded region E, tolerance δ 
+
+> 1:
+
+Initialize k = 0 , Q0 = {Qinit }, and L0 = Φ lb (Qinit ); 
+
+> 2:
+
+Set U0 = Φ ub (Qinit ) if Qinit ∩ E = ∅, else U0 = ∞; 
+
+> 3:
+
+while Uk − Lk > δ do  
+
+> 4:
+
+If Qk = ∅ or Lk ≥ 0, return success (early stop);  
+
+> 5:
+
+If Uk < 0 , return failure (early stop);  
+
+> 6:
+
+Initialize Qk+1 = ∅, Lk+1 = ∞, and Uk+1 = ∞; 
+
+> 7:
+
+for Q ∈ Q k do  
+
+> 8:
+
+Split Q along its longest axis into Q1 and Q2; 
+
+> 9:
+
+for i ∈ { 1, 2} do  
+
+> 10:
+
+if Qi̸ ⊂ E then  
+
+> 11:
+
+Lk+1 = min( Lk+1 , Φlb (Qi)) ; 
+
+> 12:
+
+If Qi ∩ E = ∅, Uk+1 = min( Uk+1 , Φub (Qi)) ; 
+
+> 13:
+
+If Φlb (Qi) < 0, Qk+1 = Qk+1 ∪ { Qi}; 
+
+> 14:
+
+end if  
+
+> 15:
+
+end for  
+
+> 16:
+
+end for  
+
+> 17:
+
+k ← k + 1 ; 
+
+> 18:
+
+end while  
+
+> 19:
+
+return success ;order Taylor expansion, we get more accurate bounds: 
+
+Φ(2) lb (Q) = Φ( xm) − ∂Φ
+
+∂x (xm) v − 12 v⊤ ∂2Φ
+
+∂x 2 (xm) v
+
+− 16 TΦ∥v∥22∥v∥1, (24a) 
+
+Φ(2) ub (Q) = Φ( xm) − ∂Φ
+
+∂x (xm) v + 12 v⊤ ∂2Φ
+
+∂x 2 (xm) v
+
++ 16 TΦ∥v∥22∥v∥1. (24b) To obtain the tightest combined enclosure subject to the smoothness of Φ, we take Φlb (Q) = max(Φ (0) lb , Φ(1) lb , Φ(2) lb )
+
+and Φub (Q) = min(Φ (0) ub , Φ(1) ub , Φ(2) ub ). The detailed BnB algo-rithm is given in Algorithm 2. The algorithm starts from the initial rectangle Qinit and keeps splitting the rectangles into smaller ones until one of the early stop conditions is met or the required precision is achieved. Finally, we evaluate the worst-case convergence of this scheme. Given Q, its volume and condition number are: 
+
+vol( Q) = 
+
+> nx
+
+Y
+
+> i=1
+
+(xub ,i − xlb ,i ), (25) 
+
+cond( Q) = max i=1 ,...,n x (xub ,i − xlb ,i )min i=1 ,...,n x (xub ,i − xlb ,i ) . (26) 
+
+Lemma 3 (Lemma 1 in [41]): For any k and any rectangle 
+
+Q ∈ Q k generated in Algorithm 2, we have 
+
+cond( Q) ≤ max {cond( Qinit ), 2}. (27) 
+
+Theorem 3: Assume that Φ is Lipschitz continuous and 
+
+KΦ ≥ Lip(Φ) . If none of the early stop conditions are satisfied and E = ∅, then Algorithm 2 finishes within k0 = ⌈log 2(P0)⌉
+
+iterations, evaluating at most O(P0) rectangles, where P0 =  √nxKΦ max {cond( Qinit ),2}
+
+> 2δ
+
+nx
+
+vol( Qinit ).2 3 4 5 6 7 8 9 10 
+
+Number of layers    
+
+> 24
+> 26
+> 28
+> 30
+> 32
+> 34
+> 36
+> BnB depth
+> γ= 0 .5
+> γ= 1 .0
+> γ= 2 .0
+
+Fig. 3 : BnB depth w.r.t. the number of layers and Lipschitz bound. 
+
+Proof: By the equivalence of norms, 
+
+∥v(Q)∥2 ≤ √nx 
+
+> 2
+
+max i(xub ,i − xlb ,i ). Because 
+
+cond( Q) ≥ 1, we lower bound the volume by 
+
+vol( Q) ≥ max i(xub ,i − xlb ,i )[min i(xub ,i − xlb ,i )] nx−1 = 
+
+> [max i(xub ,i −xlb ,i )] nx
+> cond( Q)nx −1
+
+≥   max i(xub ,i −xlb ,i )cond( Q)
+
+nx
+
+. This implies 
+
+vol( Q) ≥   2∥v∥2 
+
+> √nxcond( Q)
+
+nx
+
+. Rearranging provides a bound on the half-width norm of any Q:
+
+∥v(Q)∥2 ≤√nx
+
+2 cond( Q) vol( Q) 1 
+
+> nx
+
+. (28) Because the algorithm always splits a rectangle into two, the volume at iteration k is vol( Q) = 12k vol( Qinit ). For any 
+
+Q ∈ Q k, applying this and Lemma 3 yields: 
+
+∥v(Q)∥2 ≤√nx
+
+2 max {cond( Qinit ), 2}
+
+ vol( Qinit )2k
+
+ 1
+
+> nx
+
+.
+
+(29) Using the zeroth-order bounds (22), we have 
+
+Lk = min Q∈Q k [Φ( xm(Q)) − KΦ∥v(Q)∥2] ≥ Uk −
+
+KΦ max Q∈Q k ∥v(Q)∥2. Therefore, by (29), Uk − Lk ≤ 
+
+> √nx
+> 2
+
+KΦ max {cond( Qinit ), 2}  vol( Qinit )2k
+
+ 1 
+
+> nx
+
+. To obtain 
+
+Uk − Lk ≤ δ for any δ > 0, we need k0 = ⌈log 2(P0)⌉
+
+iterations where 
+
+P0 =
+
+ √nxKΦ max {cond( Qinit ), 2}
+
+2δ
+
+nx
+
+vol( Qinit ). (30) After k0 iterations, the total number of evaluated rectangles is 
+
+2k0+1 − 1 which is O(P0).
+
+Theorem 4: Under the same conditions as Theorem 3, if Φ ∈ C2 and HΦ ≥ sup x∈Rnx  
+
+> ∂2Φ
+> ∂x 2
+
+(x) 2, then Algorithm 2 finishes within k1 = ⌈log 2(P1)⌉ itera-tions, evaluating at most O(P1) rectangles, where P1 =
+
+  nxHΦ max 2{cond( Qinit ),2}
+
+> 4δ
+
+ nx  
+
+> 2
+
+vol( Qinit ).
+
+Proof: By the definition of Uk and Lk
+
+and the first-order bounds (23), we have Uk ≤
+
+min Q∈Q k [Φ( xm) − ∂Φ 
+
+> ∂x
+
+(xm) v(Q) + 12 HΦ∥v(Q)∥22] ≤
+
+Lk + HΦ max Q∈Q k ∥v(Q)∥22. The rest of the proof follows the algebraic rearrangement established in Theorem 3. When Φ( x) = Vθ1 (x), nx = 4 , σ = tanh , cond( Qinit ) = 1 ,
+
+vol( Qinit ) = 1 , and δ = 0 .001 , the resulting BnB depth of Theorem 4 is shown in Fig. 3 for Sandwich Layers [28]. 
+
+Remark 7: The lines 7-16 of Algorithm 2 can be acceler-ated using parallel computation on a GPU. As demonstrated in Section VI, this approach not only offers runtime benefits but also scales better to larger neural networks. 8 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+C. Verification of the RCLF 
+
+In this subsection, we detail the application of the high-order BnB algorithm (Algorithm 2) to formally verify the three core conditions of an RCLF.  
+
+> 1) Positive Definiteness:
+
+To verify condition (8a), we must guarantee that Vθ1 (x) > 0 strictly away from the origin. To avoid numerical intractability near the equilibrium [14], [15], [21], we verify this property over the domain X \ B2(0 , η )
+
+for a small margin η ≪ 1. Thus, we set the target function 
+
+Φ( x) = Vθ1 (x) and the excluded region E = B2(0 , η ).Because Vθ1 is parameterized to be γV -Lipschitz, we set the zeroth-order bound constant to KΦ = γV . If the chosen acti-vation functions are C3, the spectral bounds from Theorems 1 and 2 immediately provide the constants for the higher-order bounds in (23) and (24). During the pruning step (line 10 in Algorithm 2), a rectangle 
+
+Q = [ xlb , x ub ] is fully contained within the excluded origin ball ( Q ⊂ E) if Pnx 
+
+> i=1
+
+max( |xlb ,i |, |xub ,i |)2 ≤ η2.     
+
+> 2) Inclusion of B2(0, μ )by ΩbVr:
+
+Definition 3 requires that the ball B2(0 , μ ) is entirely contained within the verified sublevel set ΩbVr = {x ∈ X | Vθ1 (x) ≤ bVr }. Because Vθ1 is γV -Lipschitz, this condition is trivially satisfied if bVr ≥ γV μ.If this shortcut does not hold, we cast the inclusion check as a verification problem by setting Φ( x) = bVr − Vθ1 (x),initializing the root node as Qinit = [ −μ, μ ]nx , and defining the excluded region as E = Qinit \ B2(0 , μ ). Algorithm 2 then checks if Φ( x) ≥ 0 over B2(0 , μ ). As before, high-order bounds apply if Vθ1 ∈ C 3.Here, the pruning condition Q ⊂ E is met if the rectangle lies strictly outside the ball B2(0 , μ ). This occurs when its minimum squared distance to the origin exceeds μ2, which is Pnx 
+
+> i=1
+
+max(0 , x lb ,i , −xub ,i )2 > μ 2. 
+
+> 3) Decrease Condition:
+
+To verify the stability condition (8b), we evaluate H(x) + ω(x) ≤ 0 (which is a stronger guarantee than (8b), as derived in (11)). We restrict our search space to the verified forward-invariant set ΩbVr and exclude the interior of B2(0 , μ ). We therefore set Φ( x) = −H(x) − ω(x)
+
+and E = int( B2(0 , μ )) ∪ { x ∈ X | Vθ1 (x) > bVr }.A rectangle Q is pruned if it is completely inside B2(0 , μ ) or strictly outside the sublevel set: Pnx 
+
+> i=1
+
+max( |xlb ,i |, |xub ,i |)2 <μ2 or Vθ1,lb (Q) > bVr where Vθ1,lb is the tightest available lower bound for Vθ1 on Q, obtained via (22), (23), or (24) subject to the smoothness of Vθ1 .Due to input saturation and the norm operations within 
+
+H(x), the target function Φ( x) is only C0. Its global Lipschitz bound KΦ can be computed by: 
+
+Lip( H + ω) ≤ HV Cf + γV (Cfx + γπ Cfu )+ Kω + HV ∥G∥2Cϵ + γV ∥G∥2Kϵ
+
+> def
+
+= KΦ
+
+where Kω ≥ Lip( ω), Cf = max x∈Q,u ∈U ∥f (x, u )∥2, Cϵ =max x∈Q ϵ(x), Cfx = max x∈Q,u ∈U ∥ ∂f ∂x (x, u )∥2, Cfu =max x∈Q,u ∈U ∥ ∂f ∂u (x, u )∥2, and Kϵ ≥ Lip( ϵ) due to the bound-edness of X and U. Because a direct Taylor expansion on the non-smooth Φ is impossible, we derive a custom high-order lower bound for min x∈Q Φ( x) in Appendix D. 
+
+Remark 8: Our framework can be extended to address parametric uncertainties. For ˙x = f (x, u, λ ) with the uncertain parameters λ ∈ Λ ⊂ Rnλ and state-feedback controller πθ2 ,the closed-loop system is ˙x = fcl (x, λ ) = f (x, π θ2 (x), λ ).We enforce a uniform Lyapunov decrease in the loss function: 
+
+sup λ∈Λ 
+
+> ∂V θ1
+> ∂x
+
+(x)fcl (x, λ ) + ω(x) ≤ 0. The sup λ∈Λ operator can be implemented via adversarial sampling of λ, and/or exploiting structure: if f is affine in λ and Λ is a convex polytope, the supremum is attained at vertices. Verification is analogous: check the Lyapunov inequality at the vertices of Λ
+
+if the structure allows; otherwise, apply BnB over (x, λ ).
+
+Remark 9: Theorems 3 and 4 bound the number of eval-uated rectangles, so the overall time complexity is the BnB tree size times the per-node bound computation cost. The global constants HΦ and TΦ are computed once offline using Theorems 1 and 2, so the per-node cost is dominated by the local derivatives ∂Φ 
+
+> ∂x
+
+(xm) and ∂2Φ 
+
+> ∂x 2
+
+(xm) (e.g., Φ = Vθ1 for positive definiteness and Φ = bVr − Vθ1 for inclusion). With analytical forward-mode differentiation, this cost is O(LV n2 
+
+> V
+
+),
+
+O(LV n2 
+
+> V
+
+nx), and O(LV n2 
+
+> V
+
+n2
+
+> x
+
+) for the zeroth-, first-, and second-order bounds, respectively, where LV and nV are the number of layers and maximum layer width of Vθ1 . Although incorporating higher-order derivatives increases the per-node computational cost polynomially in nx, it produces signifi-cantly tighter bounds. This trade-off drastically reduces the overall BnB depth, preventing the explosion of the search tree that empirically causes the zeroth-order baseline to become computationally intractable (see Appendix E). 
+
+Remark 10: Although the RCLF can be rescaled (Prop-erty 3), a much smaller Lipschitz bound is undesirable in practice: at a fixed absolute tolerance δ, it shrinks the bounding error and the signal together, so the apparent speedup is merely degraded relative precision; and it flattens Vθ1 , yielding vanishing, ill-conditioned gradients that make the network harder to train. 
+
+Remark 11: Parameterizing eV (x) = 12 ∥g(x)∥22 with a bi-Lipschitz network g [18], [19] intrinsically guarantees positive definiteness and topologically spherical level sets, eliminating both the positive definiteness loss term and its verification step. This is a promising direction, but deriving the high-order bounds for this composition poses additional analytical challenges and is left to future work. 
+
+Remark 12: Although Lyapunov functions for asymptoti-cally stable systems have level sets topologically equivalent to spheres [42], our framework targets systems with persistent disturbances and achieves UUB, for which it suffices to verify the forward invariance of ΩbVr to trap trajectories. 
+
+VI. S IMULATION STUDIES 
+
+We evaluate our methodology on six dynamical systems (five depicted in Fig. 4): the inverted pendulum, unicycle path following, a third-order system, the cartpole, the 2D quadrotor, and the SCARA arm. Table I reports the RCLF verification times for Algorithm 2, dReal [29] (a CPU-based SMT solver widely used for Lyapunov verification [14]–[16]), and α, β -CROWN [23] (a GPU-based bound-propagation verifier, also used in [22]) at the same precision. For each case we train with four random seeds and report the mean and standard deviation. For the SCARA arm, we use interval bound propagation (IBP) AUTHOR et al. : TITLE 9
+
+(a) Inverted pendulum (b) Unicycle (c) Cartpole wind (d) 2D quadrotor (e) SCARA arm 
+
+Fig. 4 : Diagrams of the inverted pendulum, unicycle path following, cartpole, 2D quadrotor, and SCARA arm. 
+
+TABLE I : Verification time (in seconds unless otherwise specified) of the positive definiteness, decrease, and inclusion (of B2(0 , μ ) by ΩbVr )conditions for different systems and different numbers of layers in Vθ1 (denoted by LV ). 
+
+System LV
+
+Positive Definiteness Decrease Inclusion dReal Ours (CPU) 
+
+α, β -CROWN a Ours (GPU) dReal Ours (CPU) 
+
+α, β -CROWN a Ours (GPU) dReal Ours (CPU) 
+
+α, β -CROWN a Ours (GPU) Inverted Pendulum (nx = 2 )2 0.06 ±0.007 0.03 ±0.006 0.93 ±0.03 0.31 ±0.02 ≈ 989 b 0.79 ±0.003 4.39 ±0.02 0.71 ±0.02 -c - - -3 55.16 ±10.92 0.04 ±0.009 1.27 ±0.04 0.30 ±0.02 > 1 h 0.72 ±0.03 6.67 ±0.03 0.71 ±0.01 - - - -4 > 1 h 0.05 ±0.04 1.67 ±0.07 0.33 ±0.03 > 1 h 0.74 ±0.01 8.75 ±0.13 0.62 ±0.01 - - - -Unicycle Path Following (nx = 2 )2 0.10 ±0.003 0.02 ±0.0004 0.96 ±0.07 0.31 ±0.03 3.80 ±1.48 1.53 ±0.01 NaN d 1.92 ±0.04 -c - - -3 39.67 ±3.42 0.03 ±0.002 1.24 ±0.08 0.34 ±0.03 OOM d 1.53 ±0.02 NaN 1.88 ±0.03 - - - -4 > 1 h 0.03 ±0.006 1.56 ±0.05 0.32 ±0.01 OOM 1.55 ±0.01 NaN 1.94 ±0.05 - - - -Third-Order System (nx = 3 )2 33.17 ±27.40 0.04 ±0.004 1.37 ±0.12 0.34 ±0.03 ≈ 107 b 1.65 ±0.06 NaN 1.29 ±0.04 0.04 ±0.01 0.02 ±0.0003 0.43 ±0.05 0.13 ±0.002 
+
+3 > 1 h 0.06 ±0.007 1.82 ±0.05 0.32 ±0.03 OOM 4.51 ±0.75 NaN 1.39 ±0.03 20.46 ±1.20 0.02 ±0.001 0.46 ±0.03 0.13 ±0.007 
+
+4 > 1 h 0.08 ±0.02 2.41 ±0.02 0.32 ±0.01 OOM 10.78 ±0.33 NaN 1.70 ±0.05 > 1 h 0.03 ±0.001 0.48 ±0.04 0.12 ±0.005 
+
+Cartpole (nx = 4 )2 > 1 h 0.57 ±0.07 2.59 ±0.03 0.35 ±0.01 > 4 h 88.52 ±9.94 NaN 13.28 ±0.08 0.17 ±0.02 0.02 ±0.001 0.42 ±0.03 0.13 ±0.003 
+
+3 > 1 h 3.37 ±0.30 4.66 ±0.03 0.39 ±0.01 > 4 h 474.10 ±19.59 NaN 29.24 ±1.77 500.96 ±81.82 0.03 ±0.005 0.47 ±0.02 0.13 ±0.004 
+
+4 > 1 h 6.70 ±0.62 7.73 ±0.05 0.51 ±0.006 > 4 h 0.47 ±0.07 h NaN 78.25 ±10.68 OOM 0.03 ±0.002 0.50 ±0.05 0.12 ±0.004 
+
+2D Quadrotor (nx = 6 ) 2 > 1 h 6.87 ±0.19 14.09 ±1.89 0.79 ±0.009 > 6 h 1.92 ±0.33 h NaN 506.32 ±83.18 > 1 h 0.24 ±0.01 0.96 ±0.03 0.36 ±0.04 
+
+SCARA Arm (nx = 8 ) 2 > 1 h 153.22 ±7.01 11.21 ±0.09 9.05 ±0.04 > 12 h > 12 h ERR d 9.53 ±0.37 h > 1 h 136.07 ±48.93 0.46 ±0.04 7.67 ±2.58 
+
+0.34 ±0.03 aa As α, β -CROWN only accepts linear constraints in problem definition, we relax all ℓ2 balls to ℓ∞ balls in a way that favors α, β -CROWN. B2(0 , η )
+
+is replaced by B∞(0 , η ) for checking the positive definiteness condition; B2(0 , μ ) by B∞(0 , μ ) for decrease condition and by B∞(0 , μ/ √nx) for inclusion condition. Due to the large volume difference between ℓ2 and ℓ∞ balls for nx = 8 , we report two values for our method on GPU. The first uses the original ℓ2 constraints; the second uses the same ℓ∞ relaxation used by α, β -CROWN to provide a direct comparison. 
+
+b dReal times out ( > 1 h) on two out of four trials for the inverted pendulum and three out of four for the third-order system. 
+
+c The inclusion condition is omitted for the inverted pendulum and unicycle path following as bVr ≥ γV μ.
+
+d NaN: encounters NaN in bound evaluation. ERR: internal error. OOM: out of memory. 
+
+TABLE II : Verification time (in seconds unless otherwise specified) of the positive definiteness, decrease, and inclusion (of B2(0 , μ ) by ΩbVr )conditions for different systems and different Lipschitz bounds of Vθ1 (denoted by γV ). 
+
+System γV Success Rate Positive Definiteness Decrease Inclusion Ours (CPU) Ours (GPU) Ours (CPU) Ours (GPU) Ours (CPU) Ours (GPU) Inverted Pendulum 1.0 100% 0.02 ±0.003 0.31 ±0.02 0.62 ±0.23 0.72 ±0.03 - -2.0 100% 0.02 ±0.002 0.32 ±0.02 0.80 ±0.006 0.73 ±0.04 - -4.0 100% 0.02 ±0.003 0.31 ±0.03 0.80 ±0.005 0.71 ±0.02 - -Unicycle Path Following 1.0 100% 0.02 ±0.0004 0.31 ±0.03 1.53 ±0.01 1.92 ±0.04 - -2.0 100% 0.02 ±0.0008 0.29 ±0.005 1.54 ±0.01 1.91 ±0.03 - -4.0 100% 0.02 ±0.001 0.31 ±0.02 1.53 ±0.02 1.92 ±0.07 - -Third-Order System 2.5 100% 0.04 ±0.003 0.32 ±0.03 1.49 ±0.01 1.26 ±0.02 0.02 ±0.0003 0.13 ±0.003 
+
+5.0 100% 0.04 ±0.004 0.34 ±0.03 1.65 ±0.06 1.29 ±0.04 0.02 ±0.0003 0.13 ±0.002 
+
+10.0 100% 0.05 ±0.004 0.32 ±0.01 2.06 ±0.55 1.21 ±0.24 0.02 ±0.0002 0.13 ±0.007 
+
+Cartpole 1.0 100% 0.60 ±0.05 0.35 ±0.02 82.61 ±8.62 11.09 ±2.81 0.02 ±0.003 0.13 ±0.007 
+
+2.0 100% 0.62 ±0.04 0.38 ±0.04 108.69 ±12.19 14.73 ±0.44 0.02 ±0.004 0.13 ±0.003 
+
+4.0 100% 0.65 ±0.06 0.36 ±0.02 146.89 ±20.81 17.60 ±1.23 0.02 ±0.001 0.13 ±0.003 
+
+2D Quadrotor 0.5 100% 5.24 ±0.08 0.68 ±0.04 1.06 ±0.03 h 292.50 ±8.23 0.33 ±0.07 0.34 ±0.004 
+
+1.0 100% 6.87 ±0.19 0.79 ±0.009 1.92 ±0.33 h 506.32 ±83.18 0.24 ±0.01 0.36 ±0.04 
+
+SCARA Arm 0.5 100% 115.60 ±2.46 7.57 ±0.07 > 12 h 5.12 ±0.33 17.94 ±0.67 1.26 ±0.05 
+
+1.0 100% 153.22 ±7.01 9.05 ±0.04 > 12 h 9.53 ±0.37 136.07 ±48.93 7.67 ±2.58 10 IEEE TRANSACTIONS AND JOURNALS TEMPLATE      
+
+> (a) Vθ1(x)(b) H(x) + ω(x)
+
+Fig. 5 : Visualization of Vθ1 (x) and H(x) + ω(x) for the inverted pendulum. (a): level sets of Vθ1 (x) and the largest forward invari-ant sets given by our method, LQR, and NLC. (b): level sets of 
+
+H(x)+ ω(x) with the cutoff region B2(0 , μ ), showing that violations (H(x) + ω(x) > 0) remain confined within the cutoff region, consistent with condition (8b). 
+
+TABLE III : Forward invariant region ratio (%) for inverted pendulum.            
+
+> LQR NLC Ours ( LV=2 )Ours ( LV=3 )Ours ( LV=4 )23.28 28.57 71.86 74.24 75.15
+
+for local bounds on the gradient, Hessian, and third-order derivative of the LNNs to accelerate verification. Our results show that Algorithm 2 offers better scalability for larger LNNs and significantly reduces the computational time. Table II fixes LV = 2 and varies γV , reporting the verification time and success rate (over four random seeds) for each example. We use Sandwich Layers [28] for this section and set Ψ(ℓ) = I for Vθ1 throughout. The network struc-tures and hyperparameters are given in Tables VIII and VII. Appendix F reports results with the Spectral Normalization [26] and Orthogonal Layer [27] architectures, showing that the speedups are consistent and independent of the underlying Lipschitz parameterization. All verifications are run on a PC with 64 GB RAM, an Intel Core i9-13900K, and an NVIDIA GeForce RTX 4090 GPU. 
+
+A. Inverted Pendulum 
+
+We consider the stationary inverted pendulum system (see Fig. 4(a)) with dynamics 
+
+˙x1 = x2, ˙x2 = [ mgl sin( x1) + u + d(t, x )] /ml 2 (31) where x1 represents the angle between the pendulum and the upward direction and x2 the angular velocity with the state space being X = {x ∈ R2 | | x1| ≤ π, |x2| ≤ 3}.The input u ∈ R is the torque applied to the pendulum with U = [−15 , 15] . We consider a disturbance signal 
+
+d(t, x ) = d0 sin(2 πt ) − d1x2 where d0 sin(2 πt ) represents a time-varying external torque and −d1x2 the viscous friction proportional to the angular velocity. The system parameters are m = 1 .0 kg , l = 1 .0 m , g = 9 .81 m s −2, d0 = 0 .1 N m ,and d1 = 0 .1 N m s . As shown in Fig. 5(a) and Table III, our method achieves a much larger forward invariant region than LQR and NLC [14]. The region where H(x) + ω(x) > 0 is contained in B2(0 , μ ) with μ = 0 .3 as depicted in Fig. 5(b). The verified forward invariant region is ΩbVr with bVr = 1 .19      
+
+> (a) Vθ1(x)(b) H(x) + ω(x)
+
+Fig. 6 : Visualization of Vθ1 (x) and H(x)+ ω(x) for the unicycle path following example. (a): level sets of Vθ1 (x) and the largest forward invariant sets given by our method, LQR, and NLC. (b): level sets of H(x) + ω(x) and the cutoff region B2(0 , μ ).
+
+TABLE IV : Forward invariant region ratio (%) for unicycle.            
+
+> LQR NLC Ours ( LV=2 )Ours ( LV=3 )Ours ( LV=4 )50.58 44.09 62.06 62.51 63.88
+
+which is greater than γV μ in this case, so B2(0 , μ ) must be contained within ΩbVr . We sample 200 initial conditions on the boundary of ΩbVr , and the average control effort ( R T 
+
+> 0
+
+∥u(t)∥22dt )of LQR, NLC, and our method is 353.93, 302.63, and 255.95, respectively. The average settling time ( inf {τ ≥ 0 | ∥ x(t)∥2 ≤
+
+0.05 , ∀t ≥ τ }) is 11.38 s, 8.45 s, and 9.65 s, respectively. 
+
+B. Unicycle Path Following 
+
+Consider the unicycle path following example depicted in Fig. 4(b). Denote by θp the angle between the current tangent to the path and the horizontal direction and θu the angle between the unicycle velocity and the horizontal direction. Let 
+
+x1 be the distance between the center of the unicycle and the path and x2 = θu − θp the orientation error. In the case of following a circular path [43], the dynamics are given by 
+
+˙x1 = v sin( x2), ˙x2 = u − v cos( x2)
+
+R − x1
+
++ d(t) (32) where v ∈ R+ is the fixed linear velocity of the unicycle, 
+
+R ∈ R+ is the radius of the circular path, and the control 
+
+u ∈ R is the angular velocity of the unicycle. The disturbance signal d(t) represents the uncertainties in the dynamics of orientation error (e.g., input noise). Assume that d(t) takes the form d(t) = d0 cos(2 πt ), and the system parameters are 
+
+v = 2 m s −1, R = 10 m , and d0 = 0 .1 s −1. Let the state space be X = {x ∈ R2 | | x1| ≤ 1, |x2| ≤ 1} and control limits U = [ −3.8, 4.2] . As we still need to generate a control equal to v/R at the equilibrium point (0 , 0) , we apply a change of variable u = v/R + ˜ u to shift the control to zero at x = 0 .We see from Fig. 6(a) and Table IV that our method obtains a larger forward invariant region than LQR and NLC. As shown in Fig. 6(b), the region where H(x) + ω(x) > 0 is contained in B2(0 , μ ) with μ = 0 .2. As the verified forward invariant region is ΩbVr with bVr = 0 .32 which is greater than 
+
+γV μ in this case, B2(0 , μ ) must be contained within ΩbVr . We sample 200 initial conditions on the boundary of ΩbVr , and the average control effort ( R T 
+
+> 0
+
+∥˜u(t)∥22dt ) of LQR, NLC, and AUTHOR et al. : TITLE 11                            
+
+> (a) Vθ1(x)on (x1, x 2)(b) Vθ1(x)on (x1, x 3)
+> (c) Vθ1(x)on (x2, x 3)(d) H(x) + ω(x)on (x1, x 2)
+> (e) H(x) + ω(x)on (x1, x 3)(f) H(x) + ω(x)on (x2, x 3)
+
+Fig. 7 : Visualization of Vθ1 (x) and H(x) + ω(x) for the third-order system. (a)-(c): level sets of Vθ1 (x) and the largest forward invariant sets given by our method, LQR, and NLC. (d)-(f): level sets of H(x) + ω(x) and the cutoff region B2(0 , μ ).
+
+TABLE V : Forward invariant region ratio (%) for the third-order system.            
+
+> LQR NLC Ours ( LV=2 )Ours ( LV=3 )Ours ( LV=4 )0.12 2.59 39.78 40.19 41.89
+
+our method is 0.84, 7.12, and 0.80, respectively. The average settling time ( inf {τ ≥ 0 | ∥ x(t)∥2 ≤ 0.05 , ∀t ≥ τ }) is 4.16 s,4.75 s, and 2.52 s, respectively. 
+
+C. Third-Order System 
+
+Consider the third-order control-affine system proposed in [44]. The dynamics of this system are given by 
+
+˙x1 = −x1 + x3, (33a) 
+
+˙x2 = x21 − x2 − 2x1x3 + x3, (33b) 
+
+˙x3 = −x2 + u + d(t) (33c) where the disturbance signal satisfies |d(t)| ≤ 0.1. Let the state space be X = {x ∈ R3 | | x1| ≤ 5, |x2| ≤ 5, |x3| ≤ 5}
+
+and control limits U = {u ∈ R | | u| ≤ 20 }.We visualize the forward invariant regions given by our method, LQR, and NLC in Figs. 7(a)-7(c). As shown in                   
+
+> (a) Vθ1(x)on (x1, x 2)(b) Vθ1(x)on (x3, x 4)
+> (c) H(x) + ω(x)on (x1, x 2)(d) H(x) + ω(x)on (x3, x 4)
+
+Fig. 8 : Visualization of Vθ1 (x) and H(x) + ω(x) for the cartpole. (a) and (b): level sets of Vθ1 (x) and the largest forward invariant sets given by our method and LQR. (c) and (d): level sets of H(x)+ ω(x)
+
+and the cutoff region B2(0 , μ ).
+
+TABLE VI : Forward invariant region ratio (%) for cartpole.          
+
+> LQR Ours ( LV=2 )Ours ( LV=3 )Ours ( LV=4 )0.19 5.36 5.40 5.43
+
+Figs. 7(d)-7(f), the region where H(x)+ ω(x) > 0 is contained in B2(0 , μ ) with μ = 0 .5. Table V shows that our method achieves a larger forward invariant region than both LQR and NLC, and we note that the LQR solution only gives a locally stable controller with a small forward invariant region. We sample 200 initial conditions on the boundary of ΩbVr ,and under d(t) = 0.1 sin(2 πt ), the average control effort (R T 
+
+> 0
+
+∥˜u(t)∥22dt ) of NLC and our method is 25.81 and 12.59, respectively. The average settling time ( inf {τ ≥ 0 | ∥ x(t)∥2 ≤
+
+0.05 , ∀t ≥ τ }) is 4.81 s and 4.61 s, respectively. Five out of the 200 trajectories are unstable under the LQR controller. 
+
+D. Cartpole 
+
+Consider the cartpole system in Fig. 4(c) with dynamics 
+
+˙x1 = x3, ˙x2 = x4, (34a) 
+
+˙x3 = mp sin( x2)( −lx 24 + g cos( x2)) + u + d(x)
+
+mc + mp sin 2(x2) , (34b) 
+
+˙x4 = 1
+
+l(mc + mp sin 2(x2)) [( mp + mc)g sin( x2)
+
+− mpl sin( x2) cos( x2)x24 + cos( x2)( u + d(x))] (34c) where x1 is the horizontal position of the cart, x2 the angle between the pole and the upward direction in the counter-clockwise direction, x3 the horizontal speed of the cart, x4
+
+the pole’s angular velocity, and u the force applied on the cart in the horizontal direction. d(x) models the friction between 12 IEEE TRANSACTIONS AND JOURNALS TEMPLATE                            
+
+> (a) Vθ1(x)on (x1, x 4)(b) Vθ1(x)on (x2, x 5)
+> (c) Vθ1(x)on (x3, x 6)(d) H(x) + ω(x)on (x1, x 4)
+> (e) H(x) + ω(x)on (x2, x 5)(f) H(x) + ω(x)on (x3, x 6)
+
+Fig. 9 : Visualization of Vθ1 (x) and H(x) + ω(x) for the 2D quadrotor. (a)-(c): level sets of Vθ1 (x) and the largest forward invariant sets given by our method and LQR. (d)-(f): level sets of 
+
+H(x) + ω(x) and the cutoff region B2(0 , μ ).
+
+the cart and the ground, and d(x) = −d0 sgn( x3)( mc + mp)g.Let the state space be X = {x ∈ R4 | | x1| ≤ 0.9, |x2| ≤ 
+
+0.4, |x3| ≤ 1.1, |x4| ≤ 1.4} and control limits U = [ −80 , 80] .The system parameters are mc = 2 kg , mp = 0.1 kg ,
+
+l = 1 m , g = 9 .81 m s −2, and the friction coefficient is 
+
+d0 = 0 .001 . In this case, d(x)  
+
+> mc+mpsin 2(x2)
+
+≤ d(x) 
+
+> mc
+
+= 0 .0104 
+
+and cos( x2)d(x)  
+
+> l(mc+mpsin 2(x2))
+
+≤ d(x) 
+
+> lm c
+
+= 0 .0104 .Figures 8(a) and 8(b) illustrate the forward invariant regions of our method and LQR. Figures 8(c) and 8(d) demonstrate that the set where H(x)+ ω(x) > 0 is entirely contained within the ball B2(0 , μ ) with μ = 0 .05 . Table VI shows that our method achieves a larger forward invariant region than LQR. The training of NLC did not converge within a reasonable time for systems with four or more dimensions. We sample 200 initial conditions on the boundary of ΩbVr . With these same initial conditions, the average control effort ( R T 
+
+> 0
+
+∥u(t)∥22dt )of LQR and our method is 2.43 and 3.04, respectively. The average settling time ( inf {τ ≥ 0 | ∥ x(t)∥2 ≤ 0.05 , ∀t ≥ τ })is 5.56 s and 3.34 s, respectively.        
+
+> (a) ℓ2norm of states x(b) ℓ2norm of ˜u
+
+Fig. 10 : State and control trajectories for the SCARA arm. 
+
+E. 2D Quadrotor 
+
+Consider the 2D quadrotor given in Fig. 4(d) with dynamics 
+
+˙x1 = x4, ˙x2 = x5, ˙x3 = x6, (35a) 
+
+˙x4 = − sin( x3)( u1 + u2)/m + d(t), (35b) 
+
+˙x5 = −g + cos( x3)( u1 + u2)/m, (35c) 
+
+˙x6 = l(−u1 + u2)/I (35d) where x1 and x2 are the horizontal and vertical positions of the quadrotor, x3 is the angle between the body of the quadrotor and the horizontal direction, x4 and x5 are the linear velocities in the horizontal and vertical directions, x6 is the angular velocity, and u1 and u2 are the forces provided by the propellers. Let m be the mass, I the inertia, and l the arm length of the quadrotor. d(t) models the wind effect in the horizontal direction, and we assume that |d(t)| ≤ 0.003 .Let the state space be X = {x ∈ R6 | | x1| ≤ 0.4, |x2| ≤ 
+
+0.3, |x3| ≤ 0.3, |x4| ≤ 0.9, |x5| ≤ 0.5, |x6| ≤ 1.4} and control limits U = {u ∈ R2 | − 7.19 ≤ u1, u 2 ≤ 26 .81 }.The system parameters are m = 2 kg , I = 0.2 kg m 2,
+
+l = 0 .4 m , and g = 9 .81 m s −2. We apply a change of variables u1 = mg/ 2 + ˜ u1 and u2 = mg/ 2 + ˜ u2 to shift the controls to zero at x = 0 .We visualize the forward invariant regions given by our method and LQR in Figs. 9(a)-9(c). Figures 9(d)-9(f) show that the region where H(x) + ω(x) > 0 is contained in B2(0 , μ )
+
+with μ = 0.12 . We sample 200 initial conditions on the boundary of ΩbVr , and the average control effort ( R T 
+
+> 0
+
+∥˜u(t)∥22dt )of LQR and our method is 0.38 and 0.43, respectively. The average settling time ( inf {τ ≥ 0 | ∥ x(t)∥2 ≤ 0.05 , ∀t ≥ τ })is 4.81 s and 1.95 s, respectively. 
+
+F. SCARA Arm 
+
+Consider the 8-state SCARA arm in Fig. 4(e) with dynamics given in [45, Example 4.4]. The SCARA arm has three revolute joints and one prismatic joint. The states x1, ..., x 4
+
+represent the joint angles/positions and x5, ..., x 8 represent the joint velocities. The arm is fully actuated, and u1, ..., u 4
+
+are the input joint torques/forces. We consider a vertical force |fl(t)| ≤ 0.025 N applied at the end-effector as the disturbance. Let the state space be X = {x ∈ R8 ||x1| ≤ 0.59 , |x2| ≤ 0.51 , |x3| ≤ 0.51 , |x4| ≤ 0.50 , |x5| ≤ 
+
+0.79 , |x6| ≤ 1.39 , |x7| ≤ 1.00 , |x8| ≤ 0.71 } and control limits U = {u ∈ R4 | | u1| ≤ 4.52 , |u2| ≤ 3.06 , |u3| ≤ 
+
+1.67 , 3.62 ≤ u4 ≤ 6.19 }. The system parameters are the link masses m1 = 2.0, m 2 = 1.0, m 3 = m4 = 0.5 kg ,AUTHOR et al. : TITLE 13 
+
+moments of inertia Iz1 = Iz2 = Iz3 = Iz4 = 0 .1 kg m 2,link lengths l1 = l2 = 0 .4 m , and distances to the center of mass r1 = r2 = 0 .2 m . We apply a change of variables 
+
+˜u1 = u1, ˜u2 = u2, ˜u3 = u3, and u4 = m4g + ˜ u4 to shift the controls to zero at x = 0 .We set μ = 0 .24 for this example, and Fig. 10 displays 200 trajectories starting from the boundary of ΩbVr under fl(t) = 0.025 sin(0 .5πt ). With the same initial conditions, the average control effort ( R T 
+
+> 0
+
+∥˜u(t)∥22dt ) of LQR and our method is 0.13 and 0.10, respectively. The average settling time ( inf {τ ≥ 0 |∥x(t)∥2 ≤ 0.05 , ∀t ≥ τ }) is 5.26 s and 5.56 s, respectively. 
+
+VII. C ONCLUSION 
+
+This work presents a novel framework for learning robust control Lyapunov functions and synthesizing stabilizing con-trollers for continuous-time nonlinear systems under additive disturbances upper bounded by a function of state. We estab-lish bounds on the Hessian and third-order derivatives of LNNs and propose a GPU-friendly branch-and-bound verification algorithm. This algorithm substantially reduces verification time compared to previous approaches that either rely solely on zeroth-order bounds or run on CPUs. Simulation studies on six distinct dynamical systems demonstrate the effectiveness and robustness of our approach. While our results show significant advantages over prior approaches, we explicitly acknowledge that scalability to ultra-high-dimensional nonlinear systems (such as large-scale net-worked topologies) remains a fundamental challenge. Because the computational complexity of a BnB-based verifier grows rapidly with the state dimension, formal verification can even-tually become intractable for arbitrary dimensions. Addressing this bottleneck remains an open research direction. Future work will focus on developing dimension-reduction strategies, exploiting decentralized system structures, and incorporating tighter relaxations to further enhance scalability and enable formal verification of increasingly complex systems. 
+
+REFERENCES 
+
+[1] A. M. Lyapunov, “The general problem of the stability of motion,” 
+
+International J. Control , vol. 55, no. 3, pp. 531–534, 1992. [2] C. M. Kellett, “Classical converse theorems in lyapunov’s second method,” arXiv preprint arXiv:1502.04809 , 2015. [3] R. Sepulchre, M. Jankovic, and P. V. Kokotovic, Constructive nonlinear control . Springer Science & Business Media, 2012. [4] P. Giesl and S. Hafstein, “Review on computational methods for Lyapunov functions,” Discrete and Continuous Dynamical Systems - B ,vol. 20, no. 8, pp. 2291–2331, 2015. [5] V. I. Zubov, Methods of AM Lyapunov and their application . US Atomic Energy Commission, 1961, vol. 4439. [6] A. Vannelli and M. Vidyasagar, “Maximal lyapunov functions and domains of attraction for autonomous nonlinear systems,” Automatica ,vol. 21, no. 1, pp. 69–80, 1985. [7] R. Brayton and C. Tong, “Stability of dynamical systems: A constructive approach,” IEEE Transactions on Circuits and Systems , vol. 26, no. 4, pp. 224–234, 1979. [8] T. A. Johansen, “Computation of lyapunov functions for smooth non-linear systems using convex optimization,” Automatica , vol. 36, no. 11, pp. 1617–1626, 2000. [9] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan, Linear matrix inequalities in system and control theory . SIAM, 1994. [10] P. A. Parrilo, Structured semidefinite programs and semialgebraic ge-ometry methods in robustness and optimization . California Institute of Technology, 2000. [11] M. M. Peet, “Exponentially stable nonlinear systems have polynomial Lyapunov functions on bounded regions,” IEEE Transactions on Auto-matic Control , vol. 54, no. 5, pp. 979–987, 2009. [12] M. M. Peet and A. Papachristodoulou, “A converse sum of squares Lyapunov result with a degree bound,” IEEE Transactions on Automatic Control , vol. 57, no. 9, pp. 2281–2293, 2012. [13] W. Jongeneel and R. Schwan, “On continuation and convex lyapunov functions,” IEEE Transactions on Automatic Control , 2024. [14] Y.-C. Chang, N. Roohi, and S. Gao, “Neural Lyapunov control,” in Proc. Conf. on Neural Information Processing Systems , (Vancouver, Canada), Dec. 2019. [15] R. Zhou, T. Quartz, H. De Sterck, and J. Liu, “Neural Lyapunov control of unknown nonlinear systems with stability guarantees,” in Proc. Conf. on Neural Information Processing Systems , (New Orleans, LA), Nov. 2022. [16] J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou, “Physics-informed neural network lyapunov functions: Pde characterization, learning, and verification,” Automatica , vol. 175, p. 112193, 2025. [17] A. Abate, D. Ahmed, M. Giacobbe, and A. Peruffo, “Formal synthesis of Lyapunov neural networks,” IEEE Control Systems Letters , vol. 5, no. 3, pp. 773–778, 2020. [18] J. Cheng, R. Wang, and I. R. Manchester, “Learning stable and passive neural differential equations,” in Proc. IEEE Conf. on Decision and Control , (Milan, Italy), Dec 2024. [19] R. Wang, K. Dvijotham, and I. R. Manchester, “Monotone, bi-Lipschitz, and Polyak-Lojasiewicz networks,” in Proc. International Conf. on Machine Learning , (Vienna, Austria), July 2024. [20] H. Dai, B. Landry, L. Yang, M. Pavone, and R. Tedrake, “Lyapunov-stable neural-network control,” in Proc. Robotics: Science and Systems ,(Virtual), July 2021. [21] J. Wu, A. Clark, Y. Kantaros, and Y. Vorobeychik, “Neural Lyapunov control for discrete-time systems,” in Proc. Conf. on Neural Information Processing Systems , vol. 36, (New Orleans, LA), Dec. 2023, pp. 2939– 2955. [22] L. Yang, H. Dai, Z. Shi, C.-J. Hsieh, R. Tedrake, and H. Zhang, “Lyapunov-stable neural control for state and output feedback: A novel formulation,” in Proc. International Conf. on Machine Learning , (Vi-enna, Austria), July 2024. [23] S. Wang, H. Zhang, K. Xu, X. Lin, S. Jana, C.-J. Hsieh, and J. Z. Kolter, “Beta-crown: Efficient bound propagation with per-neuron split constraints for neural network robustness verification,” in Proc. Conf. on Neural Inf. Processing Systems , (Virtual), Dec 2021. [24] C. Dawson, Z. Qin, S. Gao, and C. Fan, “Safe nonlinear control using robust neural Lyapunov-barrier functions,” in Proc. Conf. on Robot Learning , (Auckland, NZ), Dec. 2022, pp. 1724–1735. [25] R. C. Rego and F. M. de Ara´ ujo, “Learning-based robust neuro-control: A method to compute control Lyapunov functions,” International Jour-nal of Robust and Nonlinear Control , vol. 32, no. 5, pp. 2644–2661, 2022. [26] T. Miyato, T. Kataoka, M. Koyama, and Y. Yoshida, “Spectral normal-ization for generative adversarial networks,” in Proc. International Conf. on Learning Representations , (Vancouver, Canada), April 2018. [27] A. Trockman and J. Z. Kolter, “Orthogonalizing convolutional layers with the Cayley transform,” in Proc. International Conf. on Learning Representations , (Virtual), May 2021. [28] R. Wang and I. Manchester, “Direct parameterization of Lipschitz-bounded deep networks,” in Proc. International Conf. on Machine Learning , (Honolulu, HI), July 2023. [29] S. Gao, S. Kong, and E. M. Clarke, “dreal: An smt solver for nonlinear theories over the reals,” in Proc. International Conference on Automated Deduction , Lake Placid, NY, June 2013, pp. 208–214. [30] C. Szegedy, W. Zaremba, I. Sutskever, J. Bruna, D. Erhan, I. Goodfellow, and R. Fergus, “Intriguing properties of neural networks,” in Proc. International Conf. on Learning Representations , (Banff, Canada), April 2014. [31] H. K. Khalil, “Nonlinear systems third edition,” Patience Hall , vol. 115, 2002. [32] F. Blanchini and S. Miani, Set-theoretic methods in control . Springer, 2015. [33] Z. Artstein, “Stabilization with relaxed controls,” Nonlinear Analysis: Theory Methods & Appl. , vol. 7, no. 11, pp. 1163–1173, 1983. [34] S. Singla and S. Feizi, “Second-order provable defenses against adversar-ial attacks,” in Proc. International Conf. on Machine Learning , (Virtual), July 2020. 14 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+[35] S. Srinivas, K. Matoba, H. Lakkaraju, and F. Fleuret, “Efficient training of low-curvature neural networks,” in Proc. Conf. on Neural Information Processing Systems , (New Orleans, LA), Dec 2022. [36] G. Neustroev, M. Giacobbe, and A. Lukina, “Neural continuous-time supermartingale certificates,” in Proc. the AAAI Conference on Artificial Intelligence , (Philadelphia, PA), February 2025. [37] M. Hein and M. Andriushchenko, “Formal guarantees on the robustness of a classifier against adversarial manipulation,” in Proc. Conf. on Neural Information Processing Systems , (Long Beach, CA), Dec 2017. [38] S. Wang, K. Pei, J. Whitehouse, J. Yang, and S. Jana, “Efficient formal safety analysis of neural networks,” in Proc. Conf. on Neural Information Processing Systems , (Montr´ eal, Canada), Dec 2018. [39] E. Wong and Z. Kolter, “Provable defenses against adversarial examples via the convex outer adversarial polytope,” in Proc. International Conf. on Machine Learning , (Stockholm, Sweden), July 2018. [40] M. Fazlyab, M. Morari, and G. J. Pappas, “Safety verification and robustness analysis of neural networks via quadratic constraints and semidefinite programming,” IEEE Transactions on Automatic Control ,vol. 67, no. 1, pp. 1–15, 2020. [41] V. Balakrishnan, S. Boyd, and S. Balemi, “Branch and bound algorithm for computing the minimum stability degree of parameter-dependent linear systems,” International Journal of Robust and Nonlinear Control ,vol. 1, no. 4, pp. 295–317, 1991. [42] M. D. Kvalheim and E. D. Sontag, “Global linearization of asymptoti-cally stable systems without hyperbolicity,” Systems & Control Letters ,vol. 203, p. 106163, 2025. [43] A. De Luca, G. Oriolo, and C. Samson, “Feedback control of anonholonomic car-like robot,” Robot motion planning and control , pp. 171–253, 2005. [44] V. Andrieu and C. Prieur, “Uniting two control lyapunov functions for affine systems,” IEEE Transactions on Automatic Control , vol. 55, no. 8, pp. 1923–1927, 2010. [45] R. M. Murray, Z. Li, and S. S. Sastry, A mathematical introduction to robotic manipulation . CRC press, 2017. 
+
+APPENDIX 
+
+A. Training Details 
+
+The hyperparameters used for training and verification are listed in Table VII. Table VIII presents the network structures and activation functions used for each example. Our framework utilizes LQR pretraining to provide a crucial “warm start” that ensures local stability, as training from random initialization frequently fails for high-dimensional systems. Several existing works on neural Lyapunov functions also use the LQR solution as a prior [14], [15], [21]. The prescribed Lipschitz bounds of the controllers ( γπ ) are set to match or slightly exceed the spectral norm of the baseline LQR gain matrix to guarantee sufficient mathematical expressivity and control authority. In practical deployments, the sensitivity to measurement noise inherent to high-gain controllers can be effectively mitigated by routing raw measurements through standard state estimators or filters. 
+
+TABLE VII : Hyperparameters used for each example. 
+
+Example γV γπ η μ ω(x)
+
+Inverted Pendulum 1.0 38.0 0.1 0.3 0.02 ∥x∥2
+
+Unicycle 1.0 3.0 0.05 0.2 0.001 ∥x∥2
+
+Third-Order System 5.0 12.5 0.5 0.5 0.001 ∥x∥2
+
+Cartpole 1.0 84.0 0.05 0.05 10 −5∥x∥2
+
+2D Quadrotor 1.0 24.0 0.1 0.12 10 −6∥x∥2
+
+SCARA Arm 1.0 3.0 0.1 0.24 10 −6∥x∥2 
+
+> a
+
+δpositive = δdecrease = δinclusion = 10 −6 for all examples. 
+
+TABLE VIII : Neural network structures and activations. 
+
+Example Vθ1 πθ2
+
+2-layer 3-layer 4-layer 2-layer Inverted Pendulum [2, 128, 1] [tanh, id] [2, 128x2, 1] [tanh x2, id] [2, 128x3, 1] [tanh x3, id] [2, 32, 1] [ReLU, id] Unicycle [2, 128, 1] [tanh, id] [2, 128x2, 1] [tanh x2, id] [2, 128x3, 1] [tanh x3, id] [2, 32, 1] [ReLU, id] Third-Order System [3, 128, 1] [tanh, id] [3, 128x2, 1] [tanh x2, id] [3, 128x3, 1] [tanh x3, id] [3, 32, 1] [ReLU, id] Cartpole [4, 128, 1] [tanh, id] [4, 128x2, 1] [tanh x2, id] [4, 128x3, 1] [tanh x3, id] [4, 32, 1] [ReLU, id] 2D Quadrotor [6, 128, 1] [tanh, id] – – [6, 32, 2] [ReLU, id] SCARA Arm [8, 128, 1] [tanh, id] – – [8, 32, 4] [ReLU, id] 
+
+B. Proof of Lemma 2 
+
+Consider the LNN F (x) defined in (3). By Lemma 1, the Jacobian of Fi(x) (the i-th component of F (x))w.r.t. x is ∂F i(x) 
+
+> ∂x
+
+= ∂F i(x) 
+
+> ∂h (L−1)
+> ∂h (L−1)
+> ∂h (L−2)
+
+· · · ∂h (1)  
+
+> ∂h (0)
+> ∂h (0)
+> ∂x
+
+.Further differentiate ∂F i(x) 
+
+> ∂x
+
+w.r.t. xj and we have   
+
+> ∂2Fi(x)
+> ∂x j∂x
+
+= PL−1  
+
+> ℓ=1
+> ∂F i(x)
+> ∂h (ℓ)
+> ∂2h(ℓ)
+> ∂x j∂h (ℓ−1)
+> ∂h (ℓ−1)
+> ∂x
+
+because ∂F i(x)
+
+> ∂h (L−1)
+
+= √γW (L) 
+
+> i
+
+and ∂h (0)  
+
+> ∂x
+
+= √γI are both independent of x. For ℓ = 1, ..., L − 1, we get from Lemma 1that ∂2h(ℓ)  
+
+> ∂x j∂h (ℓ−1)
+
+= U (ℓ) diag  σ(ℓ)′′ (z(ℓ)) ⊙ ∂z (ℓ)
+
+> ∂x j
+
+W (ℓ).Next, plug ∂2h(ℓ)  
+
+> ∂x j∂h (ℓ−1)
+
+into ∂2Fi(x)  
+
+> ∂x j∂x
+
+and we get   
+
+> ∂2Fi(x)
+> ∂x j∂x
+
+= PL−1 
+
+> ℓ=1
+> ∂F i(x)
+> ∂h (ℓ)
+
+U (ℓ) diag  σ(ℓ)′′ (z(ℓ)) ⊙ ∂z (ℓ)
+
+> ∂x j
+
+W (ℓ) 
+
+> ∂h (ℓ−1)
+> ∂x
+
+= PL−1 
+
+> ℓ=1
+
+( ∂z (ℓ) 
+
+> ∂x j
+
+)⊤ diag  σ(ℓ)′′ (z(ℓ)) ⊙ ( ∂F i(x) 
+
+> ∂h (ℓ)
+
+U (ℓ))⊤
+
+W (ℓ) ∂h (ℓ−1)  
+
+> ∂x
+
+where we use the fact that a diag( b ⊙ c) =
+
+c⊤ diag( b ⊙ a⊤) for a row vector a and two column vectors b and c of the same length. Finally, noting that  
+
+> ∂z (ℓ)
+> ∂x
+
+= W (ℓ) ∂h (ℓ−1)  
+
+> ∂x
+
+for ℓ = 1, ..., L − 1 and stacking   
+
+> ∂2Fi(x)
+> ∂x j∂x
+
+∈ R1×nx vertically, we obtain the desired result. 
+
+C. Proof of Theorem 2 
+
+Before proving Theorem 2, we establish the bounds on the forward Hessian ∂2h(ℓ)   
+
+> ∂x j∂x 2
+
+for ℓ = 0 , . . . , L − 2, and the backward Hessian ∂2Fi(x)   
+
+> ∂x j∂h (ℓ)2
+
+for ℓ = 1 , . . . , L − 1.
+
+Forward Bound (20) . When ℓ = 0 , the bound is 0 since 
+
+h(0) = √γx . For ℓ ≥ 1, we expand using the chain rule:   
+
+> ∂2h(ℓ)
+> ∂x j∂x
+
+= Pℓk=1 ∂h (ℓ)  
+
+> ∂h (k)
+> ∂2h(k)
+> ∂x j∂h (k−1)
+> ∂h (k−1)
+> ∂x
+
+. We know the local Hessian is ∂2h(k)  
+
+> ∂x j∂h (k−1)
+
+= U (k) diag   ∂z (k) 
+
+> ∂x j
+
+⊙ σ(k)′′ (z(k))W (k).Applying Cauchy–Schwarz inequality, its spectral norm is bounded by ∥c(U (k))∥∞ ∂z (k)  
+
+> ∂x j2
+
+sup |σ(k)′′ |∥ W (k)∥2. Be-cause ∂z (k)  
+
+> ∂x j2
+
+≤ ∥ W (k)∥2 ∂h (k−1)   
+
+> ∂x j2
+
+≤ √γ∥W (k)∥2, we have ∂2h(k)   
+
+> ∂x j∂h (k−1) 2
+
+≤ √γ∥c(U (k))∥∞∥W (k)∥22 sup |σ(k)′′ |.As ∥ ∂h (ℓ) 
+
+> ∂h (k)
+
+∥2 ≤ 1 and ∥ ∂h (k−1)  
+
+> ∂x
+
+∥2 ≤ √γ, the summation simplifies to (20). 
+
+Backward Bound (21) . When ℓ = L − 1, the bound is 0 because F (x) = √γW (L)h(L−1) is purely linear with respect to h(L−1) . For ℓ ≤ L − 2, we have ∂2Fi(x)  
+
+> ∂x j∂h (ℓ)
+
+=AUTHOR et al. : TITLE 15 
+
+PL−1  
+
+> k=ℓ+1
+> ∂F i(x)
+> ∂h (k)
+> ∂2h(k)
+> ∂x j∂h (k−1)
+> ∂h (k−1)
+> ∂h (ℓ)
+
+. Taking the spectral norm and applying sub-multiplicativity yields: ∂2Fi(x)   
+
+> ∂x j∂h (ℓ)2
+
+≤
+
+PL−1    
+
+> k=ℓ+1
+> ∂F i(x)
+> ∂h (k)2
+> ∂2h(k)
+> ∂x j∂h (k−1) 2
+> ∂h (k−1)
+> ∂h (ℓ)2
+
+. We already es-tablished that the local Hessian norm is bounded by 
+
+√γ∥c(U (k))∥∞∥W (k)∥22 sup |σ(k)′′ |. Furthermore, due to the 1-Lipschitz property of the intermediate layers, ∂h (k−1)   
+
+> ∂h (ℓ)2
+
+≤
+
+1 and ∂F i(x)  
+
+> ∂h (k)2
+
+≤ √γ. Substituting these three bounds directly into the summation yields the backward bound (21). 
+
+Bound on ∂3Fi(x) 
+
+> ∂x 2∂x j2
+
+. With Θ(ℓ) = W (ℓ) ∂h (ℓ−1)  
+
+> ∂x
+
+and 
+
+Λ(ℓ) = diag( λ(ℓ)), λ(ℓ) = ( ∂F i(x) 
+
+> ∂h (ℓ)
+
+U (ℓ))⊤ ⊙ σ(ℓ)′′ (z(ℓ)), we have ∂3Fi(x) 
+
+> ∂x 2∂x j
+
+= PL−1 
+
+> ℓ=1
+
+Θ(ℓ)⊤Λ(ℓ) ∂Θ(ℓ) 
+
+> ∂x j
+
++ ∂Θ(ℓ)⊤ 
+
+> ∂x j
+
+Λ(ℓ)Θ(ℓ) +Θ(ℓ)⊤ diag( p(ℓ))Θ (ℓ) + Θ (ℓ)⊤ diag( q(ℓ))Θ (ℓ), where p(ℓ) =( ∂2Fi(x)  
+
+> ∂x j∂h (ℓ)
+
+U (ℓ))⊤ ⊙ σ(ℓ)′′ (z(ℓ)) and q(ℓ) = ( ∂F i(x) 
+
+> ∂h (ℓ)
+
+U (ℓ))⊤ ⊙
+
+σ(ℓ)′′′ (z(ℓ)) ⊙ ∂z (ℓ) 
+
+> ∂x j
+
+are the two summands of ∂Λ(ℓ) 
+
+> ∂x j
+
+.For any nonnegative weight vector w (indexed by the hidden units of layer ℓ), let Γw := ∥Θ(ℓ)⊤ diag( w)Θ (ℓ)∥2 =
+
+∥diag( w)1/2Θ(ℓ)∥22. Using ∂h (ℓ−1)   
+
+> ∂x 2
+
+≤ √γ, we have 
+
+Γc(U (ℓ)) ≤ γ β (ℓ) and Γc(U (ℓ))⊙r(W (ℓ)) ≤ γ τ (ℓ).
+
+Term Θ(ℓ)⊤ diag( p(ℓ))Θ (ℓ). As in the proof of Theo-rem 1, ∥Θ(ℓ)⊤ diag( p(ℓ))Θ (ℓ)∥2 ≤ Γ|p(ℓ)|. By Cauchy– Schwarz, |p(ℓ) 
+
+> k
+
+| ≤ sup |σ(ℓ)′′ | ∂2Fi(x)  
+
+> ∂x j∂h (ℓ)2
+
+[c(U (ℓ))] k, so 
+
+∥Θ(ℓ)⊤ diag( p(ℓ))Θ (ℓ)∥2 ≤ γ β (ℓ) sup |σ(ℓ)′′ | ∂2Fi(x)  
+
+> ∂x j∂h (ℓ)2
+
+.
+
+Term Θ(ℓ)⊤ diag( q(ℓ))Θ (ℓ). Since ∂z (ℓ) 
+
+> ∂x j
+
+= W (ℓ) ∂h (ℓ−1) 
+
+> ∂x j
+
+and ∂h (ℓ−1)   
+
+> ∂x j2
+
+≤ √γ, we have ( ∂z (ℓ) 
+
+> ∂x j
+
+)k ≤√γ [r(W (ℓ))] k, while ( ∂F i(x) 
+
+> ∂h (ℓ)
+
+U (ℓ))k ≤ √γ [c(U (ℓ))] k
+
+as before. Hence |q(ℓ) 
+
+> k
+
+| ≤ γ sup |σ(ℓ)′′′ |[c(U (ℓ)) ⊙
+
+r(W (ℓ))] k, and ∥Θ(ℓ)⊤ diag( q(ℓ))Θ (ℓ)∥2 ≤ Γ|q(ℓ)| ≤
+
+γ sup |σ(ℓ)′′′ | Γc(U (ℓ))⊙r(W (ℓ)) ≤ γ2 sup |σ(ℓ)′′′ | τ (ℓ).
+
+Term Θ(ℓ)⊤Λ(ℓ) ∂Θ(ℓ) 
+
+> ∂x j
+
+. Θ(ℓ)⊤Λ(ℓ) ∂Θ(ℓ)  
+
+> ∂x j2
+
+≤
+
+diag( |λ(ℓ)|)1/2Θ(ℓ) 
+
+> 2
+
+diag( |λ(ℓ)|)1/2 ∂Θ(ℓ) 
+
+> ∂x j2
+
+, as Λ(ℓ) is diagonal. As |λ(ℓ) 
+
+> k
+
+| ≤ √γ sup |σ(ℓ)′′ |[c(U (ℓ))] k, the first factor obeys ∥diag( |λ(ℓ)|)1/2Θ(ℓ)∥22 ≤ √γ sup |σ(ℓ)′′ | Γc(U (ℓ)) ≤
+
+γ3/2 sup |σ(ℓ)′′ |β(ℓ). For the second, ∂Θ(ℓ) 
+
+> ∂x j
+
+= W (ℓ) ∂2h(ℓ−1)   
+
+> ∂x j∂x
+
+,and it follows that diag( |λ(ℓ)|)1/2 ∂Θ(ℓ) 
+
+> ∂x j
+> 22
+
+≤ √γ sup |σ(ℓ)′′ |
+
+diag( c(U (ℓ))) 1/2W (ℓ) 22  
+
+> ∂2h(ℓ−1)
+> ∂x j∂x
+> 22
+
+= √γ sup |σ(ℓ)′′ |
+
+β(ℓ) ∂2h(ℓ−1)  
+
+> ∂x j∂x
+> 22
+
+. Taking the square root, ∥Θ(ℓ)⊤Λ(ℓ) ∂Θ(ℓ) 
+
+> ∂x j
+
+∥2
+
+≤ γ β (ℓ) sup |σ(ℓ)′′ |∥ ∂2h(ℓ−1)   
+
+> ∂x j∂x
+
+∥2.As ∥Θ(ℓ)⊤Λ(ℓ) ∂Θ(ℓ) 
+
+> ∂x j
+
+∥2 = ∥ ∂Θ(ℓ)⊤ 
+
+> ∂x j
+
+Λ(ℓ)Θ(ℓ)∥2, summing these terms over ℓ = 1 , . . . , L − 1 yields (19). 
+
+D. High-order Lower Bound for Φ(x) = −H(x) − ω(x)
+
+The target function for verifying the decrease condition is 
+
+Φ( x) = −H(x)−ω(x), where H(x) def 
+
+= ∂V θ1 
+
+> ∂x
+
+(x)f (x, π θ2 (x))+ 
+
+∥ ∂V θ1 
+
+> ∂x
+
+(x)G∥2ϵ(x). Because πθ2 and the ℓ2-norm operator are only C0, a direct Taylor expansion of H(x) is impossible. In-stead, we decompose H(x) = H1(x)+ H2(x) where H1(x) =  
+
+> ∂V θ1
+> ∂x
+
+(x)f (x, π θ2 (x)) and H2(x) = ∥ ∂V θ1 
+
+> ∂x
+
+(x)G∥2ϵ(x). Given a rectangle Q, let xm be its midpoint, v be its half-width vector, 
+
+ζ = ∥v∥2, and UQ the hyperrectangle formed by the element-wise lower and upper bounds of πθ2 on Q. To rigorously lower bound Φ( x), we will derive upper bounds for H1(x), H2(x),and ω(x) on Q.
+
+Taylor Expansions. Because f is C2, we can expand the system dynamics around xm. For any x ∈ Q
+
+there exists λ′ 
+
+> i
+
+∈ (0 , 1) defining the intermediate points 
+
+x′ 
+
+> i
+
+= xm + λ′
+
+> i
+
+(x − xm) and u′ 
+
+> i
+
+= πθ2 (xm) + λ′
+
+> i
+
+(πθ2 (x) −
+
+πθ2 (xm)) such that f (x, π θ2 (x)) = f (xm, π θ2 (xm)) +  
+
+> ∂f ∂x
+
+(xm, π θ2 (xm))( x − xm) + ∂f ∂u (xm, π θ2 (xm))( πθ2 (x) −
+
+πθ2 (xm)) + [ 12 (x − xm)⊤ ∂2fi 
+
+> ∂x 2
+
+(x′
+
+> i
+
+, u ′
+
+> i
+
+)( x − xm)] i + [ 12 (x −
+
+xm)⊤ ∂2fi 
+
+> ∂u∂x
+
+(x′
+
+> i
+
+, u ′
+
+> i
+
+)( πθ2 (x) − πθ2 (xm))] i + [ 12 (πθ2 (x) −
+
+πθ2 (xm)) ⊤ ∂2fi 
+
+> ∂x∂u
+
+(x′
+
+> i
+
+, u ′
+
+> i
+
+)( x − xm)] i + [ 12 (πθ2 (x) −
+
+πθ2 (xm)) ⊤ ∂2fi 
+
+> ∂u 2
+
+(x′
+
+> i
+
+, u ′
+
+> i
+
+)( πθ2 (x) − πθ2 (xm))] i.Similarly, because Vθ1 is C3, for λ′′  
+
+> i
+
+∈ (0 , 1) and interme-diate points x′′  
+
+> i
+
+= xm + λ′′  
+
+> i
+
+(x − xm), ∂V θ1 
+
+> ∂x
+
+(x) = ∂V θ1 
+
+> ∂x
+
+(xm) + (x − xm)⊤ ∂2Vθ1 
+
+> ∂x 2
+
+(xm) + [ 12 (x − xm)⊤ ∂3Vθ1 
+
+> ∂x 2∂x i
+
+(x′′  
+
+> i
+
+)( x − xm)] i.
+
+Bounding H1(x). By multiplying the expansions above and bounding the higher-order remainder terms using the maximum spectral norms over the domain, we obtain an upper bound for H1(x): H1(x) ≤ H1(xm) + | ∂V θ1 
+
+> ∂x
+
+(xm) 
+
+> ∂f ∂x
+
+(xm, π θ2 (xm)) + f ⊤(xm, π θ2 (xm)) ∂2Vθ1 
+
+> ∂x 2
+
+(xm)|v +
+
+∥ ∂V θ1 
+
+> ∂x
+
+(xm) ∂f ∂u (xm, π θ2 (xm)) ∥2γπ ζ + 12 | ∂V θ1 
+
+> ∂x
+
+(xm)|hf ζ2 +
+
+v⊤| ∂2Vθ1 
+
+> ∂x 2
+
+(xm) ∂f ∂x (xm, π θ2 (xm)) |v + ∥v⊤| ∂2Vθ1 
+
+> ∂x 2
+
+(xm) 
+
+> ∂f ∂u
+
+(xm, π θ2 (xm)) |∥ 2γπ ζ + 12 t⊤ 
+
+> V
+
+|f (xm, π θ2 (xm)) |ζ2 + 
+
+> 12
+
+v⊤| ∂2Vθ1 
+
+> ∂x 2
+
+(xm)|hf ζ2 + 12 t⊤ 
+
+> V
+
+| ∂f ∂x (xm, π θ2 (xm)) |vζ 2
+
++ 12 ∥t⊤ 
+
+> V
+
+| ∂f ∂u (xm, π θ2 (xm)) |∥ 2γπ ζ3 + 14 t⊤ 
+
+> V
+
+hf ζ4 where 
+
+γπ ≥ Lip( πθ2 ), and the elements of the vectors hf and tV
+
+are defined as: hf,i = 2γπ max x∈Q,u ∈UQ ∥ ∂2fi 
+
+> ∂x∂u
+
+(x, u )∥2 +
+
+γ2 
+
+> π
+
+max x∈Q,u ∈UQ ∥ ∂2fi 
+
+> ∂u 2
+
+(x, u )∥2 +max x∈Q,u ∈UQ ∥ ∂2fi 
+
+> ∂x 2
+
+(x, u )∥2
+
+and tV,i = TV with TV ≥ sup x∈Rnx ∥ ∂3Vθ1 
+
+> ∂x 2∂x j
+
+(x)∥2 for all j.
+
+Bounding H2(x) and ω(x). Applying similar expan-sions and norm inequalities to the disturbance term H2(x),we have: H2(x) ≤ ∥| ∂V θ1 
+
+> ∂x
+
+(xm)G| + v⊤| ∂2Vθ1 
+
+> ∂x 2
+
+(xm)G| + 
+
+> 12
+
+t⊤ 
+
+> V
+
+|G|ζ2∥2(ϵ(xm) + Kϵζ) where Kϵ ≥ Lip( ϵ). Finally, the function ω(x) is upper bounded by ω(x) ≤ ω(xm) + Kω ζ
+
+where Kω ≥ Lip( ω).By combining the upper bounds of H1, H2, and ω, we obtain the required high-order lower bound for the verification target min x∈Q Φ( x).
+
+E. Comparison between the Zeroth- and High-Order Bounds 
+
+Table IX compares the verification times of Algorithm 2 when using only the zeroth-order bounds versus the proposed higher-order bounds with the Sandwich Layers [28]. While the algorithm is theoretically capable of running solely with the zeroth-order bounds, doing so quickly becomes computation-ally intractable. As demonstrated empirically, the zeroth-order baseline consistently times out on the positive definiteness and decrease conditions for systems with state dimensions nx ≥ 4,highlighting the necessity of the higher-order bounds. 16 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+TABLE IX : Verification times (in seconds unless otherwise specified) for each system using different bounds on GPU (average over four trials). ZO: zeroth-order. HO: high-order.                                                                       
+
+> System LVPos. Def. Decrease Inclusion ZO HO ZO HO ZO HO Inverted Pendulum 20.16 0.31 0.17 0.71 ––30.17 0.30 0.18 0.71 ––40.16 0.33 0.19 0.62 ––Cartpole 2>4h0.39 >4h17.87 0.45 0.12
+> 3>4h0.43 >4h48.09 0.46 0.12
+> 4>4h0.55 >4h127.40 0.46 0.13
+> SCARA Arm 2>12 h151.90 >12 h9.53 h5.02 h7.92
+
+F. Additional Results with the Spectral Normalization and Orthogonal Layer Architectures 
+
+In Tables X and XI, we report the performance of the BnB algorithm on the inverted pendulum and the cartpole when integrated with the Spectral Normalization [26] and Or-thogonal Layer [27] architectures, respectively. These results demonstrate that the computational speedups achieved by our BnB algorithm are consistent and independent of the specific underlying Lipschitz parameterization. Furthermore, our empirical evaluations indicate that the Sandwich Layer architecture [28] offers superior expressivity compared to the other two architectures. For instance, in the inverted pendulum example, the average verified forward-invariant region covers 59.52% of the state space when using Spectral Normalization and 61.31% with Orthogonal Layers, but increases significantly to 73.75% when using Sandwich Layers. Similarly, for the cartpole system, the invariant region volumes are 5.34%, 5.30%, and 5.40% for Spectral Normal-ization, Orthogonal Layer, and Sandwich Layer, respectively. 
+
+TABLE X : Verification times (in seconds) for the Spectral Normal-ization architecture on GPU (average over four trials).                                             
+
+> System LV
+> Pos. Def. Decrease Inclusion
+> α, β -CROWN Ours α, β -CROWN Ours α, β -CROWN Ours Inverted Pendulum 20.92 0.34 4.56 0.98 ––31.24 0.30 6.67 1.03 ––41.64 0.33 8.82 1.02 ––Cartpole 22.58 0.35 NaN 12.45 0.39 0.14
+> 34.63 0.38 NaN 22.56 0.47 0.13
+> 47.69 0.47 NaN 40.59 0.51 0.13
+
+TABLE XI : Verification times (in seconds) for the Orthogonal Layer architecture on GPU (average over four trials).                                             
+
+> System LV
+> Pos. Def. Decrease Inclusion
+> α, β -CROWN Ours α, β -CROWN Ours α, β -CROWN Ours Inverted Pendulum 21.03 0.33 4.68 1.01 ––31.26 0.29 6.72 0.98 ––41.61 0.29 8.77 0.99 ––Cartpole 22.57 0.36 NaN 13.04 0.40 0.14
+> 34.64 0.41 NaN 25.66 0.46 0.13
+> 47.72 0.48 NaN 58.87 0.48 0.13
+
+G. Two-Link Cartesian Arm 
+
+Fig. 11 : Diagram of the two-link Cartesian arm. 
+
+Consider the two-link Cartesian arm depicted in Fig. 11. The dynamics of this system are given by 
+
+˙x1 = x3, ˙x2 = x4 (36a) 
+
+˙x3 = −g + ( u1 − cos( θd(t)) d)/(mℓ1 + mℓ2 ) (36b) 
+
+˙x4 = ( u2 + sin( θd(t)) d)/m ℓ2 (36c) where x1 and x2 are the joint coordinates, x3 and x4 are the joint velocities, and u1 and u2 are the joint torques controlling the two joints, respectively. Let mℓ1 and mℓ2 be the masses of the two links, and assume that there is an external force 
+
+d acting on the end of the second link, forming a time-varying angle θd(t) with the downward direction. The system parameters are mℓ1 = mℓ2 = 2 kg , g = 9 .81 m s −2, and the external force is d = 0 .1 N . Let the state space be X =
+
+{x ∈ R4 | | x1| ≤ 0.5, |x2| ≤ 0.5, |x3| ≤ 0.5, |x4| ≤ 0.5} and control limits U = {u ∈ R2 | 32 .24 ≤ u1 ≤ 46 .24 , |u2| ≤ 3}.We apply a change of variables u1 = ( mℓ1 + mℓ2 )g + ˜ u1
+
+and u2 = ˜ u2 to shift the controls to zero at x = 0 . Note that  1 
+
+> mℓ1+mℓ2
+
+cos( θd(t)) d, 1
+
+> mℓ2
+
+sin( θd(t)) d⊤ 
+
+> 2
+
+≤ 0.05 .                  
+
+> (a) Vθ1(x)on (x1, x 2)(b) Vθ1(x)on (x3, x 4)
+> (c) H(x) + ω(x)on (x1, x 2)(d) H(x) + ω(x)on (x3, x 4)
+
+Fig. 12 : Visualization of Vθ1 (x) and H(x) + ω(x) for the two-link Cartesian arm. (a) and (b): level sets of Vθ1 (x) and the largest forward invariant sets given by our method and LQR. (c) and (d): level sets of H(x) + ω(x) and the cutoff region B2(0 , μ ).
+
+We visualize the forward invariant regions given by our method and LQR in Figs. 12(a) and 12(b). As shown in AUTHOR et al. : TITLE 17 
+
+Figs. 12(c) and 12(d), the region where H(x) + ω(x) > 0 is contained in B2(0 , μ ) with μ = 0 .1. Table XII shows that our method achieves a larger forward invariant region than LQR. We simulate 200 trajectories starting from the boundary of ΩbVr
+
+under the external force d with θd(t) = 2 πt . With the same initial conditions, the average control effort ( R T 
+
+> 0
+
+∥˜u(t)∥22dt )of LQR and our method is 1.71 and 1.81, respectively. The average settling time ( inf {τ ≥ 0 | ∥ x(t)∥2 ≤ 0.05 , ∀t ≥ τ })is 3.81 s and 3.44 s, respectively. 
+
+TABLE XII : Forward invariant region ratio (%) for Cartesian arm.          
+
+> LQR Ours ( LV=2 )Ours ( LV=3 )Ours ( LV=4 )8.62 20.61 22.58 24.38
+
+H. Networked Ring System Example 
+
+We have tested the performance of our method on the following networked ring system: 
+
+˙xi = sin( xi − xi+1 ) + ui (37) with xN +1 = x1 and xi ∈ [−1, 1] up to N = 8 . As shown in Table XIII, our method consistently achieves a larger forward invariant region than the LQR baseline across these dimen-sions. Although our GPU-accelerated framework substantially improves verification speeds, the inherent difficulty of high-dimensional formal verification remains an open challenge across the neural Lyapunov literature. A comprehensive formal treatment of arbitrary N -dimensional networked topologies is an interesting direction for future work. 
+
+TABLE XIII : Forward invariant region ratio (%) for the networked ring system.

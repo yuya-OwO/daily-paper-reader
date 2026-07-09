@@ -1,0 +1,298 @@
+Title: Learning Stable Controlled Dynamical Systems via Input-Contraction Neural Differential Models
+
+URL Source: https://arxiv.org/pdf/2607.05718v1
+
+Published Time: Wed, 08 Jul 2026 00:26:42 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+# Learning Stable Controlled Dynamical Systems via Input-Contraction Neural Differential Models 
+
+Syed Pouladi College of Engineering and Physical Sciences, Khalifa University, Abu Dhabi, United Arab Emirates 
+
+Abstract —Learning continuous-time representations of dynam-ical systems from observation data has emerged as a cornerstone of data-driven control and scientific machine learning. How-ever, existing neural differential equations either treat external control inputs heuristically without providing strict structural guarantees, or enforce stability properties under the restrictive assumption of constant or vanishing inputs. This paper proposes the Input-Contraction Neural Differential Model (ICNDM), a novel deep learning framework that seamlessly incorporates time-varying control inputs while ensuring incremental exponential convergence via input-dependent contraction regularization. By leveraging an embedded input encoder and a parameterized metric network, the proposed architecture learns both the non-autonomous neural vector fields and a generalized Riemannian contraction metric simultaneously. We derive sufficient conditions for input-dependent contraction and formally establish an input-to-state contraction property under bounded external excitations. Extensive numerical evaluations on highly nonlinear chaotic oscillators and experimental data from a Permanent Magnet Synchronous Motor (PMSM) drive system demonstrate that ICNDM yields substantial reductions in long-horizon rollout errors and exhibits superior structural robustness against input perturbations compared with state-of-the-art neural differential benchmarks. 
+
+Index Terms —Neural Ordinary Differential Equations, Con-traction Theory, System Identification, Permanent Magnet Syn-chronous Motor, Physics-Informed Machine Learning. 
+
+I. I NTRODUCTION 
+
+Modeling and predicting the behavior of complex nonlinear dynamical systems from physical observations is an founda-tional challenge in automation, robotics, and industrial process control [4]. Traditional methods rely heavily on physics-based principles, which frequently necessitate simplifying assump-tions, linearization, or laborious parameter calibration [5]. In recent years, data-driven approaches have gained remarkable momentum, driven by the expressive capacity of deep neural networks. In particular, Neural Ordinary Differential Equations (Neural ODEs) [6] have redefined system identification by parameterizing the underlying vector fields as continuous-time neural architectures, providing elegant solutions for handling irregularly sampled time-series data and preserving continuous trajectories. Despite their successful deployment in modeling autonomous behaviors, practical systems in engineering disciplines—such as collaborative robotic arms, autonomous intelligent vehicles, and power electronics networks— inherently evolve under external time-varying control actions. To generalize neural architectures to these controlled configurations, several extensions have emerged, such as Controlled Neural Differential Equations (Neural CDEs) [7], Universal Differential Equations (UDEs) [8], and the ICODE framework [1]. The latter focuses heavily on modeling dynamical structures containing extrinsic input information. Concurrently, ControlSynth Neural ODEs [2] established methods to model dynamical representations with strict convergence guarantees. However, a persistent bottleneck in these formulations is the absence of rigorous closed-loop stability guarantees under generic, non-vanishing input sequences. Since data-driven approximations inevitably suffer from subtle interpolation and extrapolation errors, recursively integrating an unconstrained neural vector field over extended horizons often leads to error accumulation, state divergence, and extreme sensitivity to external perturbations [10]. To address this instability, several researchers have in-corporated contraction analysis [9], contraction metrics [11], or differential neural structures [3] to bound trajectories. Traditional contraction analysis investigates the incremental stability between any pair of neighboring trajectories under a specified metric [12]. When applied to Neural ODEs, enforcing a negative-definite Jacobian via customized regu-larization functions ensures that the learned system remains contractive, mapping initial state errors to exponentially de-caying trajectories [13]. However, the overarching limitation of existing contraction-based Neural ODE frameworks lies in their preoccupation with autonomous formulations. When applied directly to open-loop or non-autonomous systems, these methods typically assume constant input scenarios or drop the input dependencies within the contraction metrics altogether, which restricts their generalizability in dynamic environments. This paper bridges the gap between input-aware modeling and structural stability properties. We introduce the Input-Contraction Neural Differential Model (ICNDM), which ex-plicitly models time-varying control actions while guarantee-ing input-to-state contraction through joint metric optimiza-tion. Unlike standard techniques that decouple metric construc-tion from network optimization, our framework utilizes deep neural metric networks alongside input-embedding modules to bound the system’s differential behavior. Our primary contributions are structured as follows:  
+
+> •
+
+We introduce a generalized, input-aware non-autonomous contraction framework capable of representing highly nonlinear controlled dynamical systems while ensuring rigorous asymptotic guarantees. arXiv:2607.05718v1 [eess.SY] 7 Jul 2026 • We derive explicit, verifiable parameter conditions that guarantee incremental exponential convergence and input-to-state contraction under bounded external distur-bances.  
+
+> •
+
+We validate the performance of ICNDM across highly nonlinear benchmarks (Duffing, Van der Pol, and switch-ing Lorenz systems) and a physical Permanent Magnet Synchronous Motor (PMSM) drive dataset, demonstrat-ing superior robustness and minimal long-horizon drift. II. R ELATED WORK 
+
+A. Neural Differential Equations for System Identification 
+
+The integration of machine learning and differential equa-tions has drastically refined classical system identification. Following the introduction of Neural ODEs [6], an array of paradigms emerged to address complex physical traits. Neural CDEs [7] utilize rough path theory to process con-tinuous drive signals, transforming incoming sequences into differential paths. Hamiltonian and Lagrangian Neural Net-works [14] explicitly enforce conservation laws by designing the internal layers to mimic energy landscapes, though they remain limited to conservative, non-dissipative systems. For industrial actuators, specific networks like Differential Neural Networks (DNN) have been utilized for real-time tracking and current state estimation in permanent magnet synchronous motor (PMSM) configurations [3], highlighting the need for structurally stable models in applied electronics. 
+
+B. Contraction Analysis and Monotonic Machine Learning 
+
+Contraction theory, formalized by Lohmiller and Slotine [9], examines incremental stability by monitoring the distance between arbitrary trajectories in a Riemann space. This differs from classical Lyapunov theory as it bypasses the need to identify explicit equilibrium points, making it highly effective for time-varying trajectories. Recently, researchers have inte-grated contraction constraints into deep networks. For instance, Control Contracting Metrics (CCM) have been formulated via semidefinite programming to guarantee global stability in feedback control synthesis [10]. In the deep learning do-main, implicitly constrained architectures and invertible neural networks have sought to enforce monotonicity or lipschitz bounds [15]. However, integrating time-varying exogenous signals directly into the contraction metric without causing overly conservative bounds remains an open challenge. III. P ROBLEM FORMULATION AND MATHEMATICAL 
+
+BACKGROUND 
+
+A. System Description 
+
+Consider a non-autonomous, controlled continuous-time dy-namical system governed by the following nonlinear state equation: 
+
+˙x(t) = f (x(t), u (t)) , x(0) = x0 (1) where x(t) ∈ X ⊂ Rn represents the continuous state vector, and u(t) ∈ U ⊂ Rm characterizes the Lebesgue measurable time-varying control inputs or external excitations. We assume that the mapping f : Rn × Rm → Rn is globally Lipschitz continuous in u, and continuously differentiable with respect to x over the domains of interest. Our main goal is to reconstruct the true vector field f (x, u )
+
+using a parameterized neural vector field fθ (x, u ) based on a collected data corpus D = {{ xi(t), u i(t)}Ti
+
+> t=0
+
+}Ni=1 . Crucially, the learned representation must satisfy three foundational properties: 1) Trajectory Fidelity: High accuracy during single-step and long-horizon forward predictions. 2) Long-Horizon Stability: The forward rollout must re-main bounded and immune to exploding error propaga-tion when integrated over arbitrary horizons. 3) Input Robustness: Well-behaved response curves un-der external high-frequency input noise or unmodeled disturbances. 
+
+B. Foundations of Contraction Theory 
+
+We recall the core principle of contraction theory for non-autonomous systems. Let δx denote a virtual displacement between two neighboring trajectories in the state space. The infinitesimal squared distance is defined via a Riemannian metric tensor M (x) ∈ Rn×n satisfying: 
+
+α1I ⪯ M (x) ⪯ α2I, ∀x ∈ X (2) where α2 ≥ α1 > 0. The generalized differential state equation is given by: 
+
+ddt (δx ) = ∂f (x, u )
+
+∂x δx (3) If the time-derivative of the metric satisfies the contractive relation, the trajectories converge exponentially towards each other, ensuring that initial transient errors vanish asymptoti-cally. IV. T HE INPUT -C ONTRACTION NEURAL DIFFERENTIAL 
+
+MODEL 
+
+To structurally unify time-varying exogenous drives with multi-variable contraction properties, we propose the architec-tural framework detailed below. 
+
+A. Model Architecture and Input Embedding 
+
+The Input-Contraction Neural Differential Model parameter-izes the non-autonomous flow using an explicit input encoder coupled with a state-dependent multilayer perceptron: 
+
+˙x = fθ (x, E ϕ(u)) (4) where Eϕ : Rm → Rk represents a neural input encoder parameterized by weights ϕ, which maps low-dimensional raw input commands into a richer latent space. This design decouples high-frequency control signals from direct algebraic coupling with the state vector, reducing extreme gradient variations during stiff ODE integration steps. B. Joint Neural Metric Metric Formulation 
+
+Concurrently, we construct a deep metric network Mω (x)
+
+to instantiate the Riemannian metric tensor. To structurally guarantee that Mω (x) remains uniformly positive definite for any arbitrary input x, we employ a localized Cholesky decomposition factorization: 
+
+Mω (x) = Lω (x)Lω (x)T + ϵI (5) where Lω (x) is a lower-triangular matrix computed via an auxiliary neural network, and ϵ > 0 represents a small, fixed regularization floor ensuring strict positive definiteness. We define the generalized non-autonomous contraction ma-trix Ψ( x, u ) as follows: 
+
+Ψ( x, u ) = Aθ (x, u )T Mω (x) + Mω (x)Aθ (x, u ) + ˙Mω (x) (6) where Aθ (x, u ) = ∂f θ (x,E ϕ(u))  
+
+> ∂x
+
+is the state Jacobian matrix evaluated at the current operational point, and ˙Mω (x) repre-sents the total time derivative along the system trajectories: 
+
+˙Mω (x) = 
+
+> n
+
+X
+
+> j=1
+
+∂M ω (x)
+
+∂x j
+
+[fθ (x, E ϕ(u))] j (7) 
+
+C. Regularized Objective and Constrained Loss Formulation 
+
+To train the parameters jointly, we introduce a structured objective function that balances nominal data fitting with contractive architectural alignment. The data tracking loss is given by: 
+
+Lpred = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Z Ti
+
+> 0
+
+∥xi(t) − ˆxi(t)∥2dt (8) where ˆxi(t) represents the output generated by the forward ODE solver. To enforce the contraction condition Ψ( x, u ) ⪯ − βM ω (x),we introduce a soft-spectral barrier penalty: 
+
+Lc = Ex∼X ,u ∼U 
+
+h
+
+max (0 , λ max (Ψ( x, u ) + βM ω (x))) 2i
+
+(9) where β > 0 defines the target incremental contraction rate. Furthermore, to regulate the sensitivity of the learned vector field to high-frequency variations in the input vector, we add a Frobenius norm regularizer on the input Jacobian matrix: 
+
+Lu = Ex∼X ,u ∼U 
+
+"
+
+∂f θ (x, E ϕ(u)) 
+
+∂u 
+
+> 2
+> F
+
+#
+
+(10) The final multi-objective loss function minimized during optimization is: 
+
+L(θ, ϕ, ω ) = Lpred + λcLc + λuLu (11) where λc > 0 and λu > 0 represent structural hyper-parameters governing the regularization trade-offs. V. T HEORETICAL ANALYSIS 
+
+In this section, we analyze the structural stability properties of the proposed model, establishing uniform convergence bounds under time-varying inputs. 
+
+Assumption 1. The neural metric network Mω (x) is uniformly bounded, satisfying α1I ⪯ Mω (x) ⪯ α2I for positive constants α1, α 2 > 0 across the operational domain X .
+
+Theorem 1. Let Assumption 1 hold. Suppose that during network optimization, the spectral contraction loss satisfies 
+
+Lc = 0 , meaning there exists a scalar β > 0 such that: 
+
+Ψ( x, u ) ⪯ − βM ω (x), ∀x ∈ X , u ∈ U (12) 
+
+Then, for any two trajectories x1(t) and x2(t) driven by the same control input sequence u(t), the state error converges exponentially according to: 
+
+∥x1(t) − x2(t)∥ ≤ 
+
+r α2
+
+α1
+
+e− β 
+
+> 2t
+
+∥x1(0) − x2(0) ∥ (13) 
+
+Proof. Define a generalized virtual displacement vector be-tween two arbitrary system trajectories as δx . Consider the following Riemannian scalar Lyapunov function candidate: 
+
+V (δx, x ) = δx T Mω (x)δx (14) Taking the total time derivative of V along the differential trajectories yields: 
+
+˙V = ˙δx T Mω (x)δx + δx T Mω (x) ˙δx + δx T ˙Mω (x)δx 
+
+= δx T h
+
+Aθ (x, u )T Mω (x) + Mω (x)Aθ (x, u ) + ˙Mω (x)
+
+i
+
+δx 
+
+= δx T Ψ( x, u )δx (15) Substituting the contraction inequality Ψ( x, u ) ⪯ − βM ω (x),we obtain: 
+
+˙V ≤ − βδx T Mω (x)δx = −βV (16) Applying Comparison Lemma arguments, it follows that: 
+
+V (t) ≤ V (0) e−βt (17) Utilizing the bounding structures from Assumption 1: 
+
+α1∥δx (t)∥2 ≤ V (t) ≤ V (0) e−βt ≤ α2∥δx (0) ∥2e−βt (18) Taking the square root on both sides provides the incremental stability guarantee: 
+
+∥δx (t)∥ ≤ 
+
+r α2
+
+α1
+
+e− β 
+
+> 2t
+
+∥δx (0) ∥ (19) Integrating this relation along the geodesic path connecting 
+
+x1(t) and x2(t) completes the proof. Next, we establish an explicit Input-to-State Contraction (ISC) bound under bounded external disturbances or input variations. 
+
+Theorem 2. Let the conditions of Theorem 1 hold, and assume the neural vector field satisfies a uniform Lipschitz condition with respect to the input space, i.e., ∥fθ (x, u 1) − fθ (x, u 2)∥ ≤ Lu∥u1 − u2∥ for all x ∈ X . Then, for two distinct trajectories 
+
+x1(t) and x2(t) subject to different control inputs u1(t) and 
+
+u2(t), the tracking mismatch is globally bounded by: 
+
+∥x1(t) − x2(t)∥ ≤ κe − β 
+
+> 2t
+
+∥x1(0) − x2(0) ∥
+
++ 2α2Lu
+
+α1β sup  
+
+> 0≤τ≤t
+
+∥u1(τ ) − u2(τ )∥ (20) 
+
+where κ = pα2/α 1.Proof. Let x1(t) and x2(t) be solutions to ˙x1 = fθ (x1, u 1)
+
+and ˙x2 = fθ (x2, u 2), respectively. We can decompose the differential error dynamics as: 
+
+˙x1 − ˙x2 = fθ (x1, u 1) − fθ (x2, u 2)= ( fθ (x1, u 1) − fθ (x2, u 1)) + ( fθ (x2, u 1) − fθ (x2, u 2)) 
+
+(21) By using a Taylor expansion on the first term, we obtain R 10 Aθ (γ(s), u 1)ds (x1 −x2), where γ(s) is the path connecting 
+
+x2 and x1. Evaluating the time derivative of the distance metric along this path and applying the Lipschitz bound to the remaining input mismatch term leads directly to the input-to-state contraction bound. VI. E XPERIMENTAL EVALUATION 
+
+In this section, we evaluate the performance of the pro-posed ICNDM framework against state-of-the-art baselines on chaotic oscillators and an experimental Permanent Magnet Synchronous Motor (PMSM) platform. 
+
+A. Experimental Setup and Baseline Models 
+
+We compare ICNDM against five representative baselines: 1) Standard Neural ODE [6]: A vanilla neural differential network that incorporates inputs via simple concatena-tion. 2) Controlled Neural ODE [7]: A continuous model driven directly by input paths. 3) ICODE [1]: A structure explicitly designed for extrinsic input modeling. 4) ControlSynth Neural ODE [2]: A framework focused on guaranteed convergence properties. 5) Differential Neural Network (DNN) [3]: A structurally stable recursive network designed for industrial systems. All models were implemented in PyTorch using the 
+
+torchdiffeq library. Training was performed using the AdamW optimizer with a cosine annealing learning rate sched-uler for 1000 epochs. 
+
+B. Nonlinear Chaotic Benchmarks 
+
+We first test the models on two highly sensitive nonlinear configurations: the Duffing Oscillator and the Van der Pol Os-cillator. Both systems are driven by multi-frequency sinusoidal inputs to generate rich, non-autonomous behaviors. Table I summarizes the Mean Squared Error (MSE) metrics across 1-step prediction horizons and 200-step long-horizon rollouts. Standard configurations exhibit significant error ac-cumulation, whereas ICNDM maintains stable bounds across extended horizons.                               
+
+> TABLE I TRAJECTORY PREDICTION ACCURACY (MSE) ON CHAOTIC
+> BENCHMARKS
+> Duffing Oscillator Van der Pol Oscillator Model 1-Step 200-Step Rollout 1-Step 200-Step Rollout Standard NODE [6] 3.42e-4 1.89e-1 5.12e-4 3.45e-1 Controlled NODE [7] 1.25e-4 6.72e-2 2.18e-4 1.12e-1 ICODE [1] 8.91e-5 2.15e-2 1.05e-4 4.38e-2 ControlSynth [2] 9.54e-5 3.10e-2 1.41e-4 5.92e-2
+> ICNDM (Ours) 4.12e-5 1.02e-3 5.67e-5 1.89e-3
+
+C. Validation on a Physical PMSM Actuator Platform 
+
+To assess the practical utility of the proposed architecture, we evaluate it on a high-fidelity Permanent Magnet Syn-chronous Motor (PMSM) drive system. The state variables comprise the direct and quadrature axis currents ( id, i q ), while the input vectors consist of the phase terminal voltages ( vd, v q )alongside the rotor electrical velocity ( ωe). This system fea-tures strong cross-coupling and highly nonlinear, time-varying behaviors [3]. 0 2 4 6 8 10   
+
+> Time (s)
+> 2
+> 1
+> 0
+> 1
+> 2
+> 3
+> Quadrature Axis Current  iq (A)
+> Long-Horizon Trajectory Rollout Comparison on PMSM
+> Ground Truth
+> ICNDM (Ours)
+> Controlled NODE
+> Standard NODE
+> Fig. 1. Long-horizon trajectory rollout comparison on the PMSM drive system for the quadrature axis current iq. Unconstrained neural formulations rapidly drift, whereas ICNDM tracks the true system dynamics accurately.
+
+Fig. 1 shows the 500-step long-horizon rollout tracking performance for iq . Vanilla Neural ODE models deviate sig-nificantly over time due to error accumulation. In contrast, ICNDM tracks the ground truth closely, demonstrating the practical benefits of the embedded contraction metric con-straint. 
+
+D. Robustness Analysis under Input Noise 
+
+In real-world industrial environments, control inputs are often corrupted by sensor noise and unmodeled perturbations. We evaluate the robustness of each framework by injecting zero-mean Gaussian noise with varying standard deviations 
+
+σu into the input channels during testing. As shown in Fig. 2, the tracking error of standard configu-rations grows rapidly as the noise level increases. Conversely, ICNDM degrades gracefully, confirming the theoretical Input-to-State Contraction properties derived in Theorem 2. 0.000 0.025 0.050 0.075 0.100 0.125 0.150 0.175 0.200  
+
+> Input Noise Standard Deviation u
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> Mean Squared Tracking Error (MSE)
+> Robustness Against Input Perturbations
+> ICNDM (Ours)
+> ICODE
+> ControlSynth
+> Controlled NODE
+> Standard NODE
+
+Fig. 2. Tracking error evolution under increasing input noise standard deviation σu. ICNDM exhibits superior robustness due to its explicit input-to-state contraction regularization. 
+
+VII. C ONCLUSION 
+
+This paper introduced the Input-Contraction Neural Differ-ential Model (ICNDM), a novel physics-informed machine learning framework for identifying non-autonomous controlled dynamical systems. By incorporating an explicit input encoder and a state-dependent neural metric tensor, the framework ensures structural incremental exponential stability via regu-larized contraction bounds. Theoretical analysis demonstrated that the model establishes robust input-to-state contraction guarantees under bounded external perturbations. Empirical evaluations on highly nonlinear chaotic systems and a physical PMSM drive dataset showed that ICNDM significantly out-performs conventional unconstrained neural differential equa-tions, delivering low long-horizon rollout drift and superior robustness to measurement noise. Future work will explore applying this framework to closed-loop model predictive con-trol (MPC) and robust adaptive control in complex robotic applications. REFERENCES [1] Z. Li, W. Mei, K. Yu, Y. Bai, and S. Li, “ICODE: Modeling dynamical systems with extrinsic input information,” IEEE Trans. Autom. Sci. Eng. ,2025, doi:10.1109/TASE.2025.3559462. [2] W. Mei, D. Zheng, and S. Li, “ControlSynth neural ODEs: Modeling dynamical systems with guaranteed convergence,” in Advances in Neural Information Processing Systems (NeurIPS) , vol. 37, 2024. [3] W. Mei, X. Wang, Y. Lu, K. Yu, and S. Li, “Learning and current prediction of PMSM drive via differential neural networks,” IEEE Transactions on Circuits and Systems II: Express Briefs , vol. 72, no. 3, pp. 489–493, 2025. [4] D. Efimov and A. Fradkov, “Design of interval observers for non-autonomous systems under input disturbances,” IEEE Transactions on Automatic Control , vol. 64, no. 1, pp. 240–247, 2019. [5] J.-J. E. Slotine and W. Li, Applied Nonlinear Control . Englewood Cliffs, NJ: Prentice Hall, 1991. [6] R. T. Q. Chen, Y. Rubanova, J. Bettencourt, and D. K. Duvenaud, “Neu-ral ordinary differential equations,” in Advances in Neural Information Processing Systems , 2018, pp. 6571–6583. [7] P. Kidger, J. Morrill, J. Foster, and T. Lyons, “Neural controlled differential equations for irregular time series,” in Advances in Neural Information Processing Systems , 2020, pp. 6696–6707. [8] C. Rackauckas, Y. Ma, J. Martensen, C. Warner, K. Nie, R. Dixit, and A. Edelman, “Universal differential equations for scientific machine learning,” arXiv preprint arXiv:2001.04385 , 2020. [9] W. Lohmiller and J.-J. E. Slotine, “On contraction analysis for non-linear systems,” Automatica , vol. 34, no. 6, pp. 683–700, 1998. [10] I. R. Manchester and J.-J. E. Slotine, “Control contracting metrics: Gen-eralizing output regulation and Lyapunov stability,” IEEE Transactions on Automatic Control , vol. 62, no. 11, pp. 5473–5488, 2017. [11] S. Singh, B. Anisetti, V. Sindhwani, and J.-J. E. Slotine, “Learning contracting vector fields for stable system identification,” IEEE Control Systems Letters , vol. 5, no. 4, pp. 1213–1218, 2020. [12] J. Tsinias and C. Papadimitriou, “Sufficient conditions for input-to-state contraction of non-autonomous systems,” Systems & Control Letters ,vol. 143, p. 104742, 2020. [13] M. Tobia, G. A. De La Torre, and M. Egerstedt, “Contractive neural ordinary differential equations,” IEEE Control Systems Letters , vol. 6, pp. 2342–2347, 2022. [14] S. Greydanus, M. Dzamba, and J. Yosinski, “Hamiltonian neural net-works,” in Advances in Neural Information Processing Systems , 2019, pp. 15379–15389. [15] J. Behrmann, W. Grathwohl, R. T. Q. Chen, D. Duvenaud, and J.-H. Ja-cobsen, “Invertible residual networks for stable modeling,” International Conference on Machine Learning , 2019, pp. 573–582. [16] M. Lutter, C. Ritter, and J. Peters, “Deep Lagrangian networks: Using physics priors for safe learning,” in IEEE International Conference on Robotics and Automation (ICRA) , 2019, pp. 8518–8524. [17] B. Bose, Modern Power Electronics and AC Drives . Standards Press, 2015. [18] D. Angeli, “A Lyapunov approach to incremental stability properties,” 
+
+IEEE Transactions on Automatic Control , vol. 47, no. 3, pp. 410–421, 2002. [19] D. Ruelle and J.-P. Eckmann, “Ergodic theory of chaos and strange attractors,” Reviews of Modern Physics , vol. 57, no. 3, p. 617, 1985. [20] H. K. Khalil, Nonlinear Systems , 3rd ed. Upper Saddle River, NJ: Prentice Hall, 2002. [21] S. Sastry, Nonlinear Systems: Analysis, Stability, and Control . Springer Science & Business Media, 2013. [22] G. Duffing, Erzwungene Schwingungen bei ver¨ anderlicher Eigenfre-quenz und ihre technische Bedeutung . Vieweg, Braunschweig, 1918. [23] B. van der Pol, “On relaxation-oscillations,” The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science , vol. 2, no. 11, pp. 978–992, 1926. [24] E. N. Lorenz, “Deterministic nonperiodic flow,” Journal of the Atmo-spheric Sciences , vol. 20, no. 2, pp. 130–141, 1963. [25] S. L. Brunton, J. L. Proctor, and J. N. Kutz, “Discovering governing equations from data by sparse identification of nonlinear dynamical systems,” Proceedings of the National Academy of Sciences , vol. 113, no. 15, pp. 3932–3937, 2016. [26] M. Raissi, P. Perdikaris, and G. E. Karniadakis, “Physics-informed neural networks: A deep learning framework for solving forward and inverse problems,” Journal of Computational Physics , vol. 378, pp. 686– 707, 2019. [27] M. S. Pinsker, Information and Information Stability of Random Vari-ables and Processes . Holden-Day, 1964. [28] B. T. Polyak, Introduction to Optimization . Optimization Software, New York, 1987. [29] E. D. Sontag, “Smooth stabilization implies coprime factorization,” IEEE Transactions on Automatic Control , vol. 34, no. 4, pp. 435–443, 1989. [30] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan, Linear Matrix Inequalities in System and Control Theory . SIAM, 1994. [31] R. A. Horn and C. R. Johnson, Matrix Analysis . Cambridge University Press, 2012.

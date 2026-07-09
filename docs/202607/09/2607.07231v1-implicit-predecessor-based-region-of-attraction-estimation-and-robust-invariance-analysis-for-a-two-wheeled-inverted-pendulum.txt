@@ -1,0 +1,391 @@
+Title: Implicit Predecessor-Based Region of Attraction Estimation and Robust Invariance Analysis for a Two-Wheeled Inverted Pendulum
+
+URL Source: https://arxiv.org/pdf/2607.07231v1
+
+Published Time: Thu, 09 Jul 2026 00:43:58 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Implicit Predecessor-Based Region of Attraction Estimation and Robust Invariance Analysis for a Two-Wheeled Inverted Pendulum 
+
+Lorenzo Fici 1 a and Guillaume Ducard 1 b *
+
+> 1
+
+Université Côte d‘Azur, i3S/CNRS, Sophia Antipolis, France fici@i3s.unice.fr, ducard@i3s.unice.fr Keywords: Region of Attraction, Robust Positive Invariance, Lyapunov Stability, Nonlinear Systems, Two-Wheeled Inverted Pendulum, Linear Quadratic Regulator. Abstract: Estimating the region of attraction (RoA) of nonlinear systems is fundamental for assessing closed-loop stability and ensuring safe operation. While Lyapunov-based approaches provide certified stability guarantees, they often yield conservative inner approximations of the RoA. This paper combines a certified Lyapunov-based positively invariant set with a predecessor-based implicit representation to compute a significantly less conservative inner approximation of the RoA while preserving formal stability guarantees. In addition, the robust positive invariance of the initial certified Lyapunov-based invariant set is analyzed under bounded additive input disturbances, providing formal robustness guarantees. The proposed methodology is demonstrated on a non-linear two-wheeled inverted pendulum stabilized by a saturated linear quadratic regulator. The resulting RoA approximation is compared with the initial Lyapunov-certified invariant set and validated through Monte Carlo simulations and hardware experiments, showing a substantially enlarged certified operating region that matches the empirical closed-loop behavior. These results demonstrate the practical applicability of combining certified Lyapunov analysis with predecessor-based set propagation for RoA approximation and robustness assessment of nonlinear systems. 
+
+# 1 INTRODUCTION 
+
+The Region of Attraction (RoA) is a fundamen-tal concept in nonlinear control, defined as the set of all initial conditions from which the closed-loop system asymptotically converges to a de-sired equilibrium (Khalil, 2002). As such, the RoA provides a measure of closed-loop stabil-ity, characterizing the range of operating condi-tions for which a controller can successfully re-cover the system. Despite its importance, com-puting the exact RoA of nonlinear systems is generally intractable, and practical approaches typically rely on either conservative analytical  
+
+> a
+
+https://orcid.org/0009-0001-9450-1441  
+
+> b
+
+https://orcid.org/0000-0002-7400-4915 *This work was supported by the French gov-ernment through the France 2030 investment plan managed by the National Research Agency (ANR), as part of the Initiative of Excellence Université Côte d’Azur under reference number ANR-15-IDEX-01. 
+
+approximations or computationally intensive nu-merical methods (Khalil, 2002; Gross et al., 2022; Tellez and Collado, 2013; Horibe et al., 2018). Two-Wheeled Inverted Pendulums (TWIPs) constitute a representative class of underactuated nonlinear systems for which RoA analysis is par-ticularly relevant. Due to their inherently unsta-ble dynamics and actuator limitations, the ability of a controller to recover the upright equilibrium depends strongly on the initial condition of the system (Zhang and Mohamad Nor, 2025). Con-sequently, the RoA provides a meaningful metric for assessing the closed-loop performance of bal-ancing controllers and for quantifying the range of initial conditions from which balance can be successfully restored. A variety of approaches have been proposed to approximate the RoA of nonlinear systems. Lyapunov-based methods provide certified inner approximations with formal stability guarantees but are often conservative, whereas numerical and arXiv:2607.07231v1 [eess.SY] 8 Jul 2026 sampling-based techniques generally yield larger approximations at the expense of losing rigor-ous certification. Predecessor-set methods of-fer a complementary perspective by iteratively propagating invariant regions under the system’s nonlinear dynamics, enabling the computation of progressively larger certified approximations when initialized from a positively invariant set. Motivated by these observations, this work in-vestigates the application of a predecessor-based implicit representation to enlarge a Lyapunov-certified invariant set for a nonlinear TWIP, while complementing the analysis with a robust positive invariance (RPI) study and experimental valida-tion. 
+
+## 1.1 Related work 
+
+A broad range of methods has been proposed to estimate the RoA of nonlinear systems. Clas-sical Lyapunov-based approaches provide certi-fied but often conservative inner approximations; alternative approaches based on numerical sim-ulations, Monte Carlo sampling, or experimen-tal exploration generally produce less conserva-tive approximations but sacrifice formal guaran-tees (Gross et al., 2022; Tellez and Collado, 2013; Horibe et al., 2018). Several works have ad-dressed this objective through Lyapunov func-tion design. Vannelli and Vidyasagar (Van-nelli and Vidyasagar, 1985) introduced the con-cept of maximal Lyapunov functions, whose level sets converge to the exact domain of attraction. While theoretically appealing, constructing maxi-mal Lyapunov functions for general nonlinear sys-tems remains computationally demanding. More recently, Valmorbida and Anderson (Valmorbida and Anderson, 2017) proposed the use of ratio-nal Lyapunov functions, i.e., V (x) = p(x) 
+
+> q(x)
+
+, where 
+
+p(x) and q(x) are polynomial functions, to ob-tain significantly less conservative RoA estimates than conventional polynomial or quadratic Lya-punov functions. In contrast, this work delib-erately employs a quadratic Lyapunov function, prioritizing computational simplicity while lever-aging the predecessor-expansion procedure as a complementary means to enlarge the resulting re-gion. Another line of research enlarges certified re-gions by propagating invariant sets through the system dynamics. Balint et al. (Balint et al., 2006) formulate the expanded region as recursive preimages of a certified invariant set, whereas the proposed method expresses the predecessor ex-pansion through an implicit scalar membership function obtained by composing the Lyapunov function with the nonlinear closed-loop dynamics. This representation enables exact membership evaluation without explicitly constructing the ex-panded set and naturally supports numerical val-idation and experimental certification. More re-cently, Serry and Liu (Serry and Liu, 2025) de-veloped an implicit predecessor representation to compute underapproximations of the safe do-main of attraction by iteratively expanding back-ward reachable sets while enforcing safety con-straints. The predecessor computation adopted in the present work is closely related to this for-mulation. However, instead of considering ex-plicit state-safety constraints, we account for the physical actuator limits by incorporating input saturation directly into the nonlinear closed-loop dynamics. The predecessor expansion is then used to enlarge an estimate of the RoA. Related ideas have also been investigated using alternative set representations. Han et al. (Han et al., 2016) proposed a zonotope-based framework, where a zonotope is a centrally sym-metric convex polytope, that enlarges inner ap-proximations of the region of attraction by recur-sively computing backward reachable sets while optimizing a feedback controller. Unlike the present work, their approach explicitly propa-gates zonotopic set representations and is pri-marily developed for linear discrete-time sys-tems, whereas the proposed method starts from a Lyapunov-certified region and enlarges it through predecessor-based expansion for nonlinear closed-loop dynamics. In summary, existing approaches either im-prove the quality of the initial Lyapunov ap-proximation through more sophisticated Lya-punov functions or enlarge certified regions us-ing backward reachability under additional as-sumptions such as linear dynamics or MPC fea-sibility. The present work combines a computa-tionally inexpensive quadratic Lyapunov function with predecessor-set expansion to obtain larger certified estimates of the RoA for a nonlinear TWIP. 
+
+## 1.2 Contributions 
+
+The scientific contributions of this paper can be summarized as follows: 1. a predecessor-based implicit representation that enlarges a certified Lyapunov-based in-variant set, yielding a significantly less con-Figure 1: Schematic of the TWIP showing the coor-dinate frames and physical parameters. The corre-sponding model parameters are listed in Table 1. 
+
+servative certified inner approximation of the RoA of the upright equilibrium of the nonlin-ear closed-loop TWIP system than that pro-vided by the original Lyapunov-based invari-ant set, 2. a robust positive invariance analysis of the ini-tial certified Lyapunov-based invariant set un-der bounded additive input disturbances. The remainder of this paper is structured as fol-lows: Section 2 presents the nonlinear model of the TWIP and the design of the LQR control pol-icy. Section 3 explains the proposed RoA estima-tion methodology. Section 4 reports the numer-ical results obtained for the proposed approach and validates its effectiveness on the TWIP sys-tem. Section 5 concludes the paper and suggests directions for future research. 
+
+# 2 SYSTEM MODELING AND CONTROL DESIGN 
+
+This section presents the nonlinear mathematical model of the TWIP robot. The model comprises two mechanical degrees of freedom and assumes longitudinal motion only, neglecting yaw dynam-ics. A schematic of the robot is shown in Fig. 1, illustrating its main components, coordinate def-initions, and physical parameters. The control objective is to stabilize the robot about its up-right equilibrium configuration, corresponding to the robot balancing configuration with zero trans-lational and angular velocities. 
+
+## 2.1 Nonlinear TWIP model 
+
+The nonlinear model serves as the basis for the computation of the Lyapunov-based invariant set, the predecessor-based expansion, the RPI analy-sis, and the closed-loop simulations. The equa-tions of motion are expressed as 
+
+¨xw = 1
+
+d1
+
+(
+
+aI O ˙θ2 sin θ − a2g sin θ cos θ + T ( IO
+
+r + a cos θ))
+
+,
+
+¨θ = 1
+
+d1
+
+(
+
+− a2 ˙θ2 sin θ cos θ + a m Og sin θ
+
+− T (mO + ar cos θ))
+
+,
+
+T = 2 igb 
+
+KRM
+
+(
+
+db u0 (uc) − K i gb 
+
+( ˙xw
+
+r − ˙θ))
+
+,
+
+(1) where T denotes the torque and the auxiliary vari-ables are given by: 
+
+a = mBl, IO = I2 + mBl2,
+
+mO = mB + 2mW + 2 Jr2 , d1 = IOmO − a2 cos 2 θ.
+
+The DC motors exhibit a dead-zone db u0 (uc) due to static friction and gearbox losses. To compen-sate for this effect, the voltage applied to the mo-tors is augmented by a constant offset u0 having the same sign as the commanded input. Conse-quently, uc denotes the dead-zone compensated motor voltage. The model parameters are listed in Table 1. 
+
+> Table 1: Model parameters of the TWIP robot.
+
+Parameters Sym. Value Unit Wheel spacing d 0.10 mAxle–COM dis-tance 
+
+l 2.75 e − 2 mWheel radius r 0.04 mBody mass mB 0.368 kg Wheel mass mW 0.02 kg Wheel inertia J 2.25 e − 5 kg ·m2
+
+Gravity g 9.81 m/s 2
+
+Gearbox ratio igb 49.86 1Motor constant K 1.5e − 3 N·m/A Motor resistance RM 12 Ω
+
+Pitch-axis inertia I2 2.17 e − 4 kg ·m2
+
+db u0 compensa-tion 
+
+u0 0.525 VFor the synthesis of the LQR controller, the nonlinear model (1) is linearized at the upright equilibrium point and discretized with exact dis-cretization using a sampling time of Ts = 10 −2 s,providing the following discrete-time linear dy-namics 
+
+xk+1 = Ad xk + Bd uk, xk = [xw ˙xw θ ˙θ]⊤ ,
+
+Ad =
+
+
+
+1 9.883 e−3 −6.524 e−5 4.471 e−60 9.768 e−1 −1.276 e−2 8.620 e−40 6.175 e−3 1.008 e+0 9.780 e−30 1.222 e+0 1.573 e+0 9.591 e−1
+
+ ,
+
+Bd =
+
+
+
+6.272 e−51.240 e−2
+
+−3.303 e−3
+
+−6.533 e−1
+
+ .
+
+(2) 
+
+## 2.2 Saturated LQR 
+
+The closed-loop system is stabilized using adiscrete-time LQR controller. The discrete-time LQR is obtained by solving the infinite-horizon quadratic optimization problem 
+
+> min
+> {uk}
+> ∞
+
+# ∑           
+
+> k=0
+> (
+> x⊤
+> kQx k+u⊤
+> kRu k
+> )
+> s.t. xk+1=Adxk+Bduk,
+
+(3) where Q and R are the state and input penalty matrices, respectively, selected following Bryson’s rule (Joao P. Hespanha, 2010), which normal-izes each state and input by the inverse square of its maximum admissible deviation. The result-ing weights were further adjusted to prioritize the regulation of selected states while balancing state performance and control effort. The penalty ma-trices are defined as                       
+
+> Q=diag
+> (
+> 10 ·(10.1
+> )2,5·(10.2
+> )2,50 ·(180 10 π
+> )2,0.1·(180 90 π
+> )2)
+> ,
+> R=250 ·(12.5
+> )2.
+
+(4) The resulting saturated state-feedback control law is given by 
+
+uk = sat (−KLQR xk
+
+) , (5) where sat (·) denotes the element-wise satu-ration operator enforcing the actuator volt-age limits uk ∈ [−2.2, 2.2] V and KLQR =[−4.291 , −8.142 , −9.271 , −0.574 ] is the corre-sponding optimal feedback gain. 
+
+# 3 REGION OF ATTRACTION ESTIMATION 
+
+This section explains the proposed methodology for computing a certified inner approximation of the RoA of the upright equilibrium. The ap-proach starts from a certified positively invari-ant set, which provides a formal but conserva-tive approximation of the RoA. In this work, a Lyapunov-based set is used as the initial certified invariant set. Building upon this initial invari-ant set, a predecessor-based implicit set expan-sion is employed to iteratively enlarge the cer-tified region, yielding a significantly less conser-vative inner approximation under the nonlinear closed-loop dynamics. Finally, a RPI analysis is performed under bounded additive input distur-bances, establishing robustness guarantees for the initial invariant set. 
+
+## 3.1 Lyapunov-Based Invariant Set 
+
+Following the Lyapunov-based construction pre-sented in (Fici et al., 2026), which is based on the proof of Theorem 4.7 in (Khalil, 2002), the nonlinear closed-loop dynamics can be rewritten as 
+
+xk+1 = Acl xk + g(xk), (6) where Acl = Ad − Bd KLQR denotes the closed-loop linear dynamics and g(xk) collects the nonlinear terms. By Taylor’s theorem, the nonlinear re-mainder is locally bounded as |g(xk)| < γ |xk|, for all states satisfying ∥xk∥ < ρ, where ρ > 0 defines a local neighborhood of the upright equilibrium. If γ satisfies 
+
+γ < −| PA cl | + √|PA cl |2 + λmin (QL)λmax (P)
+
+λmax (P) , (7) where P is the solution of the discrete-time Lya-punov equation A⊤ 
+
+> cl
+
+PA cl − P = −QL, then the Lya-punov function V (xk) = x⊤ 
+
+> k
+
+Px k decreases for all 
+
+∥xk∥ < ρ.To obtain a positively invariant set, the largest Lyapunov sublevel set contained in this neighbor-hood is selected, yielding 
+
+x⊤ 
+
+> k
+
+Px k ≤ λmin (P)ρ2. (8) This invariant set serves as the starting point for the predecessor-based expansion presented in the following subsection and as the basis for the RPI analysis 
+
+## 3.2 Predecessor-Based Expansion 
+
+The Lyapunov-certified invariant set provides a conservative inner approximation of the RoA, as it only certifies states for which the Lyapunov function decreases directly. To enlarge this certi-fied region while preserving convergence guaran-tees, a predecessor-based expansion is performed under the nonlinear closed-loop dynamics. Let 
+
+V0 = {x : v0(x) ≤ 1} , (9) denote the initial Lyapunov-certified invariant set, where 
+
+v0(x) = x⊤Px 
+
+λmin (P)ρ2 . (10) The one-step predecessor of V0 is defined as 
+
+V1 = f −1(V0) = {x : f (x) ∈ V0
+
+} , (11) where f (·) denotes the nonlinear closed-loop dy-namics. Consequently, every state belonging to 
+
+V1 reaches the invariant set V0 after one time step. Since V0 is positively invariant, every state in V1 is therefore guaranteed to converge to the upright equilibrium. This construction can be applied recursively, yielding the sequence 
+
+VN = f −N (V0), (12) where f −N (·) denotes the N-step predecessor op-erator. The resulting sets satisfy 
+
+V0 ⊆ V1 ⊆ · · · ⊆ VN ⊆ R OA , (13) where R OA denotes the region of attraction of the closed-loop system. The predecessor expan-sion is monotonic with respect to set inclusion and, as the number of predecessor iterations tends to infinity, ∞∪
+
+> N=0
+
+VN = R OA , (14) that is, the sequence of predecessor sets converges to the RoA. This property follows directly from the theory of backward reachable sets (Serry and Liu, 2025). Constructing the predecessor sets explicitly rapidly becomes analytically intractable due to the nonlinear dynamics. Instead, the predecessor expansion is represented implicitly. Since 
+
+V0 = {x : v0(x) ≤ 1} , (15) the one-step predecessor can be written as 
+
+V1 = {x : v0( f (x)) ≤ 1} , (16) and, by recursion, 
+
+VN = {x : v0
+
+( f N (x)) ≤ 1} , (17) where f N (·) denotes the N-step composition of the nonlinear closed-loop dynamics. Equation (17) provides an implicit represen-tation of the predecessor-expanded RoA approx-imation. Rather than explicitly constructing the boundary of VN , membership is determined by evaluating the implicit function 
+
+vN (x) = v0
+
+( f N (x)) . (18) Consequently, a state belongs to the predecessor-expanded approximation if 
+
+vN (x) ≤ 1. (19) Although the boundary of VN does not gen-erally admit a closed-form analytical description, the implicit representation enables exact mem-bership tests. 
+
+## 3.3 Robust Positive Invariance Analysis 
+
+The RPI analysis of the Lyapunov-certified in-variant set extends the nominal closed-loop dynamics introduced in (6) by incorporating bounded additive disturbances acting at the con-trol input. The disturbed closed-loop system is therefore written as 
+
+xk+1 = Acl xk + g(xk) + Bw k + h(xk, wk), (20) where Bw k denotes the linear contribution of the disturbance and h(xk, wk) collects the higher-order nonlinear interaction terms introduced by the dis-turbance. The disturbance satisfies ∥wk∥ ≤ ¯w.Using the quadratic Lyapunov function 
+
+V (xk) = x⊤ 
+
+> k
+
+Px k,
+
+obtained from the solution of the discrete-time Lyapunov equation in Section 3.1, the Lyapunov difference is given by 
+
+∆V (xk) = V (xk+1) −V (xk).
+
+Unlike the nominal case, the additive disturbance introduces a constant contribution through the term Bw k, which does not vanish at the equilib-rium. Consequently, 
+
+∆V (0) = ( Bw k)⊤P(Bw k) > 0,
+
+for any nonzero disturbance, implying that no neighborhood containing the origin can satisfy 
+
+∆V (xk) < 0.By combining the nonlinear remainder and the disturbance contribution into a single pertur-bation term, and applying norm inequalities to-gether with the local Taylor bound on the nonlin-ear dynamics, a sufficient condition for ∆V (xk) < 0
+
+is obtained as 
+
+p(ρ, ¯w) < 0, (21) where p(ρ, ¯w) is a sixth-degree polynomial in the radius ρ, whose coefficients depend on the dis-turbance bound ¯w. In contrast to Section 3.1, the disturbance-dependent terms prevent the sim-plifications that reduce the sufficient negativity condition to a quadratic polynomial, resulting in-stead in a sixth-degree polynomial. For a prescribed disturbance magnitude, the positive roots of p(ρ, ¯w) define the interval over which the Lyapunov function is guaranteed to de-crease. Denoting these roots by ρin and ρout , with 
+
+0 < ρin < ρout ,
+
+the decrease condition is certified for all states satisfying 
+
+ρin < ∥xk∥ ≤ ρout .
+
+Here, ρin characterizes the disturbance-dominated neighborhood around the equi-librium, while ρout determines the largest radius for which the dissipative effect of the nominal closed-loop dynamics dominates the disturbance contribution. 
+
+# 4 NUMERICAL RESULTS 
+
+This section presents the numerical results ob-tained by applying the proposed methodology to the nonlinear TWIP. First, the Lyapunov-based invariant set is computed. Next, the predecessor-based expansion is performed to obtain an en-larged certified approximation of the RoA. Fi-nally, the resulting approximation is validated through Monte Carlo simulations and hardware experiments. Following the procedure described in Sec-tion 3.1, the quadratic Lyapunov function was obtained by solving the discrete-time Lyapunov equation with QL as the 4 × 4 identity matrix, and the local bound on the nonlinear remainder was used to determine the largest neighborhood in which the Lyapunov decrease condition is sat-isfied. This yields a local validity radius of 
+
+ρ = 2.724 · 10 −2.
+
+The corresponding Lyapunov-certified invariant set is shown in Fig. 2, projected onto the (θ, ˙xw)
+
+plane. As expected, the resulting set provides a certified inner approximation of the RoA around the upright equilibrium, although it is relatively conservative. Starting from this certified invariant set, the predecessor-based expansion was computed over -6 -4 -2 0246    
+
+> 3(rad) #10 -3
+> -2 -1.5 -1 -0.5 00.5 11.5 2
+> _xw (m/s)
+> #10 -3 Certified Lyapunov-based invariant set
+> Lyapunov-based set V0(x)
+> Figure 2: Certified Lyapunov-based invariant set.
+
+a prediction horizon of N = 1500 sampling in-stants, corresponding to a simulation horizon of 
+
+15 s . Since the predecessor-expanded set is de-fined implicitly through the condition VN (x) ≤ 1,
+
+its boundary does not admit an explicit analyti-cal representation. Therefore, the contour shown in Fig. 3 was approximated numerically solely for visualization purposes. The approximation was obtained by evaluat-ing the implicit predecessor function on a uniform 
+
+600 × 600 grid over the state subspace 
+
+˙xw ∈ [−1, 1] m/s, θ ∈ [−1.5, 1.5] rad , (22) while fixing the remaining states to xw = 0 and 
+
+˙θ = 0. The boundary corresponding to VN (x) ≈
+
+1 was then extracted by interpolation between neighboring grid points. It should be emphasized that only the plotted contour is approximated. The predecessor-expanded set itself remains ex-actly defined through the implicit membership condition VN (x) ≤ 1.
+
+## 4.1 Monte Carlo Validation 
+
+Since the predecessor-expanded set is represented implicitly, its boundary has been approximated numerically for visualization. To assess the ac-curacy of this contour, a Monte Carlo validation was performed using the nonlinear closed-loop dy-namics. The simulated trajectories provide an empirical reference for evaluating the agreement between the approximated boundary and the ob-served closed-loop behavior. The validation was carried out by uniformly sampling 5000 initial conditions from the two-dimensional state subspace defined by ˙xw ∈
+
+[−1, 1] m/s, and θ ∈ [−1.5, 1.5] rad while fixing the -1.5 -1 -0.5 00.5 11.5    
+
+> 3(rad)
+> -1 -0.8 -0.6 -0.4 -0.2 00.2 0.4 0.6 0.8 1
+> _xw (m/s)
+> Predecessor-based expanded set, N = 1500
+> V1500 (x):1 approximated boundary
+
+Figure 3: Implicit predecessor-expanded RoA. The contour obtained is an approximation. 
+
+position and the angular velocity to xw = 0, ˙θ = 0
+
+for visualization purposes. Each initial condition was propagated through the nonlinear closed-loop dynamics under the saturated LQR controller over a simulation horizon of 15 s , matching the time horizon used to compute the predecessor ex-pansion. Each trajectory was classified according to whether it reached the Lyapunov-certified invari-ant set within the simulation horizon. Since this set is positively invariant, every trajectory enter-ing it is mathematically guaranteed to converge to the upright equilibrium. The resulting stable and non-converging samples were then superim-posed on the contour of the predecessor-expanded approximation defined by VN (x) = 1.Figure 4 shows that the predecessor-expanded boundary closely follows the empirical separation between stable and non-convergent initial condi-tions. Compared with the initial Lyapunov-based invariant set, the predecessor expansion captures a substantially larger portion of the observed RoA while preserving formal stability guarantees. The close agreement between the approximated con-tour and the Monte Carlo classification supports the reliability of the approximated contour as a representation of the predecessor-expanded certi-fied RoA. 
+
+## 4.2 Experimental Validation 
+
+To complement the certified RoA approxima-tion, hardware experiments were conducted on the TWIP platform using the saturated LQR controller. The objective of these experiments is to assess whether the experimentally ob--1.5 -1 -0.5 00.5 11.5     
+
+> 3(rad)
+> -1 -0.8 -0.6 -0.4 -0.2 00.2 0.4 0.6 0.8 1
+> _xw (m/s)
+> Monte Carlo and expanded set, N = 1500
+> Monte Carlo stable Monte Carlo non-convergent
+> V1500 (x):1 approximated boundary Original Lyapunov-based set V0(x)
+
+Figure 4: Monte Carlo validation of the predecessor-expanded RoA approximation. The initial Lyapunov-certified invariant set is shown for comparison. 
+
+served closed-loop behavior is consistent with the predecessor-expanded RoA approximation. In particular, for each disturbed state, the implicit predecessor function 
+
+VN (x) = V0
+
+( f N (x)) ,
+
+is evaluated. According to the proposed method-ology, states satisfying VN (x) ≤ 1 belong to the certified predecessor-expanded approximation of the RoA, whereas states for which VN (x) > 1 lie outside the certified region. A video demonstra-tion is provided anonymously. 1 2
+
+Two representative experiments were consid-ered. In the first experiment, the robot tracks a constant velocity reference of −0.5 m /s. Short-duration input disturbances, applied as square pulses of duration 0.02 s with increasing ampli-tude up to 1.4 V , driving the tracking error e =
+
+xref − x to 
+
+e = [0 −0.03 −0.21 1.50 ]⊤ ,
+
+where xref denotes the reference state correspond-ing to the prescribed constant velocity. Evaluat-ing the implicit predecessor function yields 
+
+V1500 (x) = 1.3 × 10 −9 < 1,
+
+confirming that the disturbed traking error be-longs to the predecessor-expanded RoA approx-imation. Consistent with this prediction, the robot successfully recovers and returns to the de-sired balancing configuration. In the second experiment, the robot tracks a higher velocity reference of −1.0 m /s. Under the 
+
+> 1
+
+https://youtu.be/WDq51owRtfQ 
+
+> 2
+
+https://youtu.be/k8ug0tzHzjU same disturbance conditions, the tracking error reaches 
+
+e = [0 −0.10 −0.50 −2.60 ]⊤ .
+
+In this case, 
+
+V1500 (x) = 9.6 × 10 7 > 1,
+
+indicating that the tracking error lies outside the predecessor-expanded RoA approximation. Ac-cordingly, the robot is unable to recover and loses stability. These experimental results are fully consis-tent with the proposed predecessor-based RoA approximation. In both experiments, the implicit membership test correctly predicts whether the disturbed state belongs to the certified approxi-mation, providing experimental validation of the proposed methodology. 
+
+# 5 Conclusions 
+
+This paper investigated the computation of RoA approximations for a nonlinear TWIP by com-bining a certified Lyapunov-based invariant set with a predecessor-based implicit representation. The proposed approach significantly enlarges the initial certified region, yielding an RoA approxi-mation that closely matches the empirically ob-served closed-loop behavior, as confirmed through Monte Carlo simulations and hardware experi-ments. In addition, the RPI analysis provides a formal robustness certificate for the initial Lyapunov-based invariant set under bounded ad-ditive input disturbances. While the predecessor-expanded region closely approximates the RoA, its implicit representation is not analytically tractable, requiring numerical procedures to ap-proximate its boundary for visualization. Like-wise, the robust positive invariance analysis pro-vides guaranteed disturbance bounds, although the resulting certificates remain conservative with respect to the robustness observed in practice. Future work will focus on deriving an ex-plicit analytical representation of the predecessor-expanded region. In particular, one direction consists of computing the largest analytically de-scribable set contained within the implicit prede-cessor representation, thereby obtaining an en-larged explicit certified inner approximation of the RoA. Alternatively, a certified branch-and-bound approach could be employed to verify the inclusion of candidate invariant sets, such as el-lipsoids, within the implicit predecessor represen-tation. Finally, future research will investigate less conservative approaches for robust invariance analysis, with the aim of obtaining less conserva-tive robustness certificates that more accurately reflect the disturbance levels the system can tol-erate in practice. 
+
+# Acknowledgment 
+
+This work was financially sponsored by Franck Diard, Chief Software Architect at NVIDIA, through Fondation UniCA, and by 28 Digital. 
+
+# REFERENCES 
+
+Balint, S., Kaslik, E., Balint, A. M., and Grigis, A. (2006). Methods for determination and approximation of the domain of attraction in the case of autonomous discrete dynamical systems. Advances in Difference Equations, 2006:1–16. Fici, L., Wahby, D., Detailleur, A., Barreau, M., and Ducard, G. (2026). Region of Attrac-tion Estimation for Linear Quadratic Regu-lator, Linear and Robust Model Predictive Control on a Two-Wheeled Inverted Pendu-lum. arXiv:2604.04455. Gross, L., Maywald, L., Kumar, S., Kirchner, F., and Lüth, C. (2022). Analytic Estimation of Region of Attraction of an LQR Controller for Torque Limited Simple Pendulum. pages 2695–2701. arXiv:2211.15437 [cs]. Han, D., Rizaldi, A., El-Guindy, A., and Althoff, M. (2016). On enlarging backward reach-able sets via Zonotopic set membership. In 2016 IEEE International Symposium on In-telligent Control (ISIC), pages 1–8, Buenos Aires. IEEE. Horibe, T., Zhou, B., Hara, S., and Tsubakino, D. (2018). Quantitative measure for non-linear unstable systems based on the region of attraction and its application to designing parameter optimization – inverted pendulum example. Advanced Robotics, 32(8):399–410. Joao P. Hespanha (2010). Linear System Theory. Lecture notes, University of California. Khalil, H. K. (2002). Nonlinear systems. Pren-tice Hall, Upper Saddle River, N.J, 3rd ed edition. Serry, M. and Liu, J. (2025). Underapprox-imating Safe Domains of Attraction for Discrete-Time Systems Using Implicit Rep-resentations of Backward Reachable Sets. arXiv:2409.10657 [math.OC]. Tellez, J. and Collado, J. (2013). Estimate of the region of attraction of a Kapitza pendu-lum subject to an harmonic excitation and analysis of the pendulum behavior for a non harmonic excitation. In 2013 10th Interna-tional Conference on Electrical Engineering, Computing Science and Automatic Control (CCE), pages 87–91, Mexico City, Mexico. IEEE. Valmorbida, G. and Anderson, J. (2017). Region of attraction estimation using invariant sets and rational Lyapunov functions. Automat-ica, 75:37–45. Vannelli, A. and Vidyasagar, M. (1985). Maximal Lyapunov Functions and Domains of Attrac-tion for Autonomous Nonlinear Systems. Au-tomatica. Zhang, H. and Mohamad Nor, N. (2025). Control Strategies for Two-Wheeled Self-Balancing Robotic Systems: A Comprehensive Review. Robotics, 14(8):101.

@@ -1,0 +1,2845 @@
+Title: On the Robustness in Data-Driven Nonlinear Optimal Control: From Stability to Optimality
+
+URL Source: https://arxiv.org/pdf/2607.07570v1
+
+Published Time: Thu, 09 Jul 2026 01:07:53 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+> IEEE TRANSACTIONS AND JOURNALS TEMPLATE 1
+
+# On the Robustness in Data-Driven Nonlinear Optimal Control: From Stability to Optimality 
+
+Yicheng Lin, Zhisheng Duan, Senior Member, IEEE , Tianzhi Li, Bingxian Wu and Zhiyong Sun, Member, IEEE 
+
+Abstract — In data-driven nonlinear control, optimal con-trollers designed from learned models are inevitably sub-ject to model mismatch when deployed on actual systems, potentially compromising both closed-loop stability and op-timality. This paper investigates how the model mismatch propagates through the optimal control structure and alters the resulting optimality. First, we show that the nominal optimal value function remains a Lyapunov function under a quantifiable criterion, thereby preserving closed-loop ro-bust stability. Building upon this foundation, we establish explicit characterizations for optimality deviations induced by model mismatch in both closed-loop performance and optimal controllers, and then reveal their consistency with classical linear-quadratic results. In addition, the proposed analysis admits a unified computational formulation with a provably convergent iterative algorithm, enabling quan-titative assessment of optimality robustness in nonlinear optimal control. Numerical examples validate the theoret-ical analysis, reveal its intrinsic connection with classical results, and demonstrate its practical computability. 
+
+Index Terms — Robustness analysis, nonlinear systems, data-driven control, robust optimal control. 
+
+I. I NTRODUCTION 
+
+# DATA-DRIVEN control has been reshaping how we ap-proach nonlinear dynamical systems. Rather than labori-ously deriving first-principles models, researchers increasingly learn surrogate dynamics from experimental or simulation data and then synthesize controllers based on these learned models. This paradigm has evolved into a vibrant research direction in modern nonlinear control research [1]. Representative tech-niques range from neural network (NN) approximation [2] and Gaussian process regression (GPR) [3] to sparse identification of nonlinear dynamics (SINDy) [4] and operator theoretic representations [5], each offering a distinct route toward con-structing control-oriented surrogate models directly from data. Despite these technical advances, a fundamental issue per-sisting across different data-driven control techniques is that the learned model is inherently imperfect. Besides accuracy limits of specific techniques, inevitable discrepancy between data-driven surrogate model and the actual system arises from multiple sources [6]–[8], including modeling error, data 
+
+This work was supported by the National Natural Science Foundation of China (NSFC) under grants T2121002, U24A20266 and 62173006. Yicheng Lin, Zhisheng Duan, Tianzhi Li, Bingxian Wu and Zhiyong Sun are with the School of Advanced Manufacturing and Robotics, Peking University, Beijing, 100871 China (e-mail: linyc020709@stu.pku.edu.cn, duanzs@pku.edu.cn, {tlee, davidwu2003 }@stu.pku.edu.cn, zhiyong.sun@pku.edu.cn). 
+
+limitation, external disturbance, etc. In typical practice of data-driven control, the optimal controller is often designed based on the surrogate model and then directly applied to the actual system. This naturally leads to the critical problem of how the model mismatch fundamentally alters the stability and optimality properties of the resulting closed-loop system .Existing works have tried to address the robustness issues in data-driven nonlinear control from different perspectives. On the one hand, the robustness of stability has been extensively studied within specific methodological frameworks [8]–[10]. These results often exploit structural properties oriented to the adopted learning method, and therefore provide robust-ness guarantees whose applicability is often tied to particular modeling assumptions. On the other hand, existing studies of data-driven nonlinear optimal control have primarily focused on the technical advancement for accurate learning of system dynamics as well as optimal policy. However, the robustness of optimality itself has been overlooked, as these results typically failed to address the closed-loop optimality behavior when the approximated policy was applied to the actual system. Taken together, these developments reveal a significant gap in our understanding of robustness in data-driven nonlinear op-timal control. Particularly, a unified perspective that simultane-ously addresses the preservation of stability, the degradation of optimal performance, and the sensitivity of resulting controller is still lacking. In the linear quadratic regulator (LQR) setting, related questions admit clean answers through classical robust control theory [11], most notably via perturbation analysis of the algebraic Riccati equation (ARE) [12], [13], which yields explicit first-order sensitivity of the optimal performance to the modeling uncertainty. Nevertheless, in the nonlinear set-ting, one of the central challenges for such characterizations stems from the implicit and nonlinear coupling between the optimal performance and the resulting controller through the optimality conditions. For instance, the associated Hamilton-Jacobi-Bellman (HJB) equation for nonlinear systems gener-ally does not admit an explicit perturbation structure available in ARE. As a consequence, the impact of model mismatch on optimality becomes highly nontrivial to characterize. This paper addresses the above challenges by developing a 
+
+unified robustness analysis framework for data-driven nonlin-ear optimal control. Building upon the robust stability guaran-tees, the proposed framework systematically characterizes the optimality degradation under model mismatch and ultimately enables a quantitative evaluation of optimality robustness with explicit connections to classical linear optimal control results. arXiv:2607.07570v1 [math.OC] 8 Jul 2026 2 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+The main contributions are summarized as follows.  
+
+> •
+
+Robust stability foundation: We demonstrate that the nominal optimal value function remains its validity as a Lyapunov candidate under the robust stability criterion, thereby preserving the closed-loop stability. The resulting criterion further provides a quantitative guideline for the modeling accuracy of data-driven system identification to satisfy the fundamental requirement of robust stability.  
+
+> •
+
+Optimality deviation quantification: We establish ex-plicit characterizations of optimality deviations in both closed-loop performance and resulting controller, reveal-ing how model mismatch propagates through the optimal control structure. The analysis is developed in a hierarchi-cal manner, as the performance deviation is evaluated for general nonlinear systems, while the controller deviation admits an explicit characterization for the control-affine dynamics. Further, the proposed framework consistently recovers classical sensitivity results in the LQR setting, thereby establishing a theoretical bridge between nonlin-ear optimality robustness and ARE perturbation analysis.  
+
+> •
+
+Computational robustness evaluation: We show that the optimality deviation analysis admits a unified compu-tational formulation, where seemingly different deviation quantities can be reduced to a class of PDE solving prob-lems. Based on this formulation, an iterative algorithm with guaranteed convergence is developed for quantitative evaluation of optimality robustness. The remainder of this paper is organized as follows. Sec-tion II introduces preliminaries and problem formulation. Sec-tions III and IV investigate the issues of stability preservation and optimality deviation, respectively. Section V exemplifies the proposed robustness analysis through the classical LQR framework, while Section VI develops the iterative algorithm for unified computation of optimality deviation together with numerical examples. Section VII concludes this paper. 
+
+II. P RELIMINARIES 
+
+A. Notations 
+
+Throughout this paper, we denote by Rn the n-dimensional Euclidean space. Unless otherwise noted, the norm for a real vector v ∈ Rnv is the Euclidean norm ∥v∥ = pP nv 
+
+> i=1
+
+v2 
+
+> i
+
+=√v⊤v, meanwhile the norm for a real matrix M = ( mij ) ∈
+
+Rnr ×nc is the induced 2-norm which equals to the maximum singular value. The null and column spaces of M are respec-tively denoted by Nul( M ) and Col( M ), while the direct sum of two subspaces is denoted by ⊕. For a symmetric matrix 
+
+M , we denote by λmin (M ) and λmax (M ) its minimum and maximum eigenvalue. For two symmetric matrices M1, M 2,relation M1 ⪰ M2 (M1 ⪯ M2) means that matrix M1 − M2
+
+is positive (negative) semidefinite, i.e., M1 − M2 ⪰ (⪯)0 .
+
+C0(·) denotes the space of continuous functions defined on the corresponding domains, and Ck(·) the space of functions with continuous derivatives up to order k.
+
+B. Problem Formulation 
+
+Consider a continuous-time nonlinear system represented by 
+
+˙x(t) = f (x(t), u (t)) , x(0) = x (1) where x(t) ∈ X ⊆ Rn is the state, u(t) ∈ U ⊆ Rm is the control input. We focus our analysis on a compact state space 
+
+X containing the origin, which is assumed to be a forward-invariant domain under the optimal controllers to be discussed. The system dynamics f : X × U → X is C2 while unknown, and the origin is an equilibrium of the unactuated system, i.e., 
+
+f (0 , 0) = 0 . The objective of optimal control problem is to minimize an infinite-horizon cost functional 
+
+J(x0, u (·)) = 
+
+Z ∞
+
+> 0
+
+l(x(t), u (t))d t. (2) The actual optimal value function is defined as 
+
+V ∗(x) = inf  
+
+> u(·)
+
+J(x, u (·)) , (3) and the corresponding actual optimal controller is denoted by u∗(x). According to the classical theory of optimal con-trol [14], V ∗(x) should satisfy the following HJB equation 
+
+inf  
+
+> u(·)
+
+{∇ V ∗(x)f (x, u ) + l(x, u )} = 0 (4) where ∇V ∗ = ∂∂x V ∗ denotes the gradient of V ∗.
+
+C. Data-Driven Surrogate Models 
+
+In a number of practical control problems, the actual system dynamics f (x, u ) are unavailable for controller design, while only an approximate surrogate model constructed from mea-surement data is accessible. Such surrogate model naturally arises in a broad class of data-driven modeling approaches, including NN-based learning [2], Koopman-based identifica-tion [5], GPR [10], and SINDy [4]. Whenever an explicit surrogate model is available, the robustness analysis developed in this paper applies regardless of how the surrogate model is obtained. Accordingly, the nominal surrogate model is represented by 
+
+˙x(t) = ˆf (x(t), u (t)) . (5) Since the surrogate model is only an approximation of the true dynamics, the actual system can be equivalently written as 
+
+˙x(t) = ˆf (x(t), u (t)) + r(x(t), u (t)) (6) where the approximation error r(x, u ) represents the inevitable model mismatch introduced during the data-driven modeling process. Based on the surrogate model (5), the nominal optimal controller u∗ 
+
+> 0
+
+can be synthesized using various existing meth-ods. The corresponding nominal value function V ∗ 
+
+> 0
+
+is governed by 
+
+inf 
+
+> u(·)
+
+n
+
+∇V ∗ 
+
+> 0
+
+(x) ˆf (x, u ) + l(x, u )
+
+o
+
+= 0 . (7) To establish the subsequent robustness analysis in a manner independent of particular model-learning techniques, the fol-lowing assumptions are imposed. 
+
+Assumption 1: The nominal dynamics ˆf : X × U → X in the surrogate model (5) and the running cost l : X×U → R≥0
+
+in the functional (2) are C2, ˆf (0 , 0) = 0 , l (0 , 0) = 0 , and there exist constants α1 > 0, α 2 > 0 such that 
+
+l(x, u ) ≥ α1∥x∥2 + α2∥u∥2, ∀(x, u ) ∈ X × U. (8) AUTHOR et al. : TITLE 3
+
+Remark 1 (Generality of cost): Assumption 1 preserves the positive-definite and coercive structure of the running cost l.Particularly, the standard form l(x, u ) = x⊤Qx +u⊤Ru in the LQR setting naturally satisfies (8) for Q, R ≻ 0, meanwhile more general nonlinear running costs with higher-order growth are also included. Therefore, Assumption 1 serves as a natural extension of classical linear optimal control theory to nonlinear settings. Such a condition ensures a sufficient penalization of large states and control inputs. 
+
+Assumption 2: The value functions V ∗, V ∗ 
+
+> 0
+
+: X → R≥0
+
+given by (4) and (7) respectively are classical solutions such that V ∗, V ∗ 
+
+> 0
+
+∈ C 2(X). Further, it is assumed that u∗ is the unique minimizer for (4), and analogously for u∗ 
+
+> 0
+
+in (7). 
+
+Remark 2 (Regularity of value function): Under this stand-ing assumption, our focus is to characterize the impacts of uncertainties on stability and optimality, rather than on ana-lyzing the existence and uniqueness of solutions. In addition, for the class of nonlinear optimal control problems considered here, the existence of a unique C2 solution to the HJB equation (4) or (7) in a neighborhood of the origin is ensured by [15], provided that the system is locally stabilizable and the running cost satisfies (8). In more general settings, the value functions can be interpreted in the viscosity sense [16], and the results in this paper can be extended to weaker notions of solutions with additional technical efforts in the future. The following assumption characterizes the model mismatch in a general form without restricting how the nominal surro-gate model is obtained. 
+
+Assumption 3: Suppose that the approximation error term in (6) is bounded by 
+
+∥r(x, u )∥ ≤ r1(x, u )∥x∥ + r2(x, u )∥u∥ (9) where r1, r 2 are continuous and uniformly bounded in X × U,i.e., ∥r1(x, u )∥ ≤ c1, ∥r2(x, u )∥ ≤ c2.
+
+Remark 3 (On the uncertainty bound): Assumption 3 im-poses a (semi-)linear growth bound on the approximation error with respect to the state and control input. From a theoretical viewpoint, this form naturally arises from the local smoothness of both the actual and nominal dynamics given Assumption 1. In particular, since r(0 , 0) = f (0 , 0) − ˆf (0 , 0) , continuous and bounded Jacobians ∂r ∂x , ∂r ∂u over a compact operating region 
+
+X × U imply the state- and input-dependent uncertainty bound in (9). Such a characterization is consistent with the vanishing perturbation condition in nonlinear robust control [17]. From a practical perspective, recent advances in data-driven system identification have increasingly emphasized an explicit description of model mismatch [1], [10], [18], enabling rig-orous robustness analysis beyond empirical model fitting. For example, proportional state- and input-dependent error bounds have been established for Koopman-based surrogate models [9, Proposition 5]. Likewise, deterministic error bounds are also available for kernel-based learning models as uncertainty certificates [19, Theorem 1]. Although the analytical expres-sions differ across learning methods, they all aim to provide quantitative characterizations of model mismatch. Motivated by these developments, Assumption 3 adopts a growth-bound uncertainty description that is suitable for robustness analysis in nonlinear optimal control considered in this paper. 
+
+III. R OBUSTNESS OF STABILITY 
+
+Under the nominal settings where r(x, u ) = 0 , the nominal optimal value function V ∗ 
+
+> 0
+
+serves as a Lyapunov function due to the HJB optimality condition. However, when the nominal optimal controller u∗ 
+
+> 0
+
+is applied to the actual system (6), the additional approximation error term may destroy this stabiliz-ing property. Therefore, before investigating the robustness of optimality, it is necessary to characterize whether the closed-loop stability can be preserved under model mismatch. The norm-bounded characterization (9) enables a tractable Lyapunov-based analysis of robust stability, while preserving a general applicability across different techniques. Based on As-sumption 3, we define the set R of admissible approximation error satisfying (9), i.e., 
+
+R = {r(x, u )|∥ r(x, u )∥ ≤ c1∥x∥ + c2∥u∥} . (10) Before investigating the robustness of stability, we introduce the following lemma to characterize a key property of the value function that is essential for the subsequent analysis. 
+
+Lemma 1: Under Assumptions 1-2, the gradient of nominal value function ∇V ∗ 
+
+> 0
+
+(x) is Lipshitz continuous in X. Hence, there exists L > 0 such that ∥∇ V ∗ 
+
+> 0
+
+(x)∥ ≤ L∥x∥, ∀x ∈ X.
+
+Proof: Since V ∗ 
+
+> 0
+
+(x) ∈ C 2(X) by Assumption 2, its Hes-sian matrix ∇2V ∗ 
+
+> 0
+
+(x) is continuous and uniformly bounded on the compact X. Let L = ess sup x∈X ∥∇ 2V ∗ 
+
+> 0
+
+(x)∥. Recalling that with Assumption 1 for the running cost l, V ∗ 
+
+> 0
+
+(x) ∈ C 2(X)
+
+is a positive definite value function that achieves its minimum at the origin, ∇V ∗ 
+
+> 0
+
+(0) = 0 holds. By the mean value theorem in integral form, it follows that 
+
+∇V ∗ 
+
+> 0
+
+(x) = R 10 ∇2V ∗ 
+
+> 0
+
+(tx )d t · x. Taking the norm on both sides yields 
+
+∥∇ V ∗ 
+
+> 0
+
+(x)∥ ≤ 
+
+Z 10
+
+∇2V ∗ 
+
+> 0
+
+(tx ) dt · ∥ x∥ ≤ L∥x∥.
+
+The proof is completed. With the aid of Lemma 1, robustness of stability is estab-lished by the following theorem. 
+
+Theorem 1: Let Assumptions 1-3 hold. If the error bound coefficients c1 > 0, c 2 > 0 satisfy the robust stability criterion 
+
+c1L + c22
+
+4α2
+
+L2 < α 1, (11) then the nominal optimal controller u∗ 
+
+> 0
+
+given by (7) asymptot-ically stabilizes the nonlinear system (6) for any r(x, u ) ∈ R .Hence, the nominal optimal controller u∗ 
+
+> 0
+
+stabilizes the original nonlinear system (1). 
+
+Proof: First, we calculate the time derivative of nominal value function V ∗ 
+
+> 0
+
+along the system (6) controlled by u∗
+
+> 0
+
+, i.e., 
+
+dV ∗
+
+> 0
+
+dt = ( ∇V ∗ 
+
+> 0
+
+)⊤ h ˆf (x(t), u ∗
+
+> 0
+
+(t)) + r(x(t), u ∗
+
+> 0
+
+(t)) 
+
+i
+
+= −l(x(t), u ∗
+
+> 0
+
+(t)) + ( ∇V ∗ 
+
+> 0
+
+)⊤ r(x(t), u ∗
+
+> 0
+
+(t)) .
+
+(12) With Assumption 3 and Lemma 1, we obtain 
+
+dV ∗
+
+> 0
+
+dt ≤ − l(x(t), u ∗
+
+> 0
+
+(t)) + ∥∇ V ∗ 
+
+> 0
+
+∥ (c1∥x(t)∥ + c2∥u∗
+
+> 0
+
+(t)∥)
+
+≤ − l(x(t), u ∗
+
+> 0
+
+(t)) + c1L∥x(t)∥2 + c2L∥x(t)∥∥ u∗
+
+> 0
+
+(t)∥.
+
+(13) 4 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+Since the inequality 
+
+∥x(t)∥∥ u∗
+
+> 0
+
+(t)∥ ≤ 12
+
+
+
+β∥x(t)∥2 + 1
+
+β ∥u∗
+
+> 0
+
+(t)∥2
+
+
+
+(14) holds for any β > 0, the time derivative of V ∗ 
+
+> 0
+
+satisfies 
+
+dV ∗
+
+> 0
+
+dt ≤ − α1∥x(t)∥2 − α2∥u∗
+
+> 0
+
+(t)∥2
+
++
+
+
+
+c1 + 12 βc 2
+
+
+
+L∥x(t)∥2 + 12β c2L∥u∗
+
+> 0
+
+(t)∥2.
+
+(15) If there exists a constant β > 0 such that c1 + 12 βc 2 < α1 
+
+> L
+
+and 
+
+c2 < 2βα 2 
+
+> L
+
+, the time derivative of V ∗ 
+
+> 0
+
+(x) is negative definite. With the definition of the value function and Assumption 1, 
+
+V ∗ 
+
+> 0
+
+(0) = 0 and V ∗ 
+
+> 0
+
+(x) > 0, ∀x̸ = 0 naturally hold. Therefore, 
+
+V ∗ 
+
+> 0
+
+is a Lyapunov function for any possible nonlinear system (6) satisfying r(x, u ) ∈ R , which indicates that u∗ 
+
+> 0
+
+stabilizes the original system (1). Note that 
+
+c1 + 12 βc 2 < α1
+
+L ⇔ β < 2α1 − 2c1Lc2L , (16a) 
+
+c2 < 2βα 2
+
+L ⇔ β > c2L
+
+2α2
+
+. (16b) Therefore, there exists β satisfying (16) if and only if 
+
+c2L
+
+2α2
+
+< 2α1 − 2c1Lc2L ,
+
+which is equivalent to the robust stability criterion (11). The proof is completed. Theorem 1 reveals an intrinsic synergy between optimality and stabilization in the presence of model mismatch. It high-lights that in the considered infinite-horizon optimal control problem, the pursuit of optimality does not necessarily com-promise closed-loop stability under model mismatch. Instead, stability can still be retained under appropriate conditions. As long as the data-driven surrogate model maintains a sufficient degree of accuracy, the nominal optimal controller is capable of preserving closed-loop stability. From a complementary viewpoint, the robust stability crite-rion (11) provides an uncertainty budget for the basic require-ment of stability in nonlinear optimal control. It establishes a rigorous threshold for the approximation error bound (c1, c 2),beyond which the stabilizing property of the nominal optimal controller u∗ 
+
+> 0
+
+may no longer be guaranteed. In various data-driven paradigms, it is usually laborious to obtain a sufficiently accurate surrogate model. As a consequence, Theorem 1 pro-vides a practical guideline for data-driven control, indicating how much modeling accuracy is demanded to guarantee the closed-loop stability. Following the same line of analysis, the asymptotic stability of the actual optimal controller can be established as a direct consequence. 
+
+Corollary 1: Let Assumptions 1-2 hold. Then, the actual optimal controller u∗ obtained from (4) renders the system (1) asymptotically stable. 
+
+Proof: The proof of Corollary 1 follows similar thoughts with Theorem 1. The time derivative of V ∗ given by (4) along the system (1) controlled by u∗ satisfies ˙V ∗ = −l(x(t), u ∗(t)) ,which holds negative definiteness with Assumption 1. Thus, 
+
+V ∗ is a Lyapunov function, and the closed-loop system (1) controlled by u∗ is asymptotically stable. 
+
+IV. R OBUSTNESS OF OPTIMALITY 
+
+While Section III ensures the preservation of closed-loop stability, the achieved performance may deviate from the true optimum for the actual system under model mismatch. Such degradation of achieved optimality is referred to in this paper as optimality deviation , a general concept that encompasses both performance loss and controller deviation. Accordingly, we shift our focus from stability to optimality, quantifying how model mismatch affects the optimal solutions in two complementary steps. First, we analyze the optimality deviation in the value function, which captures performance loss induced by model mismatch. Then, we study the optimal-ity deviation in the optimal controller, which reflects how the resulting feedback is perturbed. The two-step analysis is mo-tivated by the intrinsic structure of optimal control, where the optimal controller is implicitly characterized through the value function via the HJB equation. Understanding perturbations in the value function thus provides the foundation of analyzing deviations in the controller. 
+
+A. Deviation of Performance 
+
+Since the approximation error r(x, u ) perturbs the system behavior, it affects the closed-loop performance (2) under the same controller u(·). To facilitate the subsequent analysis, we use the notation J(u, x, r ). Apparently, V ∗ 
+
+> 0
+
+(x) = J(u∗
+
+> 0
+
+, x, 0) 
+
+and V ∗(x) = J(u∗, x, r ) hold by their definitions. We further define a value function V (x) = J(u∗
+
+> 0
+
+, x, r ), which characterize closed-loop performance (2) of the actual nonlinear system (1) controlled by the nominal optimal controller u∗
+
+> 0
+
+.First, we consider the optimality deviation of nominal value function V ∗ 
+
+> 0
+
+(x) with the following theorem. We note that the gradient-energy integral term will be rigorously justified to be finite after the theorem. 
+
+Theorem 2: Due to the model mismatch, applying the nom-inal optimal controller u∗ 
+
+> 0
+
+given by (7) to the actual nonlinear system (1) leads to an extra cost in (2). With Assumptions 1-3, this extra cost is characterized by 
+
+∥V − V ∗ 
+
+> 0
+
+∥ ≤ ∆Vmax = 12 C212 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
++ C12 
+
+2
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12
+
+s
+
+C212 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt + 4 V ∗ 
+
+> 0
+
+.
+
+(17) where C12 = max 
+
+nq 2 
+
+> α1
+
+c1,
+
+q 2 
+
+> α2
+
+c2
+
+o
+
+, and the integral term of ∥∇ V ∗ 
+
+> 0
+
+∥2 is evaluated along the trajectory controlled by u∗
+
+> 0
+
+under the worst-case error r∗ 
+
+> 0
+
+given by (20), i.e., 
+
+˙x(t) = ˆf (x(t), u ∗
+
+> 0
+
+(t)) + r∗ 
+
+> 0
+
+(x(t), u ∗
+
+> 0
+
+(t)) , x (0) = x. (18) 
+
+Proof: In order to bound V −V ∗ 
+
+> 0
+
+, we firstly investigate the worst-case approximation error r∗ 
+
+> 0
+
+= arg max r∈R J(u∗
+
+> 0
+
+, x, r )
+
+that aims to maximize the cost functional (2). The correspond-ing worst-case value function over all admissible errors is de-noted by V ∗ 
+
+> r
+
+(x) = max r∈R J(u∗
+
+> 0
+
+, x, r ). Using the Hamilton-Jacobi-Issacs (HJI) equation [20], r∗ 
+
+> 0
+
+and V ∗ 
+
+> r
+
+should be solved AUTHOR et al. : TITLE 5
+
+from 
+
+max 
+
+> r∈R
+
+n
+
+(∇V ∗ 
+
+> r
+
+)⊤ h ˆf (x, u ∗
+
+> 0
+
+) + r(x, u ∗
+
+> 0
+
+)
+
+i
+
++ l(x, u ∗
+
+> 0
+
+)
+
+o
+
+= 0 . (19) Since the inner product (∇V ∗ 
+
+> r
+
+)⊤r is linear in r and R is norm-bounded under Assumption 3, the maximization is achieved when r ∈ R is aligned with ∇V ∗ 
+
+> r
+
+, yielding 
+
+r∗ 
+
+> 0
+
+(x, u ∗
+
+> 0
+
+) = c1∥x∥ + c2∥u∗
+
+> 0
+
+∥∥∇ V ∗ 
+
+> r
+
+∥ ∇V ∗ 
+
+> r
+
+. (20) With (19) and (20), V ∗ 
+
+> r
+
+(x) = J(u∗
+
+> 0
+
+, x, r ∗ 
+
+> 0
+
+) is the solution of 
+
+(∇V ∗ 
+
+> r
+
+)⊤ ˆf (x, u ∗
+
+> 0
+
+) + l(x, u ∗
+
+> 0
+
+) = −(c1∥x∥ + c2∥u∗
+
+> 0
+
+∥)∥∇ V ∗ 
+
+> r
+
+∥.
+
+(21) Note that for the degenerate case in (20) where ∥∇ V ∗ 
+
+> r
+
+∥ = 0 ,we obtain 0 = l(x, u ∗
+
+> 0
+
+) ≥ α1∥x∥2 + α2∥u∗
+
+> 0
+
+∥2 with Assump-tion 1, which only occurs at the origin (x, u ∗
+
+> 0
+
+) = (0 , 0) . Thus, we can impose r∗ 
+
+> 0
+
+(0 , 0) = 0 to ensure that r∗ 
+
+> 0
+
+is continuous and well-defined in X × U. Consequently, the time derivative of V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+along (18) is 
+
+ddt (V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+) = ∇(V ∗ 
+
+> r
+
+)⊤ h ˆf (x(t), u ∗
+
+> 0
+
+(t)) + r∗ 
+
+> 0
+
+(x(t), u ∗
+
+> 0
+
+(t)) 
+
+i
+
+− ∇ (V ∗ 
+
+> 0
+
+)⊤ ˆf (x(t), u ∗
+
+> 0
+
+(t)) − ∇ (V ∗ 
+
+> 0
+
+)⊤r∗
+
+> 0
+
+= − ∇ (V ∗ 
+
+> 0
+
+)⊤ c1∥x(t)∥ + c2∥u∗
+
+> 0
+
+(t)∥∥∇ V ∗ 
+
+> r
+
+∥ ∇V ∗ 
+
+> r
+
+,
+
+which is obtained by combining (7) and (21), then 
+
+ddt (V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+) ≤ ∥∇ V ∗ 
+
+> 0
+
+∥ (c1∥x(t)∥ + c2∥u∗
+
+> 0
+
+(t)∥) .
+
+Since the closed-loop stability has been proven in Theorem 1 and hence x(∞) = 0 , V ∗ 
+
+> r
+
+and V ∗ 
+
+> 0
+
+tend to be zero when t →∞. Taking the norm from both sides of 
+
+V ∗ 
+
+> r
+
+(x) − V ∗ 
+
+> 0
+
+(x) = −
+
+Z ∞
+
+> 0
+
+ddt [V ∗ 
+
+> r
+
+(x(t)) − V ∗ 
+
+> 0
+
+(x(t))] d t, 
+
+and noting that V ∗ 
+
+> r
+
+(x) − V ∗ 
+
+> 0
+
+(x) ≥ 0 holds natively due to the maximizing property of the worst-case approximation error r∗ 
+
+> 0
+
+,we obtain 
+
+V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+≤
+
+Z ∞
+
+> 0
+
+ddt (V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+) dt
+
+≤
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12 Z ∞
+
+> 0
+
+(c1∥x(t)∥ + c2∥u∗
+
+> 0
+
+(t)∥)2dt
+
+ 12
+
+.
+
+(22) The last integral term corresponding to the approximation error can be bounded by 
+
+Z ∞
+
+> 0
+
+(c1∥x(t)∥ + c2∥u∗
+
+> 0
+
+(t)∥)2 dt
+
+≤
+
+Z ∞
+
+> 0
+
+2  c21∥x(t)∥2 + c22∥u∗
+
+> 0
+
+(t)∥2 dt
+
+≤
+
+Z ∞
+
+> 0
+
+max 
+
+ 2c21
+
+α1
+
+, 2c22
+
+α2
+
+  α1∥x(t)∥2 + α2∥u∗
+
+> 0
+
+(t)∥2 dt
+
+≤ max 
+
+ 2c21
+
+α1
+
+, 2c22
+
+α2
+
+ Z ∞
+
+> 0
+
+l(x(t), u ∗
+
+> 0
+
+(t))d t = C212 V ∗ 
+
+> r
+
+(x).
+
+(23) Combining (22) and (23) induces 
+
+V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+≤ C12 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12
+
+(V ∗ 
+
+> r
+
+) 12 , (24) which can be regarded as a quadratic inequality in the non-negative variable (V ∗ 
+
+> r
+
+) 12 . Solving the corresponding quadratic equation and retaining its nonnegative root yields 
+
+(V ∗ 
+
+> r
+
+) 12 ≤ 12 C12 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12
+
++ 12
+
+s
+
+C212 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt + 4 V ∗ 
+
+> 0
+
+.
+
+(25) Since r∗ 
+
+> 0
+
+denotes the worst-case approximation error that tries to maximize the value function, ∥V − V ∗ 
+
+> 0
+
+∥ ≤ V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+holds, and the upper bound (17) can be verified by calculating the square of both sides of (25). By symmetry, when the approxi-mation error acts in the opposite direction, the resulting value function may also be lower than V ∗ 
+
+> 0
+
+. Under this circumstance, 
+
+r∗∗  
+
+> 0
+
+= arg min r∈R J(u∗
+
+> 0
+
+, x, r ) should be solved from the HJB equation 
+
+min 
+
+> r∈R
+
+n
+
+(∇V ∗∗  
+
+> r
+
+)⊤ h ˆf (x, u ∗
+
+> 0
+
+) + r(x, u ∗
+
+> 0
+
+)
+
+i
+
++ l(x, u ∗
+
+> 0
+
+)
+
+o
+
+= 0 .
+
+The minimization of (∇V ∗∗  
+
+> r
+
+)⊤r linearly dependent on r is also achieved when r ∈ R is aligned with ∇V ∗ 
+
+> r
+
+, yielding 
+
+r∗∗  
+
+> 0
+
+= − c1∥x∥ + c2∥u∗
+
+> 0
+
+∥∥∇ V ∗∗  
+
+> r
+
+∥ ∇V ∗∗  
+
+> r
+
+.
+
+The time derivative can be obtained 
+
+ddt (V ∗∗  
+
+> r
+
+− V ∗ 
+
+> 0
+
+) = ∇(V ∗ 
+
+> 0
+
+)⊤ c1∥x∥ + c2∥u∗
+
+> 0
+
+∥∥∇ V ∗∗  
+
+> r
+
+∥ ∇V ∗∗ 
+
+> r
+
+and the same upper bound of ∥V ∗∗  
+
+> r
+
+− V ∗ 
+
+> 0
+
+∥ can be derived with a similar way and leads to the same result with (17). The proof is completed. Theorem 2 introduces the gradient-energy integral as a key quantity governing the sensitivity of performance degradation. More precisely, this integral should be interpreted as an initial-state-dependent energy functional that measures the accumu-lated magnitude of the nominal value function gradient along the worst-case trajectory. Moreover, the following proposition shows that this quantity is automatically finite and admits an upper bound proportional to the nominal value function. 
+
+Proposition 1: Suppose that Assumptions 1-3 hold and the robust stability criterion (11) is satisfied. Then, there exists a constant μ > 0, such that the gradient-energy integral term in (17) is bounded by 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt ≤ L2
+
+μ V ∗ 
+
+> 0
+
+(x). (26) 
+
+Proof: As revealed by the proof of Theorem 1, since the robust stability criterion (11) is satisfied, there exists a constant 
+
+β > 0 such that (15) holds and meanwhile  c1 + 12 βc 2
+
+ L −
+
+α1 < 0, 12β c2L − α2 < 0. Consider μ = α1 −  c1 + 12 βc 2
+
+ L.Then, along the closed-loop system trajectory (6) controlled by u∗ 
+
+> 0
+
+for any r(x, u ) ∈ R , the time derivative of the nominal optimal value function satisfies 
+
+dV ∗ 
+
+> 0
+
+(x(t)) dt ≤ − μ∥x(t)∥2. (27) Integrating both sides over [0 , ∞) gives 
+
+−V ∗ 
+
+> 0
+
+(x) = 
+
+Z ∞
+
+> 0
+
+dV ∗ 
+
+> 0
+
+(x(t)) dt dt ≤ − μ
+
+Z ∞
+
+> 0
+
+∥x(t)∥2dt (28) 6 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+since lim t→∞ x(t) = 0 is guaranteed by Theorem 1. Further-more, by Lemma 1, we obtain 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+(x(t)) ∥2dt ≤ L2
+
+Z ∞
+
+> 0
+
+∥x(t)∥2dt ≤ L2
+
+μ V ∗ 
+
+> 0
+
+(x).
+
+(29) The proof is completed. 
+
+B. Deviation of Controller 
+
+The analysis in Section IV-A has established that the perfor-mance degradation can be quantified under general nonlinear dynamics and cost functional relying only on Assumptions 1-3, which highlights the general applicability of the theoretical results. By contrast, quantifying the explicit deviation in the resulting controller is more involved. In general, the optimal controller is implicitly defined through the Hamiltonian min-imization in the HJB equation, which couples the controller to value function in a way that prevents a direct derivation of explicit optimality deviation bound. To enable an explicit expression for the optimal controller and facilitate the deviation analysis, we introduce an additional structural assumption. 
+
+Assumption 4: The nominal surrogate dynamics (5) learned from data is control-affine, i.e., 
+
+˙x(t) = ˆf (x(t), u (t)) = f0(x(t)) + g0(x(t)) u(t). (30) Furthermore, the running cost is of the form 
+
+l(x, u ) = q(x) + 12 u⊤Ru, R ≻ 0. (31) Assumption 4 is only imposed for the analysis of optimal controller deviation in this subsection and does not affect the generality of theoretical results for performance deviation in Section IV-A. It is worth emphasizing that the control-affine structure is imposed on the surrogate model (5) rather than the actual system (1). This reflects a common paradigm in data-driven control, where a more structured model class is adopted to facilitate the control synthesis, while the actual system may exhibit more complicated nonlinear dynamics. The resulting model mismatch is captured by the approximation error term 
+
+r(x, u ), explicitly accounted for in the robustness analysis. We are now ready to quantify the optimality deviation in the optimal controller with the following theorem. 
+
+Theorem 3: Due to the existence of model mismatch, the nominal optimal controller u∗ 
+
+> 0
+
+given by (7) deviates from the actual optimal controller u∗ corresponding to the original nonlinear system (1). Under Assumptions 1-4, this deviation is characterized by 
+
+Z ∞
+
+> 0
+
+(u∗ 
+
+> 0
+
+− u∗)⊤R(u∗ 
+
+> 0
+
+− u∗)d t
+
+≤2∆ Vmax + 2 C12 
+
+
+
+(V ∗ 
+
+> 0
+
++ ∆ Vmax )
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12
+
+(32) where the integral term of ∥∇ V ∗ 
+
+> 0
+
+∥2 here is evaluated along the actual optimal trajectory, i.e., (1) controlled by u∗, and 
+
+C12 , ∆Vmax are given by Theorem 2. 
+
+Proof: With Assumption 4, the actual value function V ∗
+
+solved from the HJB equation (4) satisfies 
+
+min 
+
+> u
+
+(∇V ∗)⊤[f0(x) + g0(x)u + r(x, u )] + l(x, u ) = 0 
+
+where the running cost l(x, u ) is given by (31). The partial derivative of r(x, u ) = f (x, u ) − f0(x) − g0(x)u with respect to u is C1 since ∂r ∂u = ∂f ∂u − g0(x). Denote ru∗ = ∂r ∂u (x, u ∗).Accordingly, the actual optimal controller satisfies 
+
+u∗(x) = −R−1
+
+
+
+g0(x) + ∂r ∂u (x, u ∗)
+
+⊤
+
+∇V ∗. (33) With (4) and (33), V ∗(x) is the solution of 
+
+(∇V ∗)⊤f0(x) + q(x) − 12 (∇V ∗)⊤g0(x)R−1g⊤ 
+
+> 0
+
+(x)∇V ∗
+
++( ∇V ∗)⊤r(x, u ∗) + 12 (∇V ∗)⊤ru∗ R−1r⊤ 
+
+> u∗
+
+∇V ∗ = 0 .
+
+(34) For the nominal case where r(x, u ) = 0 , the HJB equation (34) degenerates to 
+
+(∇V ∗ 
+
+> 0
+
+)⊤f0(x) + q(x) − 12 (∇V ∗ 
+
+> 0
+
+)⊤g0(x)R−1g⊤ 
+
+> 0
+
+(x)∇V ∗ 
+
+> 0
+
+= 0 
+
+(35) which is equivalent to (7) for control-affine case and induces the nominal optimal controller u∗ 
+
+> 0
+
+= −R−1g⊤ 
+
+> 0
+
+(x)∇V ∗ 
+
+> 0
+
+. Then, 
+
+(u∗ 
+
+> 0
+
+− u∗)⊤R(u∗ 
+
+> 0
+
+− u∗) = ( ∇V ∗)⊤ru∗ R−1r⊤ 
+
+> u∗
+
+∇V ∗
+
++ 2 ∇(V ∗ − V ∗ 
+
+> 0
+
+)⊤g0(x)R−1r⊤ 
+
+> u∗
+
+∇V ∗
+
++ ∇(V ∗ − V ∗ 
+
+> 0
+
+)⊤g0(x)R−1g⊤ 
+
+> 0
+
+(x)∇(V ∗ − V ∗ 
+
+> 0
+
+)
+
+holds. With (34) and (35), we obtain 
+
+(u∗ 
+
+> 0
+
+− u∗)⊤R(u∗ 
+
+> 0
+
+− u∗) = −2( ∇V ∗ 
+
+> 0
+
+)⊤r(x, u ∗)
+
+−2∇(V ∗ − V ∗ 
+
+> 0
+
+)⊤ [f0(x) + g0(x)u∗ + r(x, u ∗)] . (36) Based on Theorem 1 and Corollary 1 that confirms the closed-loop robust stability, V ∗(x(∞)) = V ∗ 
+
+> 0
+
+(x(∞)) = 0 holds. The last term in (36) is the time derivative of −(V ∗ −V ∗ 
+
+> 0
+
+) along the trajectory (1) controlled by the actual optimal controller u∗.By integrating along this trajectory, the optimality deviation characterized by the nominal and actual optimal controllers satisfies 
+
+Z ∞
+
+> 0
+
+(u∗ 
+
+> 0
+
+− u∗)⊤R(u∗ 
+
+> 0
+
+− u∗)d t
+
+= − 2
+
+Z ∞
+
+> 0
+
+ ddt (V ∗ − V ∗ 
+
+> 0
+
+) + ( ∇V ∗ 
+
+> 0
+
+)⊤r (x(t), u ∗ (t)) 
+
+
+
+dt
+
+=2 ( V ∗(x) − V ∗ 
+
+> 0
+
+(x)) − 2
+
+Z ∞
+
+> 0
+
+(∇V ∗ 
+
+> 0
+
+)⊤r (x(t), u ∗ (t)) d t. 
+
+(37) Following similar procedures to (22) and (23), we obtain 
+
+Z ∞
+
+> 0
+
+(∇V ∗ 
+
+> 0
+
+)⊤r (x(t), u ∗ (t)) d t
+
+≤
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12 Z ∞
+
+> 0
+
+(c1∥x∥ + c2∥u∗∥)2dt
+
+ 12
+
+≤C12 
+
+
+
+V ∗
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12
+
+.
+
+(38) With the notation J(u, z, r ), the relations 
+
+V ∗ 
+
+> r
+
+(x) = J(u∗
+
+> 0
+
+, x, r ∗ 
+
+> 0
+
+) ≥ V (x) = J(u∗
+
+> 0
+
+, x, r ),V ∗ 
+
+> r
+
+(x) = J(u∗
+
+> 0
+
+, x, r ∗ 
+
+> 0
+
+) ≥ V ∗ 
+
+> 0
+
+(x) = J(u∗
+
+> 0
+
+, x, 0) ,V (x) = J(u∗
+
+> 0
+
+, x, r ) ≥ V ∗(x) = J(u∗, x, r )
+
+(39) AUTHOR et al. : TITLE 7
+
+hold, which directly follow from the definitions of V, V ∗ 
+
+> 0
+
+, V ∗
+
+> r
+
+and the optimality properties of u∗ 
+
+> 0
+
+and r∗ 
+
+> 0
+
+. Consequently, we have 
+
+V ∗ − V ∗ 
+
+> 0
+
+= V ∗ − V + V − V ∗ 
+
+> 0
+
+≤ V − V ∗ 
+
+> 0
+
+≤ ∆Vmax .
+
+Then inequalities (38) can be further processed, i.e., 
+
+Z ∞
+
+> 0
+
+(∇V ∗ 
+
+> 0
+
+)⊤r (x(t), u ∗ (t)) d t
+
+≤C12 
+
+
+
+(V ∗ 
+
+> 0
+
++ ∆ Vmax )
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt
+
+ 12
+
+.
+
+Along with (37), the optimality deviation of controller satisfies (32). The proof is completed. 
+
+Remark 4 (An underlying novel analytical strategy): The proof of Theorem 3 also confirms that the optimality deviation between the nominal and actual optimal value functions is bounded by V ∗ − V ∗ 
+
+> 0
+
+≤ ∆Vmax . Directly connecting V ∗ 
+
+> 0
+
+(x)
+
+and V ∗(x), u∗ 
+
+> 0
+
+and u∗ is relatively challenging due to their implicit coupling through distinct HJB equation. Therefore, the intermediate worst-case value function V ∗ 
+
+> r
+
+(z) serves as a pivotal bridge, which captures the maximal deviation induced by admissible model mismatch and allows a tractable analysis of V ∗ − V ∗ 
+
+> 0
+
+. In this sense, V ∗ 
+
+> r
+
+is not an auxiliary construct but a conceptually necessary element that supports the entire optimality deviation analysis. 
+
+V. E XEMPLIFICATION THROUGH THE LQR L ENS 
+
+To further elucidate the proposed robustness analysis frame-work, we consider its specialization to the classical LQR prob-lem. Beyond providing a concrete and analytically transparent example, the LQR setting offers an invaluable perspective from which broader implications of the proposed framework can be more clearly understood. As will be shown, the exemplifica-tion establishes an unexpected connection between nonlinear optimality degradation and Riccati perturbation analysis [21], revealing that the two perspectives are linked through closely related underlying structures. 
+
+A. From Nonlinear Robustness to LQR Stability 
+
+Consider the optimal control problem of a linear system 
+
+˙x(t) = Ax (t) + Bu (t) (40) with the quadratic cost functional (2) where 
+
+l(x(t), u (t)) = 12 x⊤(t)Qx (t) + 12 u⊤(t)Ru (t). (41) Suppose that the nominal surrogate model (5) is given by 
+
+˙x(t) = ˆAx (t) + ˆBu (t). (42) Then, the resulting approximation error can be expressed by 
+
+r(x(t), u (t)) = ∆ Ax (t) + ∆ Bu (t) (43) where ∆A = A− ˆA, ∆B = B− ˆB. It is known that under such settings with Q, R ≻ 0 and ( ˆA, ˆB) being stabilizable, the nom-inal optimal controller is given by u∗
+
+> 0
+
+(t) = −R−1 ˆB⊤P0x(t)
+
+and the nominal optimal value function is V ∗ 
+
+> 0
+
+(x) = 12 x⊤P0x,where P0 is the unique positive definite solution of algebraic Riccati equation (ARE) 
+
+P0 ˆA + ˆA⊤P0 + Q − P0 ˆBR −1 ˆB⊤P0 = 0 . (44) Naturally, Assumptions 1-4 hold where α1 = 12 λmin (Q), α 2 = 
+
+> 12
+
+λmin (R), c 1 = ∥∆A∥ and c2 = ∥∆B∥. In the presence of model mismatch, our objective is not to revisit the classical LQR problem, but to examine how the optimality deviation analysis developed in Section IV manifests itself in the well-known and classical setting. Specializing the analysis in Theorem 1 to the LQR setting directly yields the following result. 
+
+Corollary 2: Suppose that ( ˆA, ˆB) is stabilizable, Q, R ≻ 0.Then, the nominal optimal controller u∗ 
+
+> 0
+
+= −R−1 ˆB⊤P0x in the LQR setting stabilizes the actual linear system (40) if 
+
+∥P0∥
+
+λmin (Q)
+
+
+
+2∥∆A∥ + ∥P0∥
+
+λmin (R) ∥∆B∥2
+
+
+
+< 1. (45) 
+
+Proof: Since the nominal optimal value function satisfies 
+
+V ∗ 
+
+> 0
+
+= 12 x⊤P0x, the Lipschitz constant in Lemma 1 can be selected as L = ∥P0∥. Substituting the quantities c1, c 2, α 1, α 2
+
+with ∥∆A∥, ∥∆B∥, 12 λmin (Q), 12 λmin (R) respectively in (11) yields the condition (45) for closed-loop robust stability. The desired result follows immediately from Theorem 1. Corollary 2 provides an explicit robust stability criterion for perturbed LQR closed-loop systems, whose structure closely parallels classical Lyapunov-based robustness conditions es-tablished in existing literature. Taking [22] for example, the condition for closed-loop stability under linear perturbations is provided by 
+
+∥∆A∥ + ∥∆B∥∥ K0∥ ≤ λmin (Q + P0 ˆBR −1 ˆB⊤P0)2∥P0∥ , (46) where K0 = −R−1 ˆB⊤P0. To make the intrinsic consistency of (46) and Corollary 2 more transparent, we illustrate their connections with two representative special cases. 
+
+Case 1: ∥∆B∥ = 0 . Under this circumstance, conditions (45) and (46) degenerate to ∥∆A∥ < λmin (Q)2∥P0∥ and ∥∆A∥ ≤    
+
+> λmin (Q+P0ˆBR −1ˆB⊤P0)2∥P0∥
+
+respectively. Note that as K⊤ 
+
+> 0
+
+RK 0 =
+
+P0 ˆBR −1 ˆB⊤P0, λmin (Q) ≤ λmin (Q + K⊤ 
+
+> 0
+
+RK 0) holds. The slight conservatism in the derived bound represents an in-evitable technical price for deploying a unified and general nonlinear robustness analysis framework. Nevertheless, both boundaries match identically in terms of algebraic scaling and order of magnitude. 
+
+Case 2: ∥∆A∥ = 0 . Under this circumstance, the condition (45) degenerates to ∥∆B∥ <
+
+√λmin (Q)λmin (R) 
+
+> ∥P0∥
+
+, which satisfies 
+
+∥∆B∥ < 1
+
+∥P0∥
+
+pλmin (Q)λmin (R) (47a) 
+
+≤ 1
+
+∥P0∥
+
+ λmin (Q)2∥K0∥ + 12∥K0∥ λmin (R)∥K0∥2
+
+
+
+(47b) 
+
+≤ λmin (Q) + λmax (K⊤ 
+
+> 0
+
+RK 0)2∥P0∥∥ K0∥ . (47c) Meanwhile, the condition (46) under ∥∆A∥ = 0 degenerates to ∥∆B∥ ≤ λmin (Q+K⊤  
+
+> 0RK 0)2∥P0∥∥ K0∥
+
+, which also satisfies (47c). Thus, 8 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+both conditions admit the same upper bound in terms of the Riccati solution and the nominal feedback gain, demonstrating that the proposed criterion preserves the essential robustness structure of existing LQR analyses even under isolated input perturbations. Together, the above two limiting cases demonstrate that the proposed nonlinear robust stability criterion admits a natural specialization to the classical LQR setting, and remains struc-turally consistent with existing robustness conditions despite being derived from a unified nonlinear analysis framework. 
+
+B. From Performance Deviation to Riccati Perturbation 
+
+To specialize the optimal performance deviation analysis to the LQR setting, the central difficulty lies in characterizing the gradient-energy integral term R ∞ 
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+(x(t)) ∥2dt evaluated along the worst-case trajectory (18) appearing in Theorem 2. By leveraging the quadratic structure of the nominal optimal value function, this quantity admits a Lyapunov characteri-zation, which finally results in a perturbation bound closely related to classical ARE sensitivity analysis. 
+
+Theorem 4: Suppose that ( ˆA, ˆB) is stabilizable, Q, R ≻ 0
+
+and the condition (45) is satisfied. Then, the actual optimal value function corresponding to the system (40) is given by 
+
+V ∗(x) = 12 x⊤P x , where P is the unique and positive definite solution of ARE 
+
+P A + A⊤P + Q − P BR −1B⊤P = 0 . (48) Further, the matrix perturbation deviation satisfies ∀ε > 0,
+
+P −P0 ≤ C12 
+
+ 12ε(1 − β) S + 2 εP 0
+
+
+
++ C212 
+
+(1 − β) S+ εC 312 
+
+2(1 − β) S, 
+
+(49) where β = 2( c1+c2∥K0∥)λmax (S)   
+
+> λmin (P20)
+
+, K0 = −R−1 ˆB⊤P0, ˆAc =ˆA + ˆBK 0, and S is the unique solution of Lyapunov equation 
+
+ˆA⊤ 
+
+> c
+
+S + S ˆAc + P 20 = 0 . (50) 
+
+Proof: Under the condition (45), the actual linear system 
+
+(A, B ) is stabilizable according to Corollary 2. Hence, the associated ARE (48) admits a unique positive definite solution [23], i.e., P ≻ 0.Since the nominal optimal value function admits a quadratic form V ∗ 
+
+> 0
+
+(x) = 12 x⊤P0x, the gradient-energy integral term appearing in (17) can be rewritten as R ∞ 
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+(x(t)) ∥2dt =R ∞ 
+
+> 0
+
+x⊤(t)P 20 x(t)d t. To relate this key quantity to a Lyapunov characterization of the nominal closed-loop system, we calcu-late the time derivative of x⊤Sx along trajectory (18). Since 
+
+( ˆA, ˆB) is stabilizable and Q, R ≻ 0, the nominal closed-loop matrix ˆAc = ˆA+ ˆBK 0 is Hurwitz, and thus Lyapunov equation (50) admits a unique positive definite solution S ≻ 0. Then, the time derivative of x⊤Sx satisfies 
+
+ddt (x⊤Sx ) = 2 x⊤(t)S
+
+h ˆAcx(t) + r∗ 
+
+> 0
+
+(x(t), u ∗
+
+> 0
+
+(t)) 
+
+i
+
+= x⊤(t)( S ˆAc + ˆA⊤ 
+
+> c
+
+S)x(t) + 2 x⊤(t)Sr ∗
+
+> 0
+
+= −x⊤(t)P 20 x(t) + 2 x⊤(t)Sr ∗ 
+
+> 0
+
+.
+
+(51) With (20), we obtain 
+
+∥r∗ 
+
+> 0
+
+(x, u ∗
+
+> 0
+
+)∥ = c1∥x∥ + c2∥u∗
+
+> 0
+
+∥ ≤ (c1 + c2 ∥K0∥) ∥x∥. (52) Combining this uncertainty bound with (51) yields 
+
+Z ∞
+
+> 0
+
+x⊤(t)P 20 x(t)d t =
+
+Z ∞
+
+> 0
+
+− ddt (x⊤Sx ) + 2 x⊤(t)Sr ∗ 
+
+> 0
+
+dt
+
+= x⊤Sx +
+
+Z ∞
+
+> 0
+
+2λmax (S)( c1 + c2∥K0∥)∥x(t)∥2dt
+
+≤ x⊤Sx +
+
+Z ∞
+
+> 0
+
+2λmax (S)( c1 + c2∥K0∥)
+
+λmin (P 20 ) x⊤(t)P 20 x(t)d t. 
+
+Rearranging the above inequality gives 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+(x(t)) ∥2dt =
+
+Z ∞
+
+> 0
+
+x⊤(t)P 20 x(t)d t ≤ 11 − β x⊤Sx, 
+
+(53) The above quadratic characterization allows the performance deviation bound in Theorem 2 to be expressed entirely in terms of matrix quantities. Substituting (53) into (17) in Theorem 2 yields that ∀ε > 0,
+
+∆Vmax ≤ C12 
+
+2
+
+ 11 − β x⊤Sx 
+
+ 12
+
+s
+
+x⊤
+
+ C212 
+
+1 − β S + 4 P0
+
+
+
+x
+
++ C212 
+
+2(1 − β) x⊤Sx ≤ C12 
+
+4ε
+
+11 − β x⊤Sx 
+
++ εC 12 
+
+4 x⊤
+
+ C212 
+
+1 − β S + 4 P0
+
+
+
+x + C212 
+
+2(1 − β) x⊤Sx, 
+
+where the Young’s inequality is applied in the last step. With (39), we have 
+
+V ∗ − V ∗ 
+
+> 0
+
+= 12 x⊤(P − P0)x ≤ ∆Vmax , (54) then the performance deviation characterization finally induces the perturbation bound (49). The proof is completed. The perturbation bound in Theorem 4 exhibits an intrinsic consistency with classical Riccati sensitivity results [12], [13], [21]. In particular, focusing on the first-order asymptotic char-acteristics where C12 = max 
+
+nq 2 
+
+> α1
+
+∥∆A∥,
+
+q 2 
+
+> α2
+
+∥∆B∥
+
+o
+
+→
+
+0, we can take the norm from both sides of (49) and obtain 
+
+∥P −P0∥ ≤ C12 
+
+ 12ε(1 − β) ∥S∥ + 2 ε∥P0∥
+
+
+
++O(C212 ). (55) Since the above inequality holds for all ε > 0, we consider 
+
+ε∗ = p∥S∥/4ε(1 − β)∥P0∥ to minimize the first-order per-turbation upper bound, yielding 
+
+∥P − P0∥ ≤ 2C12 
+
+s
+
+1(1 − β) ∥S∥∥ P0∥ + O(C212 ), (56) which is structurally consistent with classical results via ARE sensitivity analysis [12, Theorem 2.4]. Despite this alignment in the LQR problem, the underlying viewpoints remain fundamentally different. Classical sensitiv-ity methods typically initiate from explicit perturbations of the system matrices, and directly study the resulting variation of Riccati solution. In contrast, the proposed framework is rooted in the optimality deviation analysis for general nonlinear sys-tems, and arrives at a Riccati perturbation characterization as a consequence. This observation reveals that although developed from different starting points, nonlinear optimality robustness and classical Riccati perturbation theory are connected through closely related analytical structures. AUTHOR et al. : TITLE 9
+
+C. Illustrative Examples 
+
+To verify the above LQR-specialized analysis, we present a numerical case study as a transparent benchmark. Consider the linear time-invariant (LTI) system (40) with 
+
+A =
+
+0.8 −0.91.0 0.8
+
+
+
+, B =
+
+1 00 1
+
+
+
+. (57) The running cost l(x, u ) satisfies (41) where Q = I2, R = 1 .To emulate an imperfect system identification, we construct a family of nominal models by introducing perturbations in both the state and input matrices, i.e., 
+
+ˆA = A + δ
+
+0.2 −0.30.1 0.1
+
+
+
+, ˆB = B − δ
+
+0.4 00 0.2
+
+
+
+, (58) which naturally satisfies Assumption 3. By varying δ, different levels of modeling mismatch can be systematically generated. As δ varies from 0 to 0.2, the nominal model ( ˆA, ˆB) remains controllable and thus stabilizable, since the matrix [ ˆB ˆA ˆB] is full row rank for all considered values of δ. Therefore, the cor-responding Riccati solution P0(δ), feedback gain K0(δ), and auxiliary matrix S(δ) are well-defined and can be evaluated along the entire perturbation path. The Riccati solution P for the actual optimal value function 
+
+V ∗ is computed with the true LTI system (A, B ). For each δ,the resulting perturbation magnitude can then be quantified via 
+
+∥P − P0∥. Meanwhile, the theoretical upper bound provided by Theorem 4 is evaluated using the corresponding quantities 
+
+S, β, and C12 .The quantitative evaluation of the derived perturbation re-sults is presented in Fig. 1. As the level of model mismatch δ
+
+increases, the nominal surrogate model progressively deviates from the true system, leading to a larger discrepancy between the nominal and actual Riccati solutions. As shown in Fig. 1, the actual performance deviation characterized by ∥P − P0∥
+
+remains strictly enclosed by the theoretical upper bound (49) established in Theorem 4 throughout the entire uncertainty range. In addition, the first-order perturbation characterization in (56) closely follows the evolution of actual deviation and provides a less conservative estimate of the Riccati sensitivity. To examine the asymptotic behavior predicted by Theorem 4 in a more transparent way, Fig. 2 depicts the logarithmic relationship between ∥P − P0∥ and the uncertainty coefficient 
+
+C12 = max 
+
+nq 2 
+
+> α1
+
+∥∆A∥,
+
+q 2 
+
+> α1
+
+∥∆B∥
+
+o
+
+. A linear fitting yields a slope of approximately 1.0236 , which quantitatively con-firms the first-order perturbation relation ∥P − P0∥ = O(C12 )
+
+given by (56). This observation indicates that the proposed nonlinear optimality robustness framework not only provides a rigorous perturbation bound for the LQR setting, but also accurately captures the intrinsic first-order sensitivity structure of the ARE solution with respect to model mismatch. 
+
+VI. C OMPUTATIONAL EVALUATION OF OPTIMALITY 
+
+DEVIATION 
+
+The preceding analysis in Section IV has established quanti-tative characterizations of optimality deviation in terms of both value function and controller. To complement these theoretical 0 0.05 0.1 0.15                         
+
+> 00.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8
+> Perturbation Magnitude
+> Actual Deviation
+> Theoretical Upper Bound
+> First-order Perturbation Bound
+> Fig. 1. Numerical verification of Proposition 1: comparison among the actual deviation of Riccati solution ∥P−P0∥, the first-order pertur-bation bound (56) , and the theoretical upper bound (49) established by Theorem 4 as the model mismatch level δincreases. -3 -2.5 -2 -1.5 -1 -0.5
+> -3 -2.5 -2 -1.5 -1 -0.5 0
+> Actual Deviation
+> Linear Fit (Slope = 1.0236)
+> Fig. 2. Logarithmic relationship between the actual Riccati perturbation
+> ∥P−P0∥and the uncertainty coefficient C12 . The fitted slope close to unity confirms the first-order perturbation law ∥P−P0∥=O(C12 ).
+
+results, this section focuses on their computational realization. Specifically, we first present a unified approach for computing diverse forms of optimality deviation. Numerical simulations are then conducted to demonstrate the efficacy of robustness analysis framework. 
+
+A. Unified Computation Across Variants 
+
+Recall that Theorems 2 and 3 explicitly characterize the op-timality deviations in the performance and controller through the nominal value function V ∗ 
+
+> 0
+
+and the error bound coefficient 
+
+(c1, c 2) for model mismatch. Nevertheless, a closer inspection of (17) and (32) reveals a computational bottleneck, which is the main focus of this subsection. Taking the performance deviation for instance, Theorem 2 and its proof have provided two forms of the deviation bound, 10 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+(17) and (24), both of which necessitates the computation of worst-case value function V ∗ 
+
+> r
+
+. Moreover, an alternative form of performance deviation can be derived. 
+
+Corollary 3: Due to the model mismatch, applying u∗ 
+
+> 0
+
+to the actual nonlinear system (1) leads to an extra cost in (2). With Assumptions 1-3, this extra cost satisfies 
+
+∥V − V ∗ 
+
+> 0
+
+∥ ≤ C12 
+
+
+
+V ∗
+
+> 0
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> r
+
+∥2dt
+
+ 12
+
+(59) where V ∗ 
+
+> r
+
+is solved by (21), and the integral term of ∥∇ V ∗ 
+
+> r
+
+∥2
+
+is evaluated along nominal optimal trajectory, i.e., 
+
+˙x(t) = ˆf (x(t), u ∗
+
+> 0
+
+(t)) , x (0) = x. (60) 
+
+Proof: Following similar procedures to (19)-(21) in the proof of Theorem 2, we can calculate the time derivative of 
+
+V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+along trajectory (60), satisfying 
+
+ddt (V ∗ 
+
+> r
+
+− V ∗ 
+
+> 0
+
+) = −(c1∥x∥ + c2∥u∗
+
+> 0
+
+∥)∥∇ V ∗ 
+
+> r
+
+∥,
+
+which is obtained by combining (7) and (21). The upper bound for extra cost (59) can be obtained following (22) and (23), then the proof is completed. Up to this point, three different characterizations of perfor-mance deviation have been established. These variants provide complementary ways to evaluate the optimality deviation un-der different computational requirements. In particular, once the nominal optimal value function V ∗ 
+
+> 0
+
+is available, one may first solve V ∗ 
+
+> r
+
+and directly evaluate the deviation through (59). Alternatively, the worst-case trajectory (18) can be constructed based on V ∗ 
+
+> r
+
+, allowing the performance deviation bound to be computed with (17) or (24). In practical situations where explicit trajectory computation is inconvenient, the integral term R ∞ 
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt in (17) and (24) can also be approached, which further provides a tractable computation of the optimality deviation. Specifically, denote 
+
+Jgrad (x, u ∗
+
+> 0
+
+, r ) = 
+
+Z ∞
+
+> 0
+
+∥∇ V ∗ 
+
+> 0
+
+∥2dt, 
+
+˙x(t) = ˆf (x(t), u ∗
+
+> 0
+
+(t)) + r(x(t), u ∗
+
+> 0
+
+(t)) , x (0) = x. 
+
+(61) Then, Jgrad can be regarded as a cost functional in an opti-mization problem, whose maximum satisfies the HJI equation 
+
+max 
+
+> r∈R
+
+n
+
+(∇Vgrad )⊤ h ˆf (x, u ∗
+
+> 0
+
+) + r(x, u ∗
+
+> 0
+
+)
+
+i
+
++ ∥∇ V ∗ 
+
+> 0
+
+∥2o
+
+= 0 ,
+
+(62) equivalently written as 
+
+(∇Vgrad )⊤ ˆf (x, u ∗
+
+> 0
+
+)+ ∥∇ V ∗ 
+
+> 0
+
+∥2 = −(c1∥x∥+c2∥u∗
+
+> 0
+
+∥)∥∇ Vgrad ∥.
+
+(63) Note that (21) and (63) shares a common structure of partial differential equation (PDE). Thus, the performance deviation with the form (17) can be computationally characterized once 
+
+V ∗ 
+
+> 0
+
+is available. In this way, the explicit computation of opti-mality deviation leads to a unified computational formulation across different variants. To solve the PDE (21) (or (63)), an iterative scheme is developed as shown in Algorithm 1. 
+
+Algorithm 1 Iterative Computation of V ∗
+
+> r
+
+Initialization 
+
+Set k = 0 , choose an initial guess V (0)  
+
+> r
+
+and a sufficiently small ε > 0.
+
+Worst-case Error Update 
+
+Compute the worst-case approximation error based on the current value function V (k) 
+
+> r
+
+, i.e., 
+
+r(k)(x, u ∗
+
+> 0
+
+) = ( c1∥x∥ + c2∥u∗
+
+> 0
+
+∥) ∇V (k)
+
+> r
+
+∇V (k)
+
+> r
+
+. (64) 
+
+Value Function Update 
+
+Update the value function V (k+1)  
+
+> r
+
+by solving the PDE 
+
+
+
+∇V (k+1) 
+
+> r
+
+⊤ h ˆf (x, u ∗
+
+> 0
+
+) + r(k)(x, u ∗
+
+> 0
+
+)
+
+i
+
+= −l(x, u ∗
+
+> 0
+
+). (65) 
+
+Convergence Check 
+
+If ∥V (k+1)  
+
+> r
+
+−V (k) 
+
+> r
+
+∥ < ϵ , stop iteration and return V (k+1)  
+
+> r
+
+.Otherwise, set k = k + 1 and continue the iteration. The convergence of Algorithm 1 is ensured by the following theorem. 
+
+Theorem 5: Let Assumptions 1-3 hold and the robust sta-bility criterion (11) be satisfied. Then, the sequence {V (k) 
+
+> r
+
+}
+
+generated by Algorithm 1 converges to the solution V ∗ 
+
+> r
+
+of (21). 
+
+Proof: Denote r(k)(x, u ∗
+
+> 0
+
+) = ρ(x, u ∗
+
+> 0
+
+)w(k), ρ(x, u ) = 
+
+c1∥x∥ + c2∥u∥ and w(k) = ∇V (k)   
+
+> r
+> ∥∇ V(k)
+> r∥
+
+. With (65), we obtain 
+
+∇
+
+
+
+V (k+1)  
+
+> r
+
+− V (k)
+
+> r
+
+⊤ h ˆf (x, u ∗
+
+> 0
+
+) + ρ(x, u ∗
+
+> 0
+
+)w(k)i
+
+= −(∇V (k) 
+
+> r
+
+)⊤ρ(x, u ∗
+
+> 0
+
+)
+
+
+
+w(k) − w(k−1) 
+
+, k ≥ 1.
+
+(66) Integrating both sides of (65) along the trajectory 
+
+˙x = ˆf (x, u ∗
+
+> 0
+
+) + ρ(x, u ∗
+
+> 0
+
+)w(k), x (0) = x, 
+
+we have 
+
+V (k+1)  
+
+> r
+
+(x) − V (k) 
+
+> r
+
+(x)=
+
+Z ∞
+
+> 0
+
+(∇V (k) 
+
+> r
+
+)⊤ρ(x, u ∗
+
+> 0
+
+)
+
+
+
+w(k) − w(k−1) 
+
+dt (67) since ρ(x, u )w(k) ∈ R and then the closed-loop stability is ensured by Theorem 1. Note that w(k) updated at each iteration satisfies 
+
+w(k) = arg max 
+
+> ∥w∥≤ 1
+
+(∇V (k) 
+
+> r
+
+)⊤ρ(x, u ∗
+
+> 0
+
+)w, (68) rendering the right hand side of (67) positive, ∀x ∈ X, and 
+
+V (k+1)  
+
+> r
+
+(x) ≥ V (k) 
+
+> r
+
+(x). Consequently, the sequence {V (k) 
+
+> r
+
+}
+
+is monotonically increasing. Meanwhile, the worst-case ap-proximation error at each iteration satisfies r(k) ∈ R . By Theorem 1, the nominal optimal controller u∗ 
+
+> 0
+
+robustly sta-bilizes the corresponding closed-loop system under (11). As a result, the associated value function remains finite for every iteration, implying that the sequence {V (k) 
+
+> r
+
+} is upper-bounded. Therefore, the monotone sequence {V (k) 
+
+> r
+
+} converges to a limit function ¯Vr . Passing to the limit in (65) shows that ¯Vr satisfies (21), i.e., ¯Vr = V ∗ 
+
+> r
+
+. The proof is completed. AUTHOR et al. : TITLE 11 
+
+Since the linear PDE (65) for value function update gener-ally admits no analytical solution, a numerical approximation is required at each iteration of Algorithm 1. Among numerous numerical approaches for solving linear PDEs, we adopt the classical Galerkin projection method [24] owing to its simplic-ity and compatibility with the proposed iterative computational scheme. Let {φj (x)}Nj=1 be a set of linearly independent basis functions, and the value function V (k+1)  
+
+> r
+
+(x) updated at the k-th iteration is approximated as 
+
+ˆV (k+1)  
+
+> r
+
+(x) = 
+
+> N
+
+X
+
+> j=1
+
+θ(k+1)  
+
+> j
+
+φj (x) = 
+
+
+
+θ(k+1) ⊤
+
+φ(x). (69) At each value function update step, the Galerkin approxima-tion is constructed for the linear PDE parameterized by the current worst-case error r(k). Substituting this approximation into (65) yields the residual 
+
+R(x) = 
+
+
+
+θ(k+1) ⊤
+
+∇φ(x)
+
+h ˆf (x, u ∗
+
+> 0
+
+) + r(k)(x, u ∗
+
+> 0
+
+)
+
+i
+
++l(x, u ∗
+
+> 0
+
+).
+
+(70) By requiring the residual to be orthogonal to the basis func-tions over the state space X, i.e., 
+
+⟨R(x), φ j (x)⟩X =
+
+Z
+
+> X
+
+φj (x)R(x)d x = 0 , ∀j = 1 , · · · , N, 
+
+we obtain a set of linear equations 
+
+A(k)θ(k+1) = b, (71) where the elements of square matrix A(k) ∈ RN ×N and vector 
+
+b ∈ RN satisfy 
+
+A(k) 
+
+> ij
+
+=
+
+Z
+
+> X
+
+φi(x)
+
+h
+
+(∇φj )⊤f (k)(x)
+
+i
+
+dx, f (k) = ˆf + r(k), b i = −
+
+Z
+
+> X
+
+φi(x)l(x, u ∗
+
+> 0
+
+)d x. 
+
+(72) Note that the projection matrix A(k) is updated according to the current worst-case error r(k). Since the Galerkin projection itself is a standard computational technique, its convergence to the exact solution ˆV (k) 
+
+> r
+
+→ V (k) 
+
+> r
+
+as N → ∞ has been well established in the numerical analysis literature, e.g., [24], and hence is omitted here for brevity. 
+
+B. Simulation Results 
+
+To validate the proposed theoretical framework, we consider a nonlinear control-affine system governed by 
+
+ ˙x1
+
+˙x2
+
+
+
+=
+
+ −x1 + x2
+
+− 12 (x1 + x2) + 12 x21x2
+
+
+
++
+
+ 0
+
+x1
+
+
+
+u. (73) The running cost is considered as l(x, u ) = 12 (x⊤x+u⊤u). For this benchmark problem, the actual optimal value function de-fined by (4) can be analytically verified as V ∗(x) = 14 x21+ 12 x22,which yields the actual optimal controller u∗(x) = −x1x2 and serves as the a priori ground truth for evaluation of optimality deviation. To emulate the outcome of some representative parametric or gray-box data-driven identification methods, such as SINDy [4] or physics-structured NN [2], we consider a scenario where the core nonlinear features are successfully captured via dictio-nary selection or prior knowledge, but the learned regression weights contain estimation errors. Accordingly, we employ a family of surrogate models where both the drift dynamics and the control effectiveness are intentionally perturbed, leading to a nominal model of the form 
+
+ ˙ˆx1
+
+˙ˆx2
+
+
+
+=
+
+ −x1 + x2
+
+− 12 (x1 + x2) + 12 (1 − δ1)x21x2
+
+
+
++
+
+ 0(1 − δ2)x1
+
+
+
+u. 
+
+The resulting approximation error r(x, u ) = [0 12 δ1x21x2 +
+
+δ2x1u]⊤ naturally satisfies Assumption 2 on a compact operat-ing region X = [ −M, M ]2, from which the corresponding un-certainty bounds can be explicitly estimated as c1 = 12 |δ1|M 2
+
+and c2 = |δ2|M . By adjusting the parameters δ1, δ 2, different levels of state- and input-dependent modeling inaccuracies can be generated, enabling a systematic investigation of their influence on closed-loop stability and optimality robustness. For each surrogate model, the nominal optimal value func-tion V ∗ 
+
+> 0
+
+and the associated feedback controller u∗ 
+
+> 0
+
+are obtained by solving (7) via the Galerkin projection, where polynomial basis functions up to the 4th order are employed. Subsequently, Algorithm 1 is implemented to compute the worst-case value function V ∗ 
+
+> r
+
+. Under the setting M = 1 .5, δ 1 = 0 .15 , δ 2 = 0 .2,the iterative convergence behavior of Algorithm 1 is illustrated in Fig. 3. As guaranteed by Theorem 5, the Galerkin projection coefficients θj converge rapidly within a few iterations, yield-ing a numerically efficient solution of underlying PDE (21). 0 1 2 3 4   
+
+> -0.1 00.1 0.2 0.3 0.4 0.5 0.6 0.7
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> Fig. 3. Convergence behavior of the Galerkin expansion coefficients θj
+> via Algorithm 1 starting from a zero initialization ( k= 0 ).
+
+We next examine the correctness and predictive capability of robust stability criterion (11) established in Theorem 1. Fig. 3 illustrates the relation between the theoretical stability budget region and the actual closed-loop behavior under two repre-sentative cases. As shown in Fig. 3(a), the green region char-acterizes the uncertainty budget for (c1, c 2) to guarantee the stability preservation based on Theorem 1. Case A lies strictly inside the theoretically guaranteed stable region, whereas Case B violates the derived robust stability criterion (11), indicating potential instability. The corresponding closed-loop behaviors are reported in Fig. 3(b). Consistent with the theoretical predic-tion, the system under Case A exhibits asymptotic convergence 12 IEEE TRANSACTIONS AND JOURNALS TEMPLATE              
+
+> Fig. 4. Joint macro-micro verification of robust stability under model mismatch. (a) Theoretical robust stability budget region for the uncer-tainty bounds c1and c2based on Theorem 1. (b) State norm of trajec-tories under Case A (convergent) and Case B (divergent) initialized from
+> (1 .2,1.2) (solid), (−1.5,−1.5) (dash-dot), and (1 .2,1.5) (dashed), respectively.
+
+to the origin, while trajectories under Case B become unstable and diverge over time. Based on the computed quantities V ∗ 
+
+> 0
+
+and V ∗ 
+
+> r
+
+, the theoret-ical upper bound for the performance deviation established in Theorem 2 is evaluated over the entire state space. Meanwhile, the actual deviation ∥V ∗ − V ∗ 
+
+> 0
+
+∥ can be directly computed and compared with the proposed bound, as shown in Fig. 5. The contour plots indicate that the bound successfully captures the spatial distribution of optimality degradation and provides a uniform upper estimate of the actual performance deviation in the considered operating region X. Further, Fig. 6 illustrates the state-dependent gap between the analytical upper bound and the actual controller deviation, defined as the difference between the right-hand side (RHS) and left-hand side (LHS) of (32). The rigorous non-negativity of the bounding gap across the entire state space X directly validates Theorem 3. Overall, the simulation consistently validates the theoretical results throughout this paper. The derived bounds are based on the worst-case uncertainty characterization, which ensures rig-                      
+
+> Fig. 5. Validation and hierarchical comparison of the performance deviation bounds over the entire state space. The actual optimality deviation ∥V∗(x)−V∗
+> 0(x)∥(blue surface) lies at the bottom of stacked surfaces. The intermediate surface represents the bound ∥V∗
+> r(x)−
+> V∗
+> 0(x)∥constructed via Algorithm 1 (red surface), while the outermost one corresponds to the analytical bound derived in Theorem 2 (yellow surface). The strict ordering structure among the three surfaces confirms the validity of proposed theoretical results. -1.5 -1 -0.5 00.5 11.5
+> -1.5 -1 -0.5 00.5 11.5
+> 00.5 11.5 22.5
+> Fig. 6. State-space distribution of the bounding gap (RHS −LHS of
+> (32) ) for the controller deviation in Theorem 3, demonstrating the global validity of the analytical upper bound.
+
+orous validity under general nonlinear settings yet inherently introduces some conservatism. This reflects the intrinsic gap between worst-case analysis and pointwise system behavior. 
+
+VII. C ONCLUSION 
+
+This paper has established a systematic theoretical frame-work for analyzing the robustness of stability and optimality in data-driven nonlinear optimal control. We have demonstrated when closed-loop stability is preserved, how model mismatch affects the achieved performance and the resulting controller. We have further revealed an intrinsic computational formula-tion across different variants of optimality deviation, enabling a tractable evaluation through a unified algorithmic scheme. AUTHOR et al. : TITLE 13 
+
+Possible directions for future research include extending the present analysis to broader uncertainty structures, incorporat-ing adaptive and learning-based mechanisms for controller de-sign, and investigating optimality robustness in more complex control architectures large-scale systems. 
+
+REFERENCES 
+
+[1] C. De Persis and P. Tesi, “Learning controllers for nonlinear systems from data,” Annual Reviews in Control , vol. 56, p. 100915, 2023. [2] F. L. Lewis, S. Jagannathan, and A. Yesildirak, Neural Network Control of Robot Manipulators and Nonlinear Systems . Taylor & Francis, 1999. [3] C. E. Rasmussen and C. K. I. Williams, Gaussian Processes for Machine Learning . MIT Press, 2006. [4] S. L. Brunton, J. L. Proctor, and J. N. Kutz, “Discovering governing equations from data by sparse identification of nonlinear dynamical systems,” Proceedings of the National Academy of Sciences , vol. 113, no. 15, pp. 3932–3937, 2016. [5] A. Mauroy, Y. Susuki, and I. Mezic, Koopman Operator in Systems and Control . Springer, 2020. [6] L. Hewing, K. P. Wabersich, M. Menner, and M. N. Zeilinger, “Learning-based model predictive control: Toward safe learning in control,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 3, no. 1, pp. 269–296, 2020. [7] M. P. Deisenroth, D. Fox, and C. E. Rasmussen, “Gaussian processes for data-efficient learning in robotics and control,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 37, no. 2, pp. 408–423, 2015. [8] Y. Lin, B. Wu, N. Bai, Z. Sun, Y. Ren, C. Chen, and Z. Duan, “Integrating uncertainties for Koopman-based stabilization,” 2025, arXiv:2508.11533 [eess.SY]. [9] R. Str¨ asser, M. Schaller, K. Worthmann, J. Berberich, and F. Allg¨ ower, “Koopman-based feedback design with stability guarantees,” IEEE Transactions on Automatic Control , vol. 70, no. 1, pp. 355–370, 2025. [10] T. Koller, F. Berkenkamp, M. Turchetta, and A. Krause, “Learning-based model predictive control for safe exploration,” in Proc. IEEE Conf. on Decision and Control (CDC) , Miami, FL, USA, 2018, pp. 6059–6066. [11] K. Zhou, J. C. Doyle, and K. Glover, Robust and Optimal Control .Prentice Hall, 1996. [12] C. S. Kenney and G. A. Hewer, “The sensitivity of the algebraic and dif-ferential Riccati equations,” SIAM Journal on Control and Optimization ,vol. 26, no. 1, pp. 50–69, 1988. [13] M. M. Konstantinov, D. W. Gu, V. Mehrmann, and P. H. Petkov, “Perturbation theory for algebraic Riccati equations,” SIAM Journal on Matrix Analysis and Applications , vol. 14, no. 4, pp. 969–996, 1993. [14] Z. Aganovi´ c and Z. Gaji´ c, Linear optimal control of bilinear sys-tems with applications to singular perturbations and weak coupling .Springer, 1995. [15] D. L. Lukes, “Optimal regulation of nonlinear dynamical systems,” SIAM Journal on Control , vol. 7, no. 1, pp. 75–100, 1969. [16] M. Bardi and I. Capuzzo-Dolcetta, Optimal Control and Viscosity Solutions of Hamilton-Jacobi-Bellman Equations . Birkh¨ auser Boston, 1997. [17] H. K. Khalil, Nonlinear Systems , 3rd ed. Prentice Hall, 1996. [18] B. P. Russo and M. P. Laiu, “Convergence of weak-SINDy surrogate models,” SIAM Journal on Applied Dynamical Systems , vol. 23, no. 2, pp. 1017–1051, 2024. [19] E. T. Maddalena, P. Scharnhorst, and C. N. Jones, “Deterministic error bounds for kernel-based learning techniques under bounded noise,” 
+
+Automatica , vol. 134, p. 109896, 2021. [20] M. Aliyu, Nonlinear H-infinity-control, Hamiltonian systems and Hamilton-Jacobi equations . CRC Press, 2011. [21] P. Lancaster and L. Rodman, Algebraic Riccati Equations . Oxford University Press, 1995. [22] R. Patel, M. Toda, and B. Sridhar, “Robustness of linear quadratic state feedback designs in the presence of system uncertainty,” IEEE Transactions on Automatic Control , vol. 22, no. 6, pp. 945–949, 1977. [23] B. D. O. Anderson and J. B. Moore, Optimal Control: Linear Quadratic Methods . Dover Publications, 2007. [24] R. W. Beard, G. N. Saridis, and J. T. Wen, “Galerkin approximations of the generalized Hamilton-Jacobi-Bellman equation,” Automatica ,vol. 33, no. 12, pp. 2159–2177, 1997. 
+
+Yicheng Lin received the B.S. degree in theoret-ical and applied mechanics from the College of Engineering, Peking University, Beijing, China, in 2024. He is currently a Ph.D. Candidate in dynam-ical systems and control with the School of Advanced Manufacturing and Robotics, Peking University, Beijing, China. His research interests include robust control, data-driven control, non-linear systems, and operator-theoretic control. 
+
+Zhisheng Duan (Senior Member, IEEE) re-ceived the M.S. degree in mathematics from Inner Mongolia University, Hohhot, Inner Mon-golia Autonomous Region, China and the Ph.D. degree in control theory from Peking Univer-sity, Beijing, China in 1997 and 2000, respec-tively. From 2000 to 2002, he worked as a Postdoc-tor in Peking University. From 2008 to 2025, he worked as a Full Professor with the Department of Mechanics and Engineering Science, College of Engineering, Peking University. He is currently a Full Professor with the School of Advanced Manufacturing and Robotics, Peking University, Beijing, China, also serves as the Deputy Director of the State Key Laboratory for Turbulence and Complex Systems. His research interests include robust control, stability of interconnected systems, flight control, and analysis and control of complex dynamical networks. Prof. Duan was a recipient of the National Science Fund for Distin-guished Young Scholars of China, and was selected as a Changjiang Scholar (Distinguished Professor) by the Ministry of Education of the People’s Republic of China. He serves as the Principal Investigator of an Innovative Research Group Project funded by the National Natural Science Foundation of China. As the first-listed contributor, he received the National Natural Science Award (Second Class) from the State Council of the People’s Republic of China, and the Natural Science Award (First Class) from the Ministry of Education of the People’s Republic of China. He was also the recipient of the Guan Zhao-Zhi Best Paper Award at the 2001 Chinese Control Conference. He has been listed as a Highly Cited Researcher by Thomson Reuters and Clarivate. He served as an Associate Editor for IEEE Transactions on Circuits and Systems I: Regular Papers (2008-2009) and Dynamics of Continuous, Discrete and Impulsive Systems, Series B (2006-2014). 
+
+Tianzhi Li received the B.S. degree in mathe-matics from Beijing Institute of Technology, Bei-jing, China and the Ph.D. degree in dynamical systems and control from Peking University, Bei-jing, China, in 2021 and 2026, respectively. From 2024 to 2025, he was a visiting PhD at SPMS, Nanyang Technological University, Sin-gapore. His research interests include geometric mechanics and control, stochastic mechanics, and physics-informed robot learning. 14 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+Bingxian Wu received the B.S. degree in the-oretical and applied mechanics from College of Engineering, Peking University, Beijing, China, in 2025. He is currently a Ph.D. Candidate in dynam-ical systems and control with the School of Advanced Manufacturing and Robotics, Peking University, Beijing, China. His research inter-ests include reinforcement learning for motion planning, multi-agent task scheduling, and data-driven control. 
+
+Zhiyong Sun (Member, IEEE) received the Ph.D. degree in control engineering from the Australian National University (ANU), Canberra ACT, Australia, in 2017. From 2017 to 2018, he was a Research Fel-low/Lecturer with the Research School of En-gineering, ANU. From 2018 to 2020, he was a Postdoctoral Researcher with the Department of Automatic Control, Lund University of Sweden, Lund, Sweden. From 2020 to 2024, he was an Assistant Professor with Eindhoven University of Technology, Eindhoven, Netherlands. In the summer of 2024, he joined Peking University, Beijing, China, as an Assistant Professor. He has authored the book titled Cooperative Coordination and Formation Con-trol for Multiagent Systems (Cham, Switzerland: Springer, 2018). His research interests include multi-agent systems, control of autonomous formations, distributed control, and optimization. Prof. Sun is the recipient of the Springer Best Ph.D. Thesis Award, and several best paper and student paper awards from IEEE Conference on Decision and Control (IEEE CDC), Australian Control Conference (AuCC), IEEE International Conference on Robotics and Automation (ICRA), IEEE Conference on Control Technology and Applications (CCTA), IEEE International Conference on Control and Automation (ICCA), and Asian Control Conference (ASCC).

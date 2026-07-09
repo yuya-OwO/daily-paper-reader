@@ -6,50 +6,46 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-07
-- 运行时间：2026-07-07 22:13:10 UTC
+- 最新运行日期：2026-07-09
+- 运行时间：2026-07-09 21:33:28 UTC
 - 运行状态：成功
-- 本次总论文数：10
-- 精读区：6
-- 速读区：4
+- 本次总论文数：8
+- 精读区：7
+- 速读区：1
 
 ### 今日简报（AI）
-今日精读10篇论文，重点关注宇宙学原初振荡的符号回归搜索与神经符号学习的运行时表征优化。最值得关注的是《Inverse-k Primordial Oscillations》利用符号回归发现原初振荡模式，以及《Differentiate the Evaluator》提出区分求值器而非程序的效率框架。建议普通读者从这两篇入手，探索符号回归在天体物理中的创新应用和神经符号学习的实用改进方向。
-- 详情：[/202607/07/README](/202607/07/README)
+今日精读7篇、速读1篇，其中两篇关于切换系统稳定性和粗糙路径镇定的论文获得9.0高分。  
+重点关注切换系统基于交换子的稳定性界限，以及通过强Lyapunov函数镇定离散粗糙路径的方法。  
+建议优先精读两篇9分论文，再速读关于Perron-Frobenius半群强稳定性的文章。
+- 详情：[/202607/09/README](/202607/09/README)
 
 ### 精读区论文标签
-1. [Inverse-k Primordial Oscillations from a Symbolic Regression Search](/202607/07/2607.04925v1-inverse-k-primordial-oscillations-from-a-symbolic-regression-search)  
-   标签：评分：10.0/10、query:sr
-   evidence：直接使用符号回归进行宇宙学搜索
-2. [Differentiate the Evaluator, Not the Program: An Efficient Runtime Representation for Neuro-Symbolic Learning](/202607/07/2607.03574v1-differentiate-the-evaluator-not-the-program-an-efficient-runtime-representation-for-neuro-symbolic-learning)  
-   标签：评分：9.0/10、query:sr
-   evidence：提出神经符号学习的运行时表示，直接加速符号回归中的参数拟合
-3. [Learning Robust Control Lyapunov Functions through Lipschitz Neural Networks](/202607/07/2607.03713v1-learning-robust-control-lyapunov-functions-through-lipschitz-neural-networks)  
+1. [Commutator-Driven Stability Bounds for Periodic Switching](/202607/09/2607.05829v1-commutator-driven-stability-bounds-for-periodic-switching)  
    标签：评分：9.0/10、query:lyapunov-ai
-   evidence：通过Lipschitz神经网络学习鲁棒控制Lyapunov函数
-4. [Language models guide symbolic equation discovery by controlling search](/202607/07/2607.04156v1-language-models-guide-symbolic-equation-discovery-by-controlling-search)  
-   标签：评分：9.0/10、query:sr
-   evidence：语言模型指导符号回归搜索；LLM-PySR
-5. [Certified Breathing Stability Regions in Nonlinear Dynamical Systems: Composite Lyapunov Certificates, M-Matrix Conditions, and a Resilience-Fragility Correspondence](/202607/07/2607.04305v1-certified-breathing-stability-regions-in-nonlinear-dynamical-systems-composite-lyapunov-certificates-m-matrix-conditions-and-a-resilience-fragility-correspondence)  
+   evidence：Lyapunov收缩度量用于周期切换稳定性
+2. [Taming discrete rough paths via strong Lyapunov functions](/202607/09/2607.06266v1-taming-discrete-rough-paths-via-strong-lyapunov-functions)  
    标签：评分：9.0/10、query:lyapunov-ai
-   evidence：非线性动力系统的复合Lyapunov证书
-6. [Regularized Model Predictive Control via Contractivity and Implicit Lur'e Analysis](/202607/07/2607.00383v1-regularized-model-predictive-control-via-contractivity-and-implicit-lure-analysis)  
+   evidence：强Lyapunov函数用于粗糙微分方程
+3. [Stochastic Stability of Nonlinear MPPI via Contraction Theory and Control Lyapunov Functions](/202607/09/2607.06945v1-stochastic-stability-of-nonlinear-mppi-via-contraction-theory-and-control-lyapunov-functions)  
+   标签：评分：9.0/10、query:lyapunov-ai
+   evidence：使用控制李雅普诺夫函数进行稳定性证明
+4. [On the Robustness in Data-Driven Nonlinear Optimal Control: From Stability to Optimality](/202607/09/2607.07570v1-on-the-robustness-in-data-driven-nonlinear-optimal-control-from-stability-to-optimality)  
+   标签：评分：9.0/10、query:lyapunov-ai
+   evidence：证明名义最优值函数是Lyapunov函数以保证鲁棒稳定性
+5. [Input-to-State Stability Implications in Contraction Theory](/202607/09/2607.05640v1-input-to-state-stability-implications-in-contraction-theory)  
    标签：评分：8.0/10、query:lyapunov-ai
-   evidence：利用收缩性和Lur'e系统进行稳定性分析
+   evidence：使用Lyapunov型函数研究非线性控制系统的增量输入到状态稳定性与收缩理论
+6. [Learning Stable Controlled Dynamical Systems via Input-Contraction Neural Differential Models](/202607/09/2607.05718v1-learning-stable-controlled-dynamical-systems-via-input-contraction-neural-differential-models)  
+   标签：评分：8.0/10、query:lyapunov-ai
+   evidence：基于收缩性保证稳定性的神经网络模型
+7. [Implicit Predecessor-Based Region of Attraction Estimation and Robust Invariance Analysis for a Two-Wheeled Inverted Pendulum](/202607/09/2607.07231v1-implicit-predecessor-based-region-of-attraction-estimation-and-robust-invariance-analysis-for-a-two-wheeled-inverted-pendulum)  
+   标签：评分：8.0/10、query:lyapunov-ai
+   evidence：结合基于李雅普诺夫的不变集与前驱表示，实现更不保守的吸引域估计
 
 ### 速读区论文标签
-1. [Stability of input-output maps and their minimal realizations in state-linear, state-affine, LPV, and linear switched systems](/202607/07/2607.03849v1-stability-of-input-output-maps-and-their-minimal-realizations-in-state-linear-state-affine-lpv-and-linear-switched-systems)  
+1. [The strong stability of the Perron-Frobenius semigroup and almost global attractivity](/202607/09/2607.07331v1-the-strong-stability-of-the-perron-frobenius-semigroup-and-almost-global-attractivity)  
    标签：评分：7.0/10、query:lyapunov-ai
-   evidence：为输入输出映射提供稳定性条件，与李雅普诺夫稳定性分析直接相关
-2. [Weighted Phase Volume Method in Stability Analysis: Integral Criteria and Ellipsoidal Reachable Sets](/202607/07/2607.05033v1-weighted-phase-volume-method-in-stability-analysis-integral-criteria-and-ellipsoidal-reachable-sets)  
-   标签：评分：7.0/10、query:lyapunov-ai
-   evidence：提出加权相体积法分析稳定性，与李雅普诺夫稳定性相关
-3. [Data-driven Kernel-based Predictive Control with Stability and Robustness Guarantees](/202607/07/2607.02851v1-data-driven-kernel-based-predictive-control-with-stability-and-robustness-guarantees)  
-   标签：评分：6.0/10、query:lyapunov-ai
-   evidence：数据驱动预测控制中的稳定性保证
-4. [Lyapunov-Guided Training for Hardware-Safe Neural Networks Under Fixed-Point Arithmetic](/202607/07/2607.04531v1-lyapunov-guided-training-for-hardware-safe-neural-networks-under-fixed-point-arithmetic)  
-   标签：评分：6.0/10、query:lyapunov-ai
-   evidence：基于Lyapunov稳定的神经网络量化框架
+   evidence：讨论非线性动力系统的几乎全局吸引性和Lyapunov稳定性
 
 
 <div class="dpr-home-promo-card">

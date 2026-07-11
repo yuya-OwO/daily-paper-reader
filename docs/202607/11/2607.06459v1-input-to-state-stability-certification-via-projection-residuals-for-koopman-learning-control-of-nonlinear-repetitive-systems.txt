@@ -1,0 +1,707 @@
+Title: Input-to-State Stability Certification via Projection Residuals for Koopman Learning Control of Nonlinear Repetitive Systems
+
+URL Source: https://arxiv.org/pdf/2607.06459v1
+
+Published Time: Wed, 08 Jul 2026 01:17:16 GMT
+
+Number of Pages: 29
+
+Markdown Content:
+# Highlights 
+
+Input-to-State Stability Certification via Projection Residuals for Koopman Learning Control of Nonlinear Repetitive Systems 
+
+Yue Wu, Ye Cao, Jianfu Cao 
+
+• Develops a trial-axis input-to-state stability certificate for Koopman learning control. 
+
+• Separates prediction residuals from selected-channel learning certifia-bility. 
+
+• Quantifies the projection-residual contribution to the ultimate error band. 
+
+• Combines episode-level residual calibration with channel, projection, and shift margins. 
+
+• Evaluates residual scaling, weak-channel rejection, projection closure, and band coverage. arXiv:2607.06459v1 [eess.SY] 7 Jul 2026 Input-to-State Stability Certification via Projection Residuals for Koopman Learning Control of Nonlinear Repetitive Systems 
+
+Yue Wu a,b, ∗, Ye Cao a, Jianfu Cao a
+
+> aSchool of Automation, Xi’an Jiaotong University, Xi’an, 710049, China
+> bXinjiang Cigarette Factory, Hongyun Honghe Tobacco (Group) Co., Ltd., Urumqi, 830000, China
+
+Abstract 
+
+This paper studies input-to-state stability (ISS) certification for data-driven Koopman learning control of unknown discrete-time nonlinear repetitive sys-tems over finite trial horizons. Rather than proposing a new learning law, we certify when a fixed Koopman-assisted constrained update yields a practical stability bound for the selected tracking error along the trial axis. Predic-tion accuracy alone is insufficient for this purpose: the selected finite-horizon input-output channel must have a positive margin, and the unreachable com-ponent of the requested output increment must be accounted for through a projection residual. Thus, a Koopman predictor with small held-out pre-diction residuals may still fail the learning-stability certificate if its selected channel is weak. We formulate the selected stacked tracking error as the state of a discrete-time learning-axis system and treat Koopman residuals, reset mismatch, channel uncertainty, projection residuals, deployment shifts, and numerical tolerances as ISS inputs. The deterministic result gives a practi-cal ISS estimate from the initial learning error to an explicit ultimate band. A finite-sample implementation constructs an episode-level residual bound under a fixed controller and combines it with reported channel, projection, shift, and numerical margins. Numerical checks on nonlinear repetitive sys-tems support the predicted residual-to-band scaling, weak-channel rejection, projection closure, and ultimate-band coverage.   
+
+> ∗Corresponding author.
+> Email address: wuyue0619@stu.xjtu.edu.cn (Yue Wu)
+
+Keywords: Input-to-state stability, practical ISS, iterative learning control, Koopman operator, data-driven control, nonlinear repetitive systems, finite-sample certificates 
+
+1. Introduction 
+
+Stability is a central issue in learning control. In a repetitive task, the controller uses data from previous trials to update the input for future tri-als; the same mechanism that improves tracking can also amplify modelling errors, nonrepetitive disturbances, reset mismatch, sensor noise, and actua-tor constraints. Classical iterative learning control (ILC) therefore developed lifted-domain, two-dimensional repetitive-system, norm-optimal, robust, and monotonic-convergence analyses that clarify when tracking errors converge, when learning transients remain bounded, and how uncertainty affects final tracking performance [9–13]. The stability question addressed here is different from classical zero-error convergence or nominal monotonic convergence. In data-driven Koopman learning control, the finite-dimensional predictor is learned from data and is used through a selected finite-horizon input-output channel. A small pre-diction residual does not imply that this selected channel can generate the requested output correction under input-update constraints. Moreover, reset mismatch, nonrepetitive disturbances, channel-identification errors, deploy-ment shifts, and numerical tolerances do not disappear across trials. They produce a nonzero learning-axis perturbation budget and therefore lead, at best, to a certified ultimate band rather than exact convergence to zero. This separates model fit from learning certifiability: the former concerns predic-tion residuals, whereas the latter also requires a selected-channel margin and request-set reachability. Input-to-state stability (ISS) is used here because it gives the certifi-cate needed for learning under persistent perturbations. The effect of the initial learning error decays through a KL term, while residuals, reset mis-match, channel uncertainty, projection errors, and deployment shifts enter through explicit gains. Input-output stability of a finite-horizon plant chan-nel can bound output responses to input trajectories, but it does not by itself provide a trial-axis decay estimate from the initial learning error to a computable ultimate band. Internal stability of the physical plant concerns the within-trial time variable t, whereas the present certificate concerns the 2learning recursion indexed by the trial number k. Since the original ISS and small-gain developments [1–4], this viewpoint has been extended to integral, incremental, large-scale, and infinite-dimensional settings [5–8]. Koopman operator theory and data-driven finite-dimensional approxima-tions provide useful predictors for nonlinear systems [14–20]. Data-driven control and finite-data Koopman analyses likewise show that uncertainty margins must be part of controller certification, not only part of model assessment [21–24]. The technical focus is the construction of the aggre-gate ultimate-band constant from quantities available before deployment: complete-episode residual calibration, finite-horizon channel margins, pro-jection residuals, reset mismatch, deployment shift, and numerical tolerance. The contributions are as follows. First, we formulate the stability of Koopman learning control for unknown nonlinear repetitive systems as a practical ISS problem along the learning-trial axis. The selected stacked tracking error is the state, while Koopman residuals, reset mismatch, chan-nel uncertainty, projection residuals, deployment shifts, and numerical toler-ances are treated as input channels. Second, we identify projection residuals and selected-channel margins as necessary certificate objects for Koopman-assisted learning control. This shows that prediction accuracy alone is not sufficient: a learned predictor with small residual can still be non-certifiable if the selected finite-horizon input-output channel is weak or if the requested output increment is outside the constrained reachable set. Third, we pro-vide a computable certificate budget that combines complete-episode resid-ual calibration, finite-horizon channel and reset margins, projection residuals, and implementation margins. The resulting practical ISS estimate gives an explicit certified ultimate band for the learning error. Fourth, numerical studies audit the certificate components predicted by the theory, including residual-to-band scaling, selected-channel rejection, projection closure, and ultimate-band coverage. 
+
+2. System Class and Learning-Axis Stability Formulation 
+
+We consider a nonlinear repetitive system operated over a finite within-trial horizon t = 0 , . . . , N − 1 and a learning-trial index k = 0 , 1, . . . :
+
+xk(t + 1) = f (xk(t), u k(t), d k(t)) , yk(t) = h(xk(t)) . (1) The functions f and h are unknown. The reference yr(t) is repeated, but the reset xk(0) , disturbance dk, sensor noise, and actuator mismatch may vary 3from trial to trial. 
+
+Assumption 0 (Certified nonlinear repetitive task class) . We consider discrete-time nonlinear systems operated repeatedly over a finite horizon t = 0 , . . . , N −
+
+1 and indexed by the trial number k. The maps f and h are unknown, but the task protocol is resettable and the reference trajectory is repeated. The state, input, output, disturbance, reset mismatch, and actuator update are re-stricted to certified bounded sets on which solutions are well defined and the chosen lifting map ψ is evaluable. The within-trial plant is not assumed to be globally ISS. The certificate developed below concerns the selected stacked tracking error along the learning-trial axis under the declared finite-horizon protocol. 
+
+Thus, the method applies to finite-horizon nonlinear repetitive tasks, such as robot path repetition, batch operation, mechatronic servo tasks, and other resettable processes for which input-output trajectories can be collected over repeated trials and a frozen Koopman finite-horizon channel can be calibrated before deployment. Let Ek ∈ RN p denote the stacked tracking error and let SH select the rows used for certification. The controlled trial-axis state is 
+
+¯Ek = SH Ek − SH E⋆k , (2) where E⋆k is a prescribed transient error profile used to absorb bounded initial mismatch during the initial segment of each trial. The variable ¯Ek is a learning-axis state rather than a physical plant state. Exact or monotone convergence to zero would require ideal resets, exact mod-els, and feasible inverse updates. Under Koopman residuals, nonrepetitive disturbances, finite-data channel errors, actuator constraints, and numerical tolerances, the relevant question is instead whether { ¯Ek} enters a computable ultimate band as the trial index k increases. Input-output stability of the finite-horizon plant channel bounds output responses to input trajectories, whereas internal stability concerns the within-trial dynamics xk(t). We there-fore use practical ISS on the trial axis. The terms learning axis and trial axis both refer to the discrete index k of repeated task executions. 
+
+Definition 1 (Trial-axis practical ISS) . The selected learning-error system is practically ISS if there exist β ∈ KL , γ ∈ K , and c ≥ 0 such that, for every initial selected error and every admissible perturbation sequence v,
+
+¯Ek ∞ ≤ β( ¯E0 ∞ , k ) + γ
+
+
+
+sup 
+
+> 0≤j<k
+
+∥vj ∥
+
+
+
++ c (3) 4Table 1: Input-to-State Stability Inputs in the Trial-Axis Learning Error System                
+
+> Input component Source Certificate role
+> ωkKoopman and output residual, nonrepetitive disturbance Additive selected-output perturba-tion
+> pkConstrained or regularized in-put solve Unreachable requested output in-crement
+> ∆Gk∆UkLearned-channel error Gain from channel perturbation to output error
+> ∆Ok∆zk, 0Reset/observability perturba-tion Initial-shift contribution
+> hshift ,k Calibration-to-deployment mismatch Distribution-shift margin
+> ωnum ,k Solver and truncation toler-ance Numerical robustness margin
+
+for all certified trials k. If c = 0 , the system is ISS on the certified deployment grid. 
+
+The norm ∥vk∥ in (3) is any fixed product norm compatible with the componentwise bounds used below. In the deterministic certificate we use the scalar budget norm 
+
+∥vk∥ISS = ∥ωk∥∞ + ∥pk∥∞ + ϵG ∥∆Uk∥∞
+
++ ϵO ∥∆zk, 0∥∞ + hshift ,k + ∥ωnum ,k ∥∞ .
+
+The perturbation vk collects the quantities that can be certified or cali-brated in the construction below: 
+
+vk = col( ωk, p k, ∆Gk∆Uk, ∆Ok∆zk, 0, h shift ,k , ω num ,k ). (4) Here ωk is the selected model residual, pk is the projection residual of the constrained input update, ∆Gk and ∆Ok are learned-channel and observabil-ity perturbations, ∆zk, 0 is the lifted reset difference, and the last two terms cover deployment-shift and numerical effects. Table 1 summarizes the role of each component. 
+
+3. Koopman Finite-Horizon Channel and Projection Residual 
+
+Let z = ψ(x) ∈ Rq be a vector of observables. A frozen extended dy-namic mode decomposition with control (EDMDc) model is fitted before deployment, 
+
+z(t + 1) = bAz (t) + bBu (t) + ξ(t), y(t) = bCz (t) + ν(t). (5) 5Unrolling (5) over a finite horizon gives a stacked input-output relation. After selecting the certified rows, 
+
+∆ ¯Yk = O⋆,H ∆zk, 0 + G⋆,H ∆Uk + ωk, (6) where ∆Uk = Uk − Uk−1, ∆ ¯Yk = SH (Yk − Yk−1), and G⋆,H is the true selected finite-horizon Koopman–Markov channel. The controller uses frozen learned quantities ˆOH and ˆGH .The constrained update is used as a fixed Koopman-assisted learning step; the contribution lies in the associated stability certificate, namely the selected-channel margin, projection residual, and computable input-to-state stability budget. For a diagonal learning matrix Λ satisfying ∥Λ∥∞ ≤ λ < 1, the requested selected output increment is 
+
+bk = SH (E⋆k−1 − E⋆k ) − (I − Λ) ¯Ek−1 + ˆOH ∆zk, 0. (7) The admissible input update is obtained from the constrained least-squares problem 
+
+∆Uk ∈ arg min  
+
+> ∆U∈U ∆
+
+ˆGH ∆U − bk
+
+> 22
+
++ μ ∥∆U ∥22 , (8) and the residual 
+
+pk = bk − ˆGH ∆Uk (9) is retained in the stability proof. Unlike a nominal learned inverse, an incre-ment outside the reachable set ˆGH U∆ contributes its unreachable component directly as an ISS input. 
+
+Proposition 1 (Projection-residual obstruction) . Let G = ˆGH , let B be a certified request set containing all bk, and let U∆ be the admissible input-update set. A uniform zero-projection learning step over B is possible only if 
+
+B ⊆ GU∆. (10) 
+
+More generally, any uniform ISS budget over B must contain at least 
+
+¯pB = sup 
+
+> b∈B
+
+inf  
+
+> ∆U∈U ∆
+
+∥b − G∆U ∥∞ . (11) 
+
+The projection residual thus equals the distance from the requested output increment to the constrained reachable set of the learned channel, reflecting a structural limitation on actuation rather than numerical error. 
+
+6Proof. By definition, pk = bk − G∆Uk. If some b ∈ B is not in GU∆, no admissible ∆U can make pk = 0 for that request. In the nominal case with no Koopman residual, no reset perturbation, and no channel perturbation, the selected recursion contains the additive term pk. Therefore a uniform ISS budget that applies to all b ∈ B must be at least the worst-case distance in (11). 
+
+Corollary 1 (Projection-induced ultimate-band contribution) . Consider any uniform certificate of the form 
+
+¯Ek ∞ ≤ λ ¯Ek−1 ∞ + ¯ w, 0 ≤ λ < 1,
+
+over a request set B and an admissible update set U∆. If 
+
+¯pB = sup 
+
+> b∈B
+
+inf  
+
+> ∆U∈U ∆
+
+∥b − G∆U ∥∞ ,
+
+then the certified input budget must satisfy ¯w ≥ ¯pB. Consequently, within any uniform worst-case ultimate-band certificate over B based on this recursion, the projection obstruction contributes at least ¯pB/(1 − λ).Proof. Proposition 1 gives ¯w ≥ ¯pB for any uniform budget over B. Substitut-ing this lower bound into the steady-state term ¯w/ (1 − λ) yields the stated projection-induced contribution. 
+
+Proposition 2 (Projection budget and request closure) . Let G = ˆGH and let B be a certified request set containing all bk. For the regularized controller 
+
+(8) , a computable projection budget is 
+
+¯pμ, U = sup 
+
+> b∈B
+
+min  
+
+> ∆U∈U ∆
+
+ ∥G∆U − b∥22 + μ ∥∆U ∥22
+
+1/2 . (12) 
+
+Then ∥pk∥∞ ≤ ¯pμ, U . If U∆ = RN m , μ = 0 , and G has full row rank with 
+
+σmin (G) ≥ γG > 0, then pk = 0 and ∥∆Uk∥2 ≤ ∥ bk∥2 /γ G.Proof. For every certified request bk ∈ B , the optimizer of (8) attains an objective value no larger than the right-hand side of (12). Since ∥pk∥∞ ≤∥pk∥2, the claimed projection bound follows. If U∆ = RN m , μ = 0 , and G
+
+has full row rank, then G∆U = bk is feasible for every selected request. The minimum-norm solution satisfies ∆Uk = G†bk, hence pk = 0 and ∥∆Uk∥2 ≤
+
+G† 
+
+> 2
+
+∥bk∥2 ≤ ∥ bk∥2 /γ G.7Proposition 3 (Weak-channel non-certifiability) . Suppose the learned se-lected channel and its spectral perturbation radius satisfy 
+
+σmin ( ˆGH ) − ϵG, 2 ≤ 0. (13) 
+
+Then the data cannot certify a positive lower input-output stability (IOS) margin for the true selected channel G⋆,H . Consequently, no uniform inverse-gain or projection-closure certificate of the form used below can be issued from these data. Proof. The singular-value perturbation inequality gives 
+
+σmin (G⋆,H ) ≥ σmin ( ˆGH ) − ˆGH − G⋆,H 2
+
+.
+
+If the certified perturbation radius is ϵG, 2 and (13) holds, the lower bound supplied by the data is nonpositive. Hence the data do not certify a positive channel margin γG > 0, which is required for the inverse-gain and request-closure steps. 
+
+Definition 2 (Deterministic request set) . Let B∞(r) denote an infinity-norm ball of the dimension implied by context. For a certified error radius R and reset-lift radius ¯Z0, define 
+
+B(R, ¯Z0) = B⋆ ⊕ (I − Λ) B∞(R) ⊕ ˆOH B∞( ¯Z0), (14) 
+
+B⋆ = co {SH (E⋆k−1 − E⋆k ) : k ≥ 1}.
+
+Lemma 1 (Request-set containment) . If ¯Ek−1 ∞ ≤ R and ∥∆zk, 0∥∞ ≤ ¯Z0,then the request (7) belongs to B(R, ¯Z0).Proof. The three terms in (7) belong respectively to B⋆, (I − Λ) B∞(R), and 
+
+ˆOH B∞( ¯Z0). Their sum is therefore in the Minkowski sum (14). 
+
+Proposition 4 (Certified request closure) . Let P (R, ¯Z0) be the worst projec-tion budget (12) over B(R, ¯Z0), and let ¯ξ collect all non-projection perturba-tion terms. The certified ball { ¯E : ¯E ∞ ≤ R} is invariant for the one-step learning recursion if 
+
+λR + P (R, ¯Z0) + ¯ξ ≤ R. (15) 
+
+Proof. Substituting the update request into the selected learning recursion leaves the contracted term Λ ¯Ek−1, the projection residual, and the remain-ing perturbation terms. Hence every state satisfying ¯Ek−1 ∞ ≤ R obeys 
+
+¯Ek ∞ ≤ λR +P (R, ¯Z0)+ ¯ξ. The right-hand side is at most R under (15). 8Thus (15) is a request-closure, or certified invariance, condition. It is not a small-gain theorem for an interconnection; it checks that the output incre-ments generated by the ISS state remain inside the certified finite-horizon reachable set. 
+
+Proposition 5 (Support-function projection audit) . If B(R, ¯Z0) and U∆ are compact convex sets, then the zero-projection condition B(R, ¯Z0) ⊆ GU∆ is equivalent to 
+
+hB(R, ¯Z0)(s) ≤ hU∆ (G⊤s) for all s. 
+
+For a finite audited direction set S, the reported projection margin can be lower bounded by the maximum positive violation 
+
+max  
+
+> s∈S ,∥s∥1≤1
+
+hB(R, ¯Z0)(s) − hU∆ (G⊤s) 
+
+> +
+
+.
+
+Proof. The first statement is the standard support-function characterization of convex-set inclusion. The second follows by restricting the separating directions to the audited finite set and using the dual representation of the infinity-norm distance. 9Algorithm 1 Trial-Axis ISS Certification Protocol 
+
+Require: Data splits DΘ, DC , Ddes , Dcal ; horizon H; candidate set Q of 
+
+(SH , Λ, μ, U∆); radius R, target band ∆req , risk levels. 
+
+Ensure: Status ∈ { Certified , NotCertified }, frozen controller, budget 
+
+¯wβ , band ∆ISS ,β . 
+
+> 1:
+
+Fit ( ˆA, ˆB) from DΘ and fit ˆC from DC . 
+
+> 2:
+
+for each candidate q = ( SH , Λ, μ, U∆) ∈ Q do  
+
+> 3:
+
+Compute ˆOH (q), ˆGH (q), and λ = ∥Λ∥∞. 
+
+> 4:
+
+if λ ≥ 1 then  
+
+> 5:
+
+discard q; continue  
+
+> 6:
+
+end if  
+
+> 7:
+
+Build the deterministic request set B(R, ¯Z0) from (14); use Ddes only for candidate selection.  
+
+> 8:
+
+Compute P (R, ¯Z0) by solving (12) over B(R, ¯Z0). 
+
+> 9:
+
+if σmin ( ˆGH ) − ϵG, 2 ≤ 0 then  
+
+> 10:
+
+discard q; continue  
+
+> 11:
+
+end if  
+
+> 12:
+
+if (15) fails then  
+
+> 13:
+
+discard q; continue  
+
+> 14:
+
+end if  
+
+> 15:
+
+Freeze q, ˆOH , and ˆGH . 
+
+> 16:
+
+for each calibration episode i ∈ D cal do  
+
+> 17:
+
+Run the frozen update law (8) and store (∆ Y (i) 
+
+> k
+
+, ∆z(i)
+
+> k, 0
+
+, ∆U (i) 
+
+> k
+
+). 
+
+> 18:
+
+Set Si by (31).  
+
+> 19:
+
+end for  
+
+> 20:
+
+Compute the split-conformal quantile bq1−βcal . 
+
+> 21:
+
+Compute ¯wβ from (33) and set ∆ISS ,β = ¯ wβ /(1 − λ). 
+
+> 22:
+
+if ∆ISS ,β ≤ ∆req then  
+
+> 23:
+
+for deployment trials k = 1 , . . . , K max do  
+
+> 24:
+
+Form bk by (7).  
+
+> 25:
+
+Solve (8) for ∆Uk. 
+
+> 26:
+
+Apply the admissible update and record pk = bk − ˆGH ∆Uk. 
+
+> 27:
+
+end for  
+
+> 28:
+
+return Certified , q, ¯wβ , ∆ISS ,β . 
+
+> 29:
+
+end if  
+
+> 30:
+
+end for  
+
+> 31:
+
+return NotCertified .10 Algorithm 1 is a rejection-capable certification procedure. It returns 
+
+NotCertified whenever the contraction condition, channel margin, request closure, or certified band requirement fails. The design split is used to select rows, gains, and admissible updates; the calibration split is used only after the controller is frozen. This ordering ensures the conformal score in Theo-rem 2 is computed under a fixed, rather than adaptively updated, controller. During deployment the algorithm solves the same constrained update prob-lem that appears in the proof and records the projection residual used in the ISS budget. 
+
+4. Trial-Axis Input-to-State Stability Certificates 
+
+The central deterministic event states that the learned model, the true selected channel, and the deployment protocol are close enough for the trial-axis recursion to be closed. 
+
+Assumption 1 (Certified deployment event) . For all certified deployment trials, 
+
+∥ωk∥∞ ≤ ξ0, ˆGH − G⋆,H ∞
+
+≤ ϵG,
+
+ˆOH − O⋆,H ∞
+
+≤ ϵO, ∥∆Uk∥∞ ≤ ¯U∆,
+
+∥∆zk, 0∥∞ ≤ ¯Z0, ∥pk∥∞ ≤ ¯p. (16) 
+
+The learned selected channel also satisfies the lower-margin condition 
+
+σmin ( ˆGH ) − ϵG, 2 ≥ γG > 0. (17) 
+
+Here ϵG, 2 denotes the corresponding spectral-norm perturbation radius satis-fying 
+
+ˆGH − G⋆,H 2
+
+≤ ϵG, 2. (18) 
+
+Lemma 2 (Trial-axis error recursion) . Under Assumption 1, the selected controlled error satisfies ¯Ek = Λ ¯Ek−1 + rk (19) 
+
+with 
+
+∥rk∥∞ ≤ ξ0 + ¯ p + ϵG ¯U∆ + ϵO ¯Z0. (20) 11 Proof. Substitute the true selected channel (6) into the definition of the next selected error. The desired increment identity (7) cancels the nominal se-lected channel and leaves Λ ¯Ek−1, the projection residual pk, the channel perturbation ( ˆGH − G⋆,H )∆ Uk, the reset/observability perturbation ( ˆOH −
+
+O⋆,H )∆ zk, 0, and the selected residual ωk. Applying (16) gives (20). Theorem 1 shows that the learned-channel margin, projection budget, reset mismatch, and residual calibration enter the learning recursion as ISS inputs, rather than introducing a new comparison lemma. 
+
+Theorem 1 (Deterministic practical ISS certificate) . Suppose Assumption 1 holds and define 
+
+¯w = ξ0 + ¯ p + ϵG ¯U∆ + ϵO ¯Z0. (21) 
+
+Then the selected learning-error system is ISS along the trial axis: 
+
+¯Ek ∞ ≤ λk ¯E0 ∞ + 1 − λk
+
+1 − λ ¯w. (22) 
+
+Equivalently, (3) holds with β(r, k ) = λkr, γ(s) = s/ (1 − λ), and c = 0 , after identifying s with the supremum of the certified perturbation budget. Proof. From Lemma 2, ¯Ek ∞ ≤ λ ¯Ek−1 ∞ + ¯ w. Iterating this scalar com-parison recursion gives (22). The functions β and γ are of class KL and K,respectively, because 0 ≤ λ < 1. Therefore the trial-axis system is ISS on the certified deployment grid. Consequently, the main design problem becomes certificate construction: computing ¯p, verifying a channel margin, and calibrating ξ0, rather than merely minimizing one-step prediction error. 
+
+Corollary 2 (Componentwise ISS gains) . Let 
+
+¯w = ¯ wω + ¯ wp + ¯ wG + ¯ wO
+
+where ¯wω = ξ0, ¯wp = ¯ p, ¯wG = ϵG ¯U∆, and ¯wO = ϵO ¯Z0. Then 
+
+¯Ek ∞ ≤ λk ¯E0 ∞ + X
+
+> q∈{ ω,p,G,O }
+
+1 − λk
+
+1 − λ ¯wq. (23) 
+
+Each residual source therefore shares the same scalar gain γq(s) = s/ (1 − λ),though its numerical size is set by a distinct certificate: residual calibration for ¯wω, projection computation for ¯wp, channel identification for ¯wG, and reset/observability certification for ¯wO.
+
+12 Remark 1 (Componentwise gain decomposition) . Equation (23) exposes the individual ISS input channels hidden inside a single aggregate ultimate-band budget. The decomposition separates the part caused by unmodelled dynamics from the part caused by constrained input reachability and finite-data uncer-tainty. This is the certificate object used in the numerical section: distur-bance, noise, mismatch, and finite-sample effects are not generic perturba-tions, but separate terms in the same gain estimate. 
+
+Corollary 3 (Finite-entry band) . For any η > 0, the selected error enters and remains in 
+
+Xη =
+
+
+
+¯E : ¯E ∞ ≤ ¯w
+
+1 − λ + η
+
+
+
+(24) 
+
+after at most 
+
+k⋆(η) = 
+
+&log( η/ ¯E0 ∞)log λ
+
+'
+
+> +
+
+(25) 
+
+trials. The resulting finite-entry band is therefore the ultimate bound induced by the ISS gain. 
+
+Proposition 6 (ISS Lyapunov interpretation) . Let V ( ¯E) = ¯E ∞. Under Assumption 1, 
+
+V ( ¯Ek) ≤ λV ( ¯Ek−1) + ∥vk−1∥ISS , (26) 
+
+where 
+
+∥vk−1∥ISS = ξ0 + ∥pk−1∥∞ + ϵG ∥∆Uk−1∥∞
+
++ ϵO ∥∆zk−1,0∥∞ .
+
+Consequently, for any σ ∈ (0 , 1 − λ),
+
+V ( ¯Ek−1) ≥ ∥vk−1∥ISS 
+
+1 − λ − σ
+
+=⇒ V ( ¯Ek) − V ( ¯Ek−1) ≤ − σV ( ¯Ek−1).
+
+Hence, V is an ISS Lyapunov function on the certified finite deployment grid. Proof. Inequality (26) is Lemma 2 before taking a uniform supremum over the perturbation components. Subtracting V ( ¯Ek−1) from both sides gives 
+
+V ( ¯Ek) − V ( ¯Ek−1) ≤ − (1 − λ)V ( ¯Ek−1)+ ∥vk−1∥ISS .
+
+13 The stated implication follows by upper bounding the input term by (1 −
+
+λ − σ)V ( ¯Ek−1).
+
+Remark 2 (Practical versus ideal ISS budgets) . In the ideal deterministic case the constant part of the budget can be made zero by taking exact channels, no reset mismatch, no solver error, and unconstrained full-row-rank updates. In the data-driven experiments the budget is nonzero because finite samples, calibration scores, and deployment disturbances are nonzero. Accordingly, the selected error is driven to a data-dependent ultimate ball whose radius is computed before deployment, which is what makes the result a practical, rather than idealized, ISS statement. 
+
+Assumption 2 (Episode-level exchangeability) . Conditional on the fitted Koopman model and the frozen controller ( ˆGH , ˆOH , S H , H, Λ, μ, U∆), the cal-ibration episodes and the deployment episode are exchangeable under the de-clared resettable task protocol. 
+
+Assumption 2 is stated at the episode level, where each episode consists of the reset state, disturbance realization, sensor noise, actuator mismatch, and the closed-loop trajectory generated by the frozen controller. No indepen-dence of individual time samples within an episode is required. If the reset protocol, disturbance law, actuator limits, or reference task changes after cal-ibration, the split-conformal part of the certificate is no longer claimed; only the deterministic ISS result applies with a separately verified deployment-shift margin. 
+
+Lemma 3 (Finite-horizon perturbation radii) . Suppose the identification split supplies one-step radii in a submultiplicative induced norm, 
+
+bA − A⋆ ≤ εA, bB − B⋆ ≤ εB , bC − C⋆ ≤ εC .
+
+For j ≥ 1, define 
+
+DA(j) = εAj−1
+
+X
+
+> ℓ=0
+
+bA j−1−ℓ   bA + εA
+
+ℓ, (27) 
+
+and set DA(0) = 0 . Then the j-step observability block and Markov block errors satisfy 
+
+δO(j) = bC DA(j) + εC
+
+  bA + εA
+
+j , (28) 
+
+δG(j) = bC bA j
+
+εB + δO(j)  bB + εB
+
+. (29) 14 Consequently, conservative stacked finite-horizon radii are 
+
+εO,H,β =
+
+> H−1
+
+X
+
+> j=0
+
+δO(j), εG,H,β =
+
+> H−1
+
+X
+
+> j=0
+
+(H − j)δG(j). (30) 
+
+For a row selector SH with induced norm not exceeding one, the same bounds apply to the selected stacked channel. Otherwise, the right-hand sides in (30) 
+
+are multiplied by ∥SH ∥. The same construction in spectral norm gives a conservative ϵG, 2 for (18) . These margins may also be replaced by externally audited conservative bounds, but in either case they are reported as separate certificate inputs rather than absorbed into prediction loss. Proof. The matrix-power identity gives 
+
+bAj − Aj⋆ =
+
+> j−1
+
+X
+
+> ℓ=0
+
+bAj−1−ℓ( bA − A⋆)Aℓ⋆.
+
+Using ∥A⋆∥ ≤ bA + εA yields bAj − Aj⋆ ≤ DA(j). Expanding bC bAj − C⋆Aj⋆
+
+gives (28). Expanding bC bAj bB − C⋆Aj⋆B⋆ and using ∥B⋆∥ ≤ bB + εB gives (29). Summing the observability blocks and the repeated Toeplitz Markov-block offsets over the finite horizon gives (30). 
+
+Theorem 2 (Episode-calibrated finite-sample ISS budget) . Split resettable episodes into identification data DΘ, output-map data DC , calibration episodes 
+
+Dcal , and deployment episodes. Freeze ˆGH , ˆOH , S H , H, Λ, μ , and U∆ before calibration. For each calibration episode i, define the complete-episode score 
+
+Si = max 
+
+> 1≤k≤Kmax
+
+SH (∆ Y (i) 
+
+> k
+
+− ˆOH ∆z(i) 
+
+> k, 0
+
+− ˆGH ∆U (i) 
+
+> k
+
+) ∞
+
+. (31) 
+
+Let ncal = |D cal |, let S(1) ≤ · · · ≤ S(ncal ) be the ordered scores, and set 
+
+rcal = ⌈(ncal + 1)(1 − βcal )⌉ , bq1−βcal = S(rcal ), (32) 
+
+with the usual convention that certification fails if rcal > n cal . If Assumption 2 holds, and if the parameter/channel, shift, projection, and numerical events hold with risks βpar , βshift , βproj , and βnum , then with probability at least 
+
+1 − β, β = βpar + βcal + βshift + βproj + βnum ,
+
+15 Theorem 1 holds for k ≤ Kmax with 
+
+¯wβ = bq1−βcal + εG,H,β ¯U∆ + εO,H,β ¯Z0
+
++ LΩhshift ,β + ∆ w + ∆ num ,β + ¯ pβ . (33) 
+
+Proof. For a frozen controller, the calibration scores and the deployment score are exchangeable at the complete-episode level. The split-conformal rank argument with (32) gives Sdep ≤ bq1−βcal with probability at least 1 −
+
+βcal . This bounds the residual budget rather than establishing closed-loop stability directly. The parameter/channel event transfers the learned residual score to the true selected channel through εG,H,β ¯U∆ and εO,H,β ¯Z0. The shift, disturbance, numerical, and projection events add the remaining terms in (33). A union bound over the listed events gives probability at least 1 − β.On the intersection of these events, Assumption 1 holds with ¯w ≤ ¯wβ , so Theorem 1 applies. 
+
+Remark 3 (Budget interpretation) . The finite-sample control budget is 
+
+¯wβ = bq1−βcal + ¯ pβ + εG,H,β ¯U∆ + εO,H,β ¯Z0
+
++ LΩhshift ,β + ∆ num ,β + ∆ w.
+
+The terms are, respectively, the complete-episode residual score, the projec-tion/reachability residual, the learned-channel perturbation, the reset/observability perturbation, the deployment-shift allowance, the solver tolerance, and the de-clared disturbance inflation. The certified ultimate radius is accordingly 
+
+∆ISS ,β = ¯wβ
+
+1 − λ.
+
+The learning gain λ controls amplification, whereas the data-driven protocol controls the size of the certified input budget. 
+
+The finite-sample theorem is used as an audit trail rather than as a single statistical post-processing step. First, the residual score bq1−βcal measures complete-episode mismatch after the controller has been frozen. This term is not allowed to absorb later changes in the row selector, horizon, learning gain, actuator limits, or reference task. Second, ¯pβ records the portion of the requested output increment that the admissible update set cannot produce through the learned channel, a control obstruction rather than a statistical estimation error. Third, εG,H,β ¯U∆ and εO,H,β ¯Z0 transfer identification and 16 reset uncertainty into the same trial-axis recursion. Finally, the shift, solver, and declared disturbance terms state what has been added for deployment beyond the calibrated resettable protocol. This ordering allows each certification failure to be traced to a specific cause. If the residual score is too large, the learned lifted predictor or the noise level is not compatible with the desired band. If the channel margin is not positive, the data do not certify an inverse IOS gain for the selected channel, regardless of prediction loss. If the projection residual is large, the requested correction is outside the constrained reachable set. If the numerical or shift allowance dominates, the theorem is signaling that the implementa-tion protocol, rather than the nominal learning law, sets the ultimate radius. The numerical section follows this same order, so each figure and table is tied to a term in ¯wβ .
+
+Remark 4 (IOS interpretation of the selected channel) . The map ∆Uk 7 →
+
+∆ ¯Yk is a finite-horizon input-output channel. The lower bound (17) and the projection budget (12) state when this IOS channel can generate the output increment required by the ISS recursion. 
+
+5. Numerical Checks 
+
+The numerical studies evaluate the quantities required by the ISS bound, rather than ranking learning controllers by tracking performance. Each ex-periment checks one quantity from the theory: the complete-episode residual score, the selected-channel margin, the projection budget, input/update fea-sibility, and ultimate-band coverage after the certified entry index. Table 2 summarizes the certified task protocols used in the audits. All examples belong to Assumption 0: the plant maps are unknown to the con-troller, the reference is repeated over a finite horizon, and the learning update is certified only for selected output rows and the declared bounded deploy-ment protocol. The main Duffing closed-loop audit is used for ultimate-band coverage, whereas the hard Duffing budget audit is used for the finite-sample certificate budget. Before comparing numerical values, every run is reduced to the same certificate audit. This avoids treating tracking curves, residual plots, and ablation rows as unrelated empirical evidence. Table 3 lists the proof object being tested, where it appears in the main text, and the decision it supports. 17 Table 2: System and Protocol Summary for the Certificate Audits                                            
+
+> System Dynamics class and pro-tocol
+> (n, m, p )N, K max Uncertainty and con-straints Certified ob-ject Main Duffing closed-loop audit nonlinear discrete-time repetitive
+> (2 ,1,1) 90 ,26 repeated reference; reset, disturbance, noise; in-put/update bounds selected er-ror Hard Duffing budget audit nonlinear repetitive (2 ,1,1) 70 ,35 repeated reference; reset, disturbance, noise; deploy-ment shift selected er-ror Cubic damping oscillator nonlinear repetitive (2 ,1,1) 70 ,35 repeated reference; reset, disturbance, noise; deploy-ment shift selected er-ror Nonlinear servo nonlinear repetitive (2 ,1,1) 70 ,35 repeated reference; reset, disturbance, noise; deploy-ment shift selected er-ror
+
+Table 3: Main-Text Evidence for the Input-to-State Stability Certificate                       
+
+> Certificate object Main-text evidence Certification role
+> bq1−βcal and ¯wFigs. 1–4, Tables 4 and 6 Calibrates the ISS input budget
+> ∆ISS = ¯ w/ (1 −λ)Fig. 3, Tables 5 and 6 Checks ultimate-band coverage
+> γGand channel in-formativeness Fig. 5, Tables 7 and 9 Rejects weak selected channels
+> ¯pand projection closure Fig. 6, Tables 8 and 9 Tests reachability of requested up-dates Input/update fea-sibility Fig. 3, Table 5 Checks admissible learning actions
+
+The table is also the reason the reported quantities emphasize budgets, mar-gins, and certified entry times rather than only final tracking errors. The finite-sample audit is generated from the retained experiment sum-maries by the checker scripts in the code archive. Fig. 1 shows the additive terms in ¯wβ , while Fig. 2 reports the episode-level conformal coverage check used for the residual term. Here ncal denotes the number of independently generated complete calibration episodes. Each episode consists of the reset state, disturbance realization, sensor noise, actuator mismatch, and the full closed-loop trajectory generated by the frozen controller; it is not the num-ber of within-episode time samples. These calibration episodes are Monte Carlo resettable simulation episodes used to audit the finite-sample certifi-cate. Physical deployment with fewer episodes would yield a larger conformal quantile and hence a more conservative certified band. Negative cases are interpreted accordingly: a row that violates a hypoth-esis before the ISS recursion is invoked is treated as a certificate rejection rather than a failed simulation. In particular, a weak selected channel may 18 Figure 1: Finite-sample ISS budget decomposition. Each bar is the sum of the episode residual score, projection term, channel and reset margins, shift allowance, numerical tolerance, and declared disturbance inflation. Table 4: Finite-Sample ISS Budget Audit from the Generated CSV                                  
+
+> Case ncal episodes rcal bqpβG/O shift/num/ ∆w¯wβBand Hard Duffing valid-channel 120000 115201 0.330 0.000 0.106 0.152 0.588 1.110 Hard cubic damping valid-channel 120000 115201 0.209 0.000 0.069 0.134 0.412 0.778 Hard nonlinear servo valid-channel 120000 115201 0.111 0.000 0.122 0.168 0.402 0.758
+
+still yield accurate held-out predictions, but it cannot support the certified projection step used to convert the requested output correction into an ad-missible input update. Conversely, conservatively inflating ¯w certifies the same controller under a larger admissible input budget, enlarging the ulti-mate band through the ISS gain. The first experiment is a two-state Duffing-type nonlinear repetitive plant identified only through the learned Koopman model. The selected output is the tracked second state; the deployment includes reset variation, bounded disturbance, input limits, and a finite learning horizon. The closed-loop trace in Fig. 3 shows the controlled state, output, input, and update magnitude. Table 5 lists the quantities used by the ISS certificate. The second experiment varies residual and uncertainty levels. In the ISS view, this sweep serves as a gain test rather than a conventional sensitiv-ity analysis. Increasing measurement noise, disturbance, or model mismatch 19 Figure 2: Episode-level split-conformal residual audit. The controller is frozen before calibration, and the rank rcal = ⌈(ncal + 1)(1 − βcal )⌉ determines the reported residual quantile. 
+
+increases the certified budget ¯w, and Theorem 1 predicts a monotone en-largement of the ultimate band. Table 6 reports representative rows from the generated sweep. Fig. 4 gives the corresponding residual-to-band valida-tion. These rows are reported because they correspond directly to (21) and (22): changing disturbance, noise, or mismatch changes a certified input budget, and the ultimate radius changes through the same scalar gain 1/(1 − λ).The table therefore reports ¯w, the band, and k⋆, rather than only terminal tracking error. The third experiment tests control-channel certification. Fig. 5 compares learned models that differ in the margin of the selected finite-horizon chan-nel. The weak-channel case is rejected because the selected channel fails the margin and projection conditions required by the ISS certificate. Candidate rejection is logged before the deterministic ISS theorem is in-voked. Fig. 6 and Table 8 show that the implemented protocol contains both margin-failure and request-closure-failure cases, plus certified accepted cases. 20 Figure 3: Closed-loop state, output, input, and input-update traces for the residual-certified Koopman learning controller. The certified ultimate band is the ISS gain applied to the calibrated perturbation budget. 
+
+The baseline ablation is best understood as a set of certificate decisions, not as a ranking of controller names. Table 9 keeps the same closed-loop task and asks which ingredients close the ISS argument. The nominal rich Koopman controller has a useful learned predictor, but the reported certifi-cate sets the residual input to zero; the observed trajectory therefore violates the claimed zero-residual band even though the same predictor becomes cer-tifiable once the calibrated residual budget is inserted. The inflated-budget row uses the same controller again, showing the expected ISS tradeoff: the certified band expands when the input budget is made more conservative, while the trajectory is still covered. The weak-channel row is central to the paper’s argument: although its residual budget is large, the decisive failure is the channel margin, which blocks the projection step required by Assumption 1. External LQR-ILC, neural ILC, and Koopman-MPC base-lines are useful tracking-performance comparators, but they do not provide input-to-state stability certificates unless they report the same fixed channel, projection residual, and perturbation-budget quantities. 21 Table 5: Closed-Loop ISS Certificate Quantities in the Main Duffing Run                       
+
+> Quantity Value Role Certified band ∆ISS 0.1777 ultimate ISS bound Observed entry trial 4empirical finite-entry index Theoretical entry bound 15 certified k⋆
+> Final Jmax 0.0113 terminal selected error Post-entry max Jmax 0.1102 inside certified band Max |u|1.6002 input feasibility Max |∆u|0.8520 update feasibility
+
+Figure 4: Residual-to-band validation. The certified band grows with the aggregate per-turbation budget, which is the empirical counterpart of the ISS gain γ(s) = s/ (1 − λ).
+
+The numerical evidence is deliberately scoped. It verifies the algebraic objects used by the proofs: residual score, channel lower bound, projec-tion budget, input/update feasibility, and ultimate-band coverage after the certified entry index. Additional benchmark rows and checker outputs are included in the data and code archive. 22 Table 6: Representative ISS-Gain Sweep Rows from iss_gain_sweep.csv 
+
+Family Level bq pβ channel reset other ¯w Band ρ k⋆
+
+disturbance 0.005 0.001 0.000 0.000 0.000 0.090 0.091 0.172 0.10 15 disturbance 0.090 0.026 0.000 0.000 0.000 0.260 0.286 0.540 0.10 13 noise 0.00 0.004 0.000 0.000 0.000 0.110 0.114 0.216 0.10 14 noise 0.10 0.038 0.000 0.000 0.000 0.210 0.248 0.469 0.10 13 mismatch 0.00 0.004 0.000 0.000 0.000 0.110 0.114 0.215 0.10 15 mismatch 0.22 0.005 0.000 0.000 0.000 0.330 0.335 0.631 0.10 13 
+
+Table 7: Weak-Channel Audit 
+
+Case residual σmin mG Cert. Linear dictionary 0.020 0.057 0.032 yes Polynomial dictionary 0.002 0.058 0.033 yes Rich dictionary 0.002 0.058 0.033 yes Weak-channel rich 0.118 0.010 -0.015 no 
+
+Figure 5: Selected-channel certification ablation. The weak-channel case is rejected be-cause the selected input-output channel does not pass the lower-margin test, even though residual size is also reported. 
+
+23 Figure 6: Candidate rejection cascade. The certificate rejects candidates at the first failed gate: contraction, channel margin, request closure, or ultimate-band requirement. Table 8: Candidate Rejection Log 
+
+ID mG PR closure/R Decision q1 -0.015 0.020 0.61 margin fail q2 0.033 0.310 1.07 request-closure fail q3 0.033 0.030 0.72 certified q4 0.033 0.000 0.58 certified 
+
+Table 9: Ablation Rows Read as ISS Decisions 
+
+Case Budget Band ISS cert. Linear proxy baseline 0.1305 0.2463 yes Nominal rich, zero residual 0.0000 0.0001 no Residual-certified rich 0.0941 0.1777 yes Inflated-budget rich 0.1647 0.3109 yes Weak-channel rich 0.3458 0.6525 no 
+
+24 6. Discussion 
+
+The guarantee is finite-horizon and task-protocol dependent. The row selector SH , horizon H, learning matrix Λ, admissible update set, and cali-bration score are fixed before deployment. Within this certified setting, the learning-error state decays geometrically from its initial value, and all un-certainty sources enter through the computable budget ¯w. In this sense, the result constitutes a practical ISS certificate rather than a universal ISS theorem for arbitrary learned nonlinear controllers. The result also separates three quantities that are often conflated in data-driven control: model fit, finite-horizon IOS channel informativeness, and trial-axis ISS of the learning recursion. The weak-channel case is there-fore rejected through non-certifiability of the selected channel, not through a closed-loop instability claim. The finite-sample statement has the same boundary. Split conformal cal-ibration supplies a complete-episode residual budget under an exchangeable resettable protocol and a frozen controller. It does not by itself assert sta-bility, and it does not apply after the reset law, disturbance law, actuator limits, or reference task changes. Stability is obtained by applying the de-terministic ISS theorem on the event where the calibrated budget, channel margin, projection budget, and deployment-shift margin hold. 
+
+7. Conclusion 
+
+We have formulated Koopman learning control of unknown nonlinear repetitive systems as a practical input-to-state stability certification prob-lem along the learning-trial axis. The deterministic result gives an ex-plicit ultimate-band estimate, while the finite-sample implementation con-structs the corresponding perturbation budget from complete-episode resid-uals, channel and reset margins, projection residuals, deployment-shift al-lowances, and numerical tolerances. The construction shows that Koopman learning control can be certified only when model residuals, projection resid-uals, and selected-channel margins are reported as separate stability quan-tities. Numerical checks support the predicted residual-to-band scaling and the rejection of weak selected channels by non-certifiability, without claim-ing that such predictors are inaccurate or that all closed-loop trajectories are unstable. 25 Data and code availability 
+
+The data and code supporting the numerical results are available in the public GitHub repository associated with this submission: https://github .com/marcowus/projection-residual-iss-koopman-learning-control .The archive contains the reproducibility package used to generate the figures, tables, verification CSV files, and checker outputs reported in this article. 
+
+Funding 
+
+This work was supported by the Key Research and Development Program of Shaanxi Province, Four-Chain Integration Major Project, “Research and development of key technologies and equipment for wall-working construc-tion robots based on digital twins” [grant number 2024PT-ZCK-77; project period: 2024.10.1–2026.9.30]. The funding source had no role in the study design, data collection and analysis, manuscript preparation, or decision to submit the article for publication. 
+
+Declaration of competing interest 
+
+The authors declare that they have no known competing financial inter-ests or personal relationships that could have appeared to influence the work reported in this article. 
+
+CRediT authorship contribution statement 
+
+Yue Wu: Conceptualization, Methodology, Software, Validation, Formal analysis, Writing–original draft. Ye Cao: Investigation, Validation, Visu-alization, Writing–review and editing. Jianfu Cao: Supervision, Funding acquisition, Project administration, Writing–review and editing. 
+
+Declaration of generative AI and AI-assisted technologies in the manuscript preparation process 
+
+During the preparation of this work, the authors used ChatGPT for lan-guage editing and translation support. The authors reviewed, revised, and verified all mathematical statements, experimental descriptions, and conclu-sions, and take full responsibility for the final manuscript. 26 References 
+
+[1] E. D. Sontag, “Smooth stabilization implies coprime factorization,” IEEE Transactions on Automatic Control , vol. 34, no. 4, pp. 435–443, 1989, doi: 10.1109/9.28018. [2] E. D. Sontag and Y. Wang, “On characterizations of the input-to-state stability property,” Systems & Control Letters , vol. 24, no. 5, pp. 351–359, 1995, doi: 10.1016/0167-6911(94)00050-6. [3] Z.-P. Jiang, A. R. Teel, and L. Praly, “Small-gain theorem for ISS systems and applications,” Math-ematics of Control, Signals and Systems , vol. 7, no. 2, pp. 95–120, 1994, doi: 10.1007/BF01211469. [4] Z.-P. Jiang and Y. Wang, “Input-to-state stability for discrete-time nonlinear systems,” Automatica ,vol. 37, no. 6, pp. 857–869, 2001, doi: 10.1016/S0005-1098(01)00028-0. [5] D. Angeli, E. D. Sontag, and Y. Wang, “A characterization of integral input-to-state stability,” IEEE Transactions on Automatic Control , vol. 45, no. 6, pp. 1082–1097, 2000, doi: 10.1109/9.863594. [6] D. Angeli, “A Lyapunov approach to incremental stability properties,” IEEE Transactions on Auto-matic Control , vol. 47, no. 3, pp. 410–421, 2002, doi: 10.1109/9.989067. [7] S. N. Dashkovskiy, B. S. Rüffer, and F. R. Wirth, “Small gain theorems for large scale systems and construction of ISS Lyapunov functions,” SIAM Journal on Control and Optimization , vol. 48, no. 6, pp. 4089–4118, 2010, doi: 10.1137/090746483. [8] A. Mironchenko and F. Wirth, “Characterizations of input-to-state stability for infinite-dimensional systems,” IEEE Transactions on Automatic Control , vol. 63, no. 6, pp. 1692–1707, 2018, doi: 10.1109/TAC.2017.2756341. [9] S. Arimoto, S. Kawamura, and F. Miyazaki, “Bettering operation of robots by learning,” Journal of Robotic Systems , vol. 1, no. 2, pp. 123–140, 1984, doi: 10.1002/rob.4620010203. [10] K. L. Moore, Iterative Learning Control for Deterministic Systems . London, U.K.: Springer-Verlag, 1993, doi: 10.1007/978-1-4471-1912-8. [11] N. Amann, D. H. Owens, and E. Rogers, “Iterative learning control using optimal feedback and feedforward actions,” International Journal of Control , vol. 65, no. 2, pp. 277–293, 1996, doi: 10.1080/00207179608921697. [12] F. Gao, Y. Yang, and C. Shao, “Robust iterative learning control with applications to injection mold-ing process,” Chemical Engineering Science , vol. 56, no. 24, pp. 7025–7034, 2001, doi: 10.1016/S0009-2509(01)00339-6. [13] D. A. Bristow, M. Tharayil, and A. G. Alleyne, “A survey of iterative learning control,” IEEE Control Systems Magazine , vol. 26, no. 3, pp. 96–114, 2006, doi: 10.1109/MCS.2006.1636313. [14] B. O. Koopman, “Hamiltonian systems and transformation in Hilbert space,” Proceedings of the National Academy of Sciences of the United States of America , vol. 17, no. 5, pp. 315–318, 1931, doi: 10.1073/pnas.17.5.315. [15] C. W. Rowley, I. Mezić, S. Bagheri, P. Schlatter, and D. S. Henningson, “Spectral analysis of nonlinear flows,” Journal of Fluid Mechanics , vol. 641, pp. 115–127, 2009, doi: 10.1017/S0022112009992059. [16] M. O. Williams, I. G. Kevrekidis, and C. W. Rowley, “A data-driven approximation of the Koopman operator: Extending dynamic mode decomposition,” Journal of Nonlinear Science , vol. 25, no. 6, pp. 1307–1346, 2015, doi: 10.1007/s00332-015-9258-5. [17] S. L. Brunton, B. W. Brunton, J. L. Proctor, and J. N. Kutz, “Koopman invariant subspaces and finite linear representations of nonlinear dynamical systems for control,” PLOS ONE , vol. 11, no. 2, e0150171, 2016, doi: 10.1371/journal.pone.0150171. [18] J. L. Proctor, S. L. Brunton, and J. N. Kutz, “Dynamic mode decomposition with control,” SIAM Journal on Applied Dynamical Systems , vol. 15, no. 1, pp. 142–161, 2016, doi: 10.1137/15M1013857. [19] M. Korda and I. Mezić, “Linear predictors for nonlinear dynamical systems: Koopman operator meets model predictive control,” Automatica , vol. 93, pp. 149–160, 2018, doi: 10.1016/j.automatica.2018.03.046. [20] A. Mauroy and J. Goncalves, “Koopman-based lifting techniques for nonlinear systems identi-fication,” IEEE Transactions on Automatic Control , vol. 65, no. 6, pp. 2550–2565, 2020, doi: 10.1109/TAC.2019.2941433. [21] F. Nüske, S. Peitz, F. Philipp, M. Schaller, and K. Worthmann, “Finite data error bounds for Koopman-based prediction and control,” Journal of Nonlinear Science , vol. 33, no. 1, 2023, doi: 10.1007/s00332-022-09862-1. [22] S. Dean, H. Mania, N. Matni, B. Recht, and S. Tu, “On the sample complexity of the linear quadratic regulator,” Foundations of Computational Mathematics , vol. 20, no. 4, pp. 633–679, 2020, doi: 10.1007/s10208-019-09426-y. 
+
+27 [23] C. De Persis and P. Tesi, “Formulas for data-driven control: Stabilization, optimality, and ro-bustness,” IEEE Transactions on Automatic Control , vol. 65, no. 3, pp. 909–924, 2020, doi: 10.1109/TAC.2019.2959924. [24] J. Berberich, J. Köhler, M. A. Müller, and F. Allgöwer, “Data-driven model predictive control with stability and robustness guarantees,” IEEE Transactions on Automatic Control , vol. 66, no. 4, pp. 1702–1717, 2021, doi: 10.1109/TAC.2020.3000182. [25] V. Vovk, A. Gammerman, and G. Shafer, Algorithmic Learning in a Random World . New York, NY, USA: Springer, 2005, doi: 10.1007/b106715. [26] J. Lei, M. G’Sell, A. Rinaldo, R. Tibshirani, and L. Wasserman, “Distribution-free predictive inference for regression,” Journal of the American Statistical Association , vol. 113, no. 523, pp. 1094–1111, 2018, doi: 10.1080/01621459.2017.1307116. 
+
+28

@@ -1,0 +1,4114 @@
+Title: Understanding Schedule-Free Methods in Nonconvex Optimization: Rate Guarantees and Escaping Saddles
+
+URL Source: https://arxiv.org/pdf/2607.09167v1
+
+Published Time: Mon, 13 Jul 2026 01:14:52 GMT
+
+Number of Pages: 51
+
+Markdown Content:
+# Understanding Schedule-Free Methods in Nonconvex Optimization: Rate Guarantees and Escaping Saddles 
+
+Jiseok Chae 
+
+Natural Science Research Institute KAIST Daejeon, Republic of Korea 
+
+jsch@kaist.ac.kr 
+
+Donghwan Kim 
+
+Department of Mathematical Sciences KAIST Daejeon, Republic of Korea 
+
+donghwankim@kaist.ac.kr 
+
+## Abstract 
+
+Schedule-Free methods have attracted growing interest for alleviating the burden of designing and tuning a learning rate scheduler, while matching and sometimes even outperforming optimizers with tuned schedulers. Despite their strong empir-ical results, their convergence theory in nonconvex optimization, where modern machine learning objectives typically arise, has remained largely unexplored. In this paper, we provide worst-case analyses of Schedule-Free gradient descent and Schedule-Free stochastic gradient descent, in their standard form and without auxiliary modifications or restrictive conditions, for smooth but possibly noncon-vex objectives. Based on a Lyapunov analysis derived from the continuous-time limiting ordinary differential equation associated with these methods, we show that Schedule-Free gradient descent and Schedule-Free stochastic gradient descent achieve the optimal worst-case convergence rates attainable among first-order meth-ods. We further formulate Schedule-Free gradient descent as a nonautonomous dynamical system and prove strict-saddle avoidance under an arbitrarily small one-time perturbation. These theoretical results provide a better understanding of the strong performance that Schedule-Free methods demonstrate. 
+
+## 1 Introduction 
+
+There are many first-order methods that can be used to solve a minimization problem 
+
+min 
+
+> x∈Rd
+
+f (x), (1) ranging from the established gradient descent (GD) and stochastic gradient descent (SGD) methods to those that are now standard in the machine learning community, such as Adam [ 17 ] and AdamW [ 20 ]. In modern machine learning tasks, such first-order methods are typically used together with a learning rate scheduler , which changes the learning rate during training according to a predefined rule. However, as training dynamics are largely unpredictable a priori , the choice and design of the learning rate scheduler have traditionally relied heavily on ad hoc approaches and heuristics. Schedule-Free [ 9 ] is an optimization scheme that aims to eliminate the need for handcrafted learning rate schedules, which are often difficult to design and tune. The update rule of the Schedule-Free method, which combines the techniques of iterate averaging and a momentum-like interpolation with a given base optimizer, is defined as 
+
+yk = (1 − β)zk + βxk (2a) 
+
+zk+1 = zk − γkgk (2b) 
+
+xk+1 = (1 − ck+1 )xk + ck+1 zk+1 (2c) 
+
+> Preprint. arXiv:2607.09167v1 [cs.LG] 10 Jul 2026
+
+with initial points x0 = z0, where β ∈ [0 , 1] is a fixed constant, {γk}k≥0 is the sequence of learning rates which is often set to be a constant sequence, {ck+1 }k≥0 is a predefined sequence of averaging rates such that ck+1 ∈ [0 , 1] , and gk is the update direction produced by the base optimizer at yk.For example, Schedule-Free stochastic gradient descent ( SF-SGD ) uses gk = ∇f (yk, ζ k) for some random variable ζk accounting for the stochasticity in the gradient evaluation, as in standard SGD. A notable interpretation of the Schedule-Free scheme is to understand it as an interpolation be-tween two well-known averaging schemes. When β = 0 , under the standard choice ck+1 = 1 
+
+> k+1
+
+,Schedule-Free reduces to Polyak–Ruppert averaging [27 , 28 ], where xk becomes the uniform average over the computed iterates y0, . . . , yk. On the other extreme, when β = 1 , Schedule-Free reduces to a scheme known as primal averaging [24 , 31 ]. Despite this connection, β = 1 is seldom used in Schedule-Free methods. A few common choices for β in practice are 0.9 and 0.98 , following the original experiments conducted by Defazio et al. [9] . In this paper, as the case β = 1 is well studied in the prior works on primal averaging, we focus on when β < 1.Schedule-Free methods have gained significant interest from the community, not only because they alleviate the complexities associated with learning rate schedules, but also because they demonstrate strong performance on practical deep learning workloads. This has been highlighted by the results from the recent AlgoPerf challenge [ 7], a benchmark of a wide range of optimization algorithms on large-scale deep learning tasks. Despite their empirical success in modern machine learning applications, where the underlying objectives are typically nonconvex, convergence guarantees for Schedule-Free methods were available only in the convex setting. Defazio et al. [9] introduced the method and provided an accompanying convergence-rate analysis in the convex setting. There have been some attempts to extend convergence guarantees to the nonconvex regime, for instance by applying an online-to-nonconvex conversion framework [ 2] or by directly constructing a tailored Lyapunov potential [ 4]. However, these analyses have notable limitations as we detail in Section 2, such as focusing on specific parameter choices or requiring a randomization of the parameters such as β. As a result, a comprehensive convergence analysis of Schedule-Free methods in the nonconvex setting remains largely unexplored. 
+
+1.1 Our Contributions 
+
+To address this gap, we analyze Schedule-Free methods under smooth and possibly nonconvex objectives through the worst-case convergence of the gradient location iterates, strict-saddle avoidance of the dynamics, and the worst-case behavior of the evaluation iterates commonly used in practice. Our contributions are as follows. • As a starting point, we consider the continuous-time limiting ODE of SF-GD . We construct its Lyapunov function, and establish that the solution of the SF-ODE attains an O(1 /T )
+
+decay rate in terms of the squared gradient norm ∥∇ f ∥2.• Based on the analyses of the continuous-time limiting ODE, we establish convergence rate analyses for discrete-time Schedule-Free methods. These results show that {yk}k≥0
+
+computed by SF-GD and SF-SGD achieve the worst-case optimal rates known for first-order methods [ 3, 5]. In particular, we prove convergence rates for the methods as is , unlike prior works that analyze specifically modified variants or require careful parameter tuning. • We study SF-GD as a nonautonomous dynamical system and prove that, after an arbitrarily small one-time perturbation, it almost surely avoids strict saddle points. Thus, under the usual strict-saddle landscape assumptions, convergent Schedule-Free trajectories exhibit the same qualitative behavior as GD, converging only to local minimizers rather than to saddle points. • We use the performance estimation problem (PEP) framework to study the averaged evaluation sequence {xk}k≥0 directly. The PEP results show that the worst-case behavior of {xk}k≥0 can be worse than that of {yk}k≥0. Nonetheless, we discuss how this gap can coexist with the strong empirical performance of {xk}k≥0.
+
+1.2 Problem Settings 
+
+We consider the minimization problem (1) where the objective function f : Rd → R is differentiable and possibly nonconvex. For the analyses, we further impose a standard smoothness assumption. 2Assumption 1.1 (Smoothness) . For some L > 0 given, f is L-smooth ; that is, for any x, y ∈ Rd,
+
+∥∇ f (x) − ∇ f (y)∥ ≤ L∥x − y∥.
+
+To avoid pathological cases such as minimizing an affine function, we also impose the following. 
+
+Assumption 1.2 (Finite infimum) . The objective function f is bounded below by a constant f ∗.We mainly focus on the case where the base optimizer in the Schedule-Free method is either GD, so that gk = ∇f (yk), or SGD, so that gk = ∇f (yk, ζ k), where ∇f ( · , ζ ) denotes a stochastic gradient oracle and {ζk}k≥1 is a sequence of random variables accounting for the stochasticity in the gradient evaluations. For this stochastic gradient oracle we assume that it produces an unbiased estimator of 
+
+∇f with a bounded variance. 
+
+Assumption 1.3 (Stochastic gradients) . There exists some σ2 ≥ 0 such that, for any x ∈ Rd, the stochastic gradient oracle satisfies (i) E[∇f (x, ζ )] = ∇f (x) , (ii) E∥∇ f (x, ζ ) − ∇ f (x)∥2 ≤ σ2.
+
+## 2 Related Work 
+
+Convergence Analysis of Schedule-Free Methods Defazio et al. [9] have provided convergence guarantees of SF-SGD when the objective function f is convex, but the nonconvex convergence theory for Schedule-Free methods remains largely open. Ahn et al. [2] were the first to attempt to attain convergence bounds for Schedule-Free methods in the nonconvex regime. Based on an online-to-nonconvex conversion framework, their discussion also extends to the case where f is nonsmooth .Concurrently, Brown et al. [4] have claimed a comparatively simpler and more direct proof of convergence via a construction of Lyapunov potentials tailored to nonconvex smooth objectives. However, both works have limitations that prevent them from being considered to provide compre-hensive convergence proofs for Schedule-Free methods in the nonconvex regime. The analysis by Ahn et al. [2] establishes a worst-case optimal rate, but only for a specific choice of parameters and, moreover, requires additional modifications such as making β a random variable that is resampled every iteration. Meanwhile, Brown et al. [4] proposed several convergence rates that depend on the choice of the averaging rates {ck+1 }k≥0. However, the claimed rates are mostly suboptimal, especially being only O( 1log T ) at best where T is the total number of iterations, under the standard choice of ck+1 = 1 
+
+> k+1
+
+. Moreover, their results unfortunately appear to hold only when β = 1 , as the proof relies on a premise that, to our understanding, does not hold for β < 1. See Section B for further details on these limitations. Our analyses of the convergence rates, on the other hand, apply to a wide range of β and study Schedule-Free methods as is, without any modifications. 
+
+Gradient Location Sequence vs. Evaluation Sequence The sequence {yk}k≥0 obtained from a Schedule-Free method is called the gradient location sequence, whereas the sequence {xk}k≥0 is called the evaluation sequence. It is clear that the former is named as such because of (2b) . The latter is named because the original work by Defazio et al. [9] on Schedule-Free methods advocated using 
+
+{xk}k≥0 as the “main” iterate to be used as the trained parameters in constructing a model. Since then, treating {xk}k≥0 as the primary output sequence has largely become standard practice. Nonetheless, Song et al. [30] observed that {yk}k≥0 is not merely an auxiliary sequence. In particular, they showed that {yk}k≥0 exhibits edge of stability [6 ] behavior, a well-documented large learning rate phenomenon in neural network training, and that, on the so-called river valley 
+
+loss landscapes [ 33 ], it follows the low loss path, often referred to as the river , more closely than 
+
+{xk}k≥0. They also reported a language model training example where evaluating at {yk}k≥0 yields better performance than evaluating at {xk}k≥0. These observations motivate studying {yk}k≥0 as an optimization sequence in its own right, along with the practically widely used {xk}k≥0.
+
+Performance Estimation Problem The performance estimation problem (PEP) framework [ 12 ]provides a systematic toolbox for numerically computing worst-case convergence guarantees for first-order methods over a prescribed function class. In many cases, the resulting worst-case bound can be cast as a semidefinite programming problem, shifting much of the analysis from manual 3inequality chaining to the solution of a single convex optimization problem. PEP has been used to obtain sharp guarantees for a wide range of methods and problem structures, from vanilla gradient descent to proximal methods and operator splitting schemes [1, 29, 32]. 
+
+## 3 Continuous-Time Limiting ODE of Schedule-Free Methods 
+
+Continuous-time systems, most representatively expressed in the form of ODEs, are often easier to analyze than their discrete-time counterparts. Moreover, the insights obtained by studying the continuous-time limiting ODE can often be transferred to the discrete-time system, sometimes even yielding a convergence proof. In this section, we show that this is also the case for Schedule-Free methods. As a first step in this direction, this section derives the continuous-time limiting ODE of SF-GD , where we take 
+
+gk = ∇f (yk) in the update rule specified in (2) , and analyzes its convergence properties. To this end, we focus on the standard choice of averaging rates ck+1 = 1 
+
+> k+1
+
+and a constant learning rate γk = γ.In order to derive the continuous-time limiting ODE, we should take the limit as γ → 0, so let us assume that γ ≪ 1. Then (2b) yields 
+
+˙z ≈ zk+1 − zk
+
+γ = −gk = −∇ f (yk),
+
+leading to ˙z = −∇ f (y).Next, let us consider the update rule (2c) for xk. Because it involves an averaging rate ck+1 that changes at every iteration, we introduce a time-dependent function a(t) to represent this variation in continuous time. More precisely, we wish to view the update rule (2c) as a discretization of the ODE governing the evolution of x(t), which involves an auxiliary function a(t) accounting for the time-dependent averaging rate. To this end, let us rearrange the terms in (2c) and reformulate it into 
+
+xk+1 = xk + γ · ck+1 
+
+γ(1 − ck+1 ) (zk+1 − xk+1 ). (3) One can observe that, if there were a function a(t) such that a(( k + 1) γ) = ck+1  
+
+> γ(1 −ck+1 )
+
+, it would be possible to interpret the equation (3) as an implicit Euler step of the ODE 
+
+˙x(t) = a(t)( z(t) − x(t)) . (4) However, this would require expressing ck+1  
+
+> γ(1 −ck+1 )
+
+= 1 
+
+> kγ
+
+as a function of (k + 1) γ, which is not directly possible. So, instead, invoking that 1 − ck+1 ≈ 1 when k ≫ 1, we seek a function a(t) such that a(( k + 1) γ) = ck+1  
+
+> γ
+
+= 1(k+1) γ , and interpret (3) as an approximate implicit Euler step of (4) .This, in fact, is easily achievable by simply setting a(t) = 1 
+
+> t
+
+.From these observations, we can construct the continuous-time limiting ODE of SF-GD as follows. 
+
+Definition 3.1. We define the Schedule-Free ODE (SF-ODE ) to be the continuous-time limiting ODE of SF-GD in the limit as γ → 0, which can be formulated as a system of differential equations 
+
+y = (1 − β)z + βx, (5a) 
+
+˙z = −∇ f (y), (5b) 
+
+˙x = 1
+
+t (z − x). (5c) Despite the singularity of (5c) at t = 0 , it turns out for any given initial point x0 = z0 ∈ Rd, one can always find a function triple (x, y, z) which becomes a solution of the SF-ODE on the interval (0 , T ]
+
+for some T > 0 with lim t→0+ 
+
+ x(t), y(t), z(t) = ( x0, x0, x0). See Section I for further details. 
+
+SF-ODE turns out to admit a Lyapunov function of a relatively simple form, namely, a weighted sum of f (y) and ∥z − x∥2, as shown in the following proposition. 
+
+Proposition 3.2. Consider a function L : (0 , ∞) → R defined as 
+
+L(t) = f (y(t)) − f ∗ + β
+
+2t ∥z(t) − x(t)∥2. (6) 
+
+Then it holds that ˙L ≤ − (1 − β)∥∇ f (y)∥2 ≤ 0, and thus L is a Lyapunov function of SF-ODE .
+
+4The bound on ˙L derived in Proposition 3.2 can be further used to characterize the behavior of the solution trajectories as t → ∞ . In particular, we can show that ∥∇ f (y(t)) ∥2 = O(1 /T ), as follows. 
+
+Corollary 3.3. For any T > 0, it holds that 
+
+min  
+
+> 0≤t≤T
+
+∥∇ f (y(t)) ∥2 ≤ f (x0) − f ∗
+
+(1 − β)T .
+
+## 4 Convergence Guarantees for SF-(S)GD 
+
+Motivated by the analyses of the SF-ODE in Section 3, to study the convergence of SF-GD and 
+
+SF-SGD , it is natural to seek a discrete-time Lyapunov potential for them that mirrors the Lyapunov function (5) of SF-ODE . In this section, we explicitly construct such a potential and use it to obtain the corresponding convergence rate guarantees. While the Lyapunov potentials we construct are motivated by the Lyapunov function of the SF-ODE ,which is the continuous-time limiting ODE of SF-GD with the specific choice ck+1 = 1 
+
+> k+1
+
+of the averaging rates and a constant learning rate γk = γ, it turns out that the Lyapunov potentials in the discrete setting are much more flexible, allowing a unified analysis for any sequence of learning rates and averaging rates that satisfy the following conditions. 
+
+Assumption 4.1. For a fixed constant γ and the number of warmup steps Tw satisfying 1 ≤ Tw ≤ T ,the learning rates are set as 
+
+γk = γ min 
+
+
+
+1, k + 1 
+
+Tw
+
+
+
+. (7) We write pw := Tw −1 
+
+> T
+
+, so that pw is the fraction of the optimization steps allocated to the warmup phase. Since γk = γ already at k = Tw − 1, whether to count the (Tw − 1) th step as part of warmup is a stylistic choice. We exclude it when defining pw, and thus, we have 0 ≤ pw < 1. In particular, when 
+
+Tw = 1 so that γk = γ for all k ≥ 0, there is essentially no warmup phase and pw = 0 . In practice, warmup is often 5% of the run [9], so we view pw as a fixed small constant independent of T .
+
+Assumption 4.2. For γk satisfying Assumption 4.1, there exists a constant C > 0 such that 
+
+ck+1 = min 
+
+(
+
+γ2
+
+> k
+
+Pki=0 γ2
+
+> i
+
+· (1 − β)C, 1
+
+)
+
+. (8) When β < 1 and C = 11−β , the rule (8) reduces to the averaging rates suggested by Defazio et al. [9] .Notice that taking Tw = 1 so that there is essentially no warmup phase is equivalent to choosing a constant learning rate γk = γ, and yields the standard averaging rates ck+1 = 1 
+
+> k+1
+
+. Introducing the additional hyperparameter C and setting the averaging rates as in (8) follows the strategy proposed by Song et al. [30] , which is presented as a technique that empirically improves the robustness to the parameter β and performs better under large batch sizes, compared to when C is fixed as 11−β .One noteworthy consequence of Assumption 4.2 is that {ck+1 }k≥0 is then monotonically decreasing. Hence, we may define k0 to be the largest integer such that ck+1 = 1 for all k ≤ k0. If such a nonnegative integer k does not exist, we naturally set k0 = −1. Further discussions and additional details on Assumption 4.2 can be found in Section D. 
+
+4.1 Convergence Analysis via the Design of Lyapunov Potentials 
+
+The Lyapunov function (6) of the SF-ODE provides strong evidence for imposing the ansatz that 
+
+SF-GD has a Lyapunov potential of the form 
+
+Vk = f (yk) − f ∗ + αk∥zk − xk∥2, (9) which, for a carefully chosen sequence of real numbers {αk}k≥0, decreases monotonically. For 
+
+SF-SGD , the Lyapunov potential might not decrease monotonically in the strict sense because additional terms are introduced by the noise in the stochastic gradients, but we expect these additional terms to be small enough to be well controlled by the decrease of the other terms. 5In the proof of Proposition 3.2, a clean derivation that (6) is a Lyapunov function of the SF-ODE relies crucially on the inner product term ⟨ ˙z, ˙x⟩ canceling out, which is achieved by deliberately weighing 
+
+∥z(t) − x(t)∥2. Rewriting the inner product term using (5) as ⟨ ˙z, ˙x⟩ = − 1 
+
+> t
+
+⟨∇ f (y), z − x⟩, one expects that the term ⟨∇ f (yk), zk − xk⟩, possibly up to a shift of some indices, will appear in the Lyapunov analysis of the discrete-time systems involving Vk. The coefficients αk should thus be chosen so as to cancel these inner product terms, ideally with ensuring that the remaining terms are monotonically decreasing, up to a small additive noise term when using stochastic gradients. Proposition 4.3 shows that such a choice of αk indeed exists. To provide a unified view, we establish the result in the stochastic setting, showing that the Lyapunov potentials are decreasing in expectation, up to an additive term induced by the noise in the gradients. In order to recover the results for the deterministic setting, one can simply set σ2 = 0 and ignore taking the expectations. 
+
+Proposition 4.3. Suppose that Assumptions 1.1–1.3 hold. For β ∈ [0 , 1) , let {xk}k≥0, {yk}k≥0,and {zk}k≥0 be the iterates computed by SF-SGD with the learning rates {γk}k≥0 satisfying (7) ,and the averaging rates {ck+1 }k≥0 satisfying (8) , where k0 denotes the largest integer such that 
+
+ck+1 = 1 for all k ≤ k0. Define a sequence of nonnegative real numbers {αk}k≥0 as 
+
+αk = βc k(1 − γk−1L(1 − β + βc k)) 2γk−1(1 − ck)2
+
+for all k = k0 + 2 , k 0 + 3 , . . . and 
+
+α0 = α1 = · · · = αk0+1 = Lβ 2c2
+
+> k0+2
+
+2 + αk0+2 (1 − ck0+2 )2.
+
+Then, the Lyapunov potentials defined as in (9) satisfy the inequality 
+
+E[Vk+1 ] − E[Vk] ≤ − γk(1 − β)2 E∥∇ f (yk)∥2 + γkσ2
+
+2
+
+ β(1 + γkL(1 − β)) ck+1 + γkL(1 − β)2
+
+for all nonnegative integers k ≥ k0 + 1 , and 
+
+E[Vk+1 ] − E[Vk] ≤ − γk
+
+2 E∥∇ f (yk)∥2 + γ2 
+
+> k
+
+Lσ 2
+
+2
+
+for all nonnegative integers k ≤ k0.
+
+For the proof, see Section E. It should be noted that Brown et al. [4] have also considered a sequence of Lyapunov potentials whose overall form is quite similar to our Vk in (9) , although their Lyapunov potentials involve f (xk) instead of f (yk), with different coefficients αk.Proposition 4.3 can be converted into a convergence bound for SF-SGD , as follows. 
+
+Theorem 4.4. Suppose that Assumptions 1.1–1.3 hold. For γ ∈ (0 , 1 
+
+> L
+
+] and β ∈ [0 , 1) , let {xk}k≥0,
+
+{yk}k≥0, and {zk}k≥0 be the iterates computed by SF-SGD with the warmup length Tw and the learning rates {γk}k≥0 satisfying (7) , and the averaging rates {ck+1 }k≥0 satisfying (8) . Then for any T ≥ 1, letting pw = Tw −1 
+
+> T
+
+, we have the bound 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2( f (x0) − f ∗)
+
+γ(1 − β)(1 − pw)T + γL (1 − β)σ2
+
+1 − pw
+
++ 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T .
+
+(10) Notice that the convergence bound (10) does not require any assumptions on β other than β < 1, and also incorporates the warmup phase in the learning rates as used in practice. 
+
+4.2 Rate-Optimal Convergence of SF-GD and SF-SGD 
+
+From Theorem 4.4, we can immediately deduce the convergence guarantee for SF-GD by setting 
+
+σ2 = 0 . As the method is deterministic, we can also drop the expectation from the left hand side of (10), and obtain the following. 
+
+Corollary 4.5. Suppose that Assumptions 1.1 and 1.2 hold. For any γ ∈ (0 , 1 
+
+> L
+
+] and β ∈ [0 , 1) , let 
+
+{xk}k≥0, {yk}k≥0, and {zk}k≥0 be the iterates computed by SF-GD with the warmup length Tw
+
+and the learning rates {γk}k≥0 satisfying (7) , and the averaging rates {ck+1 }k≥0 satisfying (8) .Then for any T ≥ 1, letting pw = Tw −1 
+
+> T
+
+, it holds that 
+
+min   
+
+> k=0 ,...,T −1
+
+∥∇ f (yk)∥2 ≤ 2( f (x0) − f ∗)
+
+γ(1 − β)(1 − pw)T . (11) 6That is, SF-GD enjoys a convergence rate of O(1 /T ) in the nonconvex smooth setting. Equivalently, for a given target accuracy ϵ > 0, SF-GD can find a point y such that ∥∇ f (y)∥ ≤ ϵ within O(ϵ−2)
+
+gradient evaluations. Carmon et al. [5] have shown that, when the objective function is nonconvex and only L-smooth, any first-order method must perform at least Ω( ϵ−2) gradient evaluations to find a point y such that ∥∇ f (y)∥ ≤ ϵ. Hence, (11) implies that SF-GD attains the optimal convergence rate within the class of deterministic first-order methods. For SF-SGD where σ2 > 0, we should take into account the second and third terms on the right hand side of (10) , as they are now nonzero. Following the learning rate choice strategy of Theorem 1 in the original Schedule-Free paper [ 9], we take γ ≍ 1/√T to balance the O( 1 
+
+> γT
+
+) and the O(γ) terms in terms of their orders with respect to T , to obtain the following. 
+
+Corollary 4.6. Suppose that Assumptions 1.1–1.3 hold. Say we run SF-SGD for T ≥ 1 iterations with β ∈ [0 , 1) , the warmup length Tw and the learning rates {γk}k≥0 satisfying (7) , and the averaging rates {ck+1 }k≥0 satisfying (8) , to obtain the iterates {xk}k≥0, {yk}k≥0, and {zk}k≥0.Then, choosing γ = min { 1 
+
+> L
+
+, 1(1 −β)√T }, for pw = Tw −1 
+
+> T
+
+and A := max {1, L 
+
+> 1−β
+
+} it holds that 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2A(f (x0) − f ∗) + Lσ 2
+
+(1 − pw)√T + 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T . (12) 
+
+Moreover, if additionally T ≥ L2 
+
+> (1 −β)2
+
+, then the convergence bound (12) holds with A = 1 .
+
+The proof of Corollary 4.6 is in Section F. From (12) , we deduce that SF-SGD achieves a con-vergence rate of O(1 /√T ). Equivalently, for any target accuracy ϵ > 0, SF-SGD finds a point y
+
+satisfying E ∥∇ f (y)∥ ≤ ϵ using O(ϵ−4) oracle queries. Arjevani et al. [3] have shown that, for non-convex smooth objectives and stochastic gradient oracles returning unbiased estimators with bounded variance, Ω( ϵ−4) queries are necessary in the worst case to find such a point. Thus, Corollary 4.6 shows that SF-SGD is rate-optimal within this class of stochastic first-order methods. 
+
+## 5 Schedule-Free Methods Avoid Strict Saddle Points 
+
+It is now widely known that GD with a randomly chosen initial point avoids strict saddle points [ 18 ]. A natural question is whether an analogous statement can be established for Schedule-Free methods. Indeed, under mild conditions where avoiding strict saddles implies convergence to minimizers, such a result would provide a principled reason to expect convergent Schedule-Free trajectories to approach minimizers rather than remain near saddle points. To this end, we formulate Schedule-Free methods as a dynamical system. While the update rule for Schedule-Free methods is most commonly expressed in terms of three sequences (xk, yk, zk), one can use (2a) to eliminate one of them, yielding an equivalent two-sequence formulation. For instance, as we detail in Section G.1, as long as β ∈ [0 , 1) , one can eliminate zk and obtain 
+
+yk+1 = yk + βc k+1 
+
+1 − β (yk − xk) − γk(1 − β + βc k+1 )gk, (13a) 
+
+xk+1 = xk + ck+1 
+
+1 − β (yk − xk) − γkck+1 gk. (13b) For SF-GD , where gk only depends on yk, the right hand sides of both (13a) and (13b) are functions of (yk, xk). So, letting hk denote the map from (yk, xk) to the right hand side of (13) , SF-GD can be viewed as a nonautonomous dynamical system (yk+1 , xk+1 ) = hk(yk, xk) in Rd × Rd.A simple computation reveals that the fixed points of the dynamical system are precisely the points 
+
+(x∗, x∗) where x∗ is a stationary point of f .
+
+Proposition 5.1. For any integer k ≥ 0, suppose that γk̸ = 0 and ck+1 ̸ = 0 . Then, a point 
+
+(y∗, x∗) ∈ Rd × Rd is a fixed point of hk if and only if y∗ = x∗ and ∇f (x∗) = 0.
+
+In particular, notice that there are no fixed points at which only the gradient location coordinate is stationary while the evaluation coordinate remains nonstationary. Whenever convergence to an equilibrium occurs, the limiting values of yk and xk must coincide at a stationary point of f .Recall that, for a twice continuously differentiable function f , a stationary point x∗ is called a strict saddle point if λmin (∇2f (x∗)) < 0. For clarity of presentation, we temporarily assume for 7the remainder of this section that Tw = 1 , so that γk = γ and ck+1 = 1 
+
+> k+1
+
+. The general case is conceptually similar and is deferred to Section G. Lee et al. [18] show that, for GD and related first-order methods run with suitably chosen constant learning rates, the set of initial points converging to strict saddles has Lebesgue measure zero. An analogue of this result would yield a Lebesgue null exceptional set W ⊂ Rd × Rd that any trajectory 
+
+{(yk, xk)}k≥0 converging to a strict saddle point must hit. However, this is not enough for almost sure avoidance under the initialization of SF-GD . Since c1 = 1 , the update rules (2c) and (2a) force 
+
+y1 = x1. Thus, the distribution of (y1, x1) is supported on ∆ = {(x, x) : x ∈ Rd}, which is a Lebesgue measure zero subset of Rd × Rd. Hence, while W is a Lebesgue null set, it could still be hit with positive probability under this degenerate distribution, and a direct analogue of the almost sure avoidance conclusion of Lee et al. [18] does not follow. To address this degeneracy, we introduce a one-time perturbation of the iterates, following the approach of O’Neill and Wright [26] for proving that accelerated methods avoid strict saddle points. After computing z1 and x1, we replace z1 by z1 + ξ, where ξ is drawn from a distribution that is absolutely continuous with respect to Lebesgue measure. This distribution may be chosen to have arbitrarily small variance. Moreover, when the distribution has mean zero, the convergence rates obtained in Section 4 can be preserved, as we show in Theorem G.8. The absolute continuity of this perturbation yields the following avoidance result. 
+
+Theorem 5.2. Consider SF-GD with a one-time perturbation applied after z1 and x1 are computed, where z1 is replaced by z1 + ξ. Suppose that the initial point x0 = z0 and the perturbation ξ are drawn independently from distributions that are absolutely continuous with respect to Lebesgue measure on Rd. Then, for β ∈ [0 , 1) and a twice continuously differentiable L-smooth f , as long as 
+
+γ < 1 
+
+> L
+
+, the one-time perturbed SF-GD almost surely does not converge to any strict saddle point of f .
+
+Thus, the obstruction above is an artifact of the degeneracy caused by c1 = 1 , rather than evidence that the Schedule-Free iterates are attracted to strict saddle points. Once this degeneracy is removed, 
+
+SF-GD recovers the same qualitative strict-saddle avoidance behavior as GD. Together with the small-variance and mean-zero observations above, this perturbation should be viewed as a negligible initialization-level modification of the method, rather than a substantive change to the algorithm. Under the standard additional assumptions that turn avoidance of strict saddle points into convergence to minimizers, strict saddle points that are not minimizers are therefore excluded from asymptotic limits of the perturbed Schedule-Free dynamics. 
+
+## 6 Further Discussions on the Evaluation Iterates 
+
+As we have discussed in Section 1, Schedule-Free can be understood as an interpolation between Polyak–Ruppert averaging and primal averaging. In fact, Schedule-Free itself is also an averaging scheme, where the evaluation iterates xk can be interpreted as a weighted average of the iterates yk.Indeed, Morwani et al. [22] have observed, for all k ≥ 0, that 
+
+xk+1 = (1 − β)(1 − ck+1 )xk + ck+1 yk+1 
+
+(1 − β)(1 − ck+1 ) + ck+1 
+
+. (14) It is by now folklore that averaged iterates are beneficial, offering stabilized optimization dynamics, reduced sensitivity to checkpoint choice, and often improved robustness and generalization [ 15 , 21 ,25 ]. Thus, if the iterates {yk}k≥0 inherit the nice convergence properties of the base optimizer, à la the results in Section 4, this folklore could serve as an intuitive explanation on the superior performance of Schedule-Free methods. In contrast, convergence guarantees for averaged iterates in nonconvex optimization are generally weak. For primal averaging, corresponding to β = 1 in SF-SGD , Defazio [8] showed that the joint 
+
+minimum of ∥∇ f (xk)∥2 and ∥∇ f (zk)∥2 over k = 0 , 1, . . . , T − 1 is O( 1 
+
+> γT
+
+) + O(γ), matching our bound in (10) . However, if the minimum of only ∥∇ f (xk)∥2 is considered as the optimality measure, then according to Brown et al. [4] , the convergence rate appears to be no better than O( 1log T ). To the best of our knowledge, no comparable result is known for β < 1, and nonconvex SGD theory often avoids using averaged iterates as the output [ 13 , 16 ]. Motivated by this gap, we use PEP to numerically compute worst-case upper bounds on min 0≤k<T ∥∇ f (xk)∥2 for the iterates generated by SF-GD . The results are organized and plotted in Figure 1. 820 40 60 80 100                  
+
+> T
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> min 0≤k<T ‖∇ f(xk)‖2from PEP
+> L= 1 , γ =1
+> L, c k+1 =1
+> k+1
+> β= 0 .0
+> β= 0 .1
+> β= 0 .5
+> β= 0 .75
+> β= 0 .8
+> β= 0 .9
+> β= 0 .95
+> β= 1 .0
+
+Figure 1: PEP results on the convergence of the evaluation iterates xk from SF-GD , with varying β.The PEP results first confirm that xk can be a pessimistic output sequence in the worst case. When 
+
+β = 0 , the Polyak–Ruppert averages xk of the convergent iterates yk seem to fail to approach station-arity. Also in the regime where 0 < β < 1, the plotted results suggest that min 0≤k<T ∥∇ f (xk)∥2
+
+does not achieve the ideal O(1 /T ) worst-case rate that matches those we would have obtained if yk
+
+were considered instead. Still, we can also observe an intriguing phenomenon that merits further discussion. When β is large enough and close to 1, the certified worst-case bound from PEP appears to be strictly improved compared to both endpoint cases β = 0 and β = 1 . At least up to T = 100 , for values of β from 
+
+0.75 to 0.95 , the convergence plots lie consistently below the curve for β = 1 . This suggests that Schedule-Free methods may improve over both Polyak–Ruppert averaging and primal averaging through an appropriate interpolation between them. This observation is also consistent with the effectiveness of choosing β ≥ 0.9 in practice. Meanwhile, the pessimistic worst-case behavior of xk is not surprising in view of (14) , since {xk}k≥0
+
+is an averaged sequence of {yk}k≥0. If f were convex, then its desirable consequences such as Jensen’s inequality would allow us to transfer the convergence of {yk}k≥0 into that of {xk}k≥0 more easily. But for general nonconvex objectives, we cannot expect such optimistic cases to be always true. Nonetheless, empirical and theoretical evidence suggests that many modern learning problems exhibit convex-like regularity near or along optimization trajectories, including PL *-type regularity [ 19 ]and star convexity along optimization paths [ 34 ]. Once a convergent Schedule-Free trajectory, as suggested by the discussion in Section 5, approaches a neighborhood of a local minimizer where such regularity holds, the averaging that defines xk is less likely to move the evaluation point outside the same well-behaved low-loss region traced by the gradient location iterates {yk}k≥0. In this sense, while strict-saddle avoidance does not by itself yield convergence guarantees for {xk}k≥0, it nonetheless offers a useful lens for understanding the empirical success of these averaged evaluation iterates despite the pessimistic worst-case PEP observations. 
+
+## 7 Conclusion 
+
+In this paper, we studied Schedule-Free methods on smooth nonconvex objectives from the perspec-tives of worst-case convergence, strict saddle avoidance, and evaluation iterate behavior. Guided by 
+
+SF-ODE , the continuous-time limiting ODE of SF-GD , we developed Lyapunov analyses show-ing that the gradient location iterates yk of SF-GD and SF-SGD achieve the known worst-case optimal rates. We also formulated SF-GD as a nonautonomous dynamical system and proved strict saddle avoidance under an arbitrarily small one-time perturbation. Finally, we complemented these theoretical results with a PEP-based numerical study of the evaluation iterates xk.While these results clarify several theoretical aspects of Schedule-Free methods in the nonconvex setting, some natural questions remain open. Although we establish worst-case rate-optimality, our constant factors may not yet be tight, and improving them would be an interesting direction for future 9work. Deriving analytical convergence guarantees for the evaluation iterates xk would also be a compelling direction for subsequent studies. 
+
+## Acknowledgments and Disclosure of Funding 
+
+This work was supported in part by the National Research Foundation of Korea (NRF) grants funded by the Korea government (MSIT) (Nos. RS-2019-NR040050 and RS-2025-00515159), and by the KAIST Grand Challenge 30 Project (KC30) funded by MSIT and KAIST (No. N11260046). This research was also supported by the KAIST Jang Young Sil Fellow Program. 
+
+## References 
+
+[1] Hadi Abbaszadehpeivasti, Etienne de Klerk, and Moslem Zamani. The exact worst-case conver-gence rate of the gradient method with fixed step lengths for L-smooth functions. Optimization Letters , 16(6):1649–1661, 2022. [2] Kwangjun Ahn, Gagik Magakyan, and Ashok Cutkosky. General framework for online-to-nonconvex conversion: Schedule-free SGD is also effective for nonconvex optimization. In 
+
+International Conference on Machine Learning , 2025. [3] Yossi Arjevani, Yair Carmon, John C. Duchi, Dylan J. Foster, Nathan Srebro, and Blake Woodworth. Lower bounds for non-convex stochastic optimization. Mathematical Programming ,199(1):165–214, 2023. [4] Connor Brown, Chi Jin, and Ahmed Khaled. Analysis of Schedule-Free non-convex optimiza-tion. In OPT2025: 17th Annual Workshop on Optimization for Machine Learning , 2025. [5] Yair Carmon, John C. Duchi, Oliver Hinder, and Aaron Sidford. Lower bounds for finding stationary points II: first-order methods. Mathematical Programming , 185(1):315–355, 2021. [6] Jeremy Cohen, Simran Kaur, Yuanzhi Li, J. Zico Kolter, and Ameet Talwalkar. Gradient descent on neural networks typically occurs at the edge of stability. In International Conference on Learning Representations , 2021. [7] George E. Dahl, Frank Schneider, Zachary Nado, Naman Agarwal, Chandramouli Shama Sastry, Philipp Hennig, Sourabh Medapati, Runa Eschenhagen, Priya Kasimbeg, Daniel Suo, Juhan Bae, Justin Gilmer, Abel L. Peirson, Bilal Khan, Rohan Anil, Mike Rabbat, Shankar Krishnan, Daniel Snider, Ehsan Amid, Kongtao Chen, Chris J. Maddison, Rakshith Vasudev, Michal Badura, Ankush Garg, and Peter Mattson. Benchmarking neural network training algorithms. 
+
+arXiv preprint arXiv:2306.07179 , 2023. [8] Aaron Defazio. Momentum via primal averaging: Theoretical insights and learning rate schedules for non-convex optimization. arXiv preprint arXiv:2010.00406 , 2020. [9] Aaron Defazio, Xingyu Yang, Harsh Mehta, Konstantin Mishchenko, Ahmed Khaled, and Ashok Cutkosky. The road less scheduled. Advances in Neural Information Processing Systems ,37, 2024. [10] Rishabh Dixit, Mert Gürbüzbalaban, and Waheed U. Bajwa. Accelerated gradient methods for nonconvex optimization: Escape trajectories from strict saddle points and convergence to local minima. Foundations of Computational Mathematics , 2026. [11] Yoel Drori and Ohad Shamir. The complexity of finding stationary points with stochastic gradient descent. In International Conference on Machine Learning , 2020. [12] Yoel Drori and Marc Teboulle. Performance of first-order methods for smooth convex mini-mization: a novel approach. Mathematical Programming , 145(1):451–482, 2014. [13] Saeed Ghadimi and Guanghui Lan. Stochastic first-and zeroth-order methods for nonconvex stochastic programming. SIAM Journal on Optimization , 23(4):2341–2368, 2013. 10 [14] Baptiste Goujaud, Céline Moucer, François Glineur, Julien M. Hendrickx, Adrien B. Taylor, and Aymeric Dieuleveut. PEPit: computer-assisted worst-case analyses of first-order optimization methods in Python. Mathematical Programming Computation , 16(3):337–367, 2024. [15] Pavel Izmailov, Dmitrii Podoprikhin, Timur Garipov, Dmitry P. Vetrov, and Andrew Gordon Wilson. Averaging weights leads to wider optima and better generalization. In Proceedings of the Thirty-Fourth Conference on Uncertainty in Artificial Intelligence , pages 876–885, 2018. [16] Ahmed Khaled and Peter Richtárik. Better theory for SGD in the nonconvex world. Transactions on Machine Learning Research , 2023. [17] Diederik P. Kingma and Jimmy Lei Ba. A method for stochastic optimization. In International Conference on Learning Representations , 2015. [18] Jason D. Lee, Ioannis Panageas, Georgios Piliouras, Max Simchowitz, Michael I. Jordan, and Benjamin Recht. First-order methods almost always avoid strict saddle points. Mathematical programming , 176(1):311–337, 2019. [19] Chaoyue Liu, Libin Zhu, and Mikhail Belkin. Loss landscapes and optimization in over-parameterized non-linear systems and neural networks. Applied and Computational Harmonic Analysis , 59:85–116, 2022. [20] Ilya Loshchilov and Frank Hutter. Decoupled weight decay regularization. In International Conference on Learning Representations , 2019. [21] Daniel Morales-Brotons, Thijs Vogels, and Hadrien Hendrikx. Exponential moving average of weights in deep learning: Dynamics and benefits. Transactions on Machine Learning Research ,2024. [22] Depen Morwani, Nikhil Vyas, Hanlin Zhang, and Sham Kakade. Connections between Schedule-Free optimizers and accelerated SGD variants. In OPT2024: 16th Annual Workshop on Optimization for Machine Learning , 2024. [23] Andreea-Alexandra Mu¸ sat and Nicolas Boumal. A non-autonomous center-stable set theorem for saddle avoidance in optimization. arXiv preprint arXiv:2603.02782 , 2026. [24] Yurii Nesterov and Vladimir Shikhman. Quasi-monotone subgradient methods for nonsmooth convex minimization. Journal of Optimization Theory and Applications , 165(3):917–940, 2015. [25] Gergely Neu and Lorenzo Rosasco. Iterate averaging as regularization for stochastic gradient descent. In Conference on Learning Theory , pages 3222–3242. PMLR, 2018. [26] Michael O’Neill and Stephen J. Wright. Behavior of accelerated gradient methods near critical points of nonconvex functions. Mathematical Programming , 176(1):403–427, 2019. [27] Boris T. Polyak. New stochastic approximation type procedures. Avtomatika i Telemekhanika ,7:98–107, 1990. [28] David Ruppert. Efficient estimations from a slowly convergent Robbins–Monro process. Technical report, Cornell University Operations Research and Industrial Engineering, 1988. [29] Ernest K. Ryu, Adrien B. Taylor, Carolina Bergeling, and Pontus Giselsson. Operator splitting performance estimation: Tight contraction factors and optimal parameter selection. SIAM Journal on Optimization , 30(3):2251–2271, 2020. [30] Minhak Song, Beomhan Baek, Kwangjun Ahn, and Chulhee Yun. Through the river: Under-standing the benefit of Schedule-Free methods for language model training. Advances in Neural Information Processing Systems , 38, 2025. [31] Wei Tao, Zhisong Pan, Gaowei Wu, and Qing Tao. Primal averaging: A new gradient evaluation step to attain the optimal individual convergence. IEEE Transactions on Cybernetics , 50(2): 835–845, 2018. 11 [32] Adrien B. Taylor, Julien M. Hendrickx, and François Glineur. Exact worst-case convergence rates of the proximal gradient method for composite convex minimization. Journal of Optimiza-tion Theory and Applications , 178(2):455–476, 2018. [33] Kaiyue Wen, Zhiyuan Li, Jason Wang, David Hall, Percy Liang, and Tengyu Ma. Understanding warmup-stable-decay learning rates: A river valley loss landscape view. In International Conference on Learning Representations , 2025. [34] Yi Zhou, Junjie Yang, Huishuai Zhang, Yingbin Liang, and Vahid Tarokh. SGD converges to global minimum in deep learning via star-convex path. In International Conference on Learning Representations , 2019. 12 Contents 
+
+1 Introduction 1
+
+1.1 Our Contributions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21.2 Problem Settings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+
+2 Related Work 33 Continuous-Time Limiting ODE of Schedule-Free Methods 44 Convergence Guarantees for SF-(S)GD 5
+
+4.1 Convergence Analysis via the Design of Lyapunov Potentials . . . . . . . . . . . . 54.2 Rate-Optimal Convergence of SF-GD and SF-SGD . . . . . . . . . . . . . . . . 6
+
+5 Schedule-Free Methods Avoid Strict Saddle Points 76 Further Discussions on the Evaluation Iterates 87 Conclusion 9A Useful Lemmata 14 
+
+A.1 Basic Inequalities . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14 A.2 Local Diffeomorphisms and Absolute Continuity of Measures . . . . . . . . . . . 15 A.3 Identities Between Schedule-Free Iterates . . . . . . . . . . . . . . . . . . . . . . 15 A.4 Log-Concave Sequences . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16 
+
+B Further Related Work and Supplementary Remarks 17 
+
+B.1 On the Existing Nonconvex Smooth Convergence Analysis of Schedule-Free Methods 17 B.2 On the Existing Nonconvex Nonsmooth Convergence Analysis of Schedule-Free Methods . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18 
+
+C Dynamics of the SF-ODE 18 D Further Discussions on the Parameter Choices 19 
+
+D.1 Conditions for Monotonically Decreasing Averaging Rates . . . . . . . . . . . . . 19 D.2 Consequences of Assumption 4.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 
+
+E Lyapunov Descent Lemma for Schedule-Free Methods 23 F Convergence Rate of SF-SGD 26 G SF-GD as a Nonautonomous Dynamical System 29 
+
+G.1 Two-sequence reformulation of the Schedule-Free Update Rule . . . . . . . . . . . 29 G.2 SF-GD as a Nonautonomous Dynamical System . . . . . . . . . . . . . . . . . . 30 G.3 Convergence of the One-Time Perturbed SF-SGD . . . . . . . . . . . . . . . . . 34 13 G.4 Proof of Lemma G.4 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35 
+
+H PEP Experiments 39 I Regularity of SF-ODE near t = 0 40 
+
+## A Useful Lemmata 
+
+A.1 Basic Inequalities 
+
+Let us begin by recalling some standard facts that are consequences of the assumptions we impose. 
+
+Lemma A.1. Suppose that f : Rd → R is L-smooth. Then, for any x, y ∈ Rd, it holds that 
+
+f (x) ≤ f (y) + ⟨x − y, ∇f (y)⟩ + L
+
+2 ∥x − y∥2.
+
+Proof. Consider a function h : R → R defined as 
+
+h(t) = f ((1 − t)y + tx) + (1 − t) ⟨x − y, ∇f (y)⟩ .
+
+Differentiating and then applying the Cauchy–Schwarz inequality, we obtain that 
+
+h′(t) = ⟨∇ f ((1 − t)y + tx), x − y⟩ − ⟨ x − y, ∇f (y)⟩
+
+= ⟨∇ f ((1 − t)y + tx) − ∇ f (y), x − y⟩≤ ∥∇ f ((1 − t)y + tx) − ∇ f (y)∥∥ x − y∥.
+
+By the L-smoothness of f , it further follows from the last line above that 
+
+h′(t) ≤ L∥(1 − t)y + tx − y∥∥ x − y∥
+
+= Lt ∥x − y∥2.
+
+Therefore, by the fundamental theorem of calculus, we have 
+
+f (x) − f (y) − ⟨ x − y, ∇f (y)⟩ = h(1) − h(0) =
+
+Z 10
+
+h′(t) d t
+
+≤ L∥x − y∥2
+
+Z 10
+
+t dt
+
+= L
+
+2 ∥x − y∥2.
+
+Rearranging the terms gives us the claimed inequality. 
+
+Lemma A.2. Suppose that Assumption 1.3 holds. Then, for any x ∈ Rd, we have 
+
+E∥∇ f (x, ζ )∥2 x ≤ ∥∇ f (x)∥2 + σ2.
+
+Proof. Observe that 
+
+∥∇ f (x, ζ )∥2 = ∥∇ f (x) + ( ∇f (x, ζ ) − ∇ f (x)) ∥2
+
+= ∥∇ f (x)∥2 − 2 ⟨∇ f (x), ∇f (x, ζ ) − ∇ f (x)⟩ + ∥∇ f (x, ζ ) − ∇ f (x)∥2.
+
+Taking the conditional expectation with respect to x, the conclusion is immediate from the equations in Assumption 1.3. The following is a simple result from elementary calculus, which we state here for completeness. 
+
+Lemma A.3. For any positive integer K ≥ 1, it holds that 
+
+> K
+
+X
+
+> k=1
+
+1
+
+k + 1 ≤ log( K + 1) .
+
+14 Proof. For any positive integer k ≥ 1, the inequality 1 
+
+> k+1
+
+≤ 1 
+
+> t
+
+holds whenever k ≤ t ≤ k + 1 . It thus follows that 
+
+> K
+
+X
+
+> k=1
+
+1
+
+k + 1 =
+
+> K
+
+X
+
+> k=1
+
+Z k+1 
+
+> k
+
+1
+
+k + 1 dt ≤
+
+> K
+
+X
+
+> k=1
+
+Z k+1 
+
+> k
+
+1
+
+t dt =
+
+Z K+1 1
+
+1
+
+t dt = log( K + 1) .
+
+A.2 Local Diffeomorphisms and Absolute Continuity of Measures 
+
+Recall that a map φ : Rd → Rd is a local diffeomorphism if its Jacobian Dφ is invertible everywhere. 
+
+Lemma A.4. Let μ be a measure on Rd which is absolutely continuous with respect to Lebesgue measure. Suppose that φ : Rd → Rd is a continuously differentiable map such that det Dφ ̸ = 0 .Then the pushforward φ♯μ is also absolutely continuous with respect to Lebesgue measure. Proof. Let λ denote the Lebesgue measure on Rd. By the inverse function theorem, for any x ∈ Rd,there exists an open neighborhood Ux of x such that φ, when restricted to Ux, is a diffeomorphism between Ux and φ(Ux). As {Ux : x ∈ Rd} is an open cover of a second countable space Rd, by Lindelöf’s lemma, it has a countable subcover. Let x1, x2, . . . be the sequence in Rd such that, by denoting Ui = Uxi , the collection {Ui : i = 1 , 2, . . . } becomes an open cover of Rd.Fix any E ⊂ Rd such that λ(E) = 0 . For each i = 1 , 2, . . . , let Vi = φ(Ui) and Ai = φ−1(E) ∩ Ui.Because φ is a continuously differentiable diffeomorphism between Ui and Vi, the change of variables formula yields 
+
+λ(Ai) = λ (φ|Ui )−1(E ∩ Vi) =
+
+Z
+
+> E∩Vi
+
+det D(φ|Ui )−1 dλ = 0 . (15) Meanwhile, as {Ui : i = 1 , 2, . . . } is an open cover of Rd, by the definition of pushforward measures we have 
+
+φ♯μ(E) = μ(φ−1(E)) = μ [
+
+> i
+
+Ai
+
+!
+
+≤ X
+
+> i
+
+μ(Ai).
+
+But here, as μ is absolutely continuous with respect to λ, (15) implies that μ(Ai) = 0 for each 
+
+i = 1 , 2, . . . . Hence, it follows that φ♯μ(E) = 0 , and therefore, φ♯μ is also absolutely continuous with respect to λ.
+
+A.3 Identities Between Schedule-Free Iterates 
+
+The intertwined update rules of {xk}k≥0, {yk}k≥0, and {zk}k≥0 in the Schedule-Free method give rise to several useful identities among these sequences. We present two such identities here, which will be used in the convergence analyses. 
+
+Lemma A.5. Let {xk}k≥0, {yk}k≥0, and {zk}k≥0 be the sequences computed by the update rule (2) .Then for any k ≥ 0, it holds that 
+
+yk+1 − yk = βc k+1 (zk − xk) − γk(1 − β + βc k+1 )gk.
+
+Proof. From the equations in (2), one can observe that 
+
+yk+1 = (1 − β)zk+1 + βxk+1 
+
+= (1 − β)zk+1 + β((1 − ck+1 )xk + ck+1 zk+1 )= (1 − β + βc k+1 )zk+1 + β(1 − ck+1 )xk
+
+= (1 − β + βc k+1 )( zk − γkgk) + β(1 − ck+1 )xk
+
+= yk − γk(1 − β)gk + βc k+1 (zk − γkgk) − βc k+1 xk.
+
+By rearranging the terms, the conclusion is immediate. 
+
+Lemma A.6. Let {xk}k≥0 and {zk}k≥0 be the sequences computed by the update rule (2) . Then for any k ≥ 0, it holds that 
+
+zk+1 − xk+1 = (1 − ck+1 )( zk − xk − γkgk).
+
+15 Proof. From the equations in (2), one can observe that 
+
+zk+1 − xk+1 = zk+1 − ((1 − ck+1 )xk + ck+1 zk+1 )= (1 − ck+1 )( zk+1 − xk)= (1 − ck+1 )( zk − xk − γkgk)
+
+which is exactly the claimed identity. 
+
+Lemma A.7. Let {xk}k≥0, {yk}k≥0, and {zk}k≥0 be the sequences computed by the update rule (2) .For any k ≥ 0, if ck+1 = 1 , then xk+1 = yk+1 = zk+1 .Proof. This is an immediate consequence of the update rules. Indeed, suppose that ck+1 = 1 . Then, from (2c) we get that xk+1 = zk+1 , and this, with (2a), asserts that yk+1 = xk+1 .
+
+A.4 Log-Concave Sequences 
+
+Let us begin by recalling the definition of log-concavity of a sequence. 
+
+Definition A.8. A sequence of positive reals {wk}k≥0 is said to be log-concave if 
+
+wk
+
+wk−1
+
+≥ wk+1 
+
+wk
+
+, (16) or equivalently w2 
+
+> k
+
+≥ wk−1wk+1 , for all k ≥ 1.
+
+Lemma A.9. Let {vk}k≥0 and {wk}k≥0 be log-concave sequences of positive reals. Then, the following sequences are also log-concave. (i) For any two constants a and b, a linear sequence {ak + b} is log-concave, within the range of k such that ak + b > 0.(ii) The pointwise product {vkwk}k≥0 is log-concave. (iii) The pointwise minimum {min {vk, w k}} k≥0 is log-concave. Proof. For any k such that both ak + b and a(k + 1) + b are positive, observe that 
+
+a(k + 1) + bak + b = 1 + 1
+
+k + ba
+
+is decreasing with respect to k. Hence, considering the condition (16) for log-concavity, statement (i) holds. It is also straightforward to verify (ii), as the log-concavity of each sequence immediately implies the inequality 
+
+v2
+
+> k
+
+w2 
+
+> k
+
+≥ (vk−1wk−1)( vk+1 wk+1 ).
+
+To show that (iii) holds, let us temporarily fix any k ≥ 1. Without loss of generality, we may assume that vk ≥ wk. Then, by the log-concavity of {wk}k≥0, it holds that 
+
+min {vk, w k}2 = w2 
+
+> k
+
+≥ wk−1wk+1 ≥ min {vk−1, w k−1} · min {vk+1 , w k+1 }.
+
+As k ≥ 1 was arbitrary, it follows that {min {vk, w k}} k≥0 is indeed log-concave. 
+
+Lemma A.10. Let {wk}k≥0 be log-concave. Then {τk}k≥0 defined as 
+
+τk = wk
+
+Pkj=0 wj
+
+is monotone decreasing. 
+
+16 Proof. Observe that 
+
+τk − τk+1 = wk
+
+Pkj=0 wj
+
+− wk+1 
+
+wk+1 + Pkj=0 wj
+
+= 1
+
+
+
+wk+1 + Pkj=0 wj
+
+ Pkj=0 wj
+
+wkwk+1 + ( wk − wk+1 )
+
+> k
+
+X
+
+> j=0
+
+wj
+
+ . (17) Hence, if wk ≥ wk+1 then we immediately have τk ≥ τk+1 , so let us assume that wk < w k+1 .By the log-concavity of {wk}k≥0, the sequence of the ratios between adjacent terms { wk+1  
+
+> wk
+
+}k≥0 is decreasing. So for any 0 ≤ j ≤ k, it holds that 
+
+wk = wjkY
+
+> i=j+1
+
+wi
+
+wi−1
+
+≥ wj
+
+ wk+1 
+
+wk
+
+k−j
+
+and thus we also have 
+
+> k
+
+X
+
+> j=0
+
+wj ≤
+
+> k
+
+X
+
+> j=0
+
+wk
+
+ wk
+
+wk+1 
+
+k−j
+
+≤ wk
+
+> ∞
+
+X
+
+> m=0
+
+ wk
+
+wk+1 
+
+m
+
+= wk
+
+1 − wk
+
+> wk+1
+
+= wkwk+1 
+
+wk+1 − wk
+
+.
+
+Plugging this into (17) while noting that we are considering the case where wk − wk+1 < 0, we get 
+
+τk − τk+1 = 1
+
+
+
+wk+1 + Pkj=0 wj
+
+ Pkj=0 wj
+
+
+
+wkwk+1 + ( wk − wk+1 ) wkwk+1 
+
+wk+1 − wk
+
+
+
+≥ 0.
+
+Therefore, we have τk ≥ τk+1 in either of the cases, so {τk}k≥0 is monotone decreasing. 
+
+## B Further Related Work and Supplementary Remarks 
+
+B.1 On the Existing Nonconvex Smooth Convergence Analysis of Schedule-Free Methods 
+
+Recently, Brown et al. [4] studied the convergence guarantees of SF-SGD when the objective function 
+
+f is smooth but possibly nonconvex. A notable aspect of their study is that they consider a wide range of averaging weights, including weights that decay to 0 at various rates by taking a > 0 and setting ck+1 = 1(k+1) a , as well as weights that do not even satisfy ck+1 → 0, such as ck+1 = kk+1 .Yet their Theorem 1, which claims the convergence rates when ck+1 = 1(k+1) a , relies on the existence of an integer k∗ such that the inequality 
+
+wk ≥ ck
+
+2η (1 + 2 ηL (1 − β)) + ηc kL2(1 − β)2
+
+2 + Lc 2
+
+> k
+
+2 (1 + η)(1 + 2 ηL 2(1 − β)2) (18) holds for all k ≥ k∗, where wk+1 = ck  
+
+> 2η(1 −ck)2
+
+. However, it unfortunately turns out that such k∗
+
+cannot exist if β < 1. Indeed, the left hand side of (18) is 
+
+wk = ck−1
+
+2η(1 − ck−1)2 = 12η ·
+
+> 1(k−1) a
+
+(1 − 1(k−1) a )2
+
+= 12η · (k − 1) a
+
+(( k − 1) a − 1) 2 = 12ηk a + o
+
+ 1
+
+ka
+
+
+
+,
+
+while the right hand side is 
+
+12ηk a
+
+ 1 + 2 ηL (1 − β) + η2L2(1 − β)2 + O
+
+ 1
+
+k2a
+
+
+
+,
+
+17 where the big-O and little-o notations denote the asymptotic behavior when k → ∞ . Hence, it follows that 
+
+wk −
+
+ ck
+
+2η (1 + 2 ηL (1 − β)) + ηc kL2(1 − β)2
+
+2 + Lc 2
+
+> k
+
+2 (1 + η)(1 + 2 ηL 2(1 − β)2)
+
+
+
+= − 2L(1 − β) + ηL 2(1 − β)2
+
+2ka + o
+
+ 1
+
+ka
+
+
+
+.
+
+Therefore, for all sufficiently large k, the opposite direction of the inequality (18) holds. In particular, there cannot exist an integer k∗ which makes (18) hold for all k ≥ k∗.
+
+B.2 On the Existing Nonconvex Nonsmooth Convergence Analysis of Schedule-Free Methods 
+
+Based on the framework which enables a conversion of the convergence guarantees for online opti-mization into those in (offline) nonconvex optimization, Ahn et al. [2] have shown that SF-SGD with a wisely chosen set of parameters achieves a worst-case optimal convergence rate in the nonconvex nonsmooth regime. Moreover, they show that under the additional assumption of smoothness of the objective function, the worst-case optimal convergence rate in that setting follows as a corollary of the nonsmooth worst-case optimal guarantee. However, interpreting their convergence results requires care, due to some caveats. The exact method they analyze, which is Algorithm 5 (or equivalently Algorithm 7) in their paper, has the overall form that resembles the update rule of Schedule-Free methods, but there are some mismatches in the details. In particular, in the method they analyze, the parameter β is not a fixed constant, but rather it is a random variable that is resampled at every iteration. In addition, while the original Schedule-Free scheme uses iteration-dependent averaging weights ck+1 , their convergence analysis replaces these with an iteration-independent constant. Finally, the convergence rates are with respect to the exponential moving average of yk, instead of yk themselves or the already existing (but differently) averaged iterates xk. Hence, while their results offer some insights regarding the performance of Schedule-Free methods, strictly speaking, their study is on a variant of a Schedule-Free method, not the Schedule-Free methods themselves. 
+
+## C Dynamics of the SF-ODE 
+
+In this section, we perform a Lyapunov analysis and study the asymptotic behavior of the solution trajectories of the SF-ODE . For the clarity of the presentation, we temporarily defer to Section I the technical verifications showing that the singularity of the SF-ODE at t = 0 is removable . Here, assuming that those details are already established, we proceed as if the SF-ODE has no singularities, and consequently, as if we can freely take the limit as t → 0+ along the solution trajectories without worrying about whether they are well-defined or finite. 
+
+Proposition C.1 (Proposition 3.2) . Consider a function L : (0 , ∞) → R defined as 
+
+L(t) = f (y(t)) − f ∗ + β
+
+2t ∥z(t) − x(t)∥2.
+
+Then it holds that ˙L ≤ − (1 − β)∥∇ f (y)∥2 ≤ 0, and thus L is a Lyapunov function of the SF-ODE .Proof. It is immediate from (5a) that ˙y = (1 − β) ˙ z + β ˙x. Differentiating L with respect to t, we get 
+
+˙L = ⟨∇ f (y), ˙y⟩ − β
+
+2t2 ∥z − x∥2 + βt ⟨ ˙z − ˙x, z − x⟩
+
+= ⟨− ˙z, (1 − β) ˙ z + β ˙x⟩ − β
+
+2t2 ∥z − x∥2 + β ⟨ ˙z − ˙x, ˙x⟩
+
+= −(1 − β)∥ ˙z∥2 − β ⟨ ˙z, ˙x⟩ − β
+
+2t2 ∥z − x∥2 + β ⟨ ˙z, ˙x⟩ − β∥ ˙x∥2
+
+= −(1 − β)∥ ˙z∥2 − 3β
+
+2t2 ∥z − x∥2.
+
+As ˙z = −∇ f (y) and β ≥ 0, we indeed have ˙L ≤ − (1 − β)∥∇ f (y)∥2 ≤ 0.18 Corollary C.2 (Corollary 3.3) . For any T > 0, it holds that 
+
+min  
+
+> 0≤t≤T
+
+∥∇ f (y(t)) ∥2 ≤ f (x0) − f ∗
+
+(1 − β)T .
+
+Proof. By Proposition 3.2, we have 
+
+L(T ) − lim  
+
+> h→0+
+
+L(h) = 
+
+Z T
+
+> 0
+
+˙L(t) d t ≤
+
+Z T
+
+> 0
+
+−(1 − β)∥ ˙z(t)∥2 dt. 
+
+By Assumption 1.2 we know that L(T ) ≥ 0, and by Proposition I.4 we have 
+
+lim  
+
+> h→0+
+
+L(h) = f (x0) − f ∗ + β
+
+2 lim 
+
+> h→0+
+
+ z(h) − x(h)
+
+h , z(h) − x(h)
+
+
+
+= f (x0) − f ∗ + β
+
+2
+
+
+
+− ∇f (x0)2 , 0
+
+
+
+= f (x0) − f ∗.
+
+Therefore, it follows that 
+
+f (x0) − f ∗ = lim  
+
+> h→0+
+
+L(h)
+
+≥ L (T ) + (1 − β)
+
+Z T
+
+> 0
+
+∥ ˙z(t)∥2 dt
+
+≥ (1 − β)
+
+Z T
+
+> 0
+
+∥∇ f (y(t)) ∥2 dt
+
+≥ (1 − β)T min  
+
+> 0≤t≤T
+
+∥∇ f (y(t)) ∥2.
+
+Dividing by (1 − β)T gives us the claimed bound. 
+
+## D Further Discussions on the Parameter Choices 
+
+Defazio et al. [9] proposed the choice of the averaging rates 
+
+ck+1 = γ2
+
+> k
+
+Pki=0 γ2
+
+> i
+
+(19) with γk abiding by Assumption 4.1. This is a generalization of the standard ck+1 = 1 
+
+> k+1
+
+, as when 
+
+Tw = 1 we have γk = γ for all k ≥ 0, and indeed (19) reduces back to ck+1 = 1 
+
+> k+1
+
+. Later, inspired by the observation that β is overloaded in the sense that it determines the momentum applied to yk
+
+and at the same time the length of the implicit averaging window, introducing a decoupling parameter 
+
+C > 0 and setting 
+
+ck+1 = min 
+
+(
+
+γ2
+
+> k
+
+Pki=0 γ2
+
+> i
+
+· (1 − β)C, 1
+
+)
+
+(20) has been proposed by Song et al. [30] . This is exactly what Assumption 4.2 enforces. Notice that (20) reduces to (19) when C = 11−β . However, it is possible that C > 11−β , so in (20) an explicit clipping of the averaging rates is imposed, in order to maintain 0 ≤ ck+1 ≤ 1.
+
+D.1 Conditions for Monotonically Decreasing Averaging Rates 
+
+For the sequence of learning rates {γk}k≥0, let us define 
+
+˜ck+1 = γ2
+
+> k
+
+Pki=0 γ2
+
+> i
+
+(21) 19 for each k ≥ 0, so that the averaging rates, according to Assumption 4.2, are set as 
+
+ck+1 = min {˜ck+1 (1 − β)C, 1}. (22) The standard choice of the averaging rates ck+1 = 1 
+
+> k+1
+
+asserts {ck+1 }k≥0 to be monotone decreasing. In fact, this monotone decreasing property of the averaging rates is guaranteed to hold as long as ck+1 
+
+is set as (22) with a log-concave sequence of learning rates. Recall Definition A.8 for the definition of log-concavity. 
+
+Proposition D.1. Suppose that the sequence of learning rates {γk}k≥0 is log-concave. Then the sequence of averaging rates, defined as (22) , is monotone decreasing. Proof. By Lemma A.9(ii), {γ2 
+
+> k
+
+}k≥0 is also log-concave, so by Lemma A.10, {˜ck+1 }k≥0 is a mono-tone decreasing sequence. As a consequence, for any k ≥ 1, it holds that 
+
+ck+1 = min {˜ck+1 (1 − β)C, 1} ≤ ˜ck+1 (1 − β)C ≤ ˜ck(1 − β)C. 
+
+In addition, we have ck+1 ≤ 1, and thus 
+
+ck+1 ≤ min {˜ck(1 − β)C, 1} = ck.
+
+As this holds for all k ≥ 1, it follows that {ck+1 }k≥0 is monotone decreasing. 
+
+D.2 Consequences of Assumption 4.1 
+
+Recall that Assumption 4.1 specifies the choice of the learning rates to be 
+
+γk = γ min 
+
+
+
+1, k + 1 
+
+Tw
+
+
+
+. (23) An immediate observation one can make, yet useful in the forthcoming analyses, is that {γk}k≥0 is a monotone increasing sequence. A slightly less obvious fact is that {γk}k≥0 is log-concave. 
+
+Proposition D.2. The sequence {γk}k≥0 defined as in (23) is log-concave. Proof. By Lemma A.9(i) and Lemma A.9(iii), it is immediate that {min {1, k+1  
+
+> Tw
+
+}} k≥0 is log-concave. In addition, Lemma A.9(i) tells us that the constant sequence {γ}k≥0 is also log-concave. Therefore, the sequence {γk}k≥0 defined as in (23) is a pointwise product of two log-concave sequences, which we know from Lemma A.9(ii) that is also log-concave. The following is then an immediate corollary of the preceding observations. 
+
+Corollary D.3. Suppose that Assumptions 4.1 and 4.2 hold. Then the sequence of averaging rates 
+
+{ck+1 }k≥0 is monotone decreasing. Proof. This is an immediate consequence of Propositions D.1 and D.2. Nonetheless, as Assumption 4.1 fixes a specific explicit form of γk, under such an assumption it becomes possible to derive more quantitatively detailed statements. To begin with, as γk = γ(k+1) 
+
+> Tw
+
+when k ≤ Tw − 1, notice that 
+
+˜ck+1 = γ2(k + 1) 2
+
+T 2
+
+> w
+
+· 1
+
+Pki=0  
+
+> γ2(i+1) 2
+> T2
+> w
+
+= (k + 1) 2
+
+Pki=0 (i + 1) 2
+
+= 6( k + 1) (k + 2)(2 k + 3) . (24) 20 On the other hand, when k ≥ Tw − 1, we have 
+
+˜ck+1 = γ2 · 1
+
+PTw −1 
+
+> i=0
+> γ2(i+1) 2
+> T2
+> w
+
++ PkTw γ2
+
+= 1
+
+PTw −1 
+
+> i=0 (i+1) 2
+> T2
+> w
+
++ k − Tw + 1 = 1   
+
+> (Tw+1)(2 Tw+1) 6Tw
+
++ k − Tw + 1 . (25) These formulae allow us to derive an upper bound of the averaging rates, as follows. 
+
+Proposition D.4. Suppose that Assumptions 4.1 and 4.2 hold. Then the averaging rates satisfy 
+
+ck+1 ≤ 6(1 − β)C · (k + 1) (k + 2)(2 k + 3) . (26) 
+
+Proof. Consider the sequence {˜ck+1 }k≥0 defined in (21). We show a stronger inequality 
+
+˜ck+1 ≤ 6( k + 1) (k + 2)(2 k + 3) , (27) as then by (22) we would consequently have (26) . When k ≤ Tw − 1, by (24) it is clear that (27) holds. Thus, it remains to show that 
+
+1   
+
+> (Tw+1)(2 Tw+1) 6Tw
+
++ k − Tw + 1 ≤ 6( k + 1) (k + 2)(2 k + 3) (28) whenever k > T w − 1, as the left hand side of (28) is nothing but the explicit form of ˜ck+1 when 
+
+k ≥ Tw − 1, which we derived in (25). Let j = k − Tw + 1 , so that (28) is equivalent to 
+
+(j + Tw + 1)(2 j + 2 Tw + 1) ≤ 6( j + Tw)
+
+
+
+j + (Tw + 1)(2 Tw + 1) 6Tw
+
+
+
+. (29) Then, it suffices to show that this holds for all j ≥ 0. To this end, observe that 
+
+6( j + Tw)
+
+
+
+j + (Tw + 1)(2 Tw + 1) 6Tw
+
+
+
+− (j + Tw + 1)(2 j + 2 Tw + 1) = ( j + Tw)
+
+
+
+6j + 2T 2 
+
+> w
+
++ 3 Tw + 1 
+
+Tw
+
+
+
+− (j + Tw)(2 j + 2 Tw + 1) − (2 j + 2 Tw + 1) = ( j + Tw)
+
+
+
+4j + 2Tw + 1 
+
+Tw
+
+
+
+− (2 j + 2 Tw + 1) = 4 j2 +
+
+
+
+4Tw + 2 + 1
+
+Tw
+
+
+
+j + 2 Tw + 1 − (2 j + 2 Tw + 1) = 4 j2 +
+
+
+
+4Tw + 1
+
+Tw
+
+
+
+j. 
+
+From this it is immediate that (29) holds for j ≥ 0, and we are done. From (26) we get that lim k→∞ ck = 0 . Hence, there exists some positive integer k0 such that k > k 0
+
+implies ck+1 < 1. Meanwhile, as c1 = min {(1 − β)C, 1}, if C > 11−β then c1 = 1 , and for the first few steps we will have ck+1 = 1 . In that case, we may let k0 be the largest integer such that ck+1 = 1 
+
+whenever k ≤ k0. But then, as we have shown in Lemma A.7, we will have xk = zk = yk for all 
+
+k = 1 , . . . , k 0 + 1 . In addition, from the update rule (2) and the initialization x0 = z0, it follows that y0 = x0. Thus, using (2b) , we conclude that yk+1 = yk − γkgk for all k = 0 , 1, . . . , k 0 + 1 .This means that the iterates that are generated for first k0 + 1 steps are exactly the same as what we would get by running the base optimizer, and the Schedule-Free modification is essentially inactive 
+
+during that phase. Let us formally state this observation. 21 Proposition D.5. Suppose that Assumptions 4.1 and 4.2 hold. Then 
+
+k0 =
+
+
+
+−1 C < 11 − β
+
+
+
+(1 − β)C + 4T 2 
+
+> w
+
+− 9Tw − 16Tw
+
+
+
+C ≥ (Tw + 1)(2 Tw + 1) 6(1 − β)Tw
+
+$
+
+−7 + 6(1 − β)C + p1 − 36(1 − β)C + 36(1 − β)2C2
+
+4
+
+%
+
+otherwise 
+
+(30) 
+
+is the integer such that ck+1 = 1 if and only if k ≤ k0. Consequently, for all k = 0 , 1, . . . , k 0 + 1 it holds that xk = zk = yk and yk+1 = yk − γkgk.Proof. As previously discussed, the second half of the statement would follow from the first half. Hence, it suffices to show that ck+1 = 1 if and only if k ≤ k0 for k0 defined in (30) . Corollary D.3 ensures that {ck+1 }k≥0 is monotone decreasing, so this is equivalent to k0 being the largest integer k
+
+such that ck+1 = 1 . Because c1 = min {(1 − β)C, 1} < 1 if and only if C < 11−β , we immediately get that k0 = −1 if C < 11−β . Now, assume that C ≥ 11−β , so that c1 = 1 , and in particular, there exists at least one nonnegative integer k such that ck+1 = 1 . Observe that 
+
+˜cTw (1 − β)C = 6(1 − β)CT w
+
+(Tw + 1)(2 Tw + 1) . (31) If the right hand side of (31) is less than 1, then cTw < 1 so k0 ≤ Tw − 1. In particular, by (24) , k0 is the largest integer such that 
+
+6(1 − β)C(k0 + 1) (k0 + 2)(2 k0 + 3) ≥ 1.
+
+By simple algebra involving solving a quadratic inequality, we obtain that in this case 
+
+k0 =
+
+$
+
+−7 + 6(1 − β)C + p1 − 36(1 − β)C + 36(1 − β)2C2
+
+4
+
+%
+
+.
+
+On the other hand, if the right hand side of (31) is greater than or equal to 1, then cTw = 1 so 
+
+k0 > T w − 1. By (25), k0 is the largest integer such that 
+
+(1 − β)C   
+
+> (Tw+1)(2 Tw+1) 6Tw
+
++ k0 − Tw + 1 ≥ 1.
+
+Again by simple algebra, with noting that the denominator of the left hand side is positive, we obtain 
+
+k0 =
+
+
+
+(1 − β)C + 4T 2 
+
+> w
+
+− 9Tw − 16Tw
+
+
+
+for this case. Proposition D.5 tells us that, if (1 − β)C ≥ 1, then for roughly a constant multiple of (1 − β)C
+
+steps the Schedule-Free method will behave exactly the same as the base optimizer. Based on this observation, one can make a conjecture on why introducing this decoupling parameter C should improve the empirical performance. In general, the base sequence {zk}k≥0 is a fast-moving sequence that directly receives the gradient updates as in (2b) , whereas the evaluation sequence {xk}k≥0
+
+evolves more conservatively, being averaged iterates of {zk}k≥0. But if (1 − β)C > 1, then the “fast” variable zk and the “slow” variable xk can start to differ only after k0 + 1 steps. Moreover, as the points z0, . . . , zk0+1 are exactly those that would be computed by the base optimizer initialized at z0, one can expect that the base optimizer would have driven both zk0+1 and xk0+1 down to a point with a lower loss that is in a more locally well-behaved region of the loss landscape than the randomly chosen initial point. After that, it becomes less likely for zk to explore exotic regions with high loss or irregular loss landscapes, and its average xk would inherit those nice properties. We leave the verifications of this heuristic explanation as future directions of work. 22 E Lyapunov Descent Lemma for Schedule-Free Methods 
+
+The main result of this section is establishing the proof of Lemma E.4, which we call the Lyapunov descent lemma . Proposition 4.3 then follows from Lemma E.4, as both share the same statements but the latter has a weaker set of assumptions which implies that of the former. In Lemma E.4, we construct Lyapunov potentials for SF-SGD and show that they form a monotone decreasing sequence, much like in the celebrated descent lemma , up to an additive noise term arising from the use of stochastic gradients. The proof of it, though, involves verifying several technical inequalities. So, to keep the main argument clear, we first establish those ancillary results before turning to the main proof itself. To this end, we define some auxiliary sequences, whose motivations behind the definitions will soon be clear. In this section, we work with the learning rates and the averaging rates satisfying conditions that are substantially weaker than Assumptions 4.1 and 4.2. We assume that the learning rates {γk}k≥0
+
+form a monotone increasing sequence of positive real numbers with γk ≤ 1 
+
+> L
+
+for all k ≥ 0, and the averaging rates {ck+1 }k≥0 are monotonically decreasing with 0 ≤ ck+1 ≤ 1 for all k ≥ 0 but not constantly 1. Under these assumptions, we set k0 to be the largest nonnegative integer such that 
+
+ck+1 = 1 whenever k ≤ k0 if such k exists, and otherwise k0 = −1. In other words, for the learning rates we assume that 
+
+0 < γ 0 ≤ γ1 ≤ γ2 ≤ · · · ≤ 1
+
+L (32) and for the averaging rates we assume that 
+
+1 = c1 = c2 = · · · = ck0+1 > c k0+2 ≥ ck0+3 ≥ · · · ≥ 0. (33) Notice that (32) is consistent with Assumption 4.1, and (33) holds as a consequence of Assump-tions 4.1 and 4.2 by the observations we made in Section D. Now, let us define a sequence {αk}k>k 0 as 
+
+αk = βc k(1 − γk−1L(1 − β + βc k)) 2γk−1(1 − ck)2 (34) for all k = k0 + 2 , k 0 + 3 , . . . , and 
+
+αk0+1 = Lβ 2c2
+
+> k0+2
+
+2 + αk0+2 (1 − ck0+2 )2. (35) For k > k 0, we then define 
+
+Dk := Lβ 2c2
+
+> k+1
+
+2 + αk+1 (1 − ck+1 )2 − αk, (36) 
+
+Gk := γ2 
+
+> k
+
+αk+1 (1 − ck+1 )2 + γ2 
+
+> k
+
+L(1 − β + βc k+1 )2
+
+2 − γk(1 − β + βc k+1 ), (37) 
+
+Sk := γ2
+
+> k
+
+
+
+αk+1 (1 − ck+1 )2 + L(1 − β + βc k+1 )2
+
+2
+
+
+
+. (38) 
+
+Lemma E.1. Suppose that β ∈ [0 , 1) . Then αk ≥ 0 for all k > k 0.Proof. It is clear that αk0+1 ≥ 0. For k ≥ k0 + 2 , as βc k  
+
+> 2γk−1(1 −ck)2
+
+≥ 0, it suffices to show that 
+
+1 − γk−1L(1 − β + βc k) ≥ 0. Indeed, as 0 < 1 − ck ≤ 1, it holds that 
+
+1 − β(1 − ck) ≤ 1 ≤ 1
+
+γk−1L ,
+
+from which it follows that 1 − γk−1L(1 − β + βc k) is nonnegative. 
+
+Lemma E.2. Suppose that β ∈ [0 , 1) . Then Gk ≤ − γk (1 −β)2 for all k > k 0.
+
+23 Proof. Noting that Gk = Sk − γk(1 − β + βc k+1 ), let us first simplify the expression of Sk. From the definition of αk+1 , we get 
+
+Sk = γ2
+
+> k
+
+
+
+αk+1 (1 − ck+1 )2 + L(1 − β + βc k+1 )2
+
+2
+
+
+
+= γ2
+
+> k
+
+ βc k+1 (1 − γkL(1 − β + βc k+1 )) 2γk
+
++ L(1 − β + βc k+1 )2
+
+2
+
+
+
+= γk
+
+2
+
+ βc k+1 (1 − γkL(1 − β + βc k+1 )) + γkL(1 − β + βc k+1 )2
+
+= γk
+
+2
+
+ βc k+1 (1 − γkL + γkLβ − γkLβc k+1 ) + γkL  (1 − β)2 + 2 β(1 − β)ck+1 + β2c2
+
+> k+1
+
+ 
+
+= γk
+
+2
+
+ βc k+1 + γkL(1 − β)2 + γkLβ (1 − β)ck+1 
+
+ .
+
+Hence, with the inequalities γkL ≤ 1 and 0 ≤ 1 − β ≤ 1, it follows that 
+
+Gk = Sk − γk(1 − β + βc k+1 )= γk
+
+2
+
+ βc k+1 + γkL(1 − β)2 + γkLβ (1 − β)ck+1 − 2(1 − β + βc k+1 )
+
+= γk
+
+2 ((1 − β)( γkL(1 − β) − 2) + βc k+1 (γkL(1 − β) − 1)) 
+
+≤ γk(1 − β)2 (γkL(1 − β) − 2) 
+
+≤ − γk(1 − β)2
+
+as claimed. 
+
+Lemma E.3. Suppose that β ∈ [0 , 1) . Then for all k > k 0, as long as 0 ≤ ck+1 ≤ ck < 1 and 
+
+0 < γ k−1 ≤ γk ≤ 1 
+
+> L
+
+, it holds that Dk ≤ 0.Proof. By the definition of αk0+1 , it is clear that Dk0+1 = 0 . Meanwhile, for k ≥ k0 + 2 , observe that 
+
+αk = βc k(1 − γk−1L(1 − β + βc k)) 2γk−1(1 − ck)2
+
+= βc k
+
+2(1 − ck)2
+
+ 1
+
+γk−1
+
+− L(1 − β + βc k)
+
+
+
+≥ βc k
+
+2(1 − ck)2
+
+ 1
+
+γk
+
+− L(1 − β + βc k)
+
+
+
+= βc k(1 − γkL(1 − β + βc k)) 2γk(1 − ck)2 .
+
+Hence, it follows that 
+
+Dk = Lβ 2c2
+
+> k+1
+
+2 + αk+1 (1 − ck+1 )2 − αk
+
+≤ Lβ 2c2
+
+> k+1
+
+2 + βc k+1 (1 − γkL(1 − β + βc k+1 )) 2γk
+
+− βc k(1 − γkL(1 − β + βc k)) 2γk(1 − ck)2
+
+= β
+
+2γk
+
+
+
+γkLβc 2 
+
+> k+1
+
++ ck+1 (1 − γkL + γkLβ − γkLβc k+1 ) − ck(1 − γkL + γkLβ − γkLβc k)(1 − ck)2
+
+
+
+= β
+
+2γk
+
+
+
+ck+1 (1 − γkL + γkLβ ) − ck(1 − γkL) + γkLβc k(1 − ck)(1 − ck)2
+
+
+
+= β
+
+2γk
+
+
+
+(1 − γkL)
+
+
+
+ck+1 − ck
+
+(1 − ck)2
+
+
+
++ γkLβ 
+
+
+
+ck+1 − ck
+
+(1 − ck)
+
+ 
+
+.
+
+As 11−ck ≥ 1, we have 
+
+ck+1 ≤ ck ≤ ck
+
+1 − ck
+
+≤ ck
+
+(1 − ck)2 ,
+
+from which it is immediate that Dk ≤ 0.24 Notice that Lemmata E.1 and E.2 only relies on that 0 ≤ ck+1 < 1. On the other hand, Lemma E.3 does require the monotone decreasing property of {ck}, although it would suffice to have a slightly weaker condition 
+
+ck+1 ≤ ck
+
+1 − ck
+
+.
+
+Nonetheless, with these observations, we are now ready to prove the following Lyapunov descent lemma .
+
+Lemma E.4. Suppose that Assumptions 1.1–1.3 hold. For β ∈ [0 , 1) , let {xk}k≥0, {yk}k≥0, and 
+
+{zk}k≥0 be the iterates computed by SF-SGD with the learning rates {γk}k≥0 satisfying (32) , and the averaging rates {ck+1 }k≥0 satisfying (33) for some k0 ≥ − 1. Define a sequence of nonnegative real numbers {αk}k≥0 as 
+
+αk = βc k(1 − γk−1L(1 − β + βc k)) 2γk−1(1 − ck)2
+
+for all k = k0 + 2 , k 0 + 3 , . . . and 
+
+α0 = α1 = · · · = αk0+1 = Lβ 2c2
+
+> k0+2
+
+2 + αk0+2 (1 − ck0+2 )2.
+
+Then, the Lyapunov potentials defined as 
+
+Vk = f (yk) − f ∗ + αk∥zk − xk∥2 (39) 
+
+satisfy the inequality 
+
+E[Vk+1 ] − E[Vk] ≤ − γk(1 − β)2 E∥∇ f (yk)∥2 + γkσ2
+
+2
+
+ β(1 + γkL(1 − β)) ck+1 + γkL(1 − β)2
+
+(40) 
+
+for all nonnegative integers k ≥ k0 + 1 , and 
+
+E[Vk+1 ] − E[Vk] ≤ − γk
+
+2 E∥∇ f (yk)∥2 + γ2 
+
+> k
+
+Lσ 2
+
+2 (41) 
+
+for all nonnegative integers k ≤ k0.Proof. Let us first consider when k ≥ k0 + 1 . By Lemmata A.1, A.5, and A.6, we have 
+
+Vk+1 − Vk
+
+= f (yk+1 ) − f (yk) + αk+1 ∥zk+1 − xk+1 ∥2 − αk∥zk − xk∥2
+
+≤ ⟨ yk+1 − yk, ∇f (yk)⟩ + L
+
+2 ∥yk+1 − yk∥2 + αk+1 ∥zk+1 − xk+1 ∥2 − αk∥zk − xk∥2
+
+= ⟨βc k+1 (zk − xk) − γk(1 − β + βc k+1 )gk, ∇f (yk)⟩
+
++ L
+
+2 ∥βc k+1 (zk − xk) − γk(1 − β + βc k+1 )gk∥2
+
++ αk+1 (1 − ck+1 )2∥zk − xk − γkgk∥2 − αk∥zk − xk∥2
+
+= βc k+1 ⟨zk − xk, ∇f (yk)⟩ − γk(1 − β + βc k+1 ) ⟨gk, ∇f (yk)⟩
+
++ Lβ 2c2
+
+> k+1
+
+2 ∥zk − xk∥2 + γ2 
+
+> k
+
+L(1 − β + βc k+1 )2
+
+2 ∥gk∥2
+
+− γkLβc k+1 (1 − β + βc k+1 ) ⟨zk − xk, gk⟩ − 2γkαk+1 (1 − ck+1 )2 ⟨zk − xk, gk⟩
+
++ αk+1 (1 − ck+1 )2∥zk − xk∥2 + γ2 
+
+> k
+
+αk+1 (1 − ck+1 )2∥gk∥2 − αk∥zk − xk∥2
+
+=
+
+ Lβ 2c2
+
+> k+1
+
+2 + αk+1 (1 − ck+1 )2 − αk
+
+
+
+∥zk − xk∥2
+
++ βc k+1 ⟨zk − xk, ∇f (yk)⟩−  γkLβc k+1 (1 − β + βc k+1 ) + 2 γkαk+1 (1 − ck+1 )2 ⟨zk − xk, gk⟩
+
++ γ2
+
+> k
+
+
+
+αk+1 (1 − ck+1 )2 + L(1 − β + βc k+1 )2
+
+2
+
+
+
+∥gk∥2
+
+− γk(1 − β + βc k+1 ) ⟨gk, ∇f (yk)⟩ .
+
+25 Let us take the conditional expectation conditioned on zk and xk. Then, by Assumption 1.3 and its consequence Lemma A.2, we obtain 
+
+E[Vk+1 |zk, xk] − Vk
+
+≤
+
+ Lβ 2c2
+
+> k+1
+
+2 + αk+1 (1 − ck+1 )2 − αk
+
+
+
+∥zk − xk∥2
+
++  βc k+1 − γkLβc k+1 (1 − β + βc k+1 ) − 2γkαk+1 (1 − ck+1 )2 ⟨zk − xk, ∇f (yk)⟩
+
++
+
+
+
+γ2 
+
+> k
+
+αk+1 (1 − ck+1 )2 + γ2 
+
+> k
+
+L(1 − β + βc k+1 )2
+
+2 − γk(1 − β + βc k+1 )
+
+
+
+∥∇ f (yk)∥2
+
++ γ2
+
+> k
+
+
+
+αk+1 (1 − ck+1 )2 + L(1 − β + βc k+1 )2
+
+2
+
+
+
+σ2.
+
+By the definition (34) of αk+1 , the coefficient of the inner product term ⟨zk − xk, ∇f (yk)⟩ is 
+
+βc k+1 − γkLβc k+1 (1 − β + βc k+1 ) − 2γkαk+1 (1 − ck+1 )2 = 0 .
+
+Hence, such a choice of αk gives us the inequality 
+
+E[Vk+1 |zk, xk] − Vk ≤ Dk∥zk − xk∥2 + Gk∥∇ f (yk)∥2 + Skσ2 (42) for Dk, Gk, and Sk defined exactly in (36) , (37) , and (38) , respectively. In Lemma E.3 we have shown that Dk ≤ 0, and in Lemma E.2 we have shown that Gk ≤ − γk (1 −β)2 . Moreover, continuing from the identity regarding Sk established in the proof of Lemma E.2, we can observe that 
+
+Sk = γk
+
+2
+
+ βc k+1 + γkL(1 − β)2 + γkLβ (1 − β)ck+1 
+
+
+
+= γk
+
+2
+
+ β(1 + γkL(1 − β)) ck+1 + γkL(1 − β)2 .
+
+Applying these results to (42), we obtain 
+
+E[Vk+1 |zk, xk] − Vk ≤ − γk(1 − β)2 ∥∇ f (yk)∥2 + γkσ2
+
+2
+
+ β(1 + γkL(1 − β)) ck+1 + γkL(1 − β)2.
+
+Taking the expectation with respect to zk and xk, by the law of total expectation, we conclude that the claimed inequality (40) holds. It remains to consider when k ≤ k0. By Lemma A.7, we have xk = zk and xk+1 = zk+1 , and thus 
+
+Vk+1 − Vk = f (yk+1 ) − f (yk).
+
+Then, as Lemma A.5 asserts that yk+1 − yk = −γkgk, the standard arguments for the classical descent lemma apply in obtaining (41). That is, by Lemma A.1, we have 
+
+Vk+1 − Vk ≤ ⟨ yk+1 − yk, ∇f (yk)⟩ + L
+
+2 ∥yk+1 − yk∥2
+
+= −γk ⟨gk, ∇f (yk)⟩ + γ2 
+
+> k
+
+L
+
+2 ∥gk∥2.
+
+Taking the conditional expectation with respect to yk and applying Lemma A.2, we obtain 
+
+E[Vk+1 |yk] − E[Vk|yk] ≤
+
+
+
+−γk + γ2 
+
+> k
+
+L
+
+2
+
+
+
+∥∇ f (yk)∥2 + γ2 
+
+> k
+
+L
+
+2 σ2. (43) Here, as γk ≤ 1 
+
+> L
+
+, it holds that −γk + γ2  
+
+> kL
+> 2
+
+≤ − γk 
+
+> 2
+
+, so we conclude that (43) implies (41). 
+
+## F Convergence Rate of SF-SGD 
+
+Theorem F.1 (Theorem 4.4) . Suppose that Assumptions 1.1–1.3 hold. For γ ∈ (0 , 1 
+
+> L
+
+] and β ∈ [0 , 1) ,let {xk}k≥0, {yk}k≥0, and {zk}k≥0 be the iterates computed by SF-SGD with the warmup length 
+
+Tw and the learning rates {γk}k≥0 satisfying (7) , and the averaging rates {ck+1 }k≥0 satisfying (8) .Then for any T ≥ 1, letting pw = Tw −1 
+
+> T
+
+, we have the bound 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2( f (x0) − f ∗)
+
+γ(1 − β)(1 − pw)T + γL (1 − β)σ2
+
+1 − pw
+
++ 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T .
+
+26 Proof. For notational convenience, for each k ≥ 0, let us define 
+
+(ak, b k) := 
+
+ γk
+
+2 , γ2 
+
+> k
+
+Lσ 2
+
+2
+
+
+
+k ≤ k0
+
+ γk(1 − β)2 , γkσ2
+
+2
+
+ β(1 + γkL(1 − β)) ck+1 + γkL(1 − β)2
+
+k ≥ k0 + 1 
+
+so that, by the Lyapunov descent lemma (Lemma E.4), the Lyapunov potentials defined in (39) satisfy 
+
+ak E∥∇ f (yk)∥2 ≤ E[Vk] − E[Vk+1 ] + bk.
+
+By telescopic summation, we obtain  
+
+> T−1
+
+X
+
+> k=0
+
+ak E∥∇ f (yk)∥2
+
+≤ V0 − E[VT ] +  
+
+> T−1
+
+X
+
+> k=0
+
+bk
+
+= V0 − E[VT ] + 
+
+> k0
+
+X
+
+> k=0
+
+γ2 
+
+> k
+
+Lσ 2
+
+2 + 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γkσ2
+
+2
+
+ β(1 + γkL(1 − β)) ck+1 + γkL(1 − β)2
+
+≤ V0 − E[VT ] + Lσ 2
+
+2
+
+> k0
+
+X
+
+> k=0
+
+γ2 
+
+> k
+
++ 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γkσ2
+
+2
+
+ β(2 − β)ck+1 + γkL(1 − β)2
+
+= V0 − E[VT ] + Lσ 2
+
+2
+
+> k0
+
+X
+
+> k=0
+
+γ2 
+
+> k
+
++ β(2 − β)σ2
+
+2 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γkck+1 + L(1 − β)2σ2
+
+2 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γ2
+
+> k
+
+= V0 − E[VT ] + L((1 − β)2 + β(2 − β)) σ2
+
+2
+
+> k0
+
+X
+
+> k=0
+
+γ2
+
+> k
+
++ β(2 − β)σ2
+
+2 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γkck+1 + L(1 − β)2σ2
+
+2 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γ2
+
+> k
+
+= V0 − E[VT ] + β(2 − β)σ2
+
+2
+
+> k0
+
+X
+
+> k=0
+
+γ2 
+
+> k
+
+L + 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γkck+1 
+
+!
+
++ L(1 − β)2σ2
+
+2 
+
+> T−1
+
+X
+
+> k=0
+
+γ2 
+
+> k
+
+.
+
+Up to this point, we only used that the learning rates {γk}k≥0 satisfy (32) and the averaging rates 
+
+{ck+1 }k≥0 satisfy (33) . But from here, in order to derive explicit convergence bounds, we invoke Assumptions 4.1 and 4.2. Consider the sequence {˜ck+1 }k≥0 as in (21) , and recall that k0 is the largest integer such that ck+1 = 1 
+
+for all k ≤ k0. Hence, from (22) which tells us that ck+1 = min {˜ck+1 (1 − β)C, 1}, we get that if 
+
+k > k 0 then ck+1 = ˜ ck+1 (1 − β)C, and on the other hand, if k ≤ k0 then ˜ck+1 (1 − β)C ≥ 1 as otherwise we cannot have ck+1 = 1 . This implies that ˜ck+1 (1 − β)C ≥ γkL whenever k ≤ k0, so we obtain that k0X
+
+> k=0
+
+γ2 
+
+> k
+
+L + 
+
+> T−1
+
+X
+
+> k=k0+1
+
+γkck+1 ≤ 
+
+> T−1
+
+X
+
+> k=0
+
+γk ˜ck+1 (1 − β)C
+
+≤ 
+
+> T−1
+
+X
+
+> k=0
+
+6γk(1 − β)C(k + 1) (k + 2)(2 k + 3) 
+
+≤ γ(1 − β)C 
+
+> T−1
+
+X
+
+> k=0
+
+6( k + 1) (k + 2)(2 k + 3) 
+
+≤ γ(1 − β)C 
+
+> T−1
+
+X
+
+> k=0
+
+3
+
+k + 1 
+
+≤ 3γ(1 − β)C(1 + log T )
+
+27 where the second line is by the upper bound of ˜ck+1 we obtained in (27) , the third line is by Assumption 4.1, the fourth line is by a simple inequality (k + 1)(2 k + 2) ≤ (k + 2)(2 k + 3) which holds for all nonnegative integers k ≥ 0, and the fifth line is by Lemma A.3. Meanwhile, as the initial points are chosen so that z0 = x0, we have y0 = (1 − β)z0 + βx0 = x0.This implies that 
+
+V0 = f (y0) − f ∗ + α0∥z0 − x0∥2 = f (x0) − f ∗.
+
+As Assumption 1.2 and Lemma E.1 together assert that VT ≥ 0, we furthermore have 
+
+V0 − E[VT ] ≤ f (x0) − f ∗.
+
+Hence, using these bounds and once again applying Assumption 4.1 of asserting γk ≤ γ, from the telescopic sum we get  
+
+> T−1
+
+X
+
+> k=0
+
+ak E∥∇ f (yk)∥2 ≤ f (x0) − f ∗ + 3γβ (1 − β)(2 − β)Cσ 2(1 + log T )2 + γ2L(1 − β)2σ2T
+
+2 .
+
+(44) We now seek a lower bound of the left hand side of (44) . By the definition of ak, for all k ≥ 0 we have ak ≥ γk (1 −β)2 ≥ 0. Also, by Assumption 4.1 we have γk = γ for all k ≥ Tw − 1 = pwT . It thus holds that  
+
+> T−1
+
+X
+
+> k=0
+
+ak E∥∇ f (yk)∥2 ≥ 
+
+> T−1
+
+X
+
+> k=0
+
+γk(1 − β)2 E∥∇ f (yk)∥2
+
+≥ 
+
+> T−1
+
+X 
+
+> k=Tw−1
+
+γ(1 − β)2 E∥∇ f (yk)∥2
+
+≥ γ(1 − β)( T − Tw + 1) 2 min     
+
+> k=Tw−1,T w,...,T −1
+
+E∥∇ f (yk)∥2
+
+≥ γ(1 − β)(1 − pw)T
+
+2 min     
+
+> k=Tw−1,T w,...,T −1
+
+E∥∇ f (yk)∥2.
+
+Plugging this lower bound back into (44) and dividing both sides by γ(1 −β)(1 −pw )T 
+
+> 2
+
+, we obtain 
+
+min    
+
+> k=Tw−1,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2( f (x0) − f ∗)
+
+γ(1 − β)(1 − pw)T + γL (1 − β)σ2
+
+1 − pw
+
++ 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T .
+
+The claimed bound now follows from the simple fact that 
+
+min     
+
+> k=Tw−1,T w,...,T −1
+
+E∥∇ f (yk)∥2 ≥ min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2,
+
+as the minimum decreases when it is taken over a larger set. 
+
+Corollary F.2 (Corollary 4.6) . Suppose that Assumptions 1.1–1.3 hold. Say we run SF-SGD for 
+
+T ≥ 1 iterations with β ∈ [0 , 1) , the warmup length Tw and the learning rates {γk}k≥0 satisfying 
+
+(7) , and the averaging rates {ck+1 }k≥0 satisfying (8) , to obtain the iterates {xk}k≥0, {yk}k≥0, and 
+
+{zk}k≥0. Then, choosing γ = min { 1 
+
+> L
+
+, 1(1 −β)√T }, for pw = Tw −1 
+
+> T
+
+and A := max {1, L 
+
+> 1−β
+
+} it holds that 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2A(f (x0) − f ∗) + Lσ 2
+
+(1 − pw)√T + 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T . (45) 
+
+Moreover, if additionally T ≥ L2 
+
+> (1 −β)2
+
+, then the convergence bound (45) holds with A = 1 .Proof. The value of γ depends on the choice of T . Accordingly, we divide into two cases. (i) 1(1 −β)√T ≤ 1
+
+> L
+
+In this case we would have γ = 1(1 −β)√T . Substituting this value of γ into (10) we get 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2( f (x0) − f ∗) + Lσ 2
+
+(1 − pw)√T + 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T . (46) 28 (ii) 1(1 −β)√T > 1
+
+> L
+
+In this case we have γ = 1 
+
+> L
+
+. Consider the three terms in the right hand side of (10) . The third term of the right hand side of (10) does not depend on γ, hence remains as is. Meanwhile, as γ = 1 
+
+> L
+
+, the first term can be bounded as 
+
+2( f (x0) − f ∗)
+
+γ(1 − β)(1 − pw)T = 2L(f (x0) − f ∗)(1 − β)(1 − pw)T ≤ 2L(f (x0) − f ∗)(1 − β)(1 − pw)√T .
+
+Moreover, for the second term, as γ = 1 
+
+> L
+
+< 1(1 −β)√T we get that 
+
+γL (1 − β)σ2
+
+1 − pw
+
+≤ Lσ 2
+
+(1 − pw)√T .
+
+Thus, in total, we have the bound 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 
+
+> 2L
+> 1−β
+
+(f (x0) − f ∗) + Lσ 2
+
+(1 − pw)√T + 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T .
+
+Hence, for A := max {1, L 
+
+> 1−β
+
+}, we see that in both cases the bound 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2A(f (x0) − f ∗) + Lσ 2
+
+(1 − pw)√T + 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T .
+
+holds. Moreover, if T ≥ L2 
+
+> (1 −β)2
+
+then only case (i) is valid between the two cases above. Hence in that case, we conclude that the bound (46) holds, which is exactly (45) with A = 1 .
+
+## G SF-GD as a Nonautonomous Dynamical System 
+
+G.1 Two-sequence reformulation of the Schedule-Free Update Rule 
+
+Assuming β ∈ [0 , 1) , here we show how the three-sequence update rule (2) can be reformulated into a two-sequence form (13). First, we use (2b) to eliminate zk+1 from (2c) which leads to 
+
+xk+1 = (1 − ck+1 )xk + ck+1 (zk − γkgk).
+
+As (2a) implies that zk = 11−β (yk − βxk), we substitute this into the above, and get 
+
+xk+1 = (1 − ck+1 )xk + ck+1 
+
+ yk − βxk
+
+1 − β − γkgk
+
+
+
+= xk + ck+1 
+
+ yk − βxk
+
+1 − β − xk − γkgk
+
+
+
+= xk + ck+1 
+
+1 − β (yk − xk) − γkck+1 gk
+
+which is exactly (13b). Meanwhile, similarly eliminating zk+1 and zk from (2b), we obtain 
+
+yk+1 − βxk+1 
+
+1 − β = yk − βxk
+
+1 − β − γkgk.
+
+Multiplying by 1 − β and substituting (13b) gives us 
+
+yk+1 = yk + β(xk+1 − xk) − γk(1 − β)gk
+
+= yk + βc k+1 
+
+1 − β (yk − xk) − γk(1 − β + βc k+1 )gk
+
+which is exactly (13a). 29 G.2 SF-GD as a Nonautonomous Dynamical System 
+
+As explained in Section 5 and derived in Section G.1, given that β ∈ [0 , 1) , SF-GD can be viewed as a nonautonomous dynamical system with maps hk : Rd × Rd → Rd × Rd defined as 
+
+hk(y, x) = 
+
+"y + βc k+1  
+
+> 1−β
+
+(y − x) − γk(1 − β + βc k+1 )∇f (y)
+
+x + ck+1  
+
+> 1−β
+
+(y − x) − γkck+1 ∇f (y)
+
+#
+
+, k = 0 , 1, . . . . (47) For convenience, we will refer to the sequence of maps (47) simply as the nonautonomous dynamical system corresponding to SF-GD .
+
+Proposition G.1 (Proposition 5.1) . For any integer k ≥ 0, suppose that γk̸ = 0 and ck+1 ̸ = 0 . Then, a point (y∗, x∗) ∈ Rd × Rd is a fixed point of hk if and only if y∗ = x∗ and ∇f (x∗) = 0.Proof. The “if” direction is straightforward from the definition of hk. To show the reverse direction, suppose that (y∗, x∗) ∈ Rd × Rd is a fixed point of hk. Then, from (47) , it is immediate that (y∗, x∗)
+
+should satisfy "βI (1 − β + βc k+1 )II ck+1 I
+
+# " ck+1  
+
+> 1−β
+
+(y∗ − x∗)
+
+−γk∇f (y∗)
+
+#
+
+=
+
+"00
+
+#
+
+(48) where I denotes the d × d identity matrix. As it holds that 
+
+"βI (1 − β + βc k+1 )II ck+1 I
+
+#
+
+=
+
+"I 1−β+βc k+1  
+
+> ck+1
+
+I
+
+0 I
+
+# " − 1−βck+1 I 0
+
+I ck+1 I
+
+#
+
+(49) where the two factors on the right hand side of (49) are invertible triangular matrices because all of their diagonal entries are nonzero, (48) holds if and only if ck+1  
+
+> 1−β
+
+(y∗ − x∗) = −γk∇f (y∗) = 0. But 
+
+ck+1 ̸ = 0 and γk̸ = 0 , so we conclude that y∗ = x∗ and ∇f (x∗) = 0.In particular, because all hk share the same set of fixed points, it is clear that 
+
+{(x∗, x∗) : ∇f (x∗) = 0}
+
+is the set of fixed points of the nonautonomous dynamical system. Let us now state some general notions regarding a nonautonomous dynamical system, introduced by Mu¸ sat and Boumal [23] . Following the standard notation, for r ≥ 0, we denote by Br (0) the open ball of radius r centered at 0.
+
+Definition G.2 ([ 23 ], Definition 2.4) . Let h : Rm → Rm and T : Rm → Rm be maps on Rm,with T linear. Let μ, λ, and ϵ be scalars such that 1 ≤ λ < μ and ϵ > 0. Consider a direct sum decomposition Rm = Ecs ⊕ Eu with the norms ∥·∥ cs and ∥·∥ u given on the subspaces Ecs and Eu,respectively. We say that the pair (h, T ) is (μ, λ, ϵ )-pseudo-hyperbolic on an open neighborhood U
+
+of 0 with respect to the splitting Rm = Ecs ⊕ Eu, and denote by 
+
+(h, T ) ∈ PH( μ, λ, ϵ ; U, E cs ⊕ Eu)
+
+if the following conditions hold: (i) h(0) = 0.(ii) If u ∈ Ecs then T (u) ∈ Ecs with ∥T (u)∥cs ≤ λ∥u∥cs , and if v ∈ Eu then T (v) ∈ Eu with 
+
+∥T (v)∥u ≥ μ∥v∥u.(iii) Lip(( h−T )|U ) ≤ ϵ < μ−λ 
+
+> 4
+
+, where Lip( · | U ) denotes the Lipschitz constant when restricted to U , with respect to the max-norm on Rm defined as 
+
+∥w∥max := max {∥ u∥cs , ∥v∥u} (50) for w = u + v with u ∈ Ecs and v ∈ Eu.
+
+Definition G.3 ([ 23 ], Definition 2.8) . Suppose that the origin 0 is a fixed point of a nonautonomous dynamical system given by the maps hk : Rm → Rm, k = 0 , 1, . . . . Then, 0 is said to be a 
+
+non-uniformly pseudo-hyperbolic (NPH) unstable fixed point of the system if there exists a splitting 
+
+Rm = Ecs ⊕ Eu with dim( Eu) ≥ 1, a sequence of linear maps Tk : Rm → Rm, k = 0 , 1, . . . , a sequence of positive scalars {(μk, λ k, ϵ k)}k≥0, a positive scalar r > 0, and a nonnegative integer 
+
+K0 ≥ 0 such that 30 (i) (hk, T k) ∈ PH( μk, λ k, ϵk 
+
+> 4
+
+; Br (0), E cs ⊕ Eu) for all k ≥ K0,(ii) ϵk < μk −λk 
+
+> 4
+
+for all k ≥ K0,(iii) P∞  
+
+> k=K0
+> ϵk
+> μk−2ϵk
+
+= ∞.As is standard in dynamical systems, the definitions are stated for the case in which the origin is the fixed point, although they apply more generally. More precisely, if w∗ is a common fixed point of 
+
+h0, h 1, . . . , then the translated maps ˜hk = hk( · + w∗) − w∗ have 0 as a common fixed point. Intuitively, the NPH unstable fixed points are a nonautonomous analogue of the ordinary unstable fixed points for autonomous dynamical systems. Indeed, as we discuss shortly, for the iterates of a nonautonomous dynamical system to remain within a neighborhood of an NPH unstable fixed point, they must all lie on a certain measure-zero set. From this, one can show that NPH unstable fixed points are almost surely avoided by the dynamical system. Lee et al. [18] showed that GD and several of its variants, which can be represented as autonomous dynamical systems, avoid strict saddle points of the objective function, in the sense that the set of initial points converging to any such point has Lebesgue measure zero. In light of this, it is natural to ask whether a similar conclusion can be drawn for strict saddle points of f when considering the nonautonomous dynamical system corresponding to SF-GD . In order to answer this question, let us consider 
+
+Q∗ := {(x∗, x∗) : ∇f (x∗) = 0 and λmin (∇2f (x∗)) < 0} (51) which is the set of fixed points of the system (47) that are associated with the strict saddle points of f .One can show that the points in Q∗ are NPH unstable, under mild conditions on the learning rates and the averaging rates, as follows. As the proof is quite long and consists mainly of technical computations, we defer it to Section G.4. 
+
+Lemma G.4. Let f be an L-smooth and twice continuously differentiable function, and let x∗ be a strict saddle point of f , so that (x∗, x∗) ∈ Q ∗ where Q∗ is defined as in (51) . Suppose that there exist 
+
+γmin and γmax such that 0 < γ min ≤ γk ≤ γmax < 1 
+
+> L
+
+for all k, and the averaging rates {ck+1 }k≥0
+
+satisfy lim k→∞ ck+1 = 0 . Then, (x∗, x∗) is an NPH unstable fixed point of the nonautonomous system (47) .
+
+As we briefly noted above, NPH unstable points are akin to ordinary unstable points of autonomous dynamical systems, in that the iterates can stay close to such a point only if they all lie in a certain measure zero set. A formal statement of this fact is as follows. 
+
+Theorem G.5 ([ 23 ], Theorem 2.14) . Suppose that each map hk : Rm → Rm in the nonautonomous dynamical system is continuously differentiable, and that its Jacobian Dh k has full rank except on a set of measure zero. Then, the set of initial points whose trajectories converge to any NPH unstable fixed point has measure zero. 
+
+To apply Theorem G.5, one has to verify that Dh k is of full rank almost surely for hk in (47) . As we show below, it in fact turns out that Dh k is invertible everywhere, given that ck+1 < 1.
+
+Proposition G.6. For any k ≥ 0, consider the map hk : Rd × Rd → Rd × Rd defined in (47) .Suppose that f is L-smooth. If ck+1 < 1 and γk < 1(1 −β)L , then Dh k is invertible. Proof. Fix any k ≥ 0. By a direct computation, we get 
+
+Dh k(y, x) = 
+
+"(1 + βc k+1  
+
+> 1−β
+
+)I − γk(1 − β + βc k+1 )∇2f (y) − βc k+1  
+
+> 1−β
+
+I 
+
+> ck+1
+> 1−β
+
+I − γkck+1 ∇2f (y) (1 − ck+1  
+
+> 1−β
+
+)I
+
+#
+
+=
+
+"(1 − β + βc k+1 )( 11−β I − γk∇2f (y)) − βc k+1  
+
+> 1−β
+
+I
+
+ck+1 ( 11−β I − γk∇2f (y)) 1−β−ck+1  
+
+> 1−β
+
+I
+
+#
+
+.
+
+For the moment, let us assume that β is chosen so that 1 − β − ck+1 ̸ = 0 , and for convenience, denote M := 11−β I − γk∇2f (y). Then the lower right block 1−β−ck+1  
+
+> 1−β
+
+I of Dh k is invertible, and 31 the Schur complement S with respect to that block is 
+
+S = (1 − β + βc k+1 )M + βc k+1 
+
+1 − β
+
+ 1 − β − ck+1 
+
+1 − β
+
+−1
+
+(ck+1 M )=
+
+
+
+1 − β + βc k+1 + βc 2
+
+> k+1
+
+1 − β − ck+1 
+
+
+
+M
+
+= (1 − β)2(1 − ck+1 )1 − β − ck+1 
+
+M .
+
+Using the formula for the determinant of a block matrix in terms of an invertible principal submatrix and the Schur complement with respect to that submatrix, we obtain 
+
+det Dh k(y, x) = det 
+
+ 1 − β − ck+1 
+
+1 − β
+
+
+
+I
+
+
+
+det S
+
+=
+
+ 1 − β − ck+1 
+
+1 − β
+
+d (1 − β)2d(1 − ck+1 )d
+
+(1 − β − ck+1 )d det M
+
+= (1 − β)d(1 − ck+1 )d det M
+
+= (1 − β)d(1 − ck+1 )d det 
+
+ 11 − β I − γk∇2f (y)
+
+
+
+= (1 − ck+1 )d det  I − γk(1 − β)∇2f (y) .
+
+While we have shown that this holds for β satisfying 1 − β − ck+1 ̸ = 0 , the determinant of a matrix is continuous with respect to its entries. Hence, by continuity, the identity holds for all β; that is, 
+
+det Dh k(y, x) = (1 − ck+1 )d det  I − γk(1 − β)∇2f (y) . (52) As the L-smoothness of f implies that γk(1 − β)∇2f (y) ≤ γk(1 − β)L < 1, no eigenvalue of 
+
+I − γk(1 − β)∇2f (y) can be zero. Therefore, det Dh k̸ = 0 , and thus Dh k is invertible. From (52) , we also see that if ck+1 = 1 , then Dh k becomes rank deficient. This is exactly as expected, because for any (yk, xk), if ck+1 = 1 then by Lemma A.7 we know that (yk+1 , xk+1 ) = hk(yk, xk)
+
+lies on the diagonal ∆ := {(x, x) : x ∈ Rd}, which is a d-dimensional linear subspace of Rd × Rd.This implies that rank( Dh k) ≤ d.At the same time, this is also the source of additional difficulties. As before, let k0 be the largest nonnegative integer such that ck0+1 = 1 . A typical statement about the avoidance of saddle points is that the set of initial points that converge to such points has measure zero, à la Theorem G.5. However, regardless of how the initial points are chosen, whether following the standard practice of setting x0 = z0 or allowing possibly x0̸ = z0, we eventually obtain xk0+1 = yk0+1 = zk0+1 ,and in particular, (yk0+1 , xk0+1 ) ∈ ∆. Thus, although ∆ is Lebesgue null as a subset of Rd × Rd,it may contain subsets that are themselves Lebesgue null by virtue of being subsets of a Lebesgue measure zero set, yet nevertheless have positive probability under the distribution of (yk0+1 , xk0+1 ).Because of the existence of such sets, even if we obtain a Lebesgue measure zero set W of initial points whose iterates converge to saddle points, we cannot directly conclude that the iterates almost surely avoid W. Notice that the same degeneracy is still present when k0 = −1, under the standard initialization choice x0 = z0, since this initialization alone implies x0 = y0.Similar measure-theoretic issues arise in the analysis of accelerated methods [ 10 , 26 ]. To circumvent this complication, we adopt the technique of O’Neill and Wright [26] , which consists of applying a small perturbation at a single iteration. More precisely, we propose the following. We still use the update rule (2) , up to obtaining xk0+1 = zk0+1 =: wk0+1 , but once we reach that point and only at that point, we slightly perturb the iterate zk0+1 and set 
+
+z+ 
+
+> k0+1
+
+= zk0+1 + ξ (53) where ξ ∈ Rd is any mean zero random variable whose distribution is absolutely continuous with respect to the Lebesgue measure. For example, one may set ξ to follow a Gaussian distribution 32 N (0, ε 2I) for arbitrarily small ε > 0. Then, at the (k0 + 1) th iteration, we use z+ 
+
+> k0+1
+
+in place of 
+
+zk0+1 and compute 
+
+yk0+1 = (1 − β)z+ 
+
+> k0+1
+
++ βxk0+1 , (54a) 
+
+zk0+2 = z+ 
+
+> k0+1
+
+− γk0+1 gk0+1 , (54b) 
+
+xk0+2 = (1 − ck0+2 )xk0+1 + ck0+2 zk0+2 . (54c) After that, we again resume updating the iterates following the update rule (2). As mentioned therein, Section 5 and, in particular, Theorem 5.2 discuss the special case k0 = 0 for clarity of the presentation. The general statement which reflects (53) and (54) is as follows. 
+
+Theorem G.7. Consider SF-GD with a one-time perturbation applied after zk0+1 and xk0+1 are computed, where zk0+1 is replaced by zk0+1 + ξ. Suppose that the initial point x0 = z0 and the perturbation ξ are drawn independently from distributions that are absolutely continuous with respect to Lebesgue measure on Rd. Then, for β ∈ [0 , 1) and a twice continuously differentiable L-smooth 
+
+f , as long as γ < 1 
+
+> L
+
+, the one-time perturbed SF-GD almost surely does not converge to any strict saddle point of f .Proof. As shown in Lemma A.7, for k = 0 , 1, . . . , k 0 we have xk = yk = zk. Hence, by the update rule (2b) it holds that zk+1 = zk − γk∇f (zk) for all k = 0 , 1, . . . , k 0. That is, z0, z1, . . . , zk0+1 is exactly the sequence of iterates obtained by running gradient descent from the initial point z0 with learning rates γk. For each k = 0 , 1, . . . , k 0, define φk : Rd → Rd by 
+
+φk(z) := z − γk∇f (z)
+
+so that zk+1 = φk(zk).Now, consider the nonautonomous dynamical system (yk+1 , xk+1 ) = hk(yk, xk), but temporarily as if it is initialized at time k = k0 + 1 . By Lemma G.4, Theorem G.5, and Proposition G.6, we can then conclude that there exists a Lebesgue measure zero set W of points such that, for the trajectory of the system to converge to any of the points in Q∗, it is necessary to have (yk0+1 , xk0+1 ) ∈ W .Thus, if we can show that the joint distribution of (yk0+1 , xk0+1 ) is absolutely continuous with respect to the Lebesgue measure on Rd × Rd, we will be able to conclude that SF-GD almost surely does not converge to any strict saddle point of f . To this end, let λ denote the Lebesgue measure on 
+
+Rd, and μ0 denote the distribution which z0 is drawn from. For each k = 0 , 1, . . . , k 0, let 
+
+μk+1 = ( φk ◦ · · · ◦ φ1 ◦ φ0)♯μ0
+
+where (·)♯ denotes the pushforward, so that zk+1 ∼ μk+1 . Notice that 
+
+Dφ k(z) = I − γk∇2f (z),
+
+and because the L-smoothness of f implies γk∇2f (z) ≤ γkL < 1, it follows that det Dφ k̸ = 0 .In particular, by the chain rule it holds that 
+
+det D(φk ◦ · · · ◦ φ1 ◦ φ0) = 
+
+> k
+
+Y
+
+> j=0
+
+det Dφ j̸ = 0 ,
+
+so by Lemma A.4, μ1, . . . , μ k0+1 are all absolutely continuous with respect to λ.Let ν denote the distribution which ξ is drawn from, so that (zk0+1 , ξ) ∼ μk0+1 ⊗ ν. Notice that (54a) is equivalent to 
+
+yk0+1 = zk0+1 + (1 − β)ξ.
+
+Hence, for a linear transformation T defined as 
+
+T (u, v) = ( u + (1 − β)v, u)
+
+it holds that (yk0+1 , xk0+1 ) = T (zk0+1 , ξ). That is, (yk0+1 , xk0+1 ) ∼ T♯(μk0+1 ⊗ ν). Here, as the inverse of T exists and is 
+
+T −1(p, q) = 
+
+
+
+q, 11 − β (p − q)
+
+
+
+we know that det DT ̸ = 0 . Applying Lemma A.4 once again, it follows that the joint distribution of 
+
+(yk0+1 , xk0+1 ) is indeed absolutely continuous with respect to the Lebesgue measure on Rd × Rd.This concludes the proof. 33 G.3 Convergence of the One-Time Perturbed SF-SGD 
+
+As mentioned in Section 5, if we additionally assume that ξ is drawn from a mean zero distribution, then we can show that the one-time perturbation does not alter the overall convergence rate, provided that the second moment of ξ is chosen small enough to satisfy E[∥ξ∥2] ≤ γk0+1 . More precisely, we have the following. 
+
+Theorem G.8. Consider SF-SGD with a one-time perturbation applied after zk0+1 and xk0+1 are computed, where zk0+1 is replaced by zk0+1 + ξ for ξ independently drawn from some mean zero distribution ν. Suppose that ν has a finite second moment, so that there exists some ρ2 ≥ 0 such that 
+
+E[∥ξ∥2] ≤ ρ2. Then, under the setting identical to that of Theorem 4.4, it holds that 
+
+min   
+
+> k=0 ,...,T −1
+
+E∥∇ f (yk)∥2 ≤ 2( f (x0) − f ∗) + (1 − β)2Lρ 2 + βρ 2/γ k0+1 
+
+γ(1 − β)(1 − pw)T
+
++ γL (1 − β)σ2
+
+1 − pw
+
++ 3β(2 − β)Cσ 2(1 + log T )(1 − pw)T .
+
+(55) 
+
+Proof. To avoid confusion, let us reuse the notation z+ 
+
+> k0+1
+
+= zk0+1 + ξ introduced in (53). That is, we replace zk0+1 by z+
+
+> k0+1
+
+. Most of the results established in Lemma E.4 continue to hold verbatim. Indeed, define the Lyapunov potentials exactly as in (39), namely 
+
+Vk = f (yk) − f ∗ + αk∥zk − xk∥2.
+
+Then for k < k 0, nothing is changed by the perturbation, so (41) still holds as is. Also, after computing zk0+2 and xk0+2 using (54b) and (54c) , we return to the ordinary Schedule-Free update rules, so for k ≥ k0 + 2 the inequality (40) still holds. To study the consequences of the one-time perturbation, let us define 
+
+V + 
+
+> k0+1
+
+= f (yk0+1 ) − f ∗ + αk0+1 z+ 
+
+> k0+1
+
+− xk0+1 
+
+> 2
+
+.
+
+If there had been no perturbation, Lemma A.7 would give zk0+1 = xk0+1 , and yk0+1 would coincide with this common value as well. To reflect this, let us define 
+
+V − 
+
+> k0+1
+
+= f (zk0+1 ) − f ∗.
+
+Then (41) applies to V − 
+
+> k0+1
+
+− Vk0 , yielding 
+
+E[V −
+
+> k0+1
+
+] − E[Vk0 ] ≤ − γk0
+
+2 E∥∇ f (yk0 )∥2 + γ2 
+
+> k0
+
+Lσ 2
+
+2 . (56) In addition, observe that the validity of (40) depends only on the identity yk = (1 − β)zk + βxk and on the sequences of learning rates {γk}k≥0 and averaging rates {ck+1 }k≥0 satisfying the assumptions of Lemmata E.2 and E.3. Hence, (40) applies to Vk0+2 − V +
+
+> k0+1
+
+, yielding 
+
+E[Vk0+2 ] − E[V +
+
+> k0+1
+
+] ≤ − γk0+1 (1 − β)2 E∥∇ f (yk0+1 )∥2
+
++ γk0+1 σ2
+
+2
+
+ β(1 + γk0+1 L(1 − β)) ck0+2 + γk0+1 L(1 − β)2.
+
+(57) Now let us examine what happens between V + 
+
+> k0+1
+
+and V −
+
+> k0+1
+
+. Using (53) and (54a), we obtain 
+
+V + 
+
+> k0+1
+
+− V − 
+
+> k0+1
+
+= f  (1 − β)z+ 
+
+> k0+1
+
++ βxk0+1 
+
+ − f (zk0+1 ) + αk0+1 z+ 
+
+> k0+1
+
+− xk0+1 
+
+> 2
+
+= f  zk0+1 + (1 − β)ξ − f (zk0+1 ) + αk0+1 ∥ξ∥2
+
+≤ ⟨ (1 − β)ξ, ∇f (zk0+1 )⟩ + L
+
+2 ∥(1 − β)ξ∥2 + αk0+1 ∥ξ∥2
+
+where the inequality follows from Lemma A.1. Taking conditional expectation given zk0+1 , by the assumption that ξ is drawn from a mean zero distribution ν and is independent of zk0+1 , we get 
+
+E V + 
+
+> k0+1
+
+zk0+1 
+
+ − E V − 
+
+> k0+1
+
+zk0+1 
+
+ ≤
+
+ (1 − β)2L
+
+2 + αk0+1 
+
+
+
+E∥ξ∥2. (58) 34 By (34) and (35), it holds that 
+
+αk0+1 = Lβ 2c2
+
+> k0+2
+
+2 + αk0+2 (1 − ck0+2 )2
+
+= Lβ 2c2
+
+> k0+2
+
+2 + βc k0+2 (1 − γk0+1 L(1 − β + βc k0+2 )) 2γk0+1 
+
+= βc k0+2 (1 − γk0+1 L(1 − β)) 2γk0+1 
+
+.
+
+As ck0+2 ≤ 1 by (8), from the above we further get that 
+
+αk0+1 ≤ β
+
+2γk0+1 
+
+.
+
+Hence, applying the law of total expectation on (58), we obtain 
+
+E V +
+
+> k0+1
+
+ − E V −
+
+> k0+1
+
+ ≤
+
+ (1 − β)2L
+
+2 + β
+
+2γk0+1 
+
+
+
+ρ2. (59) Therefore, by writing 
+
+E[Vk0+2 ]−E[Vk0 ] =  E[Vk0+2 ] − E V +
+
+> k0+1
+
+ + E V +
+
+> k0+1
+
+ − E V −
+
+> k0+1
+
+ + E V −
+
+> k0+1
+
+ − E[Vk0 ]
+
+and then observing the inequalities (56) , (57) , and (59) , we conclude that the bound on 
+
+E[Vk0+2 ] − E[Vk0 ] for the one-time perturbed SF-SGD differs from the corresponding bound for the original SF-SGD only by the additional contribution from the right-hand side of (59) . We can then repeat the proof of Theorem 4.4 to obtain a counterpart of (44), which now reads  
+
+> T−1
+
+X
+
+> k=0
+
+ak E∥∇ f (yk)∥2 ≤ f (x0) − f ∗ + 3γβ (1 − β)(2 − β)Cσ 2(1 + log T )2+ γ2L(1 − β)2σ2T
+
+2 +
+
+ (1 − β)2L
+
+2 + β
+
+2γk0+1 
+
+
+
+ρ2
+
+for ak defined in the beginning of the proof of Theorem 4.4. Proceeding further exactly as in Theorem 4.4, we obtain the claimed inequality. Notice that we had the freedom to choose ξ to have an arbitrarily small second moment. In case we set E[∥ξ∥2] ≤ γk0+1 , we may take ρ2 = γk0+1 in (55), which makes the numerator of the first term in the right hand side be bounded as 
+
+2( f (x0) − f ∗) + (1 − β)2Lρ 2 + βρ 2
+
+γk0+1 
+
+= 2( f (x0) − f ∗) + (1 − β)2γk0+1 L + β
+
+≤ 2( f (x0) − f ∗) + (1 − β)2 + β. 
+
+Then one gets that the convergence rates are unaffected by the one-time perturbation. 
+
+G.4 Proof of Lemma G.4 
+
+It is well known that, in a finite dimensional space, all norms are equivalent. Let us derive the explicit factors that arise when bounding the max-norm defined in (50) by the ℓ2-norm and vice versa, given that the splitting Rm = Ecs ⊕ Eu is an orthogonal sum. 
+
+Proposition G.9. Under the notations used in Definition G.2, let both Ecs and Eu be equipped with the ℓ2-norm ∥·∥ inherited from Rm. Suppose that Eu = E⊥ 
+
+> cs
+
+. Then for any w ∈ Rm, the max-norm defined as in (50) satisfies 
+
+∥w∥max ≤ ∥ w∥ ≤ √2∥w∥max .
+
+Proof. Let w = u + v with u ∈ Ecs and v ∈ Eu. As Eu = E⊥ 
+
+> cs
+
+, we have ⟨u, v⟩ = 0 , hence 
+
+∥w∥2 = ∥u + v∥2 = ∥u∥2 + ∥v∥2 + 2 ⟨u, v⟩
+
+= ∥u∥2 + ∥v∥2.
+
+35 On one hand, it immediately follows that 
+
+∥w∥2 = ∥u∥2 + ∥v∥2 ≤ 2 (max {∥ u∥, ∥v∥} )2 = 2 ∥w∥2max .
+
+On the other hand, it is also straightforward that 
+
+∥w∥2 = ∥u∥2 + ∥v∥2 ≥ max ∥u∥2, ∥v∥2 = (max {∥ u∥, ∥v∥} )2 = ∥w∥2max .
+
+Taking the square roots leads to the desired inequality. 
+
+Lemma G.10 (Lemma G.4) . Let f be an L-smooth and twice continuously differentiable function, and let x∗ be a strict saddle point of f , so that (x∗, x∗) ∈ Q ∗ where Q∗ is defined as in (51) .Suppose that there exist γmin and γmax such that 0 < γ min ≤ γk ≤ γmax < 1 
+
+> L
+
+for all k, and the averaging rates {ck+1 }k≥0 satisfy lim k→∞ ck+1 = 0 . Then, (x∗, x∗) is an NPH unstable fixed point of the nonautonomous system (47) .Proof. Upon a suitable translation, we may assume without loss of generality that x∗ = 0. Let 
+
+H := ∇2f (0) ∈ Rd×d. By the strict saddle property, there exists an eigenvector of H associated with a negative eigenvalue. Let V be the span of all the eigenvectors of H that are associated with a negative eigenvalue, and W the span of all eigenvectors of H associated with a nonnegative eigenvalue. As H is symmetric hence orthogonally diagonalizable, it holds that W = V ⊥. Thus, by setting Eu = V × { 0} and Ecs = W × Rd, we have Rd × Rd = Ecs ⊕ Eu, with dim( Eu) ≥ 1.For each k ≥ 0, define a linear map Tk : Rd × Rd → Rd × Rd by 
+
+Tk(y, x) = 
+
+I − γk(1 − β)H 00 I
+
+  yx
+
+
+
+.
+
+We wish to show that, for each k ≥ 0, there exists some μk, λk, and ϵk with 1 ≤ λk < μ k and ϵk > 0
+
+such that (hk, T k) is (μk, λ k, ϵk 
+
+> 4
+
+)-pseudo-hyperbolic on some open ball Br (0) with respect to the splitting Rd × Rd = Ecs ⊕ Eu.Let us equip both Ecs and Eu with the standard ℓ2 norm inherited from Rd × Rd. Any vector in Eu is of the form (v, 0) for some v ∈ V . As V is H-invariant, for any k ≥ 0 we have 
+
+Tk(v, 0) = 
+
+v − γk(1 − β)Hv 
+
+0
+
+
+
+∈ Eu.
+
+Moreover, let id V : V → V denote the identity operator on V , and HV : V → V denote the linear operator corresponding to the restriction of H to V . Then −HV is positive definite, by the definition of V . In particular, if we set 
+
+θ := min {− ν : ν < 0 and ν is an eigenvalue of H} (60) then the smallest eigenvalue of −HV is also θ. It follows that the smallest eigenvalue of 
+
+id V + γk(1 − β)( −HV ) is 1 + γk(1 − β)θ, and hence 
+
+∥Tk(v, 0)∥ = ∥v − γk(1 − β)Hv ∥ = ∥(id V + γk(1 − β)( −HV )) v∥≥ (1 + γk(1 − β)θ)∥v∥≥ (1 + γmin (1 − β)θ)∥v∥.
+
+(61) Meanwhile, any vector in Ecs is of the form (w, u) for some w ∈ W . As W is H-invariant, for any 
+
+k ≥ 0 we have 
+
+Tk(w, u) = 
+
+w − γk(1 − β)Hw u
+
+
+
+∈ Ecs .
+
+This time, let id W : W → W denote the identity operator on W , and HW : W → W denote the linear operator corresponding to the restriction of H to W . Then, by the definition of W , we know that −HW is negative semidefinite, in particular having only nonpositive eigenvalues. In addition, because the L-smoothness of f implies that ∥H∥ ≤ L, we also have ∥HW ∥ ≤ L, and thus the eigenvalues of −HW are bounded below by −L. Hence, the eigenvalues of id W + γk(1 − β)( −HW )
+
+are bounded above by 1, and bounded below by 1 − γk(1 − β)L ≥ 1 − (1 − β) = β. It follows that 
+
+∥Tk(w, u)∥2 = ∥w − γk(1 − β)Hw ∥2 + ∥u∥2
+
+= ∥(id W + γk(1 − β)( −HW )) w∥2 + ∥u∥2
+
+≤ ∥ w∥2 + ∥u∥2
+
+= ∥(w, u)∥2.
+
+(62) 36 For θ defined as in (60) , let us set μ = 1 + γmin (1 − β)θ. We claim that there exists some r > 0 and a nonnegative integer K0 which satisfy Lip(( hk − Tk)|Br (0)) ≤ μ−120 in the sense of Definition G.2(iii) whenever k ≥ K0. If this is the case, then together with (61) and (62) , we will be able to conclude that (hk, T k) ∈ PH( μ, 1, μ−120 ; Br (0), E cs ⊕ Eu) for all k ≥ K0. To this end, let us first observe that 
+
+hk(y, x) − Tk(y, x) = 
+
+" βc k+1  
+
+> 1−β
+
+(y − x) + γk(1 − β) Hy − ∇ f (y) − γkβc k+1 ∇f (y) 
+
+> ck+1
+> 1−β
+
+(y − x) − γkck+1 ∇f (y)
+
+#
+
+= γk(1 − β)
+
+Hy − ∇ f (y)
+
+0
+
+
+
++ ck+1 
+
+1 − β
+
+β(y − x)
+
+y − x
+
+
+
+− γkck+1 
+
+β∇f (y)
+
+∇f (y)
+
+
+
+.
+
+We now study the Lipschitz constant of each term in the last line above separately. Notice that 
+
+Eu = E⊥ 
+
+> cs
+
+by construction, so Proposition G.9 applies. For any y1, y2 ∈ Rd, by the fundamental theorem of calculus, we have 
+
+Hy 1 − ∇ f (y1) −  Hy 2 − ∇ f (y2) = H(y1 − y2) + ∇f (y2) − ∇ f (y1)=
+
+Z 10
+
+
+
+∇2f  y1 + t(y2 − y1) − H
+
+
+
+(y2 − y1) d t
+
+=
+
+Z 10
+
+
+
+∇2f  y1 + t(y2 − y1) − ∇ 2f (0)
+
+
+
+dt · (y2 − y1).
+
+(63) As f is twice continuously differentiable, ∇2f is continuous, so there exists some δ > 0 such that 
+
+∥y∥ < δ implies ∇2f (y) − ∇ 2f (0) < μ−1140 γmax (1 −β) . For such δ, as having both ∥y1∥ < δ and 
+
+∥y2∥ < δ implies that 
+
+∥y1 + t(y2 − y1)∥ = ∥(1 − t)y1 + ty2∥ < δ 
+
+whenever 0 ≤ t ≤ 1, by using (63) and Proposition G.9 we obtain 
+
+γk(1 − β)
+
+Hy 1 − ∇ f (y1)
+
+0
+
+
+
+− γk(1 − β)
+
+Hy 2 − ∇ f (y2)
+
+0
+
+
+
+> max
+
+≤ γk(1 − β)
+
+Hy 1 − ∇ f (y1)
+
+0
+
+
+
+−
+
+Hy 2 − ∇ f (y2)
+
+0
+
+
+
+= γk(1 − β) Hy 1 − ∇ f (y1) −  Hy 2 − ∇ f (y2)
+
+≤ γk(1 − β)
+
+Z 10
+
+
+
+∇2f  y1 + t(y2 − y1) − ∇ 2f (0)
+
+
+
+dt ∥y2 − y1∥
+
+< γk(μ − 1) 140 γmax 
+
+∥y2 − y1∥≤ μ − 1140 ∥y2 − y1∥.
+
+(64) Meanwhile, because we assume lim k→∞ ck+1 = 0 , there exists some nonnegative integer K0 such that 0 ≤ ck+1 ≤ (μ−1)(1 −β)140 whenever k ≥ K0. Then for any y1, y2 ∈ Rd, as long as k ≥ K0, it follows that 
+
+γkck+1 
+
+β∇f (y1)
+
+∇f (y1)
+
+
+
+− γkck+1 
+
+β∇f (y2)
+
+∇f (y2)
+
+
+
+> max
+
+≤ γkck+1 
+
+β(∇f (y1) − ∇ f (y2)) 
+
+∇f (y1) − ∇ f (y2)
+
+
+
+= γkck+1 
+
+p1 + β2 ∇f (y1) − ∇ f (y2)
+
+≤ γkLc k+1 
+
+p1 + β2 ∥y1 − y2∥≤ γkL(μ − 1)(1 − β)p1 + β2
+
+140 ∥y1 − y2∥≤ (μ − 1)(1 − β)p1 + β2
+
+140 ∥y1 − y2∥.
+
+37 Here, as 0 ≤ β < 1, we have a simple inequality 
+
+(1 − β)p1 + β2 ≤ (1 − β)p1 + 2 β + β2 = (1 − β)(1 + β) = 1 − β2 ≤ 1.
+
+Thus, we eventually have 
+
+γkck+1 
+
+β∇f (y1)
+
+∇f (y1)
+
+
+
+− γkck+1 
+
+β∇f (y2)
+
+∇f (y2)
+
+
+
+> max
+
+≤ μ − 1140 ∥y1 − y2∥. (65) For the same K0 as above, for any y1, y2, x1, x2 ∈ Rd, one can show, whenever k ≥ K0, that 
+
+ck+1 
+
+1 − β
+
+β(y1 − x1)
+
+y1 − x1
+
+
+
+− ck+1 
+
+1 − β
+
+β(y2 − x2)
+
+y2 − x2
+
+
+
+> max
+
+≤ ck+1 
+
+1 − β
+
+β(y1 − y2 + x2 − x1)
+
+y1 − y2 + x2 − x1
+
+
+
+= ck+1 
+
+p1 + β2
+
+1 − β ∥y1 − y2 + x2 − x1∥≤ ck+1 
+
+p1 + β2
+
+1 − β
+
+ ∥y1 − y2∥ + ∥x2 − x1∥
+
+≤ (μ − 1) √2140 
+
+ ∥y1 − y2∥ + ∥x1 − x2∥.
+
+(66) Also, for δ and K0 defined as above, let r = δ√2 . Then for any (y, x) ∈ Br (0), by Proposition G.9, we have 
+
+∥y∥ =
+
+y
+
+0
+
+
+
+≤ √2
+
+y
+
+0
+
+
+
+> max
+
+< √2r = δ. 
+
+Therefore, for any (y1, x1) and (y2, x2) in Br (0), whenever k ≥ K0, from the three inequalities (64), (65), and (66), we obtain that 
+
+hk(y1, x1) − Tk(y1, x1) −  hk(y2, x2) − Tk(y2, x2)
+
+> max
+
+≤ γk(1 − β)
+
+Hy 1 − ∇ f (y1)
+
+0
+
+
+
+− γk(1 − β)
+
+Hy 2 − ∇ f (y2)
+
+0
+
+
+
+> max
+
++ γkck+1 
+
+β∇f (y1)
+
+∇f (y1)
+
+
+
+− γkck+1 
+
+β∇f (y2)
+
+∇f (y2)
+
+
+
+> max
+
++ ck+1 
+
+1 − β
+
+β(y1 − x1)
+
+y1 − x1
+
+
+
+− ck+1 
+
+1 − β
+
+β(y2 − x2)
+
+y2 − x2
+
+
+
+> max
+
+≤ 2( μ − 1) 140 ∥y1 − y2∥ + (μ − 1) √2140 
+
+ ∥y1 − y2∥ + ∥x1 − x2∥
+
+≤ (μ − 1)(2 + √2) 140 
+
+ ∥y1 − y2∥ + ∥x1 − x2∥
+
+≤ (μ − 1)(2 √2 + 2) 140 
+
+q
+
+∥y1 − y2∥2 + ∥x1 − x2∥2
+
+= (μ − 1)(2 √2 + 2) 140 ∥(y1, x1) − (y2, x2)∥≤ (μ − 1)(4 + 2 √2) 140 ∥(y1, x1) − (y2, x2)∥max ,
+
+where the fourth inequality follows from the Cauchy–Schwarz inequality, and the last inequality follows from Proposition G.9. As 2√2 = √8 < √9 = 3 , we conclude that 
+
+hk(y1, x1) − Tk(y1, x1) −  hk(y2, x2) − Tk(y2, x2) 
+
+> max
+
+≤ μ − 120 ∥(y1, x1) − (y2, x2)∥max .
+
+That is, whenever k ≥ K0, the map hk −Tk is μ−120 -Lipschitz on Br (0) with respect to the max-norm .It follows indeed that (hk, T k) ∈ PH( μ, 1, μ−120 ; Br (0), E cs ⊕ Eu) for all k ≥ K0.Finally, for each k ≥ 0, let μk = μ, λk = 1 , and ϵk = μ−15 . It is clear that the conditions (i)–(iii) in Definition G.3 are all satisfied. Therefore, 0 is an NPH unstable fixed point of the system (47). 38 H PEP Experiments 
+
+All PEP results in this work are obtained using the Python package PEPit [14 ]. In formulating a PEP instance with an objective function f that is possibly nonconvex yet bounded below, we invoke the following theorem. 
+
+Theorem H.1 ([ 11 ], Theorem 7) . For a fixed L > 0, let {(xi, gi, f i)}i=0 ,...,T ⊂ Rd × Rd × R be a set of triplets that satisfy 
+
+12L ∥gi − gj ∥2 − L
+
+4 xi − xj − 1
+
+L (gi − gj ) ≤ fi − fj − ⟨ gj , xi − xj ⟩
+
+for all 0 ≤ i, j ≤ T . Then, there exists an L-smooth function f such that f (xi) = fi and 
+
+∇f (xi) = gi for all i = 0 , . . . , T , which in addition satisfies 
+
+min  
+
+> x
+
+f (x) = min   
+
+> i∈{ 0,1,...,T }
+
+fi − 12L ∥gi∥2.
+
+Based on this fact, we enforce the constraints of the form f (x) − 12L ∥∇ f (x)∥2 ≥ f ∗ instead of the naïve f (x) ≥ f ∗ as a formulation of Assumption 1.2. We note that a similar strategy was adopted by Abbaszadehpeivasti et al. [1]. In particular, the results plotted in Figure 1 are obtained by solving 
+
+max min  
+
+> 0≤k≤T
+
+∥∇ f (xk)∥2
+
+s.t. f is L-smooth ,
+
+x0 = y0 = z0,f (x0) − f ∗ ≤ 1,
+
+xk, yk, and zk computed by SF-GD , ∀k = 1 , . . . , T, f (xk) − 12L ∥∇ f (xk)∥2 ≥ f ∗, ∀k = 0 , 1, . . . , T, f (yk) − 12L ∥∇ f (yk)∥2 ≥ f ∗, ∀k = 0 , 1, . . . , T − 1
+
+(67) with L = 1 and γ = 1 
+
+> L
+
+. Notice that there is no loss of generality in setting L = 1 , because for an 
+
+L-smooth function f we can always alternatively consider fL in place of f . Also, to avoid unnecessary complexities, we consider the case where there is no warmup phase, i.e. , Tw = 1 , so that pw = 0 and the averaging rates become the standard ck+1 = 1 
+
+> k+1
+
+. As both the update rule of SF-GD and the optimality measure do not involve f (zk) nor ∇f (zk), the lower bound constraints regarding zk are not included in the PEP instance (67). As a complementary verification of the convergence rates we established in Section 4, we also numerically computed the tight worst-case upper bounds on min 0≤k<T ∥∇ f (yk)∥2 for the iterates generated by SF-GD , under the assumptions that f is 1-smooth and bounded below. Such results are obtained by solving 
+
+max min  
+
+> 0≤k≤T
+
+∥∇ f (yk)∥2
+
+s.t. f is L-smooth ,
+
+x0 = y0 = z0,f (x0) − f ∗ ≤ 1,
+
+xk, yk, and zk computed by SF-GD , ∀k = 1 , . . . , T, f (yk) − 12L ∥∇ f (yk)∥2 ≥ f ∗, ∀k = 0 , 1, . . . , T − 1.
+
+As now the only points where the gradient of f should be computed are yk, we may remove the lower bound constraints regarding xk.The results are plotted in Figure 2. Because we impose the initial condition f (x0) − f ∗ ≤ 1, the theoretical upper bound from Corollary 4.5 reads 2(1 −β)T . The plots show that the tight worst-case performances are indeed bounded by this quantity, validating our theoretical upper bound. In our computing environment, equipped with an Intel® Xeon® Gold 6226R 32-core CPU and 384 GB of RAM, the computations for Figure 1 took approximately 6 hours for each choice of β,while those for Figure 2 took approximately 4 hours for each choice of β.39 20 40 60 80 100 120 140                  
+
+> T
+> 10 2
+> 10 1
+> 10 0
+> min 0≤k<T ‖∇ f(yk)‖2from PEP
+> L= 1 , γ =1
+> L, c k+1 =1
+> k+1
+> PEP results Upper bounds
+> β= 0 .1
+> β= 0 .1
+> β= 0 .5
+> β= 0 .5
+> β= 0 .9
+> β= 0 .9
+
+Figure 2: The convergence plots regarding the gradient location iterates yk, with varying only β
+
+among the parameters. The solid lines with markers are the plots for the PEP results. The other dashed and dotted lines are the plots of the theoretical upper bounds obtained in Corollary 4.5. 
+
+## I Regularity of SF-ODE near t = 0 
+
+Following the standard notation, for an interval I ⊂ R, we let C(I, Rd) be the set of all continuous functions I → Rd. In cases where I is a closed interval, we equip C(I, Rd) with the uniform norm 
+
+∥w∥∞ = sup t∈I ∥w(t)∥ so that it becomes a Banach space. The equation (5c) has a factor 1 
+
+> t
+
+, which could potentially make the solutions, or even the ODE itself, ill-defined at t = 0 . However, it turns out that this singularity at t = 0 is removable, in the sense that we can always find a solution whose value at t = 0 can be assigned by a continuous extension to be exactly the desired initial point. The goal of this section is to establish this fact. As a first step, let T be any positive real number, and consider the ODE (5) and its solution (x, y, z)
+
+on the half-open interval (0 , T ]. We show that whether the solutions can be continuously extended to the closed interval [0 , T ] can be reduced into determining whether a certain integral equation has a well-posed solution. For convenience, let us define an operator I : C([0 , T ], Rd) → C([0 , T ], Rd) as 
+
+I(w)( t) = 
+
+
+
+1
+
+t
+
+Z t
+
+> 0
+
+sw(s) d s t > 0,
+
+0 t = 0 .
+
+(68) Notice that, by the continuity of w, we indeed have lim t→0+ I(w)( t) = 0.
+
+Proposition I.1. Let x, y, and z be functions in C([0 , T ], Rd). Then, for any given x0 ∈ Rd, the following are equivalent. (i) The triple (x, y, z) is a solution to the SF-ODE on the half-open interval (0 , T ], and 
+
+x(0) = y(0) = z(0) = x0.(ii) The function y is a solution of the integral equation 
+
+y(t) = x0 −
+
+Z t
+
+> 0
+
+∇f (y(s)) d s + βI(∇f ◦ y)( t), ∀t ∈ [0 , T ]. (69) 
+
+Moreover, for such y we have 
+
+x(t) = x0 −
+
+Z t
+
+> 0
+
+∇f (y(s)) d s + I(∇f ◦ y)( t), ∀t ∈ [0 , T ] (70) 
+
+and z = 11−β (y − βx).
+
+40 Proof. (i) =⇒ (ii) Whenever s > 0, from (5b) and (5c) we have 
+
+dds s2 ˙x(s) = dds s z(s) − x(s)
+
+= z(s) − x(s) + s ˙z(s) − s ˙x(s)= s ˙z(s)= −s∇f (y(s)) .
+
+(71) Thus, by integrating on the interval (0 , u ] we get 
+
+u2 ˙x(u) = −
+
+Z u
+
+> 0
+
+s∇f (y(s)) d s. 
+
+Dividing both sides by u2 and then integrating leads to 
+
+x(t) − x(0) = −
+
+Z t
+
+> 0
+
+Z u
+
+> 0
+
+su2 ∇f (y(s)) d sdu. (72) As s 7 → ∇ f (y(s)) is continuous, it is bounded on the compact set [0 , T ]. Let M be an upper bound of ∥∇ f (y)∥ on the interval [0 , T ]. Then one can observe that the function (s, u ) 7 → su2 ∇f (y(s)) is absolutely integrable on the triangle {(s, u ) : 0 < s ≤ u ≤ t} for any t > 0, from that 
+
+Z t
+
+> 0
+
+Z ts
+
+su2 ∇f (y(s)) duds ≤
+
+Z t
+
+> 0
+
+M s 
+
+Z ts
+
+1
+
+u2 du
+
+
+
+ds =
+
+Z t
+
+> 0
+
+M
+
+
+
+1 − st
+
+
+
+ds = M t 
+
+2 < ∞.
+
+Thus, we can apply the Fubini–Tonelli theorem on the right hand side of (72) to get 
+
+x(t) − x(0) = −
+
+Z t
+
+> 0
+
+Z ts
+
+su2 ∇f (y(s)) d uds
+
+= −
+
+Z t
+
+> 0
+
+
+
+1 − st
+
+
+
+∇f (y(s)) d s
+
+= −
+
+Z t
+
+> 0
+
+∇f (y(s)) d s + 1
+
+t
+
+Z t
+
+> 0
+
+s∇f (y(s)) d s. 
+
+(73) Now, notice that (5a) implies y − x = (1 − β)( z − x). Hence, from (71) we also get 
+
+dds s y(s) − x(s) = −s(1 − β)∇f (y(s)) .
+
+Integrating both sides, we obtain 
+
+ty(t) − tx(t) = −(1 − β)
+
+Z t
+
+> 0
+
+s∇f (y(s)) d s. 
+
+Dividing both sides by t and then substituting the resulting formula of x into (73) , we conclude that 
+
+y(t) = x0 −
+
+Z t
+
+> 0
+
+∇f (y(s)) d s + βt
+
+Z t
+
+> 0
+
+s∇f (y(s)) d s
+
+whenever t > 0, which is exactly (69) . The fact that (69) holds when t = 0 is immediate from the definition (68) of I. Once we have y that satisfies (69) , it follows from (73) that (70) also holds, and the formula for z holds by (5a). (ii) =⇒ (i) Suppose that y ∈ C([0 , T ], Rd) satisfies (69) , and for such y the function 
+
+x ∈ C([0 , T ], Rd) is defined as in (70) with z = 11−β (y − βx). Since x(0) = y(0) = z(0) 
+
+is then immediate, it only remains to show that these functions solve the SF-ODE on (0 , T ].By the assumption that z = 11−β (y − βx), we have (5a) . Meanwhile, subtracting β times (70) from (69), we obtain 
+
+y(t) − βx(t) = (1 − β)x0 − (1 − β)
+
+Z t
+
+> 0
+
+∇f (y(s)) d s. 
+
+41 Differentiating with respect to t and using the already obtained (5a), we end up with 
+
+˙z(t) = 11 − β
+
+ddt
+
+ y(t) − βx(t) = −∇ f (y(t)) 
+
+which is exactly (5b). Finally, subtract (70) directly from (69), to get 
+
+y(t) − x(t) = −(1 − β)I(∇f ◦ y)( t)= − 1 − βt
+
+Z t
+
+> 0
+
+s∇f (y(s)) d s. 
+
+As (5a) also implies the identity y − x = (1 − β)( z − x), from the above we also have that 
+
+t z(t) − x(t) = −
+
+Z t
+
+> 0
+
+s∇f (y(s)) d s. (74) Differentiating with respect to t and using the already obtained (5b) leads to 
+
+z(t) − x(t) + t ˙z(t) − t ˙x(t) = −t∇f (y(t)) = t ˙z(t).
+
+Simply rearranging the terms gives us (5c), recovering all three equations in the SF-ODE .Proposition I.1 gives us a way to “solve” the SF-ODE on the closed interval [0 , T ]. Indeed, for any given initial point x0 ∈ Rd, by solving the integral equation (69) , one can construct 
+
+x(t), y(t), z(t) ∈ C([0 , T ], Rd) which together become a solution of the SF-ODE on the interval 
+
+(0 , T ] and satisfies lim t→0+ 
+
+ x(t), y(t), z(t) = ( x0, x0, x0).Thus, the main question is now whether the integral equation (69) has a well-defined solution. We present an affirmative answer to this question. By mimicking the standard proof of the celebrated Picard–Lindelöf theorem for ODEs, we show that the solution of the integral equation (69) uniquely exists on the interval [0 , T ] whenever T > 0 is sufficiently small. To this end, given any fixed x0 ∈ Rd, let us set 
+
+T = 12L + 2 ∥∇ f (x0)∥ (75) and define an affine subset B of the Banach space C([0 , T ], Rd) as 
+
+B := y ∈ C([0 , T ], Rd) : y(0) = x0 .
+
+Let us also define an operator T : B → B as 
+
+T (y)( t) = x0 −
+
+Z t
+
+> 0
+
+∇f (y(s)) d s + βI(∇f ◦ y)( t) (76) so that y is a solution to the integral equation (69) if and only if it is a fixed point of T . Observe that the definition (68) of I indeed implies that T (y)(0) = x0 for any y ∈ B, from which we get that 
+
+T (B) ⊂ B and there is no problem considering B as the codomain of T .
+
+Proposition I.2. T is a contraction on B.Proof. For any two y, w ∈ B and t > 0, it holds that 
+
+T (y)( t) − T (w)( t) = 
+
+Z t
+
+> 0
+
+∇f (w(s)) − ∇ f (y(s)) d s + βt
+
+Z t
+
+> 0
+
+s(∇f (y(s)) − ∇ f (w(s))) d s. 
+
+42 Thus, by the L-smoothness of f , we obtain 
+
+∥T (y)( t) − T (w)( t)∥ ≤ 
+
+Z t
+
+> 0
+
+∇f (w(s)) − ∇ f (y(s)) d s + βt
+
+Z t
+
+> 0
+
+s(∇f (y(s)) − ∇ f (w(s))) d s
+
+≤
+
+Z t
+
+> 0
+
+∥∇ f (w(s)) − ∇ f (y(s)) ∥ ds + βt
+
+Z t
+
+> 0
+
+s∥∇ f (w(s)) − ∇ f (y(s)) ∥ ds
+
+≤ L
+
+Z t
+
+> 0
+
+∥y(s) − w(s)∥ ds + βL t
+
+Z t
+
+> 0
+
+s∥y(s) − w(s)∥ ds
+
+≤ ∥ y − w∥∞
+
+
+
+Lt + βL t
+
+Z t
+
+> 0
+
+s ds
+
+
+
+= ∥y − w∥∞
+
+
+
+1 + β
+
+2
+
+
+
+Lt 
+
+≤ 32 LT ∥y − w∥∞
+
+where in the last line we used the fact that β ≤ 1. Because T is chosen as in (75) , we have T ≤ 12L .Furthermore, as we already know from T (B) ⊂ B that T (y)(0) = T (w)(0) = x0, we have 
+
+T (y)(0) − T (w)(0) = 0, and hence it holds that 
+
+∥T (y) − T (w)∥∞ = sup  
+
+> t∈[0 ,T ]
+
+∥T (y)( t) − T (w)( t)∥ ≤ 34 ∥y − w∥∞.
+
+Therefore, we conclude that T is a contraction on B whose Lipschitz constant is at most 34 .
+
+Lemma I.3. On the interval [0 , T ], the integral equation (69) has a unique well-defined continuous solution. Proof. Consider the operator T : B → B defined in (76) , which is a contraction, as we saw in Proposition I.2. Based on this observation, we wish to use the Banach fixed point theorem. To this end, we claim that B itself is a nonempty complete Banach space. As the constant function t 7 → x0 is in B, it is clear that B is nonempty. To see that B is complete, suppose that {wk}k≥1 is a Cauchy sequence in B. Being a Cauchy sequence in a complete Banach space C([0 , T ], Rd), we know that 
+
+{wk}k≥1 converges to some w∗ ∈ C([0 , T ], Rd). As this convergence is uniform, we also have pointwise convergence, implying that w∗(0) = lim k→∞ wk(0) = x0 and thus w∗ ∈ B. It follows that B is indeed a complete Banach space. We may now apply the Banach fixed point theorem on B, to obtain the existence of a unique fixed point y of T in B. By definition, y is a fixed point of T if and only if y is a solution to the integral equation (69), so we are done. Therefore, by considering the functions defined as in the statement of Proposition I.1(ii), it becomes possible to rigorously study the solution (x, y, z) of the SF-ODE with the initial conditions given at 
+
+t = 0 . One property of such a solution that is useful when analyzing the Lyapunov function (6) is as follows. 
+
+Proposition I.4. For x, y, and z defined as in the statement of Proposition I.1(ii), it holds that 
+
+lim 
+
+> t→0+
+
+z(t) − x(t)
+
+t = − ∇f (x0)2 .
+
+Proof. From (74), it follows that 
+
+z(t) − x(t)
+
+t = − 1
+
+t2
+
+Z t
+
+> 0
+
+s∇f (y(s)) d s. 
+
+43 Taking the limit as t → 0+ , by L’Hôpital’s rule we get 
+
+lim 
+
+> t→0+
+
+z(t) − x(t)
+
+t = − lim 
+
+> t→0+
+
+R t 
+
+> 0
+
+s∇f (y(s)) d st2
+
+= − lim 
+
+> t→0+
+
+t∇f (y(t)) 2t
+
+= − ∇f (x0)2
+
+because ∇f is L-Lipschitz by Assumption 1.1 hence continuous, while Proposition I.1 asserts that 
+
+y(t) → x0 as t → 0+ .By (5c) and Proposition I.4, we have that 
+
+lim  
+
+> t→0+
+
+˙x(t) = lim 
+
+> t→0+
+
+z(t) − x(t)
+
+t = − ∇f (x0)2 .
+
+Meanwhile, as (5b) implies that 
+
+lim  
+
+> t→0+
+
+˙z(t) = lim  
+
+> t→0+
+
+−∇ f (y(t)) = −∇ f (x0)
+
+and (5a) additionally asserts that ˙y = (1 − β) ˙ z + β ˙x, we conclude that the solution can be extended to t = 0 so that it is not only continuous, but also has a derivative that is continuous up to t = 0 .44 NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: We wrote the abstract and introduction so that the main takeaways from Sections 3–6 are included and summarized. Guidelines: • The answer [N/A] means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A [No] or [N/A] answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: Although we were unable to include a separate “Limitations” section due to the page limit, the limitations are discussed in Section 7. Guidelines: • The answer [N/A] means that the paper has no limitation while the answer [No] means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate “Limitations” section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory assumptions and proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? 45 Answer: [Yes] Justification: All theoretical results explicitly state their required assumptions. Complete proofs are provided in the appendices, with the exception of direct corollaries that follow immediately from other theoretical results. Guidelines: • The answer [N/A] means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental result reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [Yes] Justification: While we use the terminology PEP experiments , these amount to numerically solving convex optimization problems rather than conducting empirical experiments as commonly understood in machine learning. Nevertheless, all details needed to reproduce the results are described in Section H. Guidelines: • The answer [N/A] means that the paper does not include experiments. • If the paper includes experiments, a [No] answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in 46 some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [Yes] Justification: The codes we used for the experiments are submitted along with the paper. No external datasets were used. Guidelines: • The answer [N/A] means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://neurips.cc/ public/guides/CodeSubmissionPolicy ) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so [No] is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //neurips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental setting/details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyperpa-rameters, how they were chosen, type of optimizer) necessary to understand the results? Answer: [Yes] Justification: How PEP instances are constructed is fully described in Section H. Guidelines: • The answer [N/A] means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment statistical significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [No] Justification: PEP results provide worst-case bounds that are exact up to the precision of the convex optimization solver used. Therefore, statistical significance testing is not applicable. Guidelines: • The answer [N/A] means that the paper does not include experiments. • The authors should answer [Yes] if the results are accompanied by error bars, confidence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. 47 • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g., negative error rates). • If error bars are reported in tables or plots, the authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments compute resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [Yes] Justification: While there are no strict requirements on the computational resources needed to reproduce our PEP results, for completeness, we report the computing environment used for our computations in Section H. Guidelines: • The answer [N/A] means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code of ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: We have read the Code of Ethics, and found no conflicts with it. Guidelines: • The answer [N/A] means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer [No], they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [N/A] Justification: Since our work focuses on the theoretical aspects of an optimization scheme, we do not expect it to have any direct societal impact. 48 Guidelines: • The answer [N/A] means that there is no societal impact of the work performed. • If the authors answer [N/A] or [No], they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate Deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pre-trained language models, image generators, or scraped datasets)? Answer: [N/A] Justification: This paper poses no such risks. Guidelines: • The answer [N/A] means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [Yes] Justification: The Python package used in the PEP experiments, namely PEPit , is cited, but since it is publicly available, we did not deem it necessary to explicitly mention its license and terms of use in the paper. No specific existing data or models have been used. Guidelines: • The answer [N/A] means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. 49 • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [N/A] Justification: This paper does not release new assets. Guidelines: • The answer [N/A] means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and research with human subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [N/A] Justification: This paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer [N/A] means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional review board (IRB) approvals or equivalent for research with human subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [N/A] Justification: This paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer [N/A] means that the paper does not involve crowdsourcing nor research with human subjects. 50 • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 16. Declaration of LLM usage 
+
+Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does not impact the core methodology, scientific rigor, or originality of the research, declaration is not required. Answer: [N/A] Justification: The core method development in this research does not involve LLMs as any important, original, or non-standard components. Guidelines: • The answer [N/A] means that the core method development in this research does not involve LLMs as any important, original, or non-standard components. • Please refer to our LLM policy in the NeurIPS handbook for what should or should not be described. 51

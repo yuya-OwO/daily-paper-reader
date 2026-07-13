@@ -1,0 +1,1865 @@
+Title: Federated Low-Rank Koopman Learning for Multivariate Time-Series Anomaly Detection in IoT Systems
+
+URL Source: https://arxiv.org/pdf/2607.08978v1
+
+Published Time: Mon, 13 Jul 2026 00:26:55 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+> JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 1
+
+# Federated Low-Rank Koopman Learning for Multivariate Time-Series Anomaly Detection in IoT Systems 
+
+Tung-Anh Nguyen, Van-Phuc Bui, Anh Tuyen Le, Kim Hue Ta, Minh Thuy Le, J.Andrew Zhang, and Xiaojing Huang 
+
+Abstract —Distributed IoT systems generate multivariate time-series streams for monitoring physical assets, servers, and embedded sensing platforms. Detecting abnormal temporal behavior is critical for fault diagnosis, predictive maintenance, and security. However, practical IoT anomaly detection is hindered by decentralized and non-IID data, limited bandwidth, and the constrained computation and memory of edge devices. This paper proposes FedKAD, a resource-efficient federated Koopman anomaly detection framework for distributed IoT multivariate time series. Unlike deep-learning-based anomaly detectors that require training and communicating large neural models, FedKAD learns normal temporal dynamics through lightweight sliding-window Koopman representations. Federated training is formulated as a low-rank consensus problem, where raw sensor streams and local reduced dynamics remain on device while only compact subspace variables are exchanged with the server. To optimize the shared representation under orthonormality constraints, we develop a federated Stiefel-ADMM algorithm and provide convergence and stationarity analysis under partial client participation. During inference, each client detects anomalies locally by measuring the prediction residual between observed future trajectories and the learned Koopman dynamics. Experiments on four widely used multivariate time-series anomaly detection benchmarks show that FedKAD maintains or improves detection performance compared with federated deep-learning baselines. More importantly for IoT deployment, FedKAD provides up to 2.1×10 3 faster training, 80 × lower communication, and 79 × lower inference latency than neural baselines, confirming its suitability for resource-constrained edge devices. 
+
+Index Terms —Internet of Things, Federated Learning, Anomaly Detection, Multivariate Time Series, Koopman Operator, Stiefel Manifold, Edge Intelligence. 
+
+I. I NTRODUCTION 
+
+Distributed Internet-of-Things (IoT) systems generate multi-variate time-series (MVTS) streams for monitoring physical assets, industrial processes, servers, spacecraft subsystems, and embedded sensing platforms. Detecting abnormal temporal behavior in these streams is essential for fault diagnosis, predictive maintenance, and security monitoring [1], [2]. Unlike conventional offline anomaly detection, IoT anomaly detection must often operate continuously at the network edge, where 
+
+T.-A Nguyen, A. T. Le, J. A. Zhang, and X. Huang are with Faculty of Engineering and IT, University of Technology Sydney, Ultimo, NSW, 2007, Australia (emails: tunganh.nguyen@uts.edu.au, anhtuyen.le@uts.edu.au, andrew.zhang@uts.edu.au, xiaojing.huang@uts.edu.au). V.-P Bui is with the Faculty of Information Technology, FPT University, Vietnam (email: phucbv5@fe.edu.vn). Kim Hue Ta and Minh Thuy Le are with School of Elec-trical and Electronic Engineering, Hanoi University of Science and Technology, Vietnam (email: hue.tathikim@hust.edu.vn, minhthuy.le@hust.edu.vn). 
+
+sensor streams are produced by geographically distributed devices with limited communication, computation, memory, and energy resources. These constraints make it difficult to rely on centralized data collection or computationally expensive models, especially when raw sensor measurements are privacy-sensitive or operationally restricted. A fundamental challenge in IoT MVTS anomaly detection is that abnormal behavior is rarely limited to an isolated point outlier. In many practical systems, faults, cyberattacks, and degradation patterns appear as abnormal temporal evolution, sensor drift, delayed responses, changes in cross-channel de-pendencies, or deviations from the normal dynamical behavior of the monitored process. For example, a machine fault may first manifest as a subtle change in vibration and temperature dynamics before a large point-wise spike appears, while a compromised IoT device may exhibit abnormal temporal communication patterns rather than a single abnormal packet. Therefore, an effective detector should capture both temporal dependencies and inter-variable relationships, and should identify when the observed trajectory becomes inconsistent with learned normal dynamics. Early time-series anomaly detection methods relied on statistical models, distance-based detectors, density estimation, or forecasting residuals [1], [2]. These approaches are attractive because they are often interpretable and computationally lightweight. However, they usually require strong assumptions about stationarity, linearity, or simple distributional forms, and they struggle to model nonlinear dependencies in high-dimensional MVTS. Thresholding methods based on extreme value theory, such as (streaming) peaks-over-threshold, can reduce the need for manually chosen thresholds in streaming settings [3], but they are typically applied on top of aprecomputed anomaly score and do not by themselves solve the problem of learning complex normal dynamics from distributed multivariate sensor streams. Deep-learning-based anomaly detectors have been developed to address the nonlinear and high-dimensional nature of MVTS [4]–[11]. Reconstruction-based models, including autoencoder and variational-autoencoder approaches, learn compact representations of normal data and flag samples with large reconstruction errors [12], [13]. Recurrent models, such as Long Short-Term Memory (LSTM) encoder-decoders and stochastic recurrent networks, further capture temporal dependencies and have been applied to multi-sensor and spacecraft telemetry anomaly detection [6], [14], [15]. More recent methods combine adversarial training, arXiv:2607.08978v1 [cs.LG] 9 Jul 2026 JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 2
+
+graph neural networks, attention mechanisms, and transformer architectures to model complex temporal and inter-sensor dependencies [11], [16]–[18]. These methods have achieved strong detection accuracy in centralized benchmarks. Despite their success, deep anomaly detectors are not always suitable for federated IoT deployment. First, many of them rely on heavy neural reconstruction, recurrent, graph, or attention modules, requiring repeated backpropagation over local windows. Second, when used in federated learning (FL), the clients must repeatedly communicate neural parameters or gradients, which can become expensive for bandwidth-limited IoT links. In addition, their memory and computation costs can be prohibitive for weak edge devices such as low-cost gateways, Raspberry Pi-class nodes, and embedded platforms. Finally, deep models are often sensitive to non-independent and non-identically distributed (non-IID) client data, which is common in IoT systems because devices operate under different environments, workloads, anomaly rates, and sensing configurations. FL offers a natural way to train models across distributed clients without uploading raw data to a server [19], [20]. In IoT systems, FL has been explored for privacy-preserving analytics, intrusion detection, and decentralized spatio-temporal modeling [21]–[23]. For example, DIoT uses federated learning to aggregate device-type-specific behavior profiles for detecting compromised IoT devices [22], while cross-node federated graph neural networks model decentralized spatio-temporal sensor data without direct data sharing [23]. However, existing FL-based approaches usually inherit the computational and communication burden of the underlying model class. When the local model is a deep neural anomaly detector, FL protects raw data but does not remove the need for local neural training and repeated communication of large model parameters. These limitations suggest that federated IoT anomaly detection should not simply wrap existing deep detectors in an FL protocol. Instead, the anomaly detector should be lightweight by construction, requiring low local computation, low memory, and compact communication while allowing client-specific dynamics to remain on device. Koopman operator theory provides a principled framework for modeling nonlinear dynamical systems through linear evo-lution in a lifted observable space [24]–[26]. This perspective is well suited to MVTS because their variables are often coupled components of an underlying dynamical process rather than independent scalar streams. In many IoT monitoring systems, a change in one variable can be an early indicator of abnormal behavior and may also affect the evolution of other variables. For example, in physiological sensing, abnormal patterns in blood pressure and heart rate are more informative when analyzed jointly than when each signal is considered in isolation; similarly, in industrial monitoring, changes in vibration, temperature, and power consumption may jointly indicate machine degradation. For MVTS data, sliding-window or delay-coordinate observables can represent a temporal segment as a dynamical state that jointly contains recent history and cross-channel dependencies. Data-driven Koopman approximations, such as dynamic mode decomposition (DMD) and optimal mode decomposition (OMD), then learn a compact linear evolution model from snapshot pairs [26]–[28]. The resulting low-rank Koopman subspace captures dominant coherent modes of normal behavior, while the reduced operator predicts their temporal evolution. Anomalies are therefore detected as deviations from these learned normal dynamics: when faults, attacks, or sensor degradation disturb either the temporal evolution of individual variables or their inter-variable coupling, the Koopman prediction residual becomes large. In this paper, we propose FedKAD , a federated low-rank Koopman anomaly detection framework for distributed IoT MVTS. The key idea is to replace heavy federated neural reconstruction with lightweight federated low-rank dynamical modeling. Each edge device transforms its local MVTS into sliding-window snapshots and learns a Koopman-style model of normal temporal evolution. Instead of learning a full high-dimensional Koopman operator, FedKAD approximates the local dynamics using an orthonormal low-rank subspace and a private reduced operator. During inference, each device detects anomalies locally by comparing the observed future trajectory with the trajectory predicted by its learned normal dynamics. FedKAD is designed to match the constraints of federated IoT systems. Raw time-series snapshots never leave the device. Each client keeps its local data matrices and reduced Koopman operator private, while the server coordinates only a shared low-rank subspace through consensus optimization. This design substantially reduces communication compared with federated deep-learning baselines, because clients exchange compact sub-space variables rather than full neural models. At the same time, the local reduced dynamics remain client-specific, allowing FedKAD to adapt to heterogeneous local behavior while still benefiting from a shared federated representation. The resulting optimization problem is a low-rank consensus formulation with orthonormal subspace constraints. To solve it, we develop a federated Stiefel-ADMM algorithm that alternates between local subspace updates, server-side consensus aggregation, and local dual updates. The orthonormality constraint is handled directly on the Stiefel manifold using projected gradient steps and QR retraction, following the principles of optimization on matrix manifolds [29], while the consensus structure follows the ADMM framework for distributed optimization [30]. We also provide convergence and stationarity analysis under partial client participation. The main contributions of this paper are summarized as follows:  
+
+> •
+
+We propose FedKAD, a federated Koopman anomaly detection framework for distributed IoT MVTS, enabling each edge device to detect abnormal temporal behavior locally without uploading raw sensor streams.  
+
+> •
+
+We formulate federated anomaly detection as a low-rank Koopman consensus problem, where each client keeps its local snapshots and reduced dynamics private while only compact subspace variables are exchanged with the server.  
+
+> •
+
+We develop a federated Stiefel-ADMM algorithm for optimizing the shared orthonormal Koopman subspace under partial client participation, and provide convergence and stationarity analysis. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 3 
+
+> •
+
+We evaluate FedKAD on four widely used MVTS anomaly detection benchmarks under non-IID federated settings and multiple evaluation protocols, motivated by recent concerns about point-adjusted time-series anomaly detec-tion metrics [31]. FedKAD achieves the best F1 score on three of four datasets while demonstrating its suitability for resource-constrained IoT deployment. II. B ACKGROUND 
+
+A. Federated Learning 
+
+FL allows distributed clients to collaboratively train a model while keeping raw data local. Each client performs local optimization and sends model updates to a server, which aggregates them into a shared model for the next communication round. FedAvg [19] is the standard formulation, and subsequent FL variants have enabled large-scale privacy-aware learning across domains [20], [32], including MVTS classification and forecasting. Despite these benefits, FL is limited by communication and client-side computation. Large parameter updates are expensive to exchange, while edge devices often have restricted memory, energy, and compute capacity. These issues become more severe for MVTS anomaly detection, where anomalies are scarce, labels are often unavailable, and temporal patterns vary significantly across clients. Prior work reduces communication through quantization [33], compression or sparsification [34], and adaptive communication [35]. However, such techniques can introduce extra processing and tuning overhead, motivating lightweight FL designs tailored to unsupervised anomaly detection on distributed time-series streams. 
+
+B. Multivariate Time-Series Anomaly Detection 
+
+MVTS anomaly detection aims to identify abnormal be-haviors from temporally correlated and high-dimensional observations. Existing methods include recurrent models for temporal dependency modeling [36], [37], reconstruction-based autoencoders that detect deviations from learned normal patterns [5], [38], and GAN-based approaches that model complex data distributions through adversarial learning [39], [40]. More recent methods use graph neural networks to capture inter-variable dependencies [8], [9] or Transformers to model long-range temporal interactions via self-attention [10], [41]. While these models improve detection capacity, they often rely on computationally heavy architectures, centralized train-ing, or careful optimization. Such requirements are difficult to satisfy in edge and IoT settings, where data are distributed across devices, anomalies are rare and unlabeled, and clients have limited memory, energy, and computation. This motivates lightweight methods that can capture temporal structure while remaining efficient under distributed and resource-constrained deployment. 
+
+C. Koopman-Based Anomaly Detection 
+
+Let xt ∈ M ⊂ Rn be the state of a discrete-time nonlinear system evolving as xt+1 = φ(xt). Koopman theory studies the evolution of observables Φ rather than the nonlinear map φ
+
+itself. The Koopman operator K acts linearly on observables as 
+
+KΦ( xt) = Φ( φ(xt)) = Φ( xt+1 ). (1) Since K is generally infinite-dimensional, practical methods use a finite observable representation Φ( xt) ∈ RD and approximate 
+
+Φ( xt+1 ) ≈ KΦ( xt), (2) where K ∈ RD×D is a finite-dimensional Koopman operator. Data-driven Koopman methods, including DMD, OMD, and their variants, approximate nonlinear dynamics from snapshot pairs through a finite-dimensional linear operator [27], [28]. These methods are interpretable, but their accuracy depends on whether the chosen observable space is sufficiently expressive. Extended DMD (EDMD) improves expressiveness by lifting states into nonlinear observables [26], while deep Koopman methods learn the observable map and operator jointly [42]. However, these approaches often require carefully designed dictionaries, high-dimensional lifted spaces, or additional neural training. Koopman-based anomaly detection uses this linearized dynamical representation to learn normal system evolution and detect anomalies through deviations from the learned dynamics. Koopman operator frameworks have been used for time-series modeling and anomaly detection, while recent Koopman predictors have been applied to anomaly detection in complex IoT systems with time-series data [43]. Koopman-based residual models have also been used for fault detection and isolation in nonlinear dynamical systems [44]. These studies show that Koopman representations are useful for structured and interpretable residual-based anomaly scoring. However, existing Koopman anomaly methods are mostly centralized, assuming that data are pooled before training. 
+
+D. Optimal Mode Decomposition 
+
+Based on the finite-dimensional linear approximation in Eq. (2), the goal is to estimate a linear operator K ∈ Rd×d
+
+that advances raw data snapshots. Given a sequence of raw data vectors x1, x 2, . . . , x M +1 , where xt ∈ Rd and M is the number of one-step training pairs, we form the paired snapshot matrices 
+
+X = x1, x 2, . . . , x M
+
+ ∈ Rd×M ,Y = x2, x 3, . . . , x M +1 
+
+ ∈ Rd×M .
+
+Here, X, Y ∈ Rd×M contain consecutive raw data snapshots. A full least-squares estimate of K can be expensive and may overfit when d is large. OMD addresses this by approximating the transition matrix with a low-rank operator of the form 
+
+K ≈ P QP ⊤,
+
+where P ∈ Rd×r has orthonormal columns, Q ∈ Rr×r, and 
+
+r ≪ d. The OMD objective is therefore 
+
+min  
+
+> P,Q
+
+Y − P QP ⊤X 2 
+
+> F
+
+, s.t. P ⊤P = I. (3) Here, P spans an r-dimensional subspace of the raw data space, while Q models the linear dynamics within that reduced JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 4
+
+> Fig. 1: System model of F ED KAD for federated IoT multivariate time-series anomaly detection.
+
+subspace. The projection P ⊤ maps each raw snapshot to reduced coordinates, Q advances the reduced state, and P
+
+maps the prediction back to the original raw data space. Hence, 
+
+P QP ⊤ ∈ Rd×d provides a rank-r approximation of the finite-dimensional transition operator in Eq. (2). 
+
+E. ADMM-based Koopman Learning. 
+
+The Alternating Direction Method of Multipliers (ADMM) is a widely used optimization framework for solving structured problems by decomposing them into smaller subproblems coor-dinated through dual variables [30]. It is particularly well suited to distributed optimization and statistical learning because local subproblems can be solved independently while a global consensus is enforced through augmented Lagrangian updates. This decompositional property makes ADMM attractive for federated learning, where clients collaboratively learn a shared model without exchanging raw data. In this work, we exploit ADMM to develop a privacy-preserving federated Koopman learning framework for mul-tivariate time-series anomaly detection in IoT systems. Each client locally estimates a low-rank Koopman model from its own normal time-series snapshots, while the server enforces consensus among client-side Koopman subspaces through ADMM-based aggregation. The local dynamics model follows the OMD principle of jointly identifying a low-rank subspace and the corresponding reduced linear dynamics [28]. Unlike centralized Koopman learning, the proposed formulation keeps raw sensor data on local devices and communicates only model-related variables, which is consistent with the privacy-preserving motivation of federated anomaly detection for MVTS [45]–[47]. The learned Koopman dynamics are then used to predict normal system evolution, and anomalies are detected from large prediction residuals. III. S YSTEM MODEL AND PROBLEM FORMULATION 
+
+A. Federated IoT Time-Series Anomaly Detection 
+
+As illustrated in Fig. 1, we consider a federated IoT monitoring system consisting of N edge devices coordinated by a central server. Client i ∈ { 1, . . . , N } observes a local MVTS 
+
+xi(t) ∈ Rn, where n is the number of monitored variables. The objective is to collaboratively learn an anomaly detector for temporal system behavior across clients, while keeping raw time-series data local. In multivariate IoT systems, anomalies rarely appear as isolated point-wise outliers [36], [37]. Instead, they often arise from abnormal temporal evolution, delayed effects between signals, or changes in cross-variable dependencies [8], [9]. Therefore, anomaly detection requires modeling not only the current observation, but also the temporal context around it. To capture local spatio-temporal dependencies, each client converts its raw stream into a sliding-window state. For a window length W , we define 
+
+zi(t) = xi(t − W + 1) ⊤, . . . , x i(t)⊤⊤ ∈ Rd, d = nW. 
+
+(4) This delay-coordinate representation is widely used in time-series anomaly detection, where reconstruction or prediction is performed over local temporal contexts [11]. By flattening the window into zi(t), the model operates jointly over the W
+
+time steps and the n monitored variables, thereby capturing both temporal dependencies across time and cross-variable dependencies within the system. 
+
+B. Problem Formulation 
+
+Given the local windowed states {zi(t)}, the goal of federated time-series anomaly detection is to learn the normal temporal evolution of distributed MVTS without transmitting raw client data to the server. In general, each client uses a prediction model to estimate the next windowed state from the current one. Let 
+
+ˆzi(t + 1) = gi
+
+ zi(t); Θ , θ i
+
+,
+
+where Θ denotes the global parameters shared across clients and 
+
+θi denotes client-specific parameters. The prediction deviation is then used as the anomaly score: 
+
+si(t) = ∥zi(t + 1) − ˆzi(t + 1) ∥2 .
+
+A large value of si(t) indicates that the observed temporal evolution cannot be well explained by the learned normal dynamics, and is therefore more likely to be anomalous. The general federated learning objective can be written as 
+
+min 
+
+> Θ,{θi}Ni=1
+> N
+
+X
+
+> i=1
+> Ti−1
+
+X
+
+> t=W
+
+ℓi
+
+ zi(t + 1) , g i
+
+ zi(t); Θ , θ i
+
+ . (5) where ℓi(·) measures the prediction error. This formulation allows the federation to learn common normal temporal patterns across clients, while preserving local differences caused by non-IID data [48]. Motivated by the ability of Koopman theory to represent temporal evolution, we reformulate (5) under the Koopman theory in (1) as follows: 
+
+min 
+
+> K
+> N
+
+X
+
+> i=1
+> Ti−1
+
+X
+
+> t=W
+
+Φ zi(t + 1)  − K Φ zi(t) 22 . (6) However, directly solving (6) is not well suited to federated IoT settings. The lifted Koopman operator can be high-dimensional, JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 5
+
+making it costly to store, compute, and communicate on resource-constrained edge devices. Moreover, a single full operator may fail to capture heterogeneous client dynamics under non-IID data. These limitations motivate F ED KAD, which uses a communication- and memory-efficient low-rank shared subspace while retaining client-specific reduced dynamics. IV. P ROPOSED FED KAD F RAMEWORK 
+
+To solve the federated prediction problem in (6), F ED KAD combines a common nonlinear observable map with low-rank Koopman modeling. The method consists of three main steps. First, each client maps its local sliding-window states into a common observable space. Second, the resulting Koopman dynamics are factorized into a shared low-rank subspace and a client-specific reduced operator. Finally, the shared subspace is learned through federated consensus optimization, while the local snapshots and reduced dynamics remain on device. 
+
+A. Koopman Representation for Temporal Dynamics 
+
+To model nonlinear temporal dynamics, we use a Koopman-inspired representation. Koopman theory represents nonlinear state evolution as linear evolution in an observable space [24], [49]. Since the Koopman operator is generally infinite-dimensional, data-driven Koopman methods approximate it using finite-dimensional observables and a linear operator learned from snapshot pairs [26]–[28]. Thus, for a lifting map 
+
+Φ( ·), the local dynamics of client i are modeled as 
+
+Φ( zi(t + 1)) ≈ KiΦ( zi(t)) ,
+
+where Ki is a finite-dimensional lifted Koopman operator. We construct Φ( ·) using a fixed nonlinear lifting. Classical DMD and OMD fit a linear transition directly in the observed state space, which is efficient but restrictive for nonlinear multivariate dynamics. Inspired by EDMD [50], we augment the windowed state with fixed nonlinear observables: 
+
+Φ( zi(t)) = 
+
+
+
+zi(t)
+
+|{z} 
+
+> Windowed state
+
+tanh( Wlift zi(t) + b)
+
+| {z }
+
+> Nonlinear observables
+
+ ∈ RD , D = d + dlift .
+
+(7) Here, Wlift ∈ Rdlift ×d and b ∈ Rdlift are fixed random parameters shared by all clients. The first block preserves the original windowed state, while the second block adds 
+
+dlift nonlinear random observables. The tanh nonlinearity is motivated by universal approximation theory: finite linear combinations of affine projections followed by sigmoidal activations can approximate continuous functions on compact domains to arbitrary accuracy [51]. This fixed lifting enriches the Koopman observable space without hand-designing a large dictionary or training a neural lifting network. Since all clients use the same window length and lifting map, their lifted states share a common dimension and semantic structure, which makes federated subspace alignment well defined. For client i, the lifted training pairs are formed by stacking consecutive lifted states column-wise: 
+
+Xi = Φ( zi(t))  
+
+> t∈T i
+
+, Y i = Φ( zi(t+1))  
+
+> t∈T i
+
+, X i, Y i ∈ RD×Mi ,
+
+where Mi is the number of valid one-step training pairs. For a local sequence of length Ti, we use 
+
+Ti = {W, . . . , T i − 1}, Mi = Ti − W. 
+
+B. Low-Rank Local Koopman Learning Problem Formulation 
+
+The finite-dimensional Koopman model in (2) requires a lifted operator Ki ∈ RD×D, which faces several limi-tations in federated IoT settings. Its storage, computation, and communication costs scale quadratically with the lifted dimension, and a single full operator is poorly suited to heterogeneous client dynamics under non-IID data. These considerations motivate an OMD-inspired low-rank formulation, which separates the Koopman subspace from the reduced temporal operator. Accordingly, we adopt the following low-rank factorization [28]: 
+
+Φ( zi(t + 1)) ≈ PiQiP ⊤ 
+
+> i
+
+Φ( zi(t)) ,
+
+where 
+
+Pi ∈ RD×r, Qi ∈ Rr×r, r ≪ D. 
+
+Here, Pi spans an r-dimensional Koopman subspace in the lifted observable space, while Qi describes the reduced linear evolution within that subspace. The factorization reduces the number of parameters from O(D2) for a full lifted operator to O(Dr + r2), making the local model more suitable for resource-constrained IoT devices. Using the lifted snapshot matrices (Xi, Y i), client i learns its local low-rank Koopman model by solving the lifted OMD objective 
+
+min 
+
+> Pi,Q i
+
+Yi − PiQiP ⊤ 
+
+> i
+
+Xi 
+
+> 2
+> F
+
+,
+
+s.t. P ⊤ 
+
+> i
+
+Pi = I. 
+
+(8) 
+
+C. Federated Koopman Learning for IoT Systems 
+
+The low-rank factorization in (8) separates the Koopman sub-space Pi from the reduced dynamics Qi. This separation aligns with shared-representation personalized federated learning, where a global representation is shared across clients while local components capture client-specific variation [48]. Motivated by this view, F ED KAD federates the low-rank Koopman subspace rather than raw data or full lifted operators. Each client keeps its snapshot matrices (Xi, Y i) and reduced operator Qi local, while the server coordinates a shared subspace through a consensus variable Z ∈ RD×r. The distributed objective is 
+
+min 
+
+> {Pi,Q i},Z N
+
+X
+
+> i=1
+
+fi(Pi, Q i), (9) with the local loss 
+
+fi(Pi, Q i) := Yi − PiQiP ⊤ 
+
+> i
+
+Xi 
+
+> 2
+> F
+
+,
+
+subject to 
+
+Pi = Z, P ⊤ 
+
+> i
+
+Pi = I, i = 1 , . . . , N. 
+
+The first constraint forces the clients to agree on a shared low-rank subspace Z, while each Qi stays private and tracks the local dynamics of client i.JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 6
+
+Since the optimal Q depends on the chosen subspace, the solution of the inner least-squares problem in Qi is denoted 
+
+ˆQi(Pi). Setting ∂f i/∂Q i to zero gives the normal equations 
+
+ P ⊤ 
+
+> i
+
+XiX⊤ 
+
+> i
+
+Pi
+
+ ˆQi(Pi)⊤ = P ⊤ 
+
+> i
+
+XiY ⊤ 
+
+> i
+
+Pi.
+
+Whenever the r × r Gram matrix Gi(Pi) := P ⊤ 
+
+> i
+
+XiX⊤ 
+
+> i
+
+Pi is invertible, this yields the closed-form solution 
+
+ˆQi(Pi) = P ⊤ 
+
+> i
+
+YiX⊤ 
+
+> i
+
+Pi Gi(Pi)−1. (10) The matrix Gi(Pi) is not guaranteed to be invertible, however: 
+
+XiX⊤ 
+
+> i
+
+has rank at most min( D, M i), and when the local snapshots are limited or when the columns of Pi fall in a nearly degenerate direction of Xi, Gi(Pi) becomes singular or severely ill-conditioned. In such cases, we fall back to a standard Tikhonov regularization, replacing Gi(Pi)−1 in (10) by  Gi(Pi) + λI −1 with λ > 0, which keeps the update well defined while preserving the single r × r linear-system cost. Because ˆQi(Pi) can be computed locally from Pi, the variables Qi can be eliminated, yielding 
+
+min 
+
+> {Pi},Z N
+
+X
+
+> i=1
+
+Yi − Pi ˆQi(Pi)P ⊤ 
+
+> i
+
+Xi
+
+> 2
+> F
+
+s.t. Pi = Z, P ⊤ 
+
+> i
+
+Pi = I, i = 1 , . . . , N. 
+
+(11) 
+
+D. ADMM-Based Federated Optimization 
+
+The linear consensus constraint Pi = Z in (11) is well suited to ADMM [30]. ADMM alternates between local primal updates, a global consensus update, and local dual updates, progressively aligning the client subspaces Pi with the global subspace Z. The orthonormality constraint P ⊤ 
+
+> i
+
+Pi = I is handled directly in the local Pi update; hence, the only dual variable is associated with the linear consensus constraint. Let 
+
+Λi ∈ RD×r denote the dual variable for client i, and let ρ > 0
+
+be the ADMM penalty parameter. The augmented Lagrangian of (11) is 
+
+L =
+
+> N
+
+X
+
+> i=1
+
+h
+
+fi
+
+ Pi, ˆQi(Pi) + ⟨Λi, P i − Z⟩F + ρ 
+
+> 2
+
+Pi − Z 2
+
+> F
+
+i
+
+, (12) 
+
+where ⟨· , ·⟩ F denotes the Frobenius inner product. 
+
+1) Primal Update (Local Updates): At communication round ℓ, each client first refits its local reduced Koopman operator using the current subspace: 
+
+ˆQℓ+1  
+
+> i
+
+= ˆQi
+
+ P ℓi
+
+.
+
+Then, client i updates its local subspace by minimizing the augmented Lagrangian over the orthonormal manifold: 
+
+P ℓ+1  
+
+> i
+
+= argmin   
+
+> P⊤
+> iPi=I
+
+h
+
+fi
+
+ Pi, ˆQℓ+1 
+
+> i
+
+ + ρ 
+
+> 2
+
+Pi − Zℓ + 1 
+
+> ρ
+
+Λℓi
+
+> 2
+> F
+
+i
+
+.
+
+2) Consensus Update (Global Update): The server aggre-gates the updated local subspaces and dual variables: 
+
+Zℓ+1 = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+
+
+P ℓ+1  
+
+> i
+
++ 1 
+
+> ρ
+
+Λℓi
+
+
+
+. (13) 
+
+3) Dual Update (Local Updates): Each client then updates its dual variable locally: 
+
+Λℓ+1  
+
+> i
+
+= Λ ℓi + ρ P ℓ+1  
+
+> i
+
+− Zℓ+1 . (14) Summing (14) over all clients and substituting (13) gives 
+
+Zℓ+1 = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+P ℓ+1  
+
+> i
+
+. (15) This simplified consensus step substantially reduces communi-cation overhead in the federated setting. Instead of exchanging raw snapshots (Xi, Y i) or full Koopman operators, each client communicates only the compact subspace matrix Pi ∈ RD×r,with r ≪ D. The data matrices and the local reduced Koopman operator ˆQi remain stored and updated entirely on device. When only a subset Sℓ ⊆ { 1, . . . , N } of clients is available at communication round ℓ, the updates are restricted to i ∈ S ℓ.In this case, the consensus rule retains its full ADMM form: 
+
+Zℓ+1 = 1
+
+|S ℓ|
+
+X
+
+> i∈S ℓ
+
+
+
+P ℓ+1  
+
+> i
+
++ 1 
+
+> ρ
+
+Λℓi
+
+
+
+, (16) because the (15) does not generally hold when some client dual variables are frozen. The convergence analysis in Sec. V covers this partial-participation setting. 
+
+E. Federated Koopman Learning on the Stiefel Manifold 
+
+The constraint P ⊤ 
+
+> i
+
+Pi = I in (11) places the local subspace variable Pi on the Stiefel manifold 
+
+St( D, r ) = {P ∈ RD×r : P ⊤P = I}.
+
+Rather than adding a penalty for this constraint, F ED KAD updates Pi directly on the manifold. At communication round 
+
+ℓ, after computing ˆQℓ+1  
+
+> i
+
+, client i approximately solves 
+
+P ℓ+1  
+
+> i
+
+= argmin  
+
+> P∈St( D,r )
+
+Fℓi (P ), (17) where 
+
+Fℓi (P ) := fi
+
+ P, ˆQℓ+1 
+
+> i
+
+ + ρ
+
+2 P − Zℓ + 1
+
+ρ Λℓi
+
+> 2
+> F
+
+− 12ρ ∥Λi∥2 
+
+> F
+
+.
+
+(18) To approximate (17), each client performs projected gradient descent on St( D, r ). Starting from the current local subspace 
+
+P ℓ, 0 
+
+> i
+
+= P ℓi , the client applies C inner steps. For c = 0 , . . . , C −
+
+1, the Euclidean gradient of Fℓi is first projected onto a feasible tangent direction, 
+
+Gℓ,c i =  I − P ℓ,c i P ℓ,c ⊤
+
+> i
+
+∇P Fℓi (P ℓ,c i ). (19) The client then takes a gradient step and retracts the result back to the Stiefel manifold using QR decomposition: 
+
+P ℓ,c +1  
+
+> i
+
+= QR 
+
+
+
+P ℓ,c i − ηG ℓ,c i
+
+
+
+, (20) where η is the local step size. The retraction keeps every inner iterate feasible, i.e., P ℓ,c ⊤ 
+
+> i
+
+P ℓ,c i = I. After C inner steps, the final inner iterate is used as the local ADMM update: 
+
+P ℓ+1  
+
+> i
+
+= P ℓ,C i .JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 7
+
+Algorithm 1 Federated Stiefel ADMM for F ED KAD  
+
+> 1:
+
+Server initializes the Z0 and dlift lifting functions randomly  
+
+> 2:
+
+Each client initializes P 0 
+
+> i
+
+with P 0⊤ 
+
+> i
+
+P 0 
+
+> i
+
+= I and Λ0 
+
+> i
+
+= 0  
+
+> 3:
+
+for ℓ = 0 , . . . , L − 1 do ▷ Global rounds  
+
+> 4:
+
+Server broadcasts Zℓ to the clients  
+
+> 5:
+
+for client i = 1 , . . . , N in parallel do  
+
+> 6:
+
+Refit ˆQℓ+1  
+
+> i
+
+= ˆQi(P ℓi ) by Eq. (10)  
+
+> 7:
+
+Set P ℓ, 0 
+
+> i
+
+= P ℓi 
+
+> 8:
+
+for c = 0 , . . . , C − 1 do ▷ Local rounds  
+
+> 9:
+
+Compute Gℓ,c i by Eq. (19)  
+
+> 10:
+
+Retract P ℓ,c +1  
+
+> i
+
+by Eq. (20)  
+
+> 11:
+
+end for  
+
+> 12:
+
+Set P ℓ+1  
+
+> i
+
+= P ℓ,C i and send P ℓ+1  
+
+> i
+
+to the server  
+
+> 13:
+
+end for  
+
+> 14:
+
+Server computes Zℓ+1 by Eq. (16)  
+
+> 15:
+
+Server broadcasts Zℓ+1 to the clients  
+
+> 16:
+
+for client i = 1 , . . . , N in parallel do  
+
+> 17:
+
+Update Λℓ+1  
+
+> i
+
+by Eq. (14)  
+
+> 18:
+
+end for  
+
+> 19:
+
+end for 
+
+The complete update sequence is summarized in Algo-rithm 1. 
+
+F. Federated Koopman Anomaly Detection 
+
+After federated training in Algorithm 1, each client i stores global Koopman subspace Z and local operator ˆQi.
+
+a) Prediction.: At each valid time t, client i forms the windowed state zi(t) as in Eq. (4) and maps it to the lifted observable Φ( zi(t)) . Given a prediction horizon H ≥ 1, the 
+
+h-step prediction in the lifted space is 
+
+bΦi(t + h) = Z ˆQ hi Z⊤Φ( zi(t)) , h = 1 , . . . , H. 
+
+b) Anomaly score.: Once the future observations become available, client i constructs the realized lifted states Φ( zi(t +
+
+h)) and compares them with the predictions. The anomaly score is the average prediction residual 
+
+si(t) = 1
+
+H
+
+> H
+
+X
+
+> h=1
+
+Φ( zi(t + h)) − bΦi(t + h) 22 .
+
+A large si(t) indicates that the observed future evolution is poorly explained by the learned normal Koopman dynamics, and is therefore treated as an anomalous event. V. F ED KAD: C ONVERGENCE ANALYSIS 
+
+We analyze the ADMM iterates defined in Sec. IV-D . Let ℓ
+
+denote the communication round and let Sℓ ⊆ { 1, . . . , N }
+
+denote the subset of clients participating in round ℓ. Let 
+
+Lℓ denote the augmented Lagrangian in (12) evaluated at 
+
+({P ℓi }, Z ℓ, {Λℓi }), after each participating client has refitted 
+
+ˆQℓ+1  
+
+> i
+
+= ˆQi(P ℓi ). We use ∇St to denote the Riemannian gradient with respect to Pi on the Stiefel manifold. 
+
+Assumptions. We impose the following assumptions:  
+
+> •
+
+A1: For each client i, the local objective fi(Pi) has an 
+
+Li-Lipschitz Riemannian gradient along the generated Stiefel iterates: 
+
+∇St fi(P ℓ+1  
+
+> i
+
+) − ∇ St fi(P ℓi ) F ≤ Li P ℓ+1  
+
+> i
+
+− P ℓi F . 
+
+> •
+
+A2: For all i, the penalty parameter ρ is chosen large enough such that the local Pi-subproblem (18) is strongly convex with modulus μi(ρ). 
+
+> •
+
+A3: The augmented Lagrangian is bounded from below along the generated iterates: 
+
+inf Lℓ > −∞ . (21)  
+
+> •
+
+A4: The local Pi-subproblems in (17) are solved inex-actly with summable errors. Specifically, there exists a nonnegative sequence εℓ such that 
+
+εℓ := X
+
+> i∈S ℓ
+
+
+
+Fℓi (P ℓ+1  
+
+> i
+
+) − min   
+
+> P∈St( D,r )
+
+Fℓi (P )
+
+
+
+,
+
+> ∞
+
+X
+
+> ℓ=0
+
+εℓ < ∞. 
+
+> •
+
+A5: The cumulative objective variation ∆Q induced by the reduced Koopman-operator updates is finite. 
+
+∆ℓQ := 
+
+> N
+
+X
+
+> i=1
+
+h
+
+fi(P ℓ+1  
+
+> i
+
+, ˆQℓ+1  
+
+> i
+
+) − fi(P ℓ+1  
+
+> i
+
+, ˆQℓi )
+
+i
+
+,
+
+> ∞
+
+X
+
+> ℓ=0
+
+∆ℓQ < ∞.
+
+Remark V.1 . Assumptions A1–A4 follow standard conditions for ADMM-type methods with smooth objectives and inexact local updates. Assumption A5 is FedKAD-specific and ensures that the objective variation from updating the reduced Koopman operators remains summable, preserving the asymptotic descent argument. To establish the convergence guarantee of F ED KAD, we analyze the generated sequence  {P ℓi }, Z ℓ, {Λℓi }. The analysis proceeds in four steps. First, we bound the successive difference of the dual variables in terms of the change in the local subspace variables. Next, we derive a perturbed descent bound for the augmented Lagrangian. We then show that the augmented Lagrangian sequence converges. Finally, we use these results to prove that the consensus residuals vanish and that the generated sequence converges to a stationary point. The empirical convergence behavior is further evaluated in VI-B 5. 
+
+A. Bound on the Successive Difference of Dual Variables 
+
+We first establish an upper bound for the successive differ-ence of the dual variables Λi in terms of the local subspace variables Pi.
+
+Lemma V.2. Suppose Assumption A1 holds. Then, for each participating client i ∈ S ℓ,
+
+∥Λℓ+1  
+
+> i
+
+− Λℓi ∥2 
+
+> F
+
+≤ L2 
+
+> i
+
+∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2 
+
+> F
+
+. (22) 
+
+Proof. For each participating client i ∈ S ℓ, the optimality condition of the local Pi-subproblem gives 
+
+∇St fi(P ℓ+1  
+
+> i
+
+) + Λ ℓi + ρ(P ℓ+1  
+
+> i
+
+− Zℓ+1 ) = 0 .
+
+Using the dual update 
+
+Λℓ+1  
+
+> i
+
+= Λ ℓi + ρ(P ℓ+1  
+
+> i
+
+− Zℓ+1 ),
+
+we obtain 
+
+Λℓ+1  
+
+> i
+
+= −∇ St fi(P ℓ+1  
+
+> i
+
+).
+
+Similarly, at the previous local iterate, 
+
+Λℓi = −∇ St fi(P ℓi ).JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 8
+
+Therefore, 
+
+∥Λℓ+1  
+
+> i
+
+− Λℓi ∥F = ∇St fi(P ℓ+1  
+
+> i
+
+) − ∇ St fi(P ℓi ) F
+
+≤ Li∥P ℓ+1  
+
+> i
+
+− P ℓi ∥F ,
+
+where the last inequality follows from Assumption A1. Squar-ing both sides completes the proof. 
+
+B. Bound for the Augmented Lagrangian 
+
+Next, we show that the augmented Lagrangian decreases sufficiently up to the perturbation terms caused by inexact local optimization and Koopman operator refitting. 
+
+Lemma V.3. Suppose Assumptions A1–A5 hold. Then the augmented Lagrangian satisfies 
+
+Lℓ+1 − L ℓ ≤ − |S ℓ|ρ
+
+2 ∥Zℓ+1 − Zℓ∥2
+
+> F
+
++ X
+
+> i∈S ℓ
+
+ L2
+
+> i
+
+ρ − μi(ρ)2
+
+
+
+∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2
+
+> F
+
++ εℓ + ∆ ℓQ.
+
+Moreover, if ρ is chosen such that 
+
+ρμ i(ρ) ≥ 2L2 
+
+> i
+
+.
+
+then there exist constants a, b > 0 such that 
+
+Lℓ+1 − L ℓ ≤ − a X
+
+> i∈S ℓ
+
+∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2 
+
+> F
+
+− b∥Zℓ+1 − Zℓ∥2
+
+> F
+
++ εℓ + ∆ ℓQ.
+
+(23) 
+
+Proof. For one communication round ℓ, we split the succes-sive difference of the augmented Lagrangian into four terms: 
+
+Lℓ+1 − L ℓ
+
+= Lℓ({P ℓ+1  
+
+> i
+
+}, Z ℓ, {Λℓi }) − L ℓ({P ℓi }, Z ℓ, {Λℓi })
+
+| {z }  
+
+> A:local Pi-update
+
++ Lℓ({P ℓ+1  
+
+> i
+
+}, Z ℓ+1 , {Λℓi }) − L ℓ({P ℓ+1  
+
+> i
+
+}, Z ℓ, {Λℓi })
+
+| {z } 
+
+> B:Z-update
+
++ Lℓ({P ℓ+1  
+
+> i
+
+}, Z ℓ+1 , {Λℓ+1  
+
+> i
+
+}) − L ℓ({P ℓ+1  
+
+> i
+
+}, Z ℓ+1 , {Λℓi })
+
+| {z } 
+
+> C:dual update
+
++ Lℓ+1 − L ℓ({P ℓ+1  
+
+> i
+
+}, Z ℓ+1 , {Λℓ+1  
+
+> i
+
+})
+
+| {z } 
+
+> D:Koopman refitting perturbation
+
+.
+
+Here, term A corresponds to the local Pi-updates with Zℓ
+
+and Λℓi fixed; term B corresponds to the global consensus 
+
+Z-update; term C corresponds to the dual-variable update; and term D captures the perturbation caused by refitting the reduced Koopman operators. 
+
+Bounding Term A. By Assumption A2, the local Pi-subproblem is strongly convex with modulus μi(ρ). Since the local subproblem is solved inexactly, the error is captured by εℓ in Assumption A4. Therefore, 
+
+A ≤ − X
+
+> i∈S ℓ
+
+μi(ρ)2 ∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2 
+
+> F
+
++ εℓ. (24) 
+
+Bounding Term B. With {P ℓ+1  
+
+> i
+
+} and {Λℓi } fixed, the 
+
+Z-update is a quadratic minimization with strong-convexity modulus |S ℓ|ρ. Hence, 
+
+B ≤ − |S ℓ|ρ
+
+2 ∥Zℓ+1 − Zℓ∥2 
+
+> F
+
+. (25) 
+
+Bounding Term C. The dual update changes only the linear dual term of the augmented Lagrangian. Thus, 
+
+C = 1
+
+ρ
+
+X
+
+> i∈S ℓ
+
+∥Λℓ+1  
+
+> i
+
+− Λℓi ∥2 
+
+> F
+
+. (26) Using Lemma V.2, we obtain 
+
+C ≤ X
+
+> i∈S ℓ
+
+L2
+
+> i
+
+ρ ∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2 
+
+> F
+
+. (27) 
+
+Bounding Term D. Term D is the perturbation introduced by refitting the local reduced Koopman operators. By Assumption A5, 
+
+D = ∆ ℓQ. (28) 
+
+Sufficient decrease. Combining (24)–(28), we obtain 
+
+Lℓ+1 − L ℓ ≤ − |S ℓ|ρ
+
+2 ∥Zℓ+1 − Zℓ∥2
+
+> F
+
++ X
+
+> i∈S ℓ
+
+ L2
+
+> i
+
+ρ − μi(ρ)2
+
+
+
+∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2
+
+> F
+
++ εℓ + ∆ ℓQ.
+
+This implies that the augmented Lagrangian has sufficient descent up to the summable perturbation terms εℓ and ∆ℓQ if the following condition is satisfied: 
+
+ρμ i(ρ) ≥ 2L2
+
+> i
+
+Remark V.4 . Lemma V.3 shows that the augmented Lagrangian has a sufficient descent property up to two summable perturba-tion terms: εℓ, caused by inexact local optimization, and ∆ℓQ,caused by refitting the reduced Koopman operators. 
+
+C. Convergence of the Augmented Lagrangian 
+
+Here, we combine Lemma V.2 and Lemma V.3 to establish the convergence of the augmented Lagrangian. 
+
+Theorem V.5. Suppose Assumptions A1–A5 hold. Further suppose that after L communication rounds, every client has participated at least once. Then, by choosing ρ sufficiently large, the augmented Lagrangian sequence {L ℓ} converges to a finite value. Moreover, 
+
+∥Zℓ+1 − Zℓ∥F → 0, ∥P ℓ+1  
+
+> i
+
+− P ℓi ∥F → 0, ∀i, 
+
+and 
+
+∥P ℓ+1  
+
+> i
+
+− Zℓ+1 ∥F → 0, ∀i. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 9
+
+Proof. Summing (23) from ℓ = 0 to L − 1 yields 
+
+LL − L 0 ≤ − a
+
+> L−1
+
+X
+
+> ℓ=0
+
+X
+
+> i∈S ℓ
+
+∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2
+
+> F
+
+− b
+
+> L−1
+
+X
+
+> ℓ=0
+
+∥Zℓ+1 − Zℓ∥2 
+
+> F
+
++
+
+> L−1
+
+X
+
+> ℓ=0
+
+εℓ +
+
+> L−1
+
+X
+
+> ℓ=0
+
+∆ℓQ.
+
+(29) By Assumption A3, LL is bounded from below. By Assump-tions A4 and A5, 
+
+> ∞
+
+X
+
+> ℓ=0
+
+εℓ < ∞,
+
+> ∞
+
+X
+
+> ℓ=0
+
+∆ℓQ < ∞.
+
+Letting L → ∞ in (29), we obtain 
+
+> ∞
+
+X
+
+> ℓ=0
+
+X
+
+> i∈S ℓ
+
+∥P ℓ+1  
+
+> i
+
+− P ℓi ∥2 
+
+> F
+
+< ∞,
+
+> ∞
+
+X
+
+> ℓ=0
+
+∥Zℓ+1 − Zℓ∥2 
+
+> F
+
+< ∞.
+
+Therefore, 
+
+∥Zℓ+1 − Zℓ∥F → 0, ∥P ℓ+1  
+
+> i
+
+− P ℓi ∥F → 0
+
+along the rounds in which client i participates. Since every client participates at least once within any L consecutive communication rounds, the latter limit holds for all clients. From the dual update, 
+
+P ℓ+1  
+
+> i
+
+− Zℓ+1 = ρ−1  Λℓ+1  
+
+> i
+
+− Λℓi
+
+ .
+
+Combining this with Lemma V.2, we have 
+
+∥Λℓ+1  
+
+> i
+
+− Λℓi ∥F → 0.
+
+Therefore, 
+
+∥P ℓ+1  
+
+> i
+
+− Zℓ+1 ∥F → 0.
+
+Finally, (23) shows that all possible increases of Lℓ are controlled by the summable sequences {εℓ} and {∆ℓQ}. Since 
+
+Lℓ is bounded from below, the sequence {L ℓ} converges to a finite value. 
+
+Remark V.6 . Theorem V.5 establishes that the augmented Lagrangian converges and that the consensus constraint is asymptotically satisfied, i.e., ∥P ℓ+1  
+
+> i
+
+− Zℓ+1 ∥F → 0 for all clients. 
+
+D. Convergence to a Stationary Point 
+
+In the following theorem, we show that every limit point of the sequence generated by F ED KAD satisfies the first-order stationarity conditions. 
+
+Theorem V.7. Suppose the conditions in Theorem V.5 hold and the local Pi-subproblems are solved to first-order stationarity. Then every limit point ({P ⋆i }, Z ⋆, {Λ⋆i }) of the sequence generated by FED KAD is a stationary solution. That is, for all i = 1 , . . . , N ,
+
+P ⋆i = Z⋆, (30) 
+
+∇St [fi(P ⋆i , Q ⋆i ) + ⟨Λ⋆i , P ⋆i − Z⋆⟩F ] = 0 . (31) 
+
+Moreover, 
+
+Q⋆i ∈ arg min 
+
+> Qi
+
+fi(P ⋆i , Q i).
+
+If P ⋆⊤ 
+
+> i
+
+XiX⊤ 
+
+> i
+
+P ⋆i is nonsingular, then 
+
+Q⋆i = P ⋆⊤ 
+
+> i
+
+YiX⊤ 
+
+> i
+
+P ⋆i
+
+ P ⋆⊤ 
+
+> i
+
+XiX⊤ 
+
+> i
+
+P ⋆i
+
+−1 .
+
+Proof. Let ({P ⋆i }, Z ⋆, {Λ⋆i }) be any limit point and consider a convergent subsequence. From Theorem V.5, 
+
+∥P ℓ+1  
+
+> i
+
+− Zℓ+1 ∥F → 0.
+
+Taking the limit along the convergent subsequence gives P ⋆i =
+
+Z⋆, which proves (30). Next, since the local Pi-subproblem is solved to first-order stationarity on the Stiefel manifold, we have 
+
+∇St 
+
+h
+
+fi(P ℓ+1  
+
+> i
+
+, Q ℓ+1  
+
+> i
+
+) + ⟨Λℓi , P ℓ+1  
+
+> i
+
+− Zℓ⟩F + ρ
+
+2 ∥P ℓ+1  
+
+> i
+
+− Zℓ∥2
+
+> F
+
+i
+
+→ 0.
+
+Moreover, 
+
+P ℓ+1  
+
+> i
+
+− Zℓ = ( P ℓ+1  
+
+> i
+
+− Zℓ+1 ) + ( Zℓ+1 − Zℓ) → 0.
+
+Thus, the gradient contribution of the quadratic consensus penalty vanishes in the limit. Passing to the limit gives 
+
+∇St [fi(P ⋆i , Q ⋆i ) + ⟨Λ⋆i , P ⋆i − Z⋆⟩F ] = 0 ,
+
+which proves (31). Finally, for each fixed P ℓ+1  
+
+> i
+
+, the reduced Koopman operator 
+
+Qℓ+1  
+
+> i
+
+is computed as a minimizer of the local least-squares objective. By continuity, 
+
+Q⋆i ∈ arg min 
+
+> Qi
+
+fi(P ⋆i , Q i).
+
+If P ⋆⊤ 
+
+> i
+
+XiX⊤ 
+
+> i
+
+P ⋆i is nonsingular, the minimizer is unique. Solving the normal equations gives 
+
+Q⋆i = P ⋆⊤ 
+
+> i
+
+YiX⊤ 
+
+> i
+
+P ⋆i
+
+ P ⋆⊤ 
+
+> i
+
+XiX⊤ 
+
+> i
+
+P ⋆i
+
+−1 .
+
+Therefore, every limit point satisfies the stated stationarity conditions. VI. E XPERIMENTAL RESULTS 
+
+We evaluate F ED KAD on four widely used MVTS anomaly-detection benchmarks summarised in Table I: (1) Pool Server Metrics (PSM) [52], a 25 -dimensional dataset from eBay’s pooled server resources with 132 ,481 training and 87 ,841 
+
+testing samples and a 27 .75% anomaly ratio; (2) Server Machine Dataset (SMD) [7], five weeks of resource-utilisation traces from 28 servers, each with 38 metrics (CPU, memory, network) and a 4.16% anomaly ratio; (3) Soil Moisture Active Passive (SMAP) and (4) Mars Science Laboratory (MSL) [37], NASA spacecraft telemetry with 54 and 27 entities and 25 and 55 channels respectively (anomaly ratios 12 .85% 
+
+and 10 .53% ). Table I lists the per-dataset train/test counts, anomaly ratio, channel count, and the number of FL clients induced by the partitioning scheme described in Sec. VI-A. 
+
+A. Federated learning settings 1) Dataset: For SMD, SMAP and MSL we use the natural per-entity partition : one physical entity (server or spacecraft subsystem) becomes one FL client, so its train and test streams remain entity-specific and disjoint and no cross-entity leakage is possible. This yields 28 , 54 and 27 clients respectively. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 10 SMD PSM SMAP MSL         
+
+> 10 2
+> 10 1
+> 10 0
+> std of per-feature means (log)
+> A. Feature distribution skew
+> (per-client distribution shift)
+> SMD PSM SMAP MSL
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> client test anomaly ratio (%)
+> B. Label distribution skew
+> (per-client anomaly fraction, sorted)
+> SMD (n=28)
+> PSM (n=24)
+> SMAP (n=54)
+> MSL (n=27)
+> SMD PSM SMAP MSL
+> 10 3
+> 10 4
+> train-stream length (time-steps, log)
+> max/min=1.2×
+> max/min=24.6×
+> max/min=9.2×
+> max/min=9.8×
+> C. Quantity skew
+> (per-client train length, sorted)
+
+Fig. 2: Non-IID heterogeneity across the four benchmarks, covering feature distribution skew, label distribution skew, and quantity skew. 
+
+PSM provides a single shared stream, so we induce non-IID-ness by Dirichlet partitioning following [19]: the 132 ,481 -sample training stream is sliced into 24 contiguous chunks of mean length 5,520 which are then assigned to clients via Dirichlet (α=0 .5) over the 25 feature dimensions, so each client predominantly observes a different subset of channels. Three independent sources of non-IID heterogeneity co-occur in our federations (Fig. 2): (i) feature-distribution skew — per-client std of the per-feature mean spans 0.14 –2.47 on SMD, 
+
+0.011 –1.96 on SMAP and 0.015 –1.33 on MSL — roughly two orders of magnitude across the federation; (ii) label-distribution skew — the per-client anomaly ratio spans 0.4–27% on SMD and 0–98% on SMAP/MSL, while PSM is essentially uniform at ≈30% by construction; and (iii) quantity skew — per-client training length varies 1.2× on SMD, ≈10 × on SMAP/MSL and up to ≈25 × on PSM. All data are z-scored per client (SMD/SMAP/MSL: each client is its own physical entity, zero leakage) or globally on PSM (a single shared test stream forces a single scaler), then clipped to ±10 σ to remove training-stream spikes that destabilise reconstruction baselines. We use a sliding window of length w=20 with stride 1, matching USAD/TranAD. The shared FedAvg envelope (Table II) trains all five methods for 
+
+30 global rounds with 25% client sampling per round, 5 local epochs, Adam at lr =1 ×10 −3, batch size 128 , and a temporal 
+
+85% /15% per-client train/validation split. For F ED KAD, we use the same default hyperparameter setting on SMD, SMAP, and MSL: Koopman lifting dimension dlift = 128 , subspace rank r = 24 , ADMM penalty ρ = 1 .0, Stiefel-ADMM step size 0.05 , ridge regularisation λ = 10 −2, spectral cap 0.995 ,score-smoothing window of 5 steps, and prediction horizon 
+
+H = 1 . For PSM, all hyperparameters are kept unchanged except for the subspace rank, which is increased from r = 24 
+
+to r = 32 based on a held-out validation sweep without 
+
+TABLE I: Dataset statistics. NS : number of channels per entity; NN :number of FL clients (one per entity for SMD/SMAP/MSL; Dirichlet-partitioned for PSM). 
+
+Dataset Train Test Anom. (%) NS NN SMD 708 405 708 420 4.16 38 28 PSM 132 481 87 841 27.75 25 24 SMAP 135 183 427 617 12.85 25 54 MSL 58 317 73 729 10.53 55 27 
+
+TABLE II: Federated training configuration shared by all methods. Component Value Component Value Aggregation [19] FedAvg Global rounds 30                 
+
+> Local epochs / round 5Client sampling / round 25%
+> Sampling policy uniform Local batch size 128
+> Optimiser, lr Adam ,10 −3Train / val split temporal 85% /15%
+> Window / stride 20 /1Seeds 0,1,2
+
+using test labels. Every (dataset, method) configuration is repeated for three seeds {0, 1, 2}; we report mean ±std across seeds. Implementation: Python 3.10, PyTorch 2.1.0, CUDA 12.1; experiments run on 4× NVIDIA A40 ( 45 GB) GPUs. 
+
+2) Baselines: We compare F ED KAD against four repre-sentative neural baselines for MTAD: (1) DeepSVDD [53], a one-class deep network with hypersphere objective; (2) LSTM-AE [6], an autoencoder of stacked LSTM units; (3) USAD [54], an adversarial encoder–decoder for unsupervised MTAD; and (4) TranAD [11], a transformer-based reconstructor with an adversarial decoder. Because these methods are originally designed for centralised training, we wrap them in FedAvg [19] with the identical federated envelope used for F ED KAD, so the only dimension of variation is the local model class. LSTM-AE, USAD and TranAD use the default architectures of the original papers; for DeepSVDD we disable the autoencoder pretraining and centralised hypersphere-centre initialisation under our FL-faithful evaluation because they would require server access to the union of every client’s raw training data, violating the FL privacy constraint. 
+
+3) Evaluation metrics: We report Precision, Recall, F 1,and AUC under a per-client macro aggregation protocol. Specifically, each metric is first computed separately on each client’s test stream using its local ground-truth labels, and the resulting scores are then averaged uniformly across clients. This protocol prevents clients with longer streams from dominating the aggregate result and therefore reflects performance at the federation level rather than at the pooled-sample level. To facilitate comparison with prior work while avoiding over-reliance on the known optimistic bias of point adjustment [31], we evaluate four complementary thresholding and adjustment protocols. First, our primary headline metric uses segment-aware PA%K with k=0 .01 [31], where the detection threshold is tuned on each client’s validation split. Under PA%K, an anomalous segment is counted as detected only if at least a JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 11 SMD PSM SMAP MSL                
+
+> FedKAD
+> LSTM-AE
+> USAD
+> DeepSVDD
+> TranAD
+> 72.2 69.9 53.3 39.6
+> 64.5 68.6 51.6 40.5
+> 53.2 64.6 44.3 35.4
+> 35.4 67.1 37.2 35.6
+> 59.8 63.9 49.3 32.7
+> Primary PA%K, k=0.01
+> 35
+> 40
+> 45
+> 50
+> 55
+> 60
+> 65
+> 70
+> F1 (%)
+
+Fig. 3: Performance under the primary PA%K protocol with k = 0 .01 .TABLE III: Paired-t test of F ED KAD versus the strongest baseline per dataset, with Cohen dz effect size and F 1 margin. Verdict gate: margin >0.5 F1.Dataset FED KAD F 1 Best baseline Margin p dz Outcome SMD 72.20 ±1.28 LSTM-AE ( 64 .51 ) +7 .69 0.0384 +2 .86 WIN                   
+
+> PSM 69.87 ±0.21 LSTM-AE ( 68 .57 )+1 .29 0.0092 +5 .97 WIN
+> SMAP 53.32 ±0.50 LSTM-AE ( 51 .56 )+1 .76 0.25 +0 .93 WIN
+> MSL 39.55 ±0.02 LSTM-AE ( 40 .50 )−0.95 0.80 −0.17 loss
+
+fraction k of its points are predicted as anomalous; thus, k=0 .01 
+
+corresponds to requiring at least 1% of the segment to be detected. This criterion mitigates the classic any-hit pathology of point adjustment, where a single isolated alarm inside an anomalous segment is sufficient to mark the entire segment as correctly detected. Second, we report the conventional blind-threshold setting based on POT [55] with any-hit point adjustment ( k=0 ) [4]; here, the threshold is selected without access to test labels and an anomalous segment is considered detected if at least one point within the segment is flagged. Third, we evaluate a stricter blind setting that combines POT thresholding with PA%K at k=0 .1, corresponding to requiring at least 10% of an anomalous segment to be detected, together with a recall cap of 0.995 to reject lucky-spike thresholds. Finally, we report strict point-wise F 1 at the POT threshold without point adjustment, which measures detection quality at the individual timestamp level. 
+
+B. Main results 1) Detection performance and statistical significance: Fig. 3 summarizes the per-client averaged F 1 scores of F ED KAD and the four baselines under the primary PAon three of the four datasets, namely SMD, PSM, and SMAP, while showing only a small degradation on MSL. On SMD, F ED KAD obtains 
+
+72 .20 ±1.28 , outperforming the strongest baseline, LSTM-AE, by +7 .69 F1 (p=0 .038 , dz = + 2 .86 ). On PSM, F ED KAD achieves 69 .87 ±0.21 , improving over LSTM-AE by +1 .29 
+
+F1 (p=0 .0092 , dz = + 5 .97 ). On SMAP, F ED KAD reaches 
+
+53 .32 ±0.50 , giving a positive margin of +1 .76 F1 over LSTM-AE. Although this gain is not statistically significant at the 
+
+p< 0.10 level, it exceeds the predefined verdict margin of 0.5
+
+F1. On MSL, F ED KAD obtains 39 .55 ±0.02 , compared with 
+
+40 .50 ±4.63 for LSTM-AE, corresponding to a small loss of 
+
+0.95 F1.Table III reports the paired-t test between F ED KAD and the strongest baseline on each dataset. The results confirm 
+
+TABLE IV: FedKAD robustness under supplementary evaluation protocols. The best baseline is selected per dataset and protocol.                                                  
+
+> Protocol Dataset FedKAD F 1Best baseline F 1Margin POT + any-hit PA SMD 89.19 ±0.78 LSTM-AE 83.94 ±0.67 +5.25 PSM 98.88 ±0.19 LSTM-AE 98.37 ±0.15 +0.51 SMAP 94.76 ±0.02 USAD 96.17 ±0.96 -1.41 MSL 83.59 ±0.08 LSTM-AE 83.58 ±0.15 +0.02 PA%K, k= 0 .10
+> SMD 55.30 ±2.39 LSTM-AE 44.68 ±0.59 +10.62 PSM 60.58 ±0.42 LSTM-AE 67.15 ±0.11 -6.57 SMAP 37.28 ±1.33 TranAD 44.78 ±0.18 -7.50 MSL 41.76 ±0.01 LSTM-AE 42.94 ±1.54 -1.17 Point-wise no-PA SMD 14.61 ±0.87 USAD 17.30 ±0.64 -2.69 PSM 24.57 ±0.06 DeepSVDD 28.65 ±8.68 -4.08 SMAP 3.87 ±0.01 DeepSVDD 15.60 ±2.36 -11.73 MSL 7.50 ±0.02 DeepSVDD 6.91 ±0.72 +0.60
+
+that the F 1 improvements on SMD and PSM are statistically supported, with margins of +7 .69 and +1 .29 F1, respectively, and large effect sizes ( dz = + 2 .86 and dz = + 5 .97 ). On SMAP, FED KAD still improves over the strongest baseline by +1 .76 
+
+F1, although the paired test is not significant because of seed-level variability. On MSL, F ED KAD is below LSTM-AE by only 0.95 F1, with a negligible effect size ( dz = − 0.17 ). It is easily to see that F ED KAD satisfies the predefined verdict gate on three of the four datasets, while its only loss remains small. 
+
+2) Robustness across evaluation protocols: Table IV evalu-ate FedKAD under three supplementary protocols. Under the classic POT threshold with any-hit point adjustment, FedKAD remains highly competitive and achieves the best F 1 on SMD and PSM, while tying LSTM-AE on MSL. However, this protocol saturates recall on long anomaly segments, so the ranking mainly reflects precision. When the PA%K requirement is tightened to k = 0 .10 , FedKAD keeps a clear advantage on SMD but becomes less competitive on PSM, SMAP, and MSL. This indicates that FedKAD detects anomalous segments reliably on server-machine streams but is more sensitive to stricter segment-coverage requirements on spacecraft and PSM streams. Finally, under the strict point-wise no-PA protocol, all methods obtain substantially lower F 1 scores, confirming the difficulty of exact point-level localization. FedKAD remains competitive on MSL but does not dominate this strict setting. Overall, the multi-protocol results show that FedKAD’s main advantage is strongest under segment-level anomaly detection protocols. 
+
+3) Federated efficiency: Fig. 4 reports end-to-end training wall-clock, per-round communication and inference latency. On all four datasets, F ED KAD trains in 1.7–4.8 s versus 
+
+75 –4020 s for the neural baselines (a 200 ×–2000 × speed-up), exchanges 1.0–1.7 MB per round versus 2.7–129 MB (a 
+
+3×–40 × reduction), and incurs 1.9–5.8 μs per inference step, comparable to or below every neural baseline. Both savings stem from F ED KAD’s two architectural commitments: closed-form local fitting, which avoids local-SGD drift under non-IID data, and low-rank subspace consensus, where communication scales with the subspace size O(Lr ) rather than the number of trainable model parameters O(|θ|). In a federated deployment, TranAD’s hour-long per-client round and USAD’s 60 –130 MB per-round upload are prohibitive on edge hardware, whereas JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 12 SMD PSM SMAP MSL       
+
+> 10 1
+> 10 2
+> 10 3
+> Train time (s)
+> FedKAD
+> LSTM-AE
+> USAD
+> DeepSVDD
+> TranAD
+> SMD PSM SMAP MSL
+> 10 3
+> 10 4
+> 10 5
+> Comm / round (KB)
+> SMD PSM SMAP MSL
+> 0
+> 25
+> 50
+> 75
+> 100
+> 125
+> 150
+> Inference (μs/step)
+
+Fig. 4: Federated efficiency: training wall-clock (s), per-round communication (KB) and inference latency ( μs/step), log scale. F ED KAD is two to three orders of magnitude faster to train and one to two orders cheaper in communication than the next-best neural baseline, with comparable or lower inference latency. 0 5 10 15 20 25 30             
+
+> Global round
+> 2
+> 3
+> 4
+> 5
+> 6
+> 1
+> N i
+> Pi Z F
+> (A) Consensus residual
+> = 0.001
+> = 0.01
+> = 0.1
+> = 1.0
+> 0510 15 20 25 30
+> Global round
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> 600
+> 700
+> (B) Augmented Lagrangian
+> = 0.001
+> = 0.01
+> = 0.1
+> = 1.0
+> 0510 15 20 25 30
+> Global round
+> 6
+> 8
+> 10
+> 12
+> 14
+> 16
+> Ni = 1
+> fi (Pi )
+> (C) Local objective convergence
+> = 0.001
+> = 0.01
+> = 0.1
+> = 1.0
+
+Fig. 5: Empirical convergence diagnostics on SMD ( N =28 clients, r=24 , 30 rounds). (A) Mean consensus residual 1
+
+> N
+
+P 
+
+> i
+
+∥P ℓi −Zℓ∥F :decays at ρ≥1 (Theorem V.5). (B) Augmented Lagrangian Lℓ: descends toward a bounded neighbourhood at ρ=1 ; the late-round oscillation is consistent with Theorem V.3 under partial client participation and the ∆ℓQ perturbation from the Qi-refit (A5). (C) Local objective P 
+
+> i
+
+f ℓi (P ℓi ):decreases over training. 
+
+FED KAD fits in single-second rounds with sub-2 MB uplinks. Combining the accuracy verdict of Table III with the efficiency profile of Fig. 4, F ED KAD is the only method in our study that is simultaneously accurate (on 3/4 datasets) and FL-deployable. 
+
+4) On-device deployment (Raspberry Pi 4): To complement the data-centre measurements of Fig. 4, we re-evaluate every method end-to-end on commodity edge hardware: a Raspberry Pi 4 (Broadcom BCM2711, 4 × Cortex-A72 @ 1.5 GHz, ARMv8, 4 GB LPDDR4) running 64 -bit Raspberry Pi OS, Python 3.13 and PyTorch 2.12 (CPU EP). The setting mirrors SMAP ( nfeatures =25 , w=20 , FedKAD r=24 , dlift =128 ), with 
+
+100 warm-started repeats per measurement and the median reported. Fig. 6 plots training time per global round (s, log ), inference latency ( μs/step) and per-round communication: the only quantity uploaded each FedAvg round is the Stiefel basis Pi ∈ RD×r, so for FedKAD the bubble area encodes 
+
+|Pi|=59 KB, an order of magnitude below LSTM-AE ( 227 KB) and USAD ( 1.9 MB). F ED KAD reaches the lower-left efficient corner on the Pi: 0.23 s/round training (vs. 0.32 s for the next-best DeepSVDD, 0.87 s for LSTM-AE, and 5.66 s for TranAD) and 0.79 μs/step inference (vs. 2.03 μs for DeepSVDD and 
+
+24 .5 μs for TranAD) — a 24 × training speed-up and 31 ×
+
+inference speed-up over the heaviest baseline, on a $ 35 device. Combined with the 59 KB per-round upload, this establishes that F ED KAD is the only method in our study that fits the compute, memory and bandwidth budget of a real edge deployment. 10 1 10 0 10 1
+
+> Training Time (s / global iter, log scale)
+> 0
+> 5000
+> 10000
+> 15000
+> 20000
+> 25000
+> 30000
+> 35000
+> Inference Time per Step (μs)
+
+Raspberry Pi 4 (4-core ARMv8, SMAP setting) 
+
+> FedKAD
+> (0.23s, 786μs, 59KB)
+> LSTM-AE
+> (0.87s, 3826μs, 227KB)
+> (3.16s, 10445μs, 1.9MB)
+> USAD
+> (0.32s, 2033μs, 290KB)
+> DeepSVDD
+> (5.66s, 24486μs, 227KB)
+> TranAD
+> Model Size
+
+256KB 512KB 1.5MB 
+
+Fig. 6: On-device benchmark on a Raspberry Pi 4 under the SMAP setting. F ED KAD achieves the best edge-deployment trade-off, requiring only 59 KB upload per round while reducing training and inference time by up to 25 × and 31 × over the slowest baseline. 
+
+5) Convergence guarantee (theoretical companion): The federated training procedure of F ED KAD is cast as a non-convex consensus ADMM on the Stiefel manifold and admits the convergence guarantee proved in Theorem V.5 shows that for any sufficiently large penalty ρ satisfying ρμ i(ρ) > 2L2
+
+i ,the augmented Lagrangian {L ℓ} converges to a finite value, the successive differences ∥P ℓ+1 
+
+i − P ℓi ∥F and ∥Zℓ+1 − Zℓ∥FJOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 13 
+
+vanish, and the consensus residual ∥P ℓ+1  
+
+> i
+
+− Zℓ+1 ∥F → 0 for every client. The empirical convergence behaviour is further examined below by tracking the consensus residual, augmented Lagrangian, and local data-fit term under different choices of 
+
+ρ.Fig. 5 visualises the three convergence indicators on SMD (N =28 clients) for ρ ∈ {10 −3, 10 −2, 10 −1, 1}. At ρ=1 
+
+(the default operating point), the mean consensus residual 
+
+> 1
+> N
+
+P 
+
+> i
+
+∥P ℓi − Zℓ∥F drops from 6.5 to 2.1 over 30 rounds (panel A), the augmented Lagrangian Lℓ descends from 670 
+
+to a neighbourhood of ≈90 –160 (panel B), and the local data-fit term P 
+
+> i
+
+f ℓi (P ℓi ) decreases from 15 .7 to 6.2 (panel C). The Lagrangian oscillates mildly in later rounds rather than descending strictly; this is consistent with Theorem V.3, which permits per-round increases when the finite-inner-loop error εℓ,the Koopman refitting perturbation ∆ℓQ, or partial-participation effects exceed the descent terms, while still guaranteeing convergence to a finite limit under A2 and A5. At smaller ρ,the penalty is insufficient: the consensus residual stagnates and 
+
+Lℓ grows because the dual accumulation exceeds the descent. The transition occurs between ρ=0 .1 and ρ=1 , confirming the “sufficiently large ρ” condition of the theorem and validating the default choice. VII. C ONCLUSION 
+
+This paper presented F ED KAD, a federated low-rank Koop-man framework for anomaly detection in resource-constrained IoT multivariate time series. By learning compact Koopman dynamics and exchanging only low-rank subspace variables, FED KAD avoids the heavy training and communication cost of federated neural baselines while keeping raw data and local dynamics on device. Experiments on four benchmarks show that FED KAD achieves the best F 1 score on three datasets under the primary PA%K protocol and provides substantial reductions in training time, communication, and inference latency. The on-device Raspberry Pi 4 benchmark further demonstrates its practicality for commodity edge hardware with limited compute, memory, and bandwidth. Future work will study adaptive rank selection, personalized thresholding, and stronger privacy mechanisms. REFERENCES [1] V. Chandola, A. Banerjee, and V. Kumar, “Anomaly detection: A survey,” 
+
+ACM Computing Surveys , vol. 41, no. 3, pp. 15:1–15:58, 2009. [2] A. A. Cook, G. Misirli, and Z. Fan, “Anomaly detection for iot time-series data: A survey,” IEEE Internet of Things Journal , vol. 7, no. 7, pp. 6481–6494, 2020. [3] A. Siffer, P.-A. Fouque, A. Termier, and C. Largou”et, “Anomaly detection in streams with extreme value theory,” in Proceedings of the 23rd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining , 2017, pp. 1067–1075. [4] H. Xu, W. Chen, N. Zhao, Z. Li, J. Bu, Z. Li, Y. Liu, Y. Zhao, D. Pei, Y. Feng et al. , “Unsupervised anomaly detection via variational auto-encoder for seasonal kpis in web applications,” in Proceedings of the 2018 world wide web conference , 2018, pp. 187–196. [5] B. Zong, Q. Song, M. R. Min, W. Cheng, C. Lumezanu, D. Cho, and H. Chen, “Deep autoencoding gaussian mixture model for unsupervised anomaly detection,” in ICLR , 2018. [6] P. Malhotra, A. Ramakrishnan, G. Anand, L. Vig, P. Agarwal, and G. Shroff, “Lstm-based encoder-decoder for multi-sensor anomaly detection,” in ICML 2016 Anomaly Detection Workshop , 2016, arXiv:1607.00148. [7] Y. Su, Y. Zhao, C. Niu, R. Liu, W. Sun, and D. Pei, “Robust anomaly detection for multivariate time series through stochastic recurrent neural network,” in Proceedings of the 25th ACM SIGKDD international conference on knowledge discovery & data mining , 2019, pp. 2828– 2837. [8] H. Zhao, Y. Wang, J. Duan, C. Huang, D. Cao, Y. Tong, B. Xu, J. Bai, J. Tong, and Q. Zhang, “Multivariate time-series anomaly detection via graph attention network,” in ICDM , 2020. [9] A. Deng and B. Hooi, “Graph neural network-based anomaly detection in multivariate time series,” in AAAI , 2021. [10] J. Xu, H. Wu, J. Wang, and M. Long, “Anomaly transformer: Time series anomaly detection with association discrepancy,” in ICLR , 2022. [11] S. Tuli, G. Casale, and N. R. Jennings, “Tranad: Deep transformer net-works for anomaly detection in multivariate time series data,” Proceedings of the VLDB Endowment , vol. 15, no. 6, pp. 1201–1214, 2022. [12] H. Xu, W. Chen, N. Zhao, Z. Li, J. Bu, Z. Li, Y. Liu, Y. Zhao, D. Pei, Y. Feng, J. Chen, Z. Wang, and H. Qiao, “Unsupervised anomaly detection via variational auto-encoder for seasonal kpis in web applications,” in 
+
+Proceedings of the 2018 World Wide Web Conference , 2018, pp. 187–196. [13] B. Zong, Q. Song, M. R. Min, W. Cheng, C. Lumezanu, D. Cho, and H. Chen, “Deep autoencoding gaussian mixture model for unsupervised anomaly detection,” in International Conference on Learning Representations , 2018. [Online]. Available: https: //openreview.net/forum?id=BJJLHbb0-[14] K. Hundman, V. Constantinou, C. Laporte, I. Colwell, and T. Soderstrom, “Detecting spacecraft anomalies using lstms and nonparametric dynamic thresholding,” in Proceedings of the 24th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining , 2018, pp. 387– 395. [15] Y. Su, Y. Zhao, C. Niu, R. Liu, W. Sun, and D. Pei, “Robust anomaly detection for multivariate time series through stochastic recurrent neural network,” in Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining , 2019, pp. 2828– 2837. [16] H. Zhao, Y. Wang, J. Duan, C. Huang, D. Cao, Y. Tong, B. Xu, J. Bai, J. Tong, and Q. Zhang, “Multivariate time-series anomaly detection via graph attention network,” in 2020 IEEE International Conference on Data Mining , 2020, pp. 841–850. [17] A. Deng and B. Hooi, “Graph neural network-based anomaly detection in multivariate time series,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 35, no. 5, 2021, pp. 4027–4035. [18] J. Xu, H. Wu, J. Wang, and M. Long, “Anomaly transformer: Time series anomaly detection with association discrepancy,” in International Conference on Learning Representations , 2022. [Online]. Available: https://openreview.net/forum?id=LzQQ89U1qm [19] H. B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. Ag”uera y Arcas, “Communication-efficient learning of deep networks from de-centralized data,” in Proceedings of the 20th International Conference on Artificial Intelligence and Statistics , ser. Proceedings of Machine Learning Research, vol. 54, 2017, pp. 1273–1282. [20] P. Kairouz, H. B. McMahan, B. Avent, A. Bellet, M. Bennis, A. N. Bhagoji, K. Bonawitz, Z. Charles, G. Cormode, R. Cummings et al. ,“Advances and open problems in federated learning,” Foundations and Trends in Machine Learning , vol. 14, no. 1–2, pp. 1–210, 2021. [21] D. C. Nguyen, M. Ding, P. N. Pathirana, A. Seneviratne, J. Li, and H. V. Poor, “Federated learning for internet of things: A comprehensive survey,” IEEE Communications Surveys & Tutorials , vol. 23, no. 3, pp. 1622–1658, 2021. [22] T. D. Nguyen, S. Marchal, M. Miettinen, H. Fereidooni, N. Asokan, and A.-R. Sadeghi, “D”Iot: A federated self-learning anomaly detection system for iot,” in 2019 IEEE 39th International Conference on Distributed Computing Systems , 2019, pp. 756–767. [23] C. Meng, S. Rambhatla, and Y. Liu, “Cross-node federated graph neural network for spatio-temporal data modeling,” in Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery and Data Mining ,2021, pp. 1202–1211. [24] B. O. Koopman, “Hamiltonian systems and transformation in hilbert space,” Proceedings of the National Academy of Sciences of the United States of America , vol. 17, no. 5, pp. 315–318, 1931. [25] C. W. Rowley, I. Mezi’c, S. Bagheri, P. Schlatter, and D. S. Henningson, “Spectral analysis of nonlinear flows,” Journal of Fluid Mechanics , vol. 641, pp. 115–127, 2009. [26] M. O. Williams, I. G. Kevrekidis, and C. W. Rowley, “A data-driven approximation of the koopman operator: Extending dynamic mode decomposition,” Journal of Nonlinear Science , vol. 25, no. 6, pp. 1307– 1346, 2015. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 14 
+
+[27] P. J. Schmid, “Dynamic mode decomposition of numerical and experi-mental data,” Journal of Fluid Mechanics , vol. 656, pp. 5–28, 2010. [28] A. Wynn, D. S. Pearson, B. Ganapathisubramani, and P. J. Goulart, “Optimal mode decomposition for unsteady flows,” Journal of Fluid Mechanics , vol. 733, pp. 473–503, 2013. [29] P.-A. Absil, R. Mahony, and R. Sepulchre, Optimization Algorithms on Matrix Manifolds . Princeton, NJ: Princeton University Press, 2008. [30] S. Boyd, N. Parikh, E. Chu, B. Peleato, J. Eckstein et al. , “Distributed optimization and statistical learning via the alternating direction method of multipliers,” Foundations and Trends® in Machine learning , vol. 3, no. 1, pp. 1–122, 2011. [31] S. Kim, K. Choi, H.-S. Choi, B. Lee, and S. Yoon, “Towards a rigorous evaluation of time-series anomaly detection,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 36, no. 7, 2022, pp. 7194–7201. [32] T. Li, A. K. Sahu, A. Talwalkar, and V. Smith, “Federated learning: Challenges, methods, and future directions,” IEEE Signal Processing Magazine , vol. 37, no. 3, pp. 50–60, 2020. [33] A. Reisizadeh, A. Mokhtari, H. Hassani, A. Jadbabaie, and R. Pedarsani, “Fedpaq: A communication-efficient federated learning method with periodic averaging and quantization,” in Proceedings of the 23rd International Conference on Artificial Intelligence and Statistics , 2020, pp. 2021–2031. [34] F. Sattler, S. Wiedemann, K.-R. M ¨uller, and W. Samek, “Robust and communication-efficient federated learning from non-iid data,” in IEEE Transactions on Neural Networks and Learning Systems , 2019. [35] S. Caldas, J. Kone ˇcn ´y, H. B. McMahan, and A. Talwalkar, “Expanding the reach of federated learning by reducing client resource requirements,” in NeurIPS Workshop on Federated Learning for Data Privacy and Confidentiality , 2018. [36] P. Malhotra, L. Vig, G. Shroff, and P. Agarwal, “Long short term memory networks for anomaly detection in time series,” in ESANN , 2015. [37] K. Hundman, V. Constantinou, C. Laporte, I. Colwell, and T. Soderstrom, “Detecting spacecraft anomalies using lstms and nonparametric dynamic thresholding,” in Proceedings of the 24th ACM SIGKDD international conference on knowledge discovery & data mining , 2018, pp. 387–395. [38] Y. Su, Y. Zhao, C. Niu, R. Liu, W. Sun, and D. Pei, “Robust anomaly detection for multivariate time series through stochastic recurrent neural network,” in KDD , 2019. [39] D. Li, D. Chen, B. Jin, L. Shi, J. Goh, and S.-K. Ng, “Mad-gan: Multivariate anomaly detection for time series data with generative adversarial networks,” in ICANN , 2019. [40] A. Geiger, D. Liu, S. Alnegheimish, A. Cuesta-Infante, and K. Veera-machaneni, “Tadgan: Time series anomaly detection using generative adversarial networks,” in BigData , 2020. [41] H. Zhou, S. Zhang, J. Peng, S. Zhang, J. Li, H. Xiong, and W. Zhang, “Informer: Beyond efficient transformer for long sequence time-series forecasting,” in AAAI , 2021. [42] B. Lusch, J. N. Kutz, and S. L. Brunton, “Deep learning for universal linear embeddings of nonlinear dynamics,” Nature communications , vol. 9, no. 1, p. 4950, 2018. [43] L. Fu, M. Ma, and Z. Zhai, “Deep koopman predictors for anomaly detection of complex iot systems with time series data,” IEEE Internet of Things Journal , vol. 11, no. 23, pp. 38 360–38 369, 2024. [44] M. Bakhtiaridoust, M. Yadegar, N. Meskin, and M. Noorizadeh, “Model-free geometric fault detection and isolation for nonlinear systems using koopman operator,” IEEE Access , vol. 10, pp. 14 835–14 845, 2022. [45] K. Zhang, Y. Jiang, L. Seversky, C. Xu, D. Liu, and H. Song, “Federated variational learning for anomaly detection in multivariate time series,” 
+
+arXiv preprint arXiv:2108.08404 , 2021. [46] W. Zhu, D. Song, Y. Chen, W. Cheng, B. Zong, T. Mizoguchi, C. Lumezanu, H. Chen, and J. Luo, “Deep federated anomaly detection for multivariate time series data,” arXiv preprint arXiv:2205.04041 , 2022. [47] F. Liu et al. , “Federated time-series anomaly detection benchmark,” arXiv preprint arXiv:2212.09518 , 2022. [48] L. Collins, H. Hassani, A. Mokhtari, and S. Shakkottai, “Exploiting shared representations for personalized federated learning,” in International conference on machine learning . PMLR, 2021, pp. 2089–2099. [49] E. Kaiser, J. N. Kutz, and S. L. Brunton, “Data-driven discovery of koopman eigenfunctions for control,” Machine Learning: Science and Technology , vol. 2, no. 3, p. 035023, 2021. [50] M. O. Williams, I. G. Kevrekidis, and C. W. Rowley, “A data–driven approximation of the koopman operator: Extending dynamic mode decomposition,” Journal of Nonlinear Science , vol. 25, no. 6, pp. 1307– 1346, 2015. [51] G. Cybenko, “Approximation by superpositions of a sigmoidal function,” 
+
+Mathematics of control, signals and systems , vol. 2, no. 4, pp. 303–314, 1989. [52] A. Abdulaal, Z. Liu, and T. Lancewicki, “Practical approach to asyn-chronous multivariate time series anomaly detection and localization,” in Proceedings of the 27th ACM SIGKDD conference on knowledge discovery & data mining , 2021, pp. 2485–2494. [53] L. Ruff, R. Vandermeulen, N. Goernitz, L. Deecke, S. A. Siddiqui, A. Binder, E. M ¨uller, and M. Kloft, “Deep one-class classification,” in 
+
+Proceedings of the 35th International Conference on Machine Learning ,ser. Proceedings of Machine Learning Research, J. Dy and A. Krause, Eds., vol. 80. PMLR, 10–15 Jul 2018, pp. 4393–4402. [Online]. Available: https://proceedings.mlr.press/v80/ruff18a.html [54] J. Audibert, P. Michiardi, F. Guyard, S. Marti, and M. A. Zuluaga, “Usad: Unsupervised anomaly detection on multivariate time series,” in 
+
+Proceedings of the 26th ACM SIGKDD international conference on knowledge discovery & data mining , 2020, pp. 3395–3404. [55] A. Siffer, P.-A. Fouque, A. Termier, and C. Largouet, “Anomaly detection in streams with extreme value theory,” in Proceedings of the 23rd ACM SIGKDD international conference on knowledge discovery and data mining , 2017, pp. 1067–1075.

@@ -1,0 +1,2524 @@
+Title: Reachability-Preserving Bellman Operator for the Discounted Reach-Cost Value Function: Uniting Hamilton-Jacobi Reachability and Reinforcement Learning
+
+URL Source: https://arxiv.org/pdf/2607.07893v1
+
+Published Time: Fri, 10 Jul 2026 00:11:30 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+> 1
+
+# Reachability-Preserving Bellman Operator for the Discounted Reach-Cost Value Function: Uniting Hamilton–Jacobi Reachability and Reinforcement Learning 
+
+Isabelle El-Hajj, Prashant Solanki, Jasper van Beers, Coen de Visser, and Erik-Jan van Kampen 
+
+Abstract —Hamilton-Jacobi (HJ) reachability provides rigorous safety and reachability guarantees for continuous-time dynamical systems, but its numerical solution suffers from the curse of dimensionality. Deep reinforcement learning (DRL), by contrast, offers scalable sample-based methods. However, RL is typically built around additive cumulative rewards; whereas, reachability objectives are inherently non-additive. This mismatch makes a direct bridge between HJ reachability and RL nontrivial. Recent discounted formulations have either introduced contraction by altering the original reachability semantics, or preserved exact semantics on the HJ side without a corresponding Bellman fixed-point characterization. In this paper, we close this gap by building on a semantics-preserving discounted reach-based value function and deriving a non-additive Bellman operator whose unique fixed point exactly matches the value function in the HJ formulation. We prove that discounting makes this operator contractive, yielding existence, uniqueness, and convergence of value iteration. Furthermore, we establish the equivalence between the HJ and Bellman characterizations, and show that RL can be interpreted as a sample-based approximation scheme for the same fixed-point equation. This yields a principled and semantically exact connection between HJ reachability and RL, enabling learning-based methods to approximate reachability value functions while preserving their safety-critical meaning. As a result, the proposed framework opens the door to scalable, data-driven computation of reachable sets and safety certificates in high-dimensional sys-tems. Numerical experiments demonstrate close agreement with Hamilton–Jacobi solutions, confirm preservation of reachability semantics via alignment of zero level sets, and support the interpretation of reinforcement learning as a sample-based solver of the proposed Bellman operator. 
+
+Index Terms —Hamilton-Jacobi reachability, Non-additive Bell-man Operator, Reinforcement learning, Reach cost, Safety-critical control. 
+
+I. I NTRODUCTION 
+
+A. Background & Motivation 
+
+Hamilton–Jacobi (HJ) reachability provides a principled framework for analyzing safety and reachability properties of continuous-time dynamical systems [18]. By characterizing reachable or safe sets as sublevel or superlevel sets of a value function satisfying a Hamilton–Jacobi variational inequality (HJVI), this framework offers strong semantic guarantees and has become a cornerstone of safety-critical control [3], [7]. However, its practical utility remains limited by the curse of dimensionality: numerical solutions of the associated partial 
+
+All authors are with the section of Control & Simulation at the Faculty of Aerospace Engineering at Delft University of Technology. 
+
+differential equations scale exponentially with the state dimen-sion [11], [12]. A large body of work has therefore sought to improve the scalability of HJ reachability, including decomposition methods, level-set approximations, and learning-based surro-gates [8], [14], [16], [17], [30]. Learning methods that are constrained by partial differential equation (PDEs), such as DeepReach [4], approximate the time-dependent HJ value function using a neural implicit representation trained to sat-isfy the PDE together with terminal and boundary conditions. While such approaches enforce local PDE consistency, they do not by themselves provide a global Bellman fixed-point characterization of the solution. In parallel, deep reinforcement learning (DRL) has emerged as a powerful paradigm for sequential decision-making and control in high-dimensional systems. Across games, robotics, fluid dynamics, quantum control, and industrial processes, DRL has shown that it can address problems that are dif-ficult for classical control and optimization [2], [9], [19], [24]–[26], [29]. By leveraging function approximation and sample-based updates, DRL methods can scale to settings that are often intractable for classical dynamic programming. However, standard RL formulations are typically built around additive cumulative rewards; whereas, reachability objectives are fundamentally non-additive: they depend on whether a target can be reached or avoided over a time horizon, rather than on the accumulation of instantaneous rewards alone. As a result, a direct bridge between HJ reachability and RL is not immediate. Any such bridge must preserve the semantics of reachability while also admitting an operator-theoretic formulation compatible with dynamic programming and learning. 
+
+B. Related Work & Contributions 
+
+The complementary strengths and limitations of HJ reacha-bility and RL have motivated considerable interest in bridging the two frameworks [10], [12], [22], [23], [27]. Broadly speaking, prior work has shown either that discounting can induce contraction properties and RL-compatible Bellman operators, or that discounted reachability formulations can preserve the exact reachability semantics on the HJ side. What has remained unaddressed is an exact Bellman fixed-point characterization for a semantics-preserving discounted reach-based value function. arXiv:2607.07893v1 [eess.SY] 8 Jul 2026 2
+
+Nonetheless, several works have taken important steps in this direction. Akametalu et al. introduced the minimum dis-counted reward (MDR) formulation, which recasts reachability as a discounted reward optimization problem and yields a con-tractive Bellman operator amenable to standard reinforcement learning methods [1]. Crucially, this work demonstrates that discounting can induce a contraction structure. However, the resulting value function does not exactly recover the original reachability semantics, and instead provides a discounted approximation of the underlying reachability problem. Fisac et al. [10] further highlighted the interface between time-discounted safety analysis and RL by showing how discounted formulations can make RL tools amenable to approximating safety value functions. Their work provides an important conceptual bridge between HJ safety analysis and RL, and helped motivate subsequent work at this intersection. In discrete time, Hsu et al. [15] derived discounted Bellman equations for reach-avoid problems and showed how such objectives can be approached through RL. More recently, related operator-theoretic perspectives have also appeared in Bellman-style formulations for constrained and reachability-related sequential decision problems [22], [23]. Collectively, these works demonstrate that reachability-type objectives can be incorporated into Bellman-style learning frameworks, but they do not provide the exact continuous-time HJ/Bellman equivalence established here for the discounted reach-based setting. On the semantics-preserving HJ side, Choi et al. [7] intro-duced a discounted reachability-based value function, termed the Control Barrier-Value Function (CBVF), and showed that it satisfies a Hamilton–Jacobi–Isaacs variational inequality (HJIVI). Importantly, this formulation preserves reachability semantics under exponential discounting and establishes a connection between HJ reachability and control barrier func-tions. Thus, Choi et al. provide the appropriate discounted HJ formulation upon which an exact bridge to RL can be built. Prior work achieves either contraction or semantic correct-ness, but not both simultaneously within a Bellman fixed-point framework. We take the semantics-preserving discounted HJ characterization formulation from Choi et al. [7] as our starting point and provide the missing Bellman fixed-point characterization. This work is also complementary to recent efforts that formalize the relationship between HJ reachability and RL through a travel-cost (also referred to as running-cost) for-mulation [27]. While that line of work focuses on a travel-cost-based value function, we instead consider a reach-cost-based value function. Both viewpoints preserve reachability semantics and admit contraction-based operator structures compatible with modern learning methods, but they lead to different value-function definitions and different Bellman operators. In this paper, we build on the semantics-preserving dis-counted reach-based formulation of Choi et al. and provide the missing operator-theoretic bridge to reinforcement learn-ing. Specifically, we derive a reachability-preserving Bellman operator whose fixed point exactly characterizes the same discounted reach-based value function that appears in the HJ formulation. Although the operator is non-additive, dis-counting renders it contractive, enabling the use of Banach’s fixed-point theorem [13] to establish existence, uniqueness, and convergence of value iteration. This yields a direct and principled bridge between HJ reachability and reinforcement learning. The main contributions of this paper are as follows:  
+
+> •
+
+Starting from the discounted reach-based value function and HJ characterization introduced by Choi et al. [7], we derive a reachability-preserving Bellman operator corresponding exactly to it.  
+
+> •
+
+We prove that, although this Bellman operator is non-additive, discounting renders it a contraction on a com-plete space of value functions, yielding a unique fixed point via Banach’s fixed-point theorem.  
+
+> •
+
+We establish the equivalence between the HJ character-ization and the Bellman fixed-point characterization of this discounted reach-based value function.  
+
+> •
+
+We show that reinforcement learning algorithms can be interpreted as sample-based approximation schemes for this Bellman operator, thereby yielding a principled and semantically correct bridge between HJ reachability and reinforcement learning. The remainder of the paper is structured as follows. Sec-tion II introduces the problem formulation and elucidates the notation used to distinguish different successive forms of the value function or candidates thereof, including the finite- and infinite-horizon variants developed in parallel throughout the paper. Section III defines the discounted reach-based value function, establishes its key properties, and derives the asso-ciated dynamic programming principle (DPP). In Section IV, the associated HJ characterization is presented. Section V then introduces the corresponding Bellman operator and proves the existence and uniqueness of its fixed point. The equivalence between the HJ and Bellman formulations is established in Section VI. Section VII further develops a discrete-time version of the Bellman operator, shows its convergence to the exact operator. Section VIII discusses learning the fixed point via reinforcement learning through sample-based access. Section IX presents numerical validation of the proposed theoretical framework. Finally, Section X offers concluding remarks and directions for future work. II. P ROBLEM FORMULATION & N OTATION 
+
+A. System Dynamics 
+
+We consider a controlled dynamical system of the form 
+
+˙x(s) = f (x(s), u (s)) , s ∈ [t, T ], (1) where x(s) ∈ Rn is the state trajectory and u(s) ∈ U ⊂ Rm
+
+is the control input. We define M(t) as the set of all control policies applicable at time t:
+
+M(t) ≡ { u : [ t, T ] → U | u measurable }.
+
+We make the following standing assumptions on the vector field f , beginning with its functional form. 3
+
+Assumption 1 (Time-invariance of f ). The vector field f
+
+is a function of state and control alone, 
+
+f : Rn × U → Rn,
+
+with no explicit dependence on time, as reflected in eq. (1). 
+
+Assumption 2 (Global Lipschitz continuity of f in x).
+
+The function f : Rn × U → Rn is globally Lipschitz continuous in x, uniformly in u. That is, there exists a constant Lf x > 0 such that 
+
+∥f (x, u ) − f (y, u )∥ ≤ Lf x ∥x − y∥∀x, y ∈ Rn, ∀u ∈ U . (2) 
+
+Assumption 3 (Continuity of f in u). For each x ∈ Rn,the function f (x, u ) is continuous in u.
+
+Assumption 4 (Compactness of U). The control set U ⊂ 
+
+Rm is nonempty and compact (i.e. closed and bounded). 
+
+B. Target Set Representation 
+
+We represent the target set G ⊂ Rn through a reach cost function g such that 
+
+G = {x ∈ Rn | g(x) < 0}.
+
+The sign of g therefore determines whether a state lies inside or outside the target set. 
+
+Assumption 5 (Sign Calibration / Semantic Assumption) . 
+
+> •
+
+g(x) < 0 inside target set G 
+
+> •
+
+g(x) ≥ 0 outside target set G
+
+We make the following additional assumptions on g, begin-ning with its functional form. 
+
+Assumption 6 (Time-independence of g). The reach cost is a function of state alone, 
+
+g : Rn → R,
+
+with no explicit dependence on time; equivalently, the target set G is fixed for all t.
+
+Assumption 7 (Global Lipschitz continuity of g in x).
+
+The reach cost g(x) : Rn → R is Lipschitz continuous in x. That is, there exists a constant Lg > 0 such that 
+
+∥g(x) − g(y)∥ ≤ Lg ∥x − y∥ ∀x, y ∈ Rn. (3) 
+
+Assumption 8 (Boundedness of g). g is bounded, i.e. 
+
+∥g∥∞ := sup 
+
+> x∈X
+
+|g(x)| ≤ M < ∞. (4) for some finite M .
+
+C. Reachability Objective 
+
+Let T ∈ [0 , ∞] denote the terminal time and ξut,x (s) denote the trajectory of the system under the admissible control u(·)
+
+starting from state x at time t, evaluated at absolute time s.The dynamics can be written as follows: 
+
+dds ξut,x (s) = f  ξut,x (s), u (s), ξut,x (t) = x, 
+
+for all s ∈ [t, T ].We consider the reachability problem over the horizon [t, T ].
+
+Backward reachable tube (BRT). The BRT is the set of states from which there exists an admissible control that drives the system into the target set G at some time within the horizon: 
+
+RBRT (t) := 
+
+x ∈ Rn ∃u(·), ∃τ ∈ [t, T ] such that ξut,x (τ ) ∈ G . (5) 
+
+Remark 1. For clarity of presentation, the theory and all main results in this paper are formulated and developed for the backward reachable tube (BRT) problem. The corresponding avoid formulation is entirely analogous. In particular, the same arguments and results carry over after replacing the reach objective by the safety objective, the target set by the unsafe set where appropriate, and the control optimization inf by sup in the relevant definitions and results. 
+
+D. Notation Across the Value Function’s Successive Forms 
+
+Having introduced the system dynamics, target set, and reachability objective, we close this section with a summary of the notation used for the value function and its successive forms, developed in sections III to VII. The value function is not a single fixed object throughout the paper: it appears first in absolute time, then in a time-to-go reparameterization, then as two a priori distinct characterizations—a viscosity solution and a Bellman fixed point—that are subsequently shown to coincide, and finally as a discretized and a learned approximation thereof. The notation in table I tracks this progression directly, with each tier of symbols corresponding to a distinct level of exactness; the table is intended as a running reference as new tiers are introduced across those sections. III. D ISCOUNTED REACH -BASED VALUE FUNCTION 
+
+The set-based reachability problem discussed in section II-C admits an equivalent value-function characterization which we present in this section (see Definitions 1 and 2). In particular, the zero sublevel set of this equivalent value function coincides with the backward reachable tube [3], [7], [14], [18]: 
+
+RBRT (t) = {x ∈ X | V (t, x ) ≤ 0}.4
+
+TABLE I: Value-Function Notation Across Successive Forms.                                        
+
+> Tier Symbol Meaning 0V(t, x ),V∞(t, x )True value function expressed in absolute time (Definitions 1 and 2) 1W(τ, x ),W∞(x)True value function expressed in the time-to-go variable τ(Definition 3) and the true stationary time-to-go value function (Definition 4) 2WBell (τ, x ),
+> W∞
+> Bell (x)
+> The unique Bellman fixed point (Theorem 3, Theorem 5), a priori distinct from W(τ, x )and W∞(x)until shown to coincide with them in Theorem 7 and Theorem 8 respectively. 3cW(τ, x ),cW∞(x)Fixed point of the finite-horizon discrete Bellman operator bTσ,λ (eq. (57)) and of the infinite-horizon discrete Bellman operator bT∞
+> σ,λ
+> 4Ψθ(τ, x ),Ψ∞
+> θ(x)Parametric (learned) approximation produced by fitted-value iteration (FVI) for finite horizon and infinite horizon cases (section VIII) —ΨGeneric placeholder argument to a Bellman operator
+
+Thus, the sign of the value function determines membership in the reachable set: V (t, x ) ≤ 0 if and only if the state x
+
+belongs to the backward reachable tube at time t.
+
+A. Absolute-Time Value Function Definition 1 (Discounted Reach-based Value Function) .
+
+V (t, x ) := inf   
+
+> u(·)∈U [t,T ]
+
+inf   
+
+> s∈[t,T ]
+
+g(ξut,x (s)) e−λ(s−t), (6) where λ > 0, and we refer to is as the discount rate .
+
+Interpretation. The value function evaluates the most favor-able (i.e., smallest) discounted reach cost attainable along a trajectory. The inner infimum over time introduces a stopping structure, capturing the first favorable encounter with the tar-get, while discounting ensures well-posedness and contraction without altering the sign-based reachability semantics. 
+
+Definition 2 (Infinite-Horizon Value Function V ∞(t, x )).
+
+The infinite-horizon value function is Definition 1 eval-uated in the limit T → ∞ :
+
+V ∞(t, x ) := inf  
+
+> u(·)∈U [t, ∞)
+
+inf  
+
+> s∈[t, ∞)
+
+g(ξut,x (s)) e−λ(s−t). (7) 
+
+V ∞ formally retains t as an argument, consistent with Definition 1. However, Lemma 2 shows it is in fact invariant of t.
+
+B. Time-to-Go Value Function 
+
+Since reinforcement learning takes on a time-to-go perspec-tive, we introduce the remaining time variable τ := T − t
+
+where t, in consistency with the previous semantics, denotes the absolute time. We substitute t = T − τ into eq. (6). 
+
+V (T − τ, x ) = inf  
+
+> u(·)∈U
+
+inf    
+
+> s∈[T−τ,T ]
+
+g(ξuT −τ,x (s)) eλ(T −τ −s)
+
+(8) Equation (8) is a direct re-expression of the original reach-ability value function now in terms of remaining time, yet without altering its time semantics: the first argument of 
+
+V (·, ·) continues to represent absolute time, and the trajectory 
+
+ξuT −τ,x (s) remains parameterized by absolute time. Next, we introduce the elapsed-time variable r which is given by 
+
+r := s − (T − τ ) where s ∈ [t, T ] (9) This then maps the interval s ∈ [T − τ, T ] to r ∈ [0 , τ ],which leads to the following updated version of eq. (8). 
+
+V (T − τ, x ) = inf  
+
+> u(·)∈U
+
+inf   
+
+> r∈[0 ,τ ]
+
+g(ξuT −τ,x (T − τ + r)) e−λr .
+
+(10) Since the dynamics are time-invariant (Assumption 1), tra-jectories depend only on the initial state, the elapsed time, and the control function. For any admissible control u(·), we therefore define the flow 
+
+ϕux(r) := ξuT −τ,x (T − τ + r), (11) which represents the state reached after elapsed time r starting from x.With this notation, and since g is time-independent (As-sumption 6), we can rewrite 
+
+g  ξuT −τ,x (T − τ + r) = g (ϕux(r)) , (12) We can now define the time-to-go value function W (τ, x ).
+
+Definition 3 (Finite-Horizon Time-to-Go Value Function 
+
+W (τ, x )).
+
+W (τ, x ) := V (T −τ, x ) = inf   
+
+> u(·)∈U [0 ,τ ]
+
+inf   
+
+> r∈[0 ,τ ]
+
+g(ϕux(r)) e−λr .
+
+(13) 
+
+Interpretation. In words, W (τ, x ) is the smallest discounted reach-cost value that can be attained within the next τ units of time, starting from state x, under any admissible control. 
+
+Definition 4 (Infinite-Horizon Time-to-Go Value Function 
+
+W ∞(x)). For the infinite-horizon case, the time-to-go variable τ becomes unbounded; we write W ∞(x) for Definition 3 evaluated at τ = ∞, which becomes only a function of xW ∞(x) := inf  
+
+> u(·)∈U
+
+inf  
+
+> r∈[0 ,∞)
+
+g(ϕux(r)) e−λr . (14) 
+
+C. Properties of the Value Function 
+
+In this subsection, we establish several regularity properties of the value function V (t, x ) and its infinite-horizon counter-part V ∞(t, x ), developed in parallel for the finite- and infinite-horizon settings. For finite horizon T < ∞, we establish boundedness (Lemma 1) and Lipschitz continuity, both in the state variable (Lemma 3) and in time, the latter stated jointly for V (t, x ) and the time-to-go value function W (τ, x )
+
+(Lemma 5). For the infinite-horizon case, we establish time-invariance of V ∞(t, x ) in t (Lemma 2) — which underlies its 5
+
+reduction to the stationary function W ∞(x) — together with pointwise continuity in x (Lemma 4) and in t (Lemma 6), the latter following directly from time-invariance. 
+
+Lemma 1 (Boundedness of V (t, x )). Assume that the reach cost g is bounded (Assumption 8). Then, the value function defined in eq. (6) is bounded, i.e. 
+
+∥V ∥∞ ≤ M < ∞ (15) 
+
+Proof. Since s − t ≥ 0 and λ > 0, then e−λ(s−t) ≤ 1.Therefore, for all admissible control u(·) ∈ U and s ∈ [t, T ]
+
+|g(ξut,x (s)) e−λ(s−t)| ≤ | g(ξut,x (s)) | ≤ M (16) Taking the infimum over u(·) ∈ U and s ∈ [t, T ] preserves this bound: 
+
+|V (t, x )| ≤ M ∀(t, x ) (17) Taking the supremum over (t, x ) gives 
+
+∥V ∥∞ ≤ M < ∞ (18) 
+
+Lemma 2 (Time-invariance of V ∞(t, x )).Proof. The expression for V ∞(t, x ) can be seen in Defini-tion 2. We set r = s − t. Since the dynamics are time-invariant, admissible controls can be shifted in time. Thus, with ¯u(r) := u(t + r),
+
+ξut,x (t + r) = ϕ¯ux(r).
+
+Therefore, 
+
+V ∞(t, x ) = inf  
+
+> ¯u(·)
+
+inf  
+
+> r∈[0 ,∞)
+
+e−λr g(ϕ¯ux(r)) =: W ∞(x).
+
+Hence, V ∞(t, x ) is invariant with respect to t, and W ∞(x)
+
+is independent of τ .
+
+Lemma 3 (Lipschitz Continuity of V (t, x ) in x for finite horizon T ). The value function V (t, x ) defined in eq. (6) is globally Lipschitz continuous in x for each fixed t ∈
+
+[0 , T ] for T < ∞. That is, there exists LV x > 0 such that 
+
+∥V (t, x ) − V (t, y )∥ ≤ LV x ∥x − y∥,
+
+∀x, y ∈ Rn, t ∈ [0 , T ] s.t. T < ∞
+
+(19) 
+
+Proof. Using the Lipschitz continuity of the dynamics in x
+
+(Assumption 2) and Grönwall’s inequality, it is possible to establish a trajectory difference bound 
+
+ξut,x (s) − ξut,y (s) ≤ eLf x (s−t)∥x − y∥ (20) Applying the Lipschitz continuity of g in x (Assumption 7) and substituting eq. (20) yields 
+
+g  ξut,x (s) − g  ξut,y (s) ≤ Lg eLf x (s−t)∥x − y∥ (21) Incorporating the discount factor 
+
+g  ξut,x (s) e−λ(s−t) − g  ξut,y (s) e−λ(s−t)
+
+≤ Lg e(Lf x −λ)( s−t)∥x − y∥
+
+(22) Applying the property that 
+
+| inf A − inf B| ≤ sup 
+
+> a∈A,b ∈B
+
+|a − b| (23) this means that 
+
+|V (t, x )−V (t, y )| ≤ sup 
+
+> u
+
+sup  
+
+> s∈[t,T ]
+
+Lg e(Lf x −λ)( s−t)∥x−y∥ (24) Since the right-hand-side is independent of u, this above simplifies to 
+
+|V (t, x ) − V (t, y )| ≤ sup  
+
+> s∈[t,T ]
+
+Lg e(Lf x −λ)( s−t)∥x − y∥ (25) The result for sup s∈[t,T ] Lg e(Lf x −λ)( s−t) will depend on how Lf x and λ compare. Specifically, 
+
+sup  
+
+> s∈[t,T ]
+
+Lg e(Lf x −λ)( s−t) =
+
+(
+
+Lg , λ ≥ Lf x ,Lg e(Lf x −λ)( T −t), λ < L f x .
+
+(26) We can upper-bound the second case: 
+
+sup  
+
+> s∈[t,T ]
+
+Lg e(Lf x −λ)( s−t) ≤
+
+(
+
+Lg , λ ≥ Lf x ,Lg e(Lf x −λ)T , λ < L f x . (27) It is clear that for finite T , that V (t, x ) is Lipschitz continuous in x uniformly in time and hence is continuous in x.
+
+Remark 2 (Lipschitz continuity of V ∞(t, x ) in x). As for the case of when T → ∞ , e(Lf x −λ)( T −t) would be finite only if λ ≥ Lf x . Hence, in the infinite-horizon setting, the discount rate must dominate the growth induced by the dynamics in order to guarantee a global Lipschitz bound for the value function. This regularity, however, is too strong and unnecessary for viscosity theory. Instead, we show the pointwise continuity of V (t, x ) in x for the case of T → ∞ .
+
+Lemma 4 (Pointwise Continuity of V ∞(t, x ) in x). For every fixed t ≥ 0, the value function V (t, x ) (Defini-tion 1) is, in the limit T → ∞ , pointwise continuous in 
+
+x on Rn.
+
+Proof. Fix t ≥ 0 and fix a state x ∈ Rn. We want to show: for every ε > 0, there exists δ > 0 such that 
+
+∥x − y∥ < δ =⇒ | V (t, x ) − V (t, y )| < ε. 
+
+Define the truncated finite-horizon value function 
+
+VS (t, x ) := inf  
+
+> u(·)∈U [t,S ]
+
+inf  
+
+> s∈[t,S ]
+
+g(ξut,x (s)) e−λ(s−t),
+
+for some finite S > t .6
+
+Let ε > 0 be given. By the triangle inequality: 
+
+|V (t, x ) − V (t, y )| ≤ | V (t, x ) − VS (t, x )|
+
+| {z }
+
+> (1)
+
++ |VS (t, x ) − VS (t, y )|
+
+| {z }
+
+> (2)
+
++ |VS (t, y ) − V (t, y )|
+
+| {z }
+
+> (3)
+
+. (28) 
+
+Controlling terms (1) and (3). Since g is bounded by M
+
+(Assumption 8) and the discount factor satisfies 
+
+e−λ(s−t) ≤ e−λ(S−t) for all s ≥ S, 
+
+the tail contribution beyond S satisfies: 
+
+|V (t, x ) − VS (t, x )| ≤ M e −λ(S−t).
+
+The same bound holds for term (3) with y in place of x,since the bound is independent of the state. Choose S large enough so that 
+
+M e −λ(S−t) < ε
+
+3 ,
+
+which is possible since 
+
+M e −λ(S−t) → 0 as S → ∞ .
+
+This choice of S depends only on ε and t, not on x or y.
+
+Controlling term (2). With S now fixed, Lemma 3 gives that VS (t, ·) is Lipschitz continuous in the state with some finite constant LV x . Therefore: 
+
+|VS (t, x ) − VS (t, y )| ≤ LV x ∥x − y∥.
+
+Choose 
+
+δ = ε
+
+3LV x 
+
+.
+
+Then whenever ∥x − y∥ < δ :
+
+|VS (t, x ) − VS (t, y )| < ε
+
+3 .
+
+Combining. For this choice of δ, whenever ∥x − y∥ < δ :
+
+|V (t, x ) − V (t, y )| < ε
+
+3 + ε
+
+3 + ε
+
+3 = ε. 
+
+Since ε was arbitrary, V (t, ·) is continuous at x. Since x
+
+was arbitrary, V (t, ·) is continuous on Rn.
+
+Lemma 5 (Lipschitz Continuity of V (t, x ) in t and 
+
+W (τ, x ) in τ for T Finite) . For every fixed x ∈ Rn and finite T < ∞: (i) the time-to-go value function W (τ, x )
+
+(Definition 3) is Lipschitz continuous in τ on [0 , T ], with some constant Kx,T > 0; (ii) consequently, the value function V (t, x ) (Definition 1) is Lipschitz continuous in 
+
+t on [0 , T ] with the same constant. 
+
+Proof. We first prove the result for the time-to-go value function Definition 3. Fix x ∈ Rn and let T < ∞. Since 
+
+u 7 → f (x, u ) is continuous and U is compact, the quantity 
+
+Cx := sup 
+
+> u∈U
+
+∥f (x, u )∥
+
+is finite. Let z(r) = ϕux(r). By global Lipschitz continuity of f in the state variable, uniformly in u, we have 
+
+∥f (z(r), u (r)) ∥ ≤ ∥ f (z(r), u (r)) − f (x, u (r)) ∥ + ∥f (x, u (r)) ∥≤ Lf ∥z(r) − x∥ + Cx.
+
+Therefore, 
+
+∥z(r) − x∥ ≤ 
+
+Z r
+
+> 0
+
+Lf ∥z(q) − x∥ dq + Cxr. 
+
+By Grönwall’s inequality, 
+
+∥z(r) − x∥ ≤ Cxre Lf r , r ∈ [0 , T ].
+
+Consequently, for all r ∈ [0 , T ],
+
+∥f (z(r), u (r)) ∥ ≤ Cx + Lf CxT e Lf T .
+
+Define 
+
+Cx,T := Cx + Lf CxT e Lf T .
+
+Then, for any r, q ∈ [0 , T ], without loss of generality q ≤ r,
+
+∥ϕux(r) − ϕux(q)∥ =
+
+Z rq
+
+f (ϕux(ℓ), u (ℓ)) dℓ 
+
+≤
+
+Z rq
+
+∥f (ϕux(ℓ), u (ℓ)) ∥ dℓ 
+
+≤ Cx,T |r − q|.
+
+Thus, 
+
+∥ϕux(r) − ϕux(q)∥ ≤ Cx,T |r − q|
+
+for all r, q ∈ [0 , T ], uniformly over all admissible controls. Now define, for each admissible control u(·),
+
+Fu(r) := e−λr g(ϕux(r)) .
+
+Using boundedness of g, Lipschitz continuity of g, and the trajectory estimate above, we obtain 
+
+|Fu(r) − Fu(q)| = e−λr g(ϕux(r)) − e−λq g(ϕux(q)) 
+
+≤ e−λr g(ϕux(r)) − e−λq g(ϕux(r)) 
+
++ e−λq g(ϕux(r)) − e−λq g(ϕux(q)) 
+
+≤ M |e−λr − e−λq | + Lg ∥ϕux(r) − ϕux(q)∥≤ (M λ + Lg Cx,T ) |r − q|.
+
+Let 
+
+Kx,T := M λ + Lg Cx,T .
+
+Then 
+
+|Fu(r) − Fu(q)| ≤ Kx,T |r − q|
+
+for all r, q ∈ [0 , T ], uniformly over admissible controls. We now show that W (·, x ) is Lipschitz continuous. Let 
+
+0 ≤ τ1 ≤ τ2 ≤ T, η := τ2 − τ1.
+
+Since [0 , τ 1] ⊂ [0 , τ 2], increasing the horizon can only decrease the infimum. Hence 
+
+W (τ2, x ) ≤ W (τ1, x ).
+
+We prove the reverse inequality up to an error of order η.Fix an arbitrary control u ∈ U [0 , τ 2]. Define 
+
+Au := inf  
+
+> r∈[0 ,τ 1]
+
+Fu(r), Bu := inf  
+
+> r∈[τ1,τ 2]
+
+Fu(r).7
+
+For every r ∈ [τ1, τ 2], the uniform Lipschitz estimate for Fu
+
+gives 
+
+Fu(r) ≥ Fu(τ1) − Kx,T η. 
+
+Since 
+
+Fu(τ1) ≥ Au,
+
+we obtain 
+
+Bu ≥ Au − Kx,T η. 
+
+Therefore, 
+
+inf  
+
+> r∈[0 ,τ 2]
+
+Fu(r) = min {Au, B u} ≥ Au − Kx,T η. 
+
+The restriction of u to [0 , τ 1] is an admissible control for the horizon τ1. Hence 
+
+Au ≥ W (τ1, x ).
+
+Thus, 
+
+inf  
+
+> r∈[0 ,τ 2]
+
+Fu(r) ≥ W (τ1, x ) − Kx,T η. 
+
+Taking the infimum over all u ∈ U [0 , τ 2] yields 
+
+W (τ2, x ) ≥ W (τ1, x ) − Kx,T η. 
+
+Combining this with W (τ2, x ) ≤ W (τ1, x ), we get 
+
+0 ≤ W (τ1, x ) − W (τ2, x ) ≤ Kx,T (τ2 − τ1).
+
+Therefore, 
+
+|W (τ2, x ) − W (τ1, x )| ≤ Kx,T |τ2 − τ1|.
+
+Hence W (·, x ) is Lipschitz continuous on [0 , T ].For finite terminal time T < ∞, the absolute-time value function satisfies 
+
+V (t, x ) = W (T − t, x ).
+
+Therefore, for any t1, t 2 ∈ [0 , T ],
+
+|V (t2, x ) − V (t1, x )| = |W (T − t2, x ) − W (T − t1, x )|≤ Kx,T |(T − t2) − (T − t1)|
+
+= Kx,T |t2 − t1|.
+
+Thus V (·, x ) is Lipschitz continuous in t, and therefore continuous. 
+
+Lemma 6 (Pointwise Continuity of V ∞(t, x ) in t). For every fixed x ∈ Rn, the value function V ∞(t, x ) (Defi-nition 2) is pointwise continuous in t.
+
+Proof. V ∞(t, x ) has been proven to be invariant with respect to t (Lemma 2). Therefore, V ∞(·, x ) is continuous in t.
+
+D. Dynamic Programming Principle (DPP) 
+
+The DPP associated with the avoid case has already been established in [7]. Following similar proof mechanics, we establish the DPP associated with the reach problem. 
+
+Proposition 1 (DPP Associated with W (τ, x )). Consider the Bellman step σ > 0, then the DPP associated with 
+
+W (τ, x ) (Definition 3) is as follows. 
+
+W (τ, x ) = inf  
+
+> u∈U [0 ,σ ]
+
+min { inf  
+
+> r∈[0 ,σ ]
+
+g (ϕux(r)) e−λr 
+
+| {z }
+
+> stopping branch
+
+,e−λσ W (τ − σ, ϕ ux(σ)) 
+
+| {z }
+
+> continuation branch
+
+}
+
+(29) 
+
+Proof. Based on eq. (13), 
+
+W (τ, x ) = inf   
+
+> u(·)∈U [0 ,τ ]
+
+inf   
+
+> r∈[0 ,τ ]
+
+g(ϕux(r)) e−λr . (30) Based on [0 , τ ] = [0 , σ ] ∪ [σ, τ ], and by admissibility and concatenation of controls, we may optimize independently: 
+
+W (τ, x ) = inf  
+
+> u1∈U [0 ,σ ]
+
+inf   
+
+> u2∈U [σ,τ ]
+
+min 
+
+n
+
+inf  
+
+> r∈[0 ,σ ]
+
+g(ϕu1 
+
+> x
+
+(r)) e−λr ,
+
+inf   
+
+> r∈[σ,τ ]
+
+g(ϕu2 
+
+> ϕu1
+> x(σ)
+
+(r)) e−λr o
+
+(31) For the second term, let q := r − σ. Thus, we get 
+
+inf   
+
+> q∈[0 ,τ −σ]
+
+g(ϕu2 
+
+> ϕu1
+> x(σ)
+
+(r)) e−λ(q+σ)
+
+= e−λσ inf   
+
+> q∈[0 ,τ −σ]
+
+g(ϕu2 
+
+> ϕu1
+> x(σ)
+
+(q + σ)) e−λq (32) Since the term on the left-hand side only depends on u1, we can move the inf u2∈U [σ,τ ] inside to the term on the right-hand side, 
+
+W (τ, x ) = inf  
+
+> u1∈U [0 ,σ ]
+
+min 
+
+n
+
+inf  
+
+> r∈[0 ,σ ]
+
+g(ϕu1 
+
+> x
+
+(r)) e−λr ,e−λσ inf   
+
+> u2∈U [σ,τ ]
+
+inf   
+
+> q∈[0 ,τ −σ]
+
+g(ϕu2 
+
+> ϕu1
+> x(σ)
+
+(q + σ)) e−λq o
+
+(33) Through semigroup flow property, the term on the right-hand side becomes 
+
+e−λσ inf   
+
+> u2∈U [σ,τ ]
+
+inf   
+
+> q∈[0 ,τ −σ]
+
+g(ϕu2 
+
+> ϕu1
+> x(σ)
+
+(q)) e−λq 
+
+= e−λσ W (τ − σ, ϕ u1 
+
+> x
+
+(σ)) 
+
+(34) Putting it all together (and renaming u1 to u so that it is more generic) yields eq. (29). 
+
+Proposition 2 (DPP Associated with W ∞(x)).
+
+W ∞(x) = inf  
+
+> u∈U [0 ,σ ]
+
+min { inf  
+
+> r∈[0 ,σ ]
+
+g (ϕux(r)) e−λr 
+
+| {z }
+
+> stopping branch
+
+,e−λσ W ∞ (ϕux(σ)) 
+
+| {z }
+
+> continuation branch
+
+}
+
+(35) 
+
+Proof. The result follows directly from eq. (29) by taking T →∞. Since W (τ, x ) → W ∞(x) as τ → ∞ (Definition 4), and the Bellman step σ > 0 is fixed and finite, the interval [0 , σ ] is unaffected by the limit. Substituting W ∞ for W (τ −σ, φ ux(σ)) 
+
+in eq. (29) yields eq. (35). 8
+
+E. Reachability Encoding 
+
+We briefly clarify how the proposed value function encodes reachability. In HJ reachability, it is standard to represent reachable sets via the sign structure of a value function defined in terms of a terminal cost g [5], [18]. In particular, for reach problems, g(x) < 0 for x in the target set and g(x) ≥ 0
+
+otherwise (Assumption 5), so that the negative sublevel set of the value function characterizes the backward reachable tube. 
+
+Proposition 3 (Reachability encoding) . Let V be the value function from Definition 1, and suppose g(x) < 0
+
+if and only if x ∈ G . Then, the strict backward reachable tube associated with G is given by 
+
+R = {x ∈ X : V (x) < 0}.
+
+Proof. The result follows directly from the definition of V
+
+(Definition 1) and the sign-preserving property of the discount factor. Since 
+
+e−λ(s−t) > 0, (36) it follows that 
+
+sign 
+
+
+
+g(ξ(s)) e−λ(s−t)
+
+= sign( g(ξ(s))) . (37) Therefore, 
+
+inf  
+
+> s≥t
+
+g(ξ(s)) e−λ(s−t) < 0
+
+⇐⇒ ∃ s ≥ t such that g(ξ(s)) < 0
+
+⇐⇒ x ∈ R BRT .
+
+(38) IV. HJ C HARACTERIZATION 
+
+We show that the discounted reach-based value function 
+
+W (τ, x ), and its infinite-horizon counterpart W ∞(x), are each the unique bounded continuous viscosity solution of an associated Hamilton–Jacobi variational inequality (HJVI). The finite-horizon case is treated in Theorem 1, and the infinite-horizon case in Theorem 2. 
+
+A. HJ Viscosity Characterization of W (τ, x )
+
+Theorem 1 (HJ Viscosity Characterization of W (τ, x )).
+
+W (τ, x ) (eq. (13)) is a unique bounded continuous vis-cosity solution of: 
+
+min 
+
+n
+
+WHJ (τ, x ) − g(x), ∂W HJ 
+
+∂τ (τ, x )
+
+− inf 
+
+> u∈U
+
+∂W HJ (τ, x )
+
+∂x f (x, u ) + λW HJ (τ, x )
+
+o
+
+= 0 ,
+
+(39) 
+
+Proof. The proof follows standard arguments in viscosity the-ory for HJ variational inequalities (see e.g. Bardi & Capuzzo-Dolcetta [5]), adapted to the discounted reach-stopping struc-ture. The result (adapted for the avoid case) is corroborated by Theorem 3 in [7]. 
+
+B. HJ Viscosity Characterization of W ∞(x)
+
+Theorem 2 (HJ Viscosity Characterization of W ∞(x)).
+
+W ∞(x) is the unique bounded continuous stationary viscosity solution of 
+
+min 
+
+n
+
+W ∞(x) − g(x),λW ∞(x) − inf 
+
+> u∈U
+
+∂W ∞(x)
+
+∂x f (x, u )
+
+o
+
+= 0 
+
+(40) 
+
+Proof. The comparison principle and viscosity characteriza-tion for eq. (40) follow the same standard arguments as Theorem 1, restricted to the stationary (time-independent) setting. In particular, since W ∞(x) is independent of τ (Defi-nition 4), it satisfies the same viscosity sub- and supersolution conditions as W (τ, x ) with the τ -derivative term vanishing, so that eq. (39) reduces exactly to eq. (40). Comparison for the resulting stationary equation is classical (see e.g. [5, Ch. II– III]) V. R EACHABILITY -P RESERVING BELLMAN OPERATOR 
+
+Up to this point, we have relied on the discounted reach-ability value function introduced by Choi et al. [7] and its associated HJ characterization. The missing ingredient is a Bellman operator whose fixed point characterizes exactly the same value function. This section derives such a reachability-preserving Bellman operator, for both the finite-horizon time-to-go value function W (τ, x ) and its infinite-horizon counter-part W ∞(x), with each operator following directly from the corresponding DPP (Proposition 1 and Proposition 2). We also establish the conditions for Banach’s fixed-point theorem to apply, which in turn means that each Bellman operator admits a unique fixed point (Theorem 3 and Theorem 5). 
+
+A. Finite-Horizon Bellman Operator Tσ,λ 
+
+The Bellman operator associated with W (τ, x ) can be inferred from the established DPP for W (τ, x ) (Proposition 1). It is presented in the following. 
+
+Definition 5 (Bellman Operator Associated with 
+
+W (τ, x )). For a bounded function ΨΨ : [0 , T ] × Rn → R, (41) and for a chosen discount rate λ > 0 and a chosen Bellman step σ > 0, we define the Bellman operator, denoted by Tσ,λ , by: 
+
+(Tσ,λ Ψ)( τ, x ) := inf   
+
+> u(·)∈U [0 ,h (τ)]
+
+min 
+
+(
+
+inf   
+
+> r∈[0 ,h (τ)]
+
+e−λr g(ϕux(r)) ,e−λh (τ )Ψ τ − h(τ ), ϕ ux(h(τ )) )
+
+,
+
+where h(τ ) = min {τ, σ }
+
+(42) We also define the discount factor as γ := e−λσ .9
+
+Remark 3 (Role of h(τ )). The function h(τ ) (see eq. (42)) ensures that the Bellman update never rolls out beyond the remaining time horizon. In particular, if 
+
+τ < σ , then only τ units of time remain, and the operator must use the interval [0 , τ ], not [0 , σ ].
+
+B. Finite-Horizon Bellman Operator Unique Fixed Point 
+
+We now proceed to prove that the finite-horizon Bellman operator (Definition 5) admits a unique fixed-point. Banach’s fixed-point theorem will be used to establish the existence and uniqueness of the fixed point of Tσ,λ . This requires showing that the operator maps a Banach space of value functions into itself (Lemma 8) and is contractive under the supremum norm. These properties are established in the following. The finite-horizon time-to-go value function W (τ, x ) satis-fies the boundary condition 
+
+W (0 , x ) = g(x).
+
+Therefore, we define a function space that has this boundary condition directly built into it: 
+
+Definition 6 (Space of Value Functions B). Let 
+
+V := 
+
+n
+
+Ψ : [0 , T ] × Rn → R,
+
+∥Ψ∥∞ < ∞, Ψ(0 , x ) = g(x) ∀x ∈ Rno (43) denote the set of bounded functions that satisfy the boundary condition Ψ(0 , x ) = g(x), where 
+
+∥Ψ∥∞ := sup  
+
+> (τ,x )∈[0 ,T ]×Rn
+
+|Ψ( τ, x )|.
+
+Let B denote V equipped with the metric: 
+
+d(Ψ 1, Ψ2) := ∥Ψ1 − Ψ2∥∞.
+
+Thus, 
+
+B := ( V, d ).
+
+Lemma 7 ( B Is Complete) . The space B := ( V, d ) is complete. 
+
+Proof. Let (Ψ k)k∈N be a Cauchy sequence in (V, d ). Since each Ψk is bounded and the space of bounded real-valued functions on [0 , T ] × Rn is complete under the supremum norm, there exists a bounded function 
+
+Ψ : [0 , T ] × Rn → R
+
+such that 
+
+∥Ψk − Ψ∥∞ → 0.
+
+It remains to verify the boundary condition. For every x ∈ Rn,
+
+Ψ(0 , x ) = lim  
+
+> k→∞
+
+Ψk(0 , x ) = g(x),
+
+because Ψk ∈ V for every k. Hence 
+
+Ψ ∈ V .
+
+Therefore V is a closed subset of the complete metric space of bounded functions. Hence V is complete. 
+
+Lemma 8 (Invariance of V Under Tσ,λ ). Let 
+
+Ψ ∈ V .
+
+Then 
+
+Tσ,λ Ψ ∈ V .
+
+Equivalently, 
+
+Tσ,λ (V) ⊆ V .
+
+Proof. We prove boundedness and the preservation of the boundary condition. 
+
+Boundedness. 
+
+Since Ψ ∈ V ,
+
+∥Ψ∥∞ < ∞.
+
+From Assumption 8, the uniform boundedness means that pointwise boundedness also holds: 
+
+|g(ϕux(r)) | ≤ M ∀r ∈ [0 , σ ], u ∈ U ][0 , σ ] (44) Since r > 0 and λ > 0, e−λr ∈ (0 , 1) . Thus, 
+
+|g(ϕux(r)) e−λr | ≤ M ∀r ∈ [0 , σ ], u ∈ U ][0 , σ ] (45) Therefore 
+
+−M ≤ inf  
+
+> r∈[0 ,σ ]
+
+g(ϕux(r)) e−λr ≤ M, ∀u ∈ U ][0 , σ ]
+
+and hence 
+
+inf  
+
+> r∈[0 ,σ ]
+
+g(ϕux(r)) e−λr ≤ M ∀u ∈ U ][0 , σ ].
+
+Moreover, 
+
+|e−λσ Ψ( τ − h(τ ), ϕ ux(σ)) | ≤ ∥ Ψ∥∞.
+
+Thus both branches are bounded by 
+
+max {M, ∥Ψ∥∞}.
+
+It follows that 
+
+|(Tσ,λ Ψ)( τ, x )| ≤ max {M, ∥Ψ∥∞}
+
+for all (τ, x ). Taking the supremum over (τ, x ),
+
+∥T σ,λ Ψ∥∞ ≤ max {M, ∥Ψ∥∞} < ∞.
+
+Hence Tσ,λ Ψ is bounded. 
+
+Boundary condition It remains to verify the boundary condition. At τ = 0 ,
+
+h(0) = 0 .
+
+Therefore, 
+
+inf  
+
+> r∈[0 ,h (0)]
+
+e−λr g(ϕux(r)) = g(x),
+
+and 
+
+e−λh (0) Ψ 0 − h(0) , ϕ ux(h(0))  = Ψ(0 , x ) = g(x),
+
+because Ψ ∈ V . Hence 
+
+(Tσ,λ Ψ)(0 , x ) = g(x).
+
+Therefore 
+
+Tσ,λ Ψ ∈ V .10 
+
+Lemma 9 (Sup-Norm Contraction Property of Tσ,λ ). For all Ψ1, Ψ2 ∈ V .
+
+Tσ,λ Ψ1 − T σ,λ Ψ2 ∞ ≤ e−λσ ∥Ψ1 − Ψ2∥∞ . (46) 
+
+Proof. Using Definition 5 and applying the non-expansiveness of the infimum, 
+
+|T σ,λ Ψ1(τ, x ) − T σ,λ Ψ2(τ, x )| ≤ 
+
+sup 
+
+> u∈U [0 ,σ ]
+
+min 
+
+n
+
+inf  
+
+> r∈[0 ,σ ]
+
+g (ϕux(r)) e−λr , e −λσ Ψ1 (τ − σ, ϕ ux(σ)) 
+
+o
+
+− min 
+
+n
+
+inf  
+
+> r∈[0 ,σ ]
+
+g (ϕux(r)) e−λr , e −λσ Ψ2 (τ − σ, ϕ ux(σ)) 
+
+o
+
+(47) Moreover, the minimum operator is 1-Lipschitz. This means that 
+
+| min( a, c ) − min( b, c )| ≤ | a − b|. (48) Therefore, 
+
+|T σ,λ Ψ1(τ, x ) − T σ,λ Ψ2(τ, x )| ≤ 
+
+sup 
+
+> u∈U [0 ,σ ]
+
+e−λσ Ψ1 (τ − σ, ϕ ux(σ)) − e−λσ Ψ2 (τ − σ, ϕ ux(σ)) 
+
+(49) We may pull e−λσ outside since it is independent of u and is a positive coefficient: 
+
+|T σ,λ Ψ1(τ, x ) − T σ,λ Ψ2(τ, x )|≤ e−λσ sup 
+
+> u(·)∈U [0 ,σ ]
+
+Ψ1 (τ − σ, ϕ ux(σ)) − Ψ2 (τ − σ, ϕ ux(σ)) .
+
+(50) By the definition of the sup-norm 
+
+|T σ,λ Ψ1(τ, x ) − T σ,λ Ψ2(τ, x )| ≤ e−λσ ∥Ψ1 − Ψ2∥∞ (51) Taking the supremum over (τ, x ) on both sides preserves the inequality, since the supremum is order-preserving. This concludes the proof. 
+
+Theorem 3 (Existence and Uniqueness of the Fixed Point of Tσ,λ ). The finite-horizon Bellman operator Tσ,λ admits a unique fixed point in V, denoted by WBell :
+
+WBell ∈ V .
+
+such that 
+
+WBell = Tσ,λ WBell 
+
+Moreover, for any initial Ψ0 ∈ V , the iteration 
+
+Ψk+1 = Tσ,λ Ψk
+
+converges uniformly to WBell , and 
+
+∥Ψk − WBell ∥∞ ≤ e−kλσ ∥Ψ0 − WBell ∥∞
+
+Proof. By Lemma 7, B is a complete space. By Lemma 8, Tσ,λ 
+
+maps V into itself. By Lemma 9, Tσ,λ is a contraction with contraction factor e−λσ < 1. Thus, the conditions for Banach’s fixed-point theorem are satisfied. The theorem, consequently, implies that Tσ,λ admits a unique fixed point WBell ∈ V .The theorem also implies that, for every Ψ0 ∈ V , the Picard iteration 
+
+Ψk+1 = Tσ,λ Ψk
+
+converges uniformly to W , with 
+
+∥Ψk − WBell ∥∞ ≤ e−kλσ ∥Ψ0 − WBell ∥∞.
+
+Theorem 4 ( W = WBell ). The discounted reachability value function W from Definition 3 is the unique fixed point of Tσ,λ in B, i.e. W = WBell .
+
+Proof. By the DPP (Proposition 1) and Definition 5, W
+
+satisfies W = Tσ,λ W , so W is a fixed point. Uniqueness follows from Theorem 3. Hence, W = WBell .
+
+C. Infinite-Horizon Bellman Operator T ∞
+
+> σ,λ
+
+We now state the corresponding infinite-horizon result. In the infinite-horizon case, since the dynamics, the cost function 
+
+g, and the control set U are invariant in time, the value function becomes stationary. That is, 
+
+V ∞(t, x ) = W ∞(x),
+
+where 
+
+W ∞(x) := inf  
+
+> u(·)∈U [0 ,∞)
+
+inf  
+
+> r∈[0 ,∞)
+
+e−λr g(ϕux(r)) .
+
+The stationary problem has no time-to-go variable and there-fore no boundary condition W (0 , x ) = g(x).
+
+Definition 7 (Stationary Infinite-Horizon Bellman Oper-ator T ∞
+
+> σ,λ
+
+). For Ψ ∈ B ∞, define 
+
+(T ∞
+
+> σ,λ
+
+Ψ)( x) := inf  
+
+> u(·)∈U [0 ,σ ]
+
+min 
+
+(
+
+inf  
+
+> r∈[0 ,σ ]
+
+e−λr g(ϕux(r)) ,e−λσ Ψ( ϕux(σ)) 
+
+)
+
+.
+
+D. Infinite-Horizon Bellman Operator Unique Fixed Point Definition 8 (Space of Stationary Value Functions B∞).
+
+Let 
+
+V∞ := {Ψ : Rn → R | ∥ Ψ∥∞ < ∞} , (52) where 
+
+∥Ψ∥∞ := sup 
+
+> x∈Rn
+
+|Ψ( x)|.
+
+Let B∞ be the function space where V∞ is equipped with the metric: 
+
+d(Ψ 1, Ψ2) := ∥Ψ1 − Ψ2∥∞.
+
+i.e. 
+
+B∞ := ( V∞, d ).11 
+
+Lemma 10 ( B∞ Is Complete) .
+
+B∞ := ( V∞, d )
+
+is a complete space. 
+
+Proof. The proof follows the same structure as that of Lemma 7, without needing to look into the boundary condition as it is not relevant for the infinite horizon case. 
+
+Lemma 11 (Invariance of V∞ Under T ∞
+
+> σ,λ
+
+).Proof. In this case, only the boundedness needs to be proven since the boundary condition no longer is relevant for the infinite-horizon case. Let Ψ ∈ B ∞. Since g is bounded by 
+
+M ,
+
+e−λr g(ϕux(r)) ≤ M
+
+for every r ∈ [0 , σ ], every x, and every admissible control. Also, 
+
+|e−λσ Ψ( ϕux(σ)) | ≤ ∥ Ψ∥∞.
+
+Therefore, 
+
+|(T ∞
+
+> σ,λ
+
+Ψ)( x)| ≤ max {M, ∥Ψ∥∞}.
+
+Taking the supremum over x, we get 
+
+∥T ∞
+
+> σ,λ
+
+Ψ∥∞ ≤ max {M, ∥Ψ∥∞} < ∞.
+
+Thus 
+
+T ∞
+
+> σ,λ
+
+Ψ ∈ B ∞.
+
+Lemma 12 (Sup-Norm Contraction Property of T ∞
+
+> σ,λ
+
+). For all Ψ1, Ψ2 ∈ V ∞
+
+∥T ∞
+
+> σ,λ
+
+Ψ1 − T ∞
+
+> σ,λ
+
+Ψ2∥∞ ≤ e−λσ ∥Ψ1 − Ψ2∥∞
+
+Proof. Let Ψ1, Ψ2 ∈ B ∞. Using the non-expansiveness of the infimum and the 1-Lipschitz property of the minimum operator, 
+
+|(T ∞
+
+> σ,λ
+
+Ψ1)( x) − (T ∞
+
+> σ,λ
+
+Ψ2)( x)|≤ sup 
+
+> u(·)∈U [0 ,σ ]
+
+e−λσ Ψ1(ϕux(σ)) − e−λσ Ψ2(ϕux(σ)) 
+
+≤ e−λσ ∥Ψ1 − Ψ2∥∞.
+
+Taking the supremum over x proves the contraction property. 
+
+Theorem 5 (Existence and Uniqueness of the Fixed Point of T ∞
+
+> σ,λ
+
+). Let λ > 0 and σ > 0. The stationary Bellman operator T ∞ 
+
+> σ,λ
+
+admits a unique fixed point 
+
+W ∞ 
+
+> Bell
+
+∈ B ∞.
+
+Moreover, for any initial Ψ0 ∈ B ∞, the iteration 
+
+Ψk+1 = T ∞
+
+> σ,λ
+
+Ψk
+
+converges uniformly to W ∞, with 
+
+∥Ψk − W ∞
+
+> Bell
+
+∥∞ ≤ e−kλσ ∥Ψ0 − W ∞
+
+> Bell
+
+∥∞.
+
+Proof. The space B∞ is complete (Lemma 10). Moreover, by Lemma 11, 
+
+T ∞ 
+
+> σ,λ
+
+: B∞ → B ∞
+
+and by Lemma 12, 
+
+∥T ∞
+
+> σ,λ
+
+Ψ1 − T ∞
+
+> σ,λ
+
+Ψ2∥∞ ≤ e−λσ ∥Ψ1 − Ψ2∥∞.
+
+Since λ > 0 and σ > 0,
+
+e−λσ < 1.
+
+Therefore, Banach’s fixed-point theorem gives a unique fixed point W ∞ ∈ B ∞, and the Picard iteration converges uniformly to it with the stated geometric rate. 
+
+Theorem 6 ( W ∞ = W ∞
+
+> Bell
+
+). The infinite-horizon dis-counted reachability value function W ∞ from Defini-tion 4 is the unique fixed point of T ∞ 
+
+> σ,λ
+
+in B∞, i.e. 
+
+W ∞ = W ∞
+
+> Bell
+
+.
+
+Proof. By the DPP (Proposition 2) and Definition 7, W ∞
+
+satisfies 
+
+W ∞(x) = ( T ∞
+
+> σ,λ
+
+W ∞)( x) ∀x ∈ Rn,
+
+so W ∞ is a fixed point of T ∞
+
+> σ,λ
+
+. Uniqueness follows from Theorem 5. Hence, W ∞ = W ∞
+
+> Bell
+
+.
+
+Remark 4 (Finite horizon versus infinite horizon) . The finite-horizon operator acts on functions of (τ, x ) and requires the boundary condition 
+
+Ψ(0 , x ) = g(x).
+
+This boundary condition is essential for obtaining auniform contraction when τ < σ .By contrast, the infinite-horizon operator is stationary and acts only on functions of x. It has no terminal or boundary condition, and the contraction follows directly from the discounted continuation term e−λσ Ψ( ϕux(σ)) .
+
+Remark 5 (Convergence speed of value iteration and numerical consistency tradeoff) . As seen from Theorem 3 and Theorem 5, σ influences convergence speed. For ex-ample, if σ is small, then the value iteration convergence becomes slow. On the other hand, numerical consistency often favours small σ. Therefore, a tradeoff between contraction speed and numerical consistency exists, and it is influenced by the choice of σ.VI. E QUIVALENCE OF CHARACTERIZATIONS 
+
+Having established both the HJ characterization (section IV) and the Bellman fixed-point characterization (section V), we now show that these two characterizations are equivalent and identify the same value function. We establish this equivalence for both the finite-horizon and infinite-horizon settings. 12 
+
+A. Finite-Horizon Equivalence of Characterizations Theorem 7 (Finite-Horizon HJ–Bellman Equivalence) .
+
+The HJ and Bellman characterizations of the discounted reachability value function coincide in the finite horizon setting. 
+
+Proof. The discounted reachability value function W from Definition 3 satisfies: 1) W is the unique bounded continuous viscosity solution of eq. (39) (Theorem 1). 2) W = WBell : W is the unique fixed point of Tσ,λ in B
+
+(Theorem 3). Thus, W = WBell . Hence, the HJ and Bellman characteriza-tions are equivalent. 
+
+B. Infinite-Horizon Equivalence of Characterizations Theorem 8 (Infinite-Horizon HJ–Bellman Equivalence) .
+
+The HJ and Bellman characterizations of the discounted reachability value function coincide in the infinite horizon setting. 
+
+Proof. The discounted reachability value function W ∞ from Definition 4 satisfies: 1) W ∞ is the unique bounded continuous viscosity solution of eq. (40) (Theorem 2). 2) W ∞ = W ∞
+
+> Bell
+
+: W ∞ is the unique fixed point of T ∞ 
+
+> σ,λ
+
+in 
+
+B∞ (Theorem 5). Combining (1) and (2), W ∞ is simultaneously the unique viscosity solution of eq. (40) and the unique fixed point of T ∞
+
+> σ,λ
+
+. Hence the HJ and Bellman characterizations are equivalent in the infinite-horizon setting. VII. C OMPUTATIONAL REALIZATION OF THE BELLMAN 
+
+OPERATOR 
+
+The Bellman operator introduced in section V character-izes the discounted reachability value function as the unique fixed point of a contraction mapping. In this section, we translate this fixed-point characterization into a computational procedure. We first construct a discrete approximation of the operator for each of the finite and infinite horizon cases in sections VII-A and VII-B. Their convergences, in the limit of the discretization parameters going to zero, to their respective true operators is shown in sections VII-C and VII-D. 
+
+A. Finite-Horizon Discrete Bellman Operator bTσ,λ 
+
+We now construct a discrete (in time) approximation of the Bellman operator suitable for computation. We restrict the time-to-go variable to the discrete time grid: 
+
+τk = kσ, 
+
+and define 
+
+Wk(x) := W (τk, x ) where W0(x) = g(x). (53) Evaluating the Bellman operator (Definition 5) at τ = τk = kσ 
+
+yields 
+
+Wk(x) = inf  
+
+> u(·)∈U [0 ,σ ]
+
+min 
+
+n
+
+inf  
+
+> r∈[0 ,σ ]
+
+g (ϕux(r)) e−λr ,e−λσ Wk−1(ϕux(σ)) 
+
+o
+
+.
+
+(54) To implement the recursion numerically, the exact flow 
+
+ϕux(·) is replaced by a consistent numerical approximation. Let bF∆t : Rn × U → Rn
+
+denote a one-step numerical integrator for the dynamics ˙x =
+
+f (x, u ) over a small time step ∆t.For example, explicit Euler yields 
+
+bF∆t(x, u ) = x + ∆ t f (x, u ),
+
+while higher-order Runge–Kutta methods provide more accu-rate approximations. In general, 
+
+bF∆t(x, u ) = ϕux(∆ t) + O(∆ tp)
+
+for some order p ≥ 1.We approximate the flow over a Bellman interval [0 , σ ] by composing H = σ/ ∆t steps. We denote by bFσ (x, u ) the H-fold composition of bF∆t:
+
+bFσ (x, u ) := ( bF∆t ◦ · · · ◦ bF∆t)
+
+| {z } 
+
+> Htimes
+
+(x, u ).
+
+Remark 6 (Separation of time scales) . The Bellman dis-cretization step σ plays a distinct role from the numerical integration step ∆t used to approximate trajectories. The Bellman operator requires evaluating the minimum of the discounted reach cost over the interval r ∈ [0 , σ ].To approximate this quantity, we introduce a finer time discretization ∆t ≪ σ to resolve trajectories within each Bellman update. This separation is essential for consistency with the continuous-time formulation. 
+
+Definition 9 (Fully Discrete Bellman Operator bTσ,λ ). Let 
+
+Ψ ∈ V (see eq. (43)). Let bF∆t be a numerical flow map, and let Ud be a finite discretization of the control set. Let rj = j∆t for 
+
+j = 0 , . . . , H , where H = σ/ ∆t.In the discrete approximation, the control input u is assumed piecewise-constant over the Bellman interval (zero-order hold parameterization). The fully discrete Bellman operator bTσ,λ acting on a value function Ψ is defined by 
+
+( bTσ,λ Ψ)( τk, x ) = min 
+
+> u∈U d
+
+min 
+
+n
+
+min  
+
+> j=0 ,...,H
+
+g xuj
+
+e−λr j
+
+| {z }
+
+> stopping branch
+
+,e−λσ Ψ τk − h(τk), x uH
+
+| {z }
+
+> continuation branch
+
+o
+
+,
+
+(55) 13 
+
+where h(τk) = min {τk, σ } and the trajectory {xuj } is defined recursively by 
+
+xu 
+
+> 0
+
+= x, xuj+1 = bF∆t(xuj , u ).
+
+B. Infinite-Horizon Discrete Bellman Operator bT ∞
+
+> σ,λ
+
+In the infinite horizon case, the value function becomes independent of τ . Thus, only the control space is discretized. 
+
+Definition 10 (Fully Discrete Bellman Operator bT ∞ 
+
+> σ,λ
+
+for Infinite Horizon) . Let Ψ ∈ B ∞ (see Definition 8). Let 
+
+bF∆t be a numerical flow map, and let Ud be a finite discretization of the control set U. Let rj = j∆t for 
+
+j = 0 , . . . , H , where H = σ/ ∆t. As in the finite-horizon case, the control input u is assumed piecewise-constant over the Bellman interval (zero-order hold parameteriza-tion). The fully discrete Bellman operator bT ∞ 
+
+> σ,λ
+
+acting on a value function Ψ is defined by 
+
+( bT ∞
+
+> σ,λ
+
+Ψ)( x) = min 
+
+> u∈U d
+
+min 
+
+n
+
+min  
+
+> j=0 ,...,H
+
+g xuj
+
+e−λr j
+
+| {z }
+
+> stopping branch
+
+,e−λσ Ψ xuH
+
+| {z }
+
+> continuation branch
+
+o
+
+,
+
+(56) where the trajectory {xuj } is defined recursively by 
+
+xu 
+
+> 0
+
+= x, xuj+1 = bF∆t(xuj , u ).
+
+C. Convergence of the Numerical Scheme for Finite Horizon 
+
+In this subsection, we prove the convergence of the numer-ical scheme. Namely, we prove the convergence of cW to W ,where cW is the fixed point of bTσ,λ (Definition 9), i.e. 
+
+cW = bTσ,λ cW . (57) We also prove the convergence of cW ∞ to W ∞, where cW ∞
+
+is the fixed point of bT ∞ 
+
+> σ,λ
+
+(Definition 10). 
+
+Lemma 13 (Consistency of bTσ,λ ). Assume that the nu-merical flow map bF∆t is a consistent approximation of the exact flow ϕux, i.e., 
+
+bF∆t(x, u ) = ϕux(∆ t) + O(∆ tp)
+
+for some order p ≥ 1.Assume furthermore that the control discretization Ud
+
+converges to U as the discretization is refined. Then, for Ψ ∈ V (see eq. (43)), bTσ,λ converges pointwise to the Bellman operator Tσ,λ (Definition 5): 
+
+( bTσ,λ Ψ)( τk, x ) → (Tσ,λ Ψ)( τk, x )
+
+as 
+
+∆t → 0, Ud → U, 
+
+for every fixed Bellman step σ > 0.
+
+Proof. Consistency of the numerical integrator implies 
+
+xuj = ϕux(rj ) + O(∆ tp).
+
+Since g is continuous, as ∆t → 0
+
+g(xuj )e−λr j → g(ϕux(rj )) e−λr j .
+
+As ∆t → 0, the discrete minimum 
+
+min  
+
+> j=0 ,...,H
+
+g(xuj )e−λr j
+
+converges to 
+
+inf  
+
+> r∈[0 ,σ ]
+
+g(ϕux(r)) e−λr .
+
+Likewise, 
+
+e−λσ Ψ( τk−1, x uH ) → e−λσ Ψ( τ − σ, ϕ ux(σ)) .
+
+Taking minima over controls and combining both terms yields 
+
+bTσ,λ Ψ → T σ,λ Ψ.
+
+Moreover, since the Lipschitz constants Lf x (Assumption 2) and Lg (Assumption 7) are independent of x and u, the constant implicit in the O(∆ tp) bound above depends only on σ, Lf x , Lg , and the integrator order p — not on x, u, or 
+
+τk. Hence 
+
+xuj → ϕux(rj )
+
+uniformly over x ∈ Rn and u ∈ U d, and consequently 
+
+( bTσ,λ Ψ)( τk, ·) → (Tσ,λ Ψ)( τk, ·)
+
+uniformly on Rn, i.e. in the sup norm, for every fixed σ > 
+
+0.
+
+Lemma 14 (Sup-Norm Contraction Property of bTσ,λ ). Let 
+
+Ψ1, Ψ2 ∈ V .
+
+bTσ,λ Ψ1 − bTσ,λ Ψ2 ∞ ≤ e−λσ ∥Ψ1 − Ψ2∥∞ . (58) 
+
+Proof. The proof can be established using the same mechanics used in the proof of Lemma 9. 
+
+Theorem 9 (Convergence of cW to W ). Let 
+
+W = Tσ,λ W
+
+and let cW = bTσ,λ cW
+
+Then cW → W as ∆t → 0
+
+Proof. 
+
+∥cW − W ∥∞ = ∥ bTσ,λ cW − T σ,λ W ∥∞ (59) 14 
+
+Now we add and subtract bTσ,λ W
+
+∥ bTσ,λ cW − T σ,λ W + bTσ,λ W − bTσ,λ W ∥∞ (60) And apply the triangle inequality 
+
+∥ bTσ,λ cW − T σ,λ W + bTσ,λ W − bTσ,λ W ∥∞
+
+≤ ∥ bTσ,λ (cW − W )∥∞ + ∥ bTσ,λ W − T σ,λ W ∥∞
+
+(61) By the contraction property of bTσ,λ 
+
+∥ bTσ,λ (cW − W )∥∞ ≤ e−λσ ∥cW − W ∥∞ (62) Thus, 
+
+∥cW −W ∥∞ ≤ e−λσ ∥cW −W ∥∞ +∥ bTσ,λ W −T σ,λ W ∥∞ (63) Rearranging leads to: 
+
+(1 − e−λσ )∥cW − W ∥∞ ≤ ∥ bTσ,λ W − T σ,λ W ∥∞ (64) Since Lemma 13 gives that ∥ bTσ,λ W − T σ,λ W ∥∞ → 0, this concludes the proof. 
+
+D. Convergence of the Numerical Scheme for Infinite Horizon 
+
+We now establish the analogous convergence result for the infinite-horizon discrete Bellman operator bT ∞
+
+> σ,λ
+
+, following similar proof mechanics to those utilized in section VII-C. 
+
+Lemma 15 (Consistency of bT ∞
+
+> σ,λ
+
+). Assume that the nu-merical flow map bF∆t is a consistent approximation of the exact flow ϕux, i.e., 
+
+bF∆t(x, u ) = ϕux(∆ t) + O(∆ tp)
+
+for some order p ≥ 1.Assume furthermore that the control discretization Ud
+
+converges to U as the discretization is refined. Then, for Ψ ∈ V ∞ (see eq. (52)), bT ∞ 
+
+> σ,λ
+
+converges pointwise to the Bellman operator T ∞ 
+
+> σ,λ
+
+(Definition 7): 
+
+( bT ∞
+
+> σ,λ
+
+Ψ)( x) → (T ∞
+
+> σ,λ
+
+Ψ)( x)
+
+as 
+
+∆t → 0, Ud → U, 
+
+for every fixed Bellman step σ > 0.
+
+Proof. The argument follows the same mechanics as the proof of Lemma 13, with the time-remaining bookkeeping (τk,
+
+h(τk)) omitted, since the stationary operator has no time-to-go argument. Consistency of the numerical integrator implies 
+
+xuj = ϕux(rj ) + O(∆ tp).
+
+Since g is continuous, as ∆t → 0
+
+g(xuj )e−λr j → g(ϕux(rj )) e−λr j .
+
+As ∆t → 0, the discrete minimum 
+
+min  
+
+> j=0 ,...,H
+
+g(xuj )e−λr j
+
+converges to 
+
+inf  
+
+> r∈[0 ,σ ]
+
+g(ϕux(r)) e−λr .
+
+Likewise, since xuH → ϕux(σ) and Ψ is continuous, 
+
+e−λσ Ψ( xuH ) → e−λσ Ψ( ϕux(σ)) .
+
+Taking minima over controls and combining both terms yields 
+
+bT ∞
+
+> σ,λ
+
+Ψ → T ∞
+
+> σ,λ
+
+Ψ.
+
+Lemma 16 (Sup-Norm Contraction Property of bT ∞
+
+> σ,λ
+
+). Let 
+
+Ψ1, Ψ2 ∈ V ∞ (eq. (52)). 
+
+bT ∞
+
+> σ,λ
+
+Ψ1 − bT ∞
+
+> σ,λ
+
+Ψ2 ∞ ≤ e−λσ ∥Ψ1 − Ψ2∥∞ . (65) 
+
+Proof. The proof can be established using the same mechanics used in the proof of Lemma 12. 
+
+Theorem 10 (Convergence of cW ∞ to W ∞). Let 
+
+W ∞ = T ∞
+
+> σ,λ
+
+W ∞
+
+and let cW ∞ = bT ∞ 
+
+> σ,λ
+
+cW ∞
+
+Then cW ∞ → W ∞ as ∆t → 0
+
+Proof. The proof relies on similar mechanics as in the case of Theorem 9 and again leveraging the contraction property, now of bT ∞
+
+> σ,λ
+
+.VIII. R EINFORCEMENT LEARNING AS A SAMPLE -B ASED 
+
+APPROXIMATION OF THE BELLMAN OPERATOR 
+
+The discrete Bellman operators bTσ,λ and bT ∞ 
+
+> σ,λ
+
+introduced in the previous subsections provide computable approximations of the exact operators, whose fixed points converge to W and 
+
+W ∞ respectively as ∆t → 0 (Theorem 9). However, even these discrete formulations require exact rollouts of the system dynamics and exhaustive optimization over Ud, which may be intractable in high-dimensional settings or when the dynamics are unknown. Instead, the operators can be approximated using sampled rollouts, leading to a sample-based approximation of value iteration in which Bellman updates are constructed from data rather than exact evaluations. We make this connection concrete by considering fitted value iteration (FVI), a value-based, sample-based method that approximates the fixed point of the reachability-preserving Bellman operator via bootstrapped regression. We note that FVI, as presented here, is more precisely described as an instance of approximate dynamic programming (ADP) [6]: the Bellman targets are computed via exact rollouts of a known dynamics model rather than through interaction with an unknown environment, which is the setting more commonly associated with RL. The connection to RL becomes direct once the rollout and optimization steps are themselves replaced by sampled trajectories and learned policies, an extension we discuss briefly at the end of this section. 15 
+
+Since the finite-horizon and infinite-horizon Bellman oper-ators act on functions of different domains ( [0 , T ] × Rn versus 
+
+Rn, respectively), we introduce two corresponding parametric approximators. Let 
+
+Ψθ : [0 , T ] × Rn → R (66) denote the finite-horizon parametric approximator, and let 
+
+Ψ∞ 
+
+> θ
+
+: Rn → R (67) denote its infinite-horizon (stationary) counterpart, where n
+
+denotes the dimension of the state. In both cases, the goal is to minimize the Bellman residual using sampled states. Given a dataset {xi}Ni=1 (where the samples are obtained from a sampling distribution ρ), the parameters θ are updated by minimizing, in the finite-horizon case, 
+
+L(θ) = E(τ,x )∼ρ
+
+Ψθ (τ, x ) − bTσ,λ (Ψ θ )( τ, x )
+
+| {z }
+
+> y(τ,x )
+
+
+
+> 2
+
+ , (68) and, in the infinite-horizon case, 
+
+L∞(θ) = Ex∼ρ
+
+Ψ∞ 
+
+> θ
+
+(x) − bT ∞
+
+> σ,λ
+
+(Ψ ∞ 
+
+> θ
+
+)( x)
+
+| {z }
+
+> y∞(x)
+
+
+
+> 2
+
+ . (69) For each sampled state, the target is determined by asampled evaluation of the corresponding discrete Bellman operator. In the finite-horizon case (based on eq. (55)), 
+
+y(τ, x ) = min 
+
+> u∈U d
+
+min 
+
+n
+
+min  
+
+> j=0 ,...,H
+
+g(xuj )
+
+e−λr j , e −λσ Ψθ (τ − σ, x uH )
+
+o
+
+,
+
+(70) and, in the infinite-horizon case, 
+
+y∞(x) = min 
+
+> u∈U d
+
+min 
+
+
+
+min  
+
+> j=0 ,...,H
+
+g(xuj ) e−λr j , e −λσ Ψ∞ 
+
+> θ
+
+(xuH )
+
+
+
+.
+
+(71) Algorithms 1 and 2 give a realization of the numerical scheme for the finite-horizon and infinite-horizon settings, respectively. 
+
+Remark 7 (Relationship between algorithm 1 and algo-rithm 2) . Algorithm 2 specializes algorithm 1 to the stationary setting in three ways: (i) pretraining is omitted since V∞ imposes no boundary condition (see Defini-tion 8), and Banach’s theorem guarantees convergence from any bounded initialization; (ii) rollouts always run the full H = σ/ ∆t steps since there is no remaining time constraint, whereas in algorithm 1 rollouts are truncated to Hi = hi/∆t steps when τi < σ ; and (iii) the network 
+
+Ψ∞ 
+
+> θ
+
+takes only x as input, reflecting the stationarity of 
+
+W ∞(x), in contrast to Ψθ (τ, x ) in the finite-horizon case. Having established both the finite- and infinite-horizon FVI schemes as sample-based realizations of their respective dis-crete Bellman operators, we close with a caveat regarding what has, and has not, been established about their convergence in Remark 8. 
+
+Algorithm 1 Finite-Horizon FVI with bTσ,λ 
+
+Require: value function Ψθ (τ, ·) structure, reach cost g, con-trol set Ud, dynamics model, optimizer O, sampling dis-tribution ρ over [0 , T ]×Rn, batch size B, Bellman step σ,timestep ∆t, discount rate λ, pretraining conververgence threshold ϵpre-training , convergence threshold ϵ 
+
+> 1:
+
+Initialize parameters θ
+
+Pretraining on reach cost (enforces boundary condition 
+
+Ψθ (0 , x ) = g(x)) 
+
+> 2:
+
+for k = 1 to Npre do  
+
+> 3:
+
+Sample {xi}Bi=1 ∼ ρ(· | τ = 0)  
+
+> 4:
+
+yi ← g(xi) 
+
+> 5:
+
+Lpre (θ) ← 1
+
+> B
+
+PBi=1 (Ψ θ (0 , x i) − yi)2 
+
+> 6:
+
+θ ← O (θ, Lpre (θ))  
+
+> 7:
+
+end for 
+
+Fitted value iteration  
+
+> 8:
+
+while 1
+
+> B
+
+PBi=1 
+
+
+
+Ψθ (τi, x i) − bTσ,λ (Ψ θ )( τi, x i)
+
+2
+
+> ϵ do  
+
+> 9:
+
+Sample {(τi, x i)}Bi=1 ∼ ρ 
+
+> 10:
+
+for each (τi, x i) do  
+
+> 11:
+
+Set hi ← min {τi, σ }, Hi ← hi/∆t 
+
+> 12:
+
+for each u ∈ U d do  
+
+> 13:
+
+Roll out trajectory {xuj }Hi 
+
+> j=0
+
+using dynamics  
+
+> 14:
+
+Jstop (u) ← min j=0 ,...,H i e−λj ∆tg(xuj ) 
+
+> 15:
+
+Jcont (u) ← e−λh i Ψθ (τi − hi, x uHi ) 
+
+> 16:
+
+J(u) ← min( Jstop (u), J cont (u))  
+
+> 17:
+
+end for  
+
+> 18:
+
+yi ← min u∈U d J(u) 
+
+> 19:
+
+end for  
+
+> 20:
+
+L(θ) ← 1
+
+> B
+
+PBi=1 (Ψ θ (τi, x i) − yi)2 
+
+> 21:
+
+θ ← O (θ, L(θ))  
+
+> 22:
+
+end while  
+
+> 23:
+
+return Ψθ
+
+Remark 8 (From Discrete to Learned Operators: An Open Convergence Question) . Lemmas 13 and 15 establish that the discrete operators bTσ,λ and bT ∞ 
+
+> σ,λ
+
+recover the exact operators Tσ,λ and T ∞ 
+
+> σ,λ
+
+as discretization parameters van-ish. This concerns the discretization of trajectories and controls, not the introduction of function approximation. The FVI scheme of section VIII adds a further approx-imation, composing the discrete operator with a least-squares projection onto a parametric class {Ψθ } (respec-tively {Ψ∞ 
+
+> θ
+
+}; eqs. (68) and (70)). Whether the resulting iterates converge to the fixed point cW (respectively cW ∞)is a distinct question: the contraction property of Lem-mas 9, 12, 14 and 16 need not be inherited by the com-posite map “regress-then-apply-operator”. Bounding or ruling out the resulting error falls within the scope of the approximate dynamic programming literature on FVI [6], [20], [21], which propagates function-approximation and finite-sample error through the Bellman recursion for standard, additive-reward operators. Extending such guar-antees to the non-additive, min-structured operator intro-duced here is left for future work (see section X). 16 
+
+Algorithm 2 Infinite-Horizon FVI with bT ∞
+
+> σ,λ
+
+Require: value function Ψ∞ 
+
+> θ
+
+(x) structure, reach cost g, con-trol set Ud, dynamics model, optimizer O, sampling distri-bution ρ over Rn, batch size B, Bellman step σ, timestep 
+
+∆t, discount rate λ, convergence threshold ϵ 
+
+> 1:
+
+Initialize parameters θ
+
+Fitted value iteration  
+
+> 2:
+
+while 1
+
+> B
+
+PBi=1 
+
+
+
+Ψ∞ 
+
+> θ
+
+(xi) − bT ∞
+
+> σ,λ
+
+(Ψ ∞ 
+
+> θ
+
+)( xi)
+
+2
+
+> ϵ do  
+
+> 3:
+
+Sample {xi}Bi=1 ∼ ρ 
+
+> 4:
+
+for each xi do  
+
+> 5:
+
+for each u ∈ U d do  
+
+> 6:
+
+Roll out trajectory {xuj }Hj=0 using dynamics, where H = σ/ ∆t 
+
+> 7:
+
+Jstop (u) ← min j=0 ,...,H e−λj ∆tg(xuj ) 
+
+> 8:
+
+Jcont (u) ← e−λσ Ψ∞ 
+
+> θ
+
+(xuH ) 
+
+> 9:
+
+J(u) ← min( Jstop (u), J cont (u))  
+
+> 10:
+
+end for  
+
+> 11:
+
+yi ← min u∈U d J(u) 
+
+> 12:
+
+end for  
+
+> 13:
+
+L∞(θ) ← 1
+
+> B
+
+PBi=1 (Ψ ∞ 
+
+> θ
+
+(xi) − yi)2 
+
+> 14:
+
+θ ← O (θ, L∞(θ))  
+
+> 15:
+
+end while  
+
+> 16:
+
+return Ψ∞
+
+> θ
+
+IX. E XPERIMENTS & R ESULTS 
+
+The objective of the experiments is to empirically support the key theoretical claims of this work, namely: (i) the preservation of reachability semantics under discounting, (ii) the equivalence between the HJ and Bellman characterizations of the discounted reachability value function, and (iii) the in-terpretation of RL algorithms as sample-based approximation schemes for the fixed-point of the proposed Bellman operator. 
+
+A. Experimental Setup a) Double Integrator Reach Problem: We consider the reach problem applied to the double integrator, a canonical time-invariant control system for which HJ reachability struc-ture is well understood. The dynamics and control set are given by eq. (72). 
+
+˙x1 = x2, ˙x2 = u, u ∈ U := [ −umax , u max ], (72) where umax is the maximum control that can be provided. In order to satisfy Assumptions 5 and 8, the reach cost g(x)
+
+is chosen as a scaled and squashed signed distance function: 
+
+gDI (x) = tanh 
+
+ (x1 − x1,ref )2 + ( x2 − x2,ref )2 − r2
+
+> DI target
+
+αDI 
+
+
+
+, (73) where rDI target defines the target set radius and αDI controls the sharpness of the transition between negative and positive val-ues. The sign of g(x) follows the calibration in Assumption 5, ensuring consistency with reachability semantics. For the function approximation, we adopt a Sinusoidal Rep-resentation Network (SIREN) architecture, as prior work has TABLE II: Parameters used in the double integrator reach experiment.                                                            
+
+> Parameter Value
+> Region of interest [−5,5] ×[−5,5]
+> Batch size B16384
+> Learning rate 10 −4
+> Optimizer Adam Training steps Ntrain 200 ,000
+> Sampling distribution ρ12U([ −5,5] ×[−5,5]) + 12N(xref ,25 I)
+> Environment
+> Dynamics Double integrator (eq. (72)) Control set U[−1,1]
+> Bellman step σ(s) 0.1
+> Time step ∆t(s) 0.01
+> Rollout steps H(-) 10
+> Discount rate λ(s −1)1.0
+> Discount factor γ(-) e−λσ ≈0.9512
+> Cost function
+> Reach cost function eq. (73) Target radius rtarget 0.5
+> Smoothing parameter α(-) 10 .0
+> Neural network
+> Network type SIREN Hidden layers (64 ,64)
+> Activation sin( ·)
+> Activation frequency ω0(rad/s) (10 .0,1.0)
+
+shown that periodic activations are well-suited for representing value functions and their gradients in HJ settings [4]. All parameters and hyperparameters used in the experiment associated with the double integrator are reported in table II. 
+
+b) Dubins Car Avoid Problem: Furthermore, we consider a Dubins car avoid problem. The state of the Dubins car is described by the position (x1, x 2) ∈ R2 and the heading angle 
+
+θ ∈ [−π, π ) rad. The control input u represents the bounded turning rate while the forward velocity ν is held constant. The system evolves according to the following dynamics: 
+
+˙x1 = ν cos( θ),
+
+˙x2 = ν sin( θ), u ∈ U := [ − ˙θmax , ˙θmax ]˙θ = u(t),
+
+(74) The goal is to avoid a certain region about a position 
+
+x1,ref , x 2,ref and with radius rDC target . Therefore, we design 
+
+gDC (x) as: 
+
+gDC (x) = tanh 
+
+ (x1 − x1,ref )2 + ( x2 − x2,ref )2 − r2
+
+> DC target
+
+αDC 
+
+
+
+, (75) In contrast to the double integrator, the Dubins car avoid problem is expected to result in a non-trivial backward reachable tube. Consequently, it provides a meaningful test case for demonstrating that the proposed Bellman formulation preserves reachability semantics, namely that the discounting does not affect the resultant contour for the zero-level set. All parameters and hyperparameters used in the Dubins car avoid experiment are reported in table III. 17 
+
+TABLE III: Parameters used in the Dubins car avoid experi-ment. All unmentioned parameters are the same as in the case of the double integrator experiment (table II). 
+
+Parameter Value 
+
+Region of interest [−5, 5] × [−5, 5] × [−π, π ]
+
+Learning rate 2.87 · 10 −4
+
+Environment 
+
+Dynamics Dubins car (eq. (74)) 
+
+ν (m/s) 1.0 
+
+Cost function 
+
+Reach cost function eq. (75) 
+
+Neural network 
+
+Hidden layers (128 , 128) 
+
+Activation frequency ω0 (rad/s) (25 .9840 , 1.2017) 
+
+B. Validation of Bellman–HJ Equivalence 
+
+We now focus on the discounted infinite-horizon setting and empirically verify that the proposed Bellman formulation recovers the same value function as the HJ characterization. For both the double integrator and Dubins car, we compute:  
+
+> •
+
+a reference solution by solving the stationary HJ varia-tional inequality (eq. (40)), and  
+
+> •
+
+an approximation of the value function using FVI (algo-rithm 2). We examine pointwise differences between the value func-tions and the agreement of their zero level sets, which define the backward reachable tubes. This provides empirical validation of Theorem 8, demon-strating that both the HJ and Bellman formulations yield the same value function. Furthermore, the close agreement sup-ports the interpretation of reinforcement learning as a sample-based approximation of the Bellman fixed-point equation. Results are shown in fig. 1. The learned value functions closely match the reference solutions obtained from the semi-lagrangian scheme, with small pointwise error across the state space. These results support both the equivalence between the HJ and Bellman formulations and the interpretation of reinforcement learning as a sampled-based/data-driven solver of the Bellman fixed-point equation. Moreover, as expected, since the double integrator is a controllable system, the reachable region becomes infinite when the horizon goes to infinity. That is why it is not possible to visualize the zero-level set which now spans the entire state space. In contrast, the Dubins car avoid problem yields a non-trivial backward reachable tube even in the infinite-horizon limit. Although the system is fully controllable, the avoid formulation induces a bounded safe set, defined as the set of states from which the system can avoid the unsafe region for all future times (see fig. 2). This provides a meaningful test case for evaluating whether the proposed Bellman formulation preserves reachability semantics (discussed in section IX-C). 
+
+C. Preservation of Reachability Semantics Under Discounting 
+
+We empirically illustrate that discounting does not alter reachability semantics by comparing the zero level sets of the −4 −2 0 2 4
+
+x1 
+
+> −4
+> −2024
+> x2 −0.01111
+> −0.00833
+> −0.00555
+> −0.00278
+> −0.024
+> −0.022
+> −0.020
+> −0.018
+> −0.016
+> −0.014
+> −0.012
+> −0.010
+> −0.008
+> −0.006
+> −0.004
+> −0.002 W (x)W ∞(x)
+
+(a) Reference value function obtained by solving stationary HJ variational inequality (eq. (40)) using semi-Lagrangian scheme. −4 −2 0 2 4
+
+x1 
+
+> −4
+> −2024
+> x2
+> −0.01103
+> −0.00827
+> −0.00552  −0.00276
+> −0.024
+> −0.022
+> −0.020
+> −0.018
+> −0.016
+> −0.014
+> −0.012
+> −0.010
+> −0.008
+> −0.006
+> −0.004
+> −0.002 Ψθ(x)Ψ∞
+> θ (x)
+
+(b) Value function learned using algorithm 2. −4 −2 0 2 4
+
+x1
+
+> −4
+> −2024
+> x2
+> −0.0028
+> −0.0026
+> −0.0024
+> −0.0022
+> −0.0020
+> −0.0018
+> −0.0016
+> −0.0014
+> −0.0012
+> −0.0010
+> −0.0008
+> −0.0006
+> −0.0004
+> −0.0002 0.0000 0.0002 0.0004 0.0006 0.0008 0.0010 0.0012 0.0014
+> Ψθ(x) − W (x)Ψ∞
+> θ (x) − W ∞(x)
+
+(c) Pointwise difference between the learned and reference value functions. 
+
+Fig. 1: Comparison between the stationary solution of the HJ variational inequality (eq. (40)) and the value function learned via FVI, for the case of the double integrator reach problem. original undiscounted value function for the reach problem, namely, 
+
+inf  
+
+> u(·)
+
+min   
+
+> s∈[t,T ]
+
+g(x(s)) (76) and the zero-level set of the discounted value function eq. (6). While the value functions themselves differ due to the presence of discounting, reachability is determined solely by 18 
+
+the sign of the value function. Therefore, agreement of the signs and of the zero level sets indicates preservation of reachability semantics. The comparison relies on a reference solution for the undis-counted value function which is obtained via the helperOC 
+
+toolbox. Note that, in practice, the infinite-horizon solution cannot be obtained via helperOC as it requires a finite-time horizon. Thus, the infinite-horizon solution is approximated via a sufficiently long finite-time horizon. The results are shown in fig. 2. The value functions exhibit different magnitudes, as expected, but their zero level sets are well aligned. This alignment indicates that discounting preserves the reachability semantics encoded by the value function. X. C ONCLUSION 
+
+This paper establishes a direct and exact connection be-tween Hamilton–Jacobi reachability and reinforcement learn-ing through a discounted reach-based value function that preserves reachability semantics. We showed that this value function admits two equivalent characterizations: as the unique viscosity solution of a Hamilton–Jacobi variational inequality and as the unique fixed point of a reachability-preserving Bellman operator. A central result is that, despite its non-additive structure, the proposed Bellman operator is contractive under discounting. This yields a well-posed fixed-point problem with a unique solution and provides a principled foundation for computing reachability value functions via iterative methods. Moreover, the equivalence established in this work provides a unifying perspective, and our results suggest that reinforce-ment learning can be interpreted as a sample-based method for approximating the same Bellman fixed point that characterizes the reachability value function. The results suggest a broader interpretation of reinforcement learning as a framework for approximating fixed points of suitable operators, rather than being solely tied to additive reward maximization. Importantly, this formulation preserves the exact semantics of the original reachability problem. This enables the use of learning-based methods in settings where formal guarantees are essential. This work also shows that RL is not fundamentally tied to additive reward maximization, but can instead be understood as a method for approximating fixed points of more general operators. This enables the direct incorporation of reachability and safety semantics into learning, without relying on heuristic reward design. Future work will focus on extending the framework to richer problem classes, including reach–avoid formulations and safety-critical control under disturbances, and stochastic dynamics. A further open direction concerns whether the sample-based approximation provably converges to the fixed point of the associated discrete Bellman operator during train-ing (Remark 8). While section IX provides empirical evidence of close agreement, an a priori convergence guarantee for FVI on the non-additive reachability-preserving operator has not been established here. Independently of this question, the post-hoc residual certification framework of [28] may extend to the −4 −2 0 2 4
+
+x1
+
+> −4
+> −2024
+> x2
+> 0.786
+> 1.571
+> 2.357
+> 3.143
+> 3.928  4.714
+> 4.714
+> 4.714
+> 4.714
+> 5.500
+> 5.500
+> 5.500
+> 5.500
+> −0.50.00.51.01.52.02.53.03.54.04.55.05.56.06.5
+> W (x)W ∞(x)
+
+(a) Reference value function for the undiscounted avoid problem, computed using helperOC over a long time horizon to approximate the infinite-horizon solution. The zero level set converges early and defines the BRT. −4 −2 0 2 4
+
+x1
+
+> −4
+> −2024
+> x2
+> −0.00604
+> −0.00302
+> −0.024
+> −0.022
+> −0.020
+> −0.018
+> −0.016
+> −0.014
+> −0.012
+> −0.010
+> −0.008
+> −0.006
+> −0.004
+> −0.002 0.000 0.002
+> Ψθ(x)Ψ∞
+> θ (x)
+
+(b) Value function learned using algorithm 2 as a sample-based approximation of the reachability-preserving Bellman operator. −4 −2 0 2 4
+
+x1
+
+> −4
+> −2024
+> x2
+> HJ (reference) FVI (learned)
+
+(c) Comparison of zero level sets of the reference and learned value functions. Their alignment indicates preservation of reachability semantics under discounting. 
+
+Fig. 2: Dubins car avoid problem. Comparison between the undiscounted HJ reference solution and the value function learned via reinforcement learning. While the value magni-tudes differ, the agreement of the zero level sets demonstrates preservation of reachability semantics. 19 
+
+operators introduced here, which share the same underlying contraction property. Investigating this route further is also an interesting avenue for future work. REFERENCES [1] Anayo K. Akametalu, Shromona Ghosh, Jaime F. Fisac, Vicenc Rubies-Royo, and Claire J. Tomlin. A minimum discounted reward hamil-ton–jacobi formulation for computing reachable sets. IEEE Transactions on Automatic Control , 69(2):1097–1103, 2024. [2] OpenAI: Marcin Andrychowicz, Bowen Baker, Maciek Chociej, Rafal Jozefowicz, Bob McGrew, Jakub Pachocki, Arthur Petron, Matthias Plappert, Glenn Powell, Alex Ray, et al. Learning dexterous in-hand manipulation. The International Journal of Robotics Research , 39(1):3– 20, 2020. [3] Somil Bansal, Mo Chen, Sylvia Herbert, and Claire J Tomlin. Hamilton-jacobi reachability: A brief overview and recent advances. In 2017 IEEE 56th annual conference on decision and control (CDC) , pages 2242– 2253. IEEE, 2017. [4] Somil Bansal and Claire J Tomlin. Deepreach: A deep learning approach to high-dimensional reachability. In 2021 IEEE International Conference on Robotics and Automation (ICRA) , pages 1817–1824. IEEE, 2021. [5] Martino Bardi, Italo Capuzzo Dolcetta, et al. Optimal control and viscosity solutions of Hamilton-Jacobi-Bellman equations , volume 12. Springer, 1997. [6] Dimitri P. Bertsekas and John N. Tsitsiklis. Neuro-Dynamic Program-ming . Athena Scientific, Belmont, MA, 1996. [7] Jason J Choi, Donggun Lee, Koushil Sreenath, Claire J Tomlin, and Sylvia L Herbert. Robust control barrier–value functions for safety-critical control. In 2021 60th IEEE Conference on Decision and Control (CDC) , pages 6814–6821. IEEE, 2021. [8] Jérôme Darbon and Stanley Osher. Algorithms for overcoming the curse of dimensionality for certain hamilton–jacobi equations arising in control theory and elsewhere. Research in the Mathematical Sciences , 3(1):19, 2016. [9] Jonas Degrave, Federico Felici, Jonas Buchli, Michael Neunert, Brendan Tracey, Francesco Carpanese, Timo Ewalds, Roland Hafner, Abbas Abdolmaleki, Diego de Las Casas, et al. Magnetic control of tokamak plasmas through deep reinforcement learning. Nature , 602(7897):414– 419, 2022. [10] Jaime F Fisac, Neil F Lugovoy, Vicenç Rubies-Royo, Shromona Ghosh, and Claire J Tomlin. Bridging hamilton-jacobi safety analysis and reinforcement learning. In 2019 International Conference on Robotics and Automation (ICRA) , pages 8550–8556. IEEE, 2019. [11] Milan Ganai. Hamilton-jacobi reachability estimation in reinforcement learning. Master’s thesis, University of California, San Diego, 2024. [12] Milan Ganai, Sicun Gao, and Sylvia L Herbert. Hamilton-jacobi reachability in reinforcement learning: A survey. IEEE Open Journal of Control Systems , 3:310–324, 2024. [13] Andrzej Granas, James Dugundji, et al. Fixed point theory , volume 14. Springer, 2003. [14] Sylvia Herbert, Jason J Choi, Suvansh Sanjeev, Marsalis Gibson, Koushil Sreenath, and Claire J Tomlin. Scalable learning of safety guarantees for autonomous systems using hamilton-jacobi reachability. In 2021 IEEE International Conference on Robotics and Automation (ICRA) , pages 5914–5920. IEEE, 2021. [15] Kai-Chieh Hsu, Vicenç Rubies-Royo, Claire J Tomlin, and Jaime F Fisac. Safety and liveness guarantees through reach-avoid reinforcement learning. arXiv preprint arXiv:2112.12288 , 2021. [16] Donggun Lee and Claire J Tomlin. A hopf-lax formula in hamilton– jacobi analysis of reach-avoid problems. IEEE Control Systems Letters ,5(3):1055–1060, 2020. [17] Yonghan Li, Chenyu Wu, Taoran Wu, Shijie Wang, and Bai Xue. Con-verse barrier certificates for finite-time safety verification of continuous-time perturbed deterministic systems. Systems & Control Letters ,209:106357, 2026. [18] John Lygeros. On reachability and minimum cost optimal control. 
+
+Automatica , 40(6):917–927, 2004. [19] Volodymyr Mnih, K. Kavukcuoglu, David Silver, Andrei A. Rusu, J. Veness, Marc G. Bellemare, Alex Graves, Martin A. Riedmiller, A. Fidjeland, Georg Ostrovski, Stig Petersen, Charlie Beattie, Amir Sadik, Ioannis Antonoglou, Helen King, D. Kumaran, Daan Wierstra, S. Legg, and D. Hassabis. Human-level control through deep reinforce-ment learning. Nature , 518:529–533, 2015. [20] Rémi Munos. Error bounds for approximate value iteration. Proceedings of the National Conference on Artificial Intelligence (AAAI) , 2005. [21] Rémi Munos and Csaba Szepesvári. Finite-time bounds for fitted value iteration. Journal of Machine Learning Research , 9:815–857, 2008. [22] William Sharpless, Dylan Hirsch, Sander Tonkens, Nikhil Shinde, and Sylvia Herbert. Dual-objective reinforcement learning with novel hamilton-jacobi-bellman formulations. arXiv preprint arXiv:2506.16016 , 2025. [23] William Sharpless, Oswin So, Dylan Hirsch, Sylvia Herbert, and Chuchu Fan. Bellman value decomposition for task logic in safe optimal control. 
+
+arXiv preprint arXiv:2602.19532 , 2026. [24] David Silver, Aja Huang, Chris J Maddison, Arthur Guez, Laurent Sifre, George Van Den Driessche, Julian Schrittwieser, Ioannis Antonoglou, Veda Panneershelvam, Marc Lanctot, et al. Mastering the game of go with deep neural networks and tree search. nature , 529(7587):484–489, 2016. [25] David Silver, Thomas Hubert, Julian Schrittwieser, Ioannis Antonoglou, Matthew Lai, Arthur Guez, Marc Lanctot, Laurent Sifre, Dharshan Kumaran, Thore Graepel, et al. A general reinforcement learning algorithm that masters chess, shogi, and go through self-play. Science ,362(6419):1140–1144, 2018. [26] David Silver, Julian Schrittwieser, Karen Simonyan, Ioannis Antonoglou, Aja Huang, Arthur Guez, Thomas Hubert, Lucas Baker, Matthew Lai, Adrian Bolton, et al. Mastering the game of go without human knowledge. nature , 550(7676):354–359, 2017. [27] Prashant Solanki, Isabelle El-Hajj, Jasper van Beers, Erik-Jan van Kampen, and Coen de Visser. Formalizing the relationship between hamilton-jacobi reachability and reinforcement learning. arXiv preprint arXiv:2601.08050 , 2026. [28] Prashant Solanki, Isabelle El-Hajj, Jasper J. van Beers, Erik-Jan van Kampen, and Coen C. de Visser. Certifying hamilton-jacobi reachability learned via reinforcement learning. arXiv preprint arXiv:2602.16475 ,2026. [29] Oriol Vinyals, Igor Babuschkin, Wojciech M Czarnecki, Michaël Math-ieu, Andrew Dudzik, Junyoung Chung, David H Choi, Richard Powell, Timo Ewalds, Petko Georgiev, et al. Grandmaster level in starcraft ii using multi-agent reinforcement learning. nature , 575(7782):350–354, 2019. [30] Bai Xue, Martin Fränzle, and Naijun Zhan. Inner-approximating reachable sets for polynomial systems with time-varying uncertainties. 
+
+IEEE Transactions on Automatic Control , 65(4):1468–1483, 2019.

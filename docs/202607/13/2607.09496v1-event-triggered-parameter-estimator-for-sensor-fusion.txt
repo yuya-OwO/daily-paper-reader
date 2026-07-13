@@ -1,0 +1,537 @@
+Title: Event-triggered parameter estimator for sensor fusion
+
+URL Source: https://arxiv.org/pdf/2607.09496v1
+
+Published Time: Mon, 13 Jul 2026 01:15:20 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Event-triggered parameter estimator for sensor fusion 
+
+Ariana M´ endez-Castillo ∗,∗∗ Irene Perez-Salesa ∗∗ 
+
+Rodrigo Aldana-L´ opez ∗∗ Antonio Ram´ ırez-Trevi˜ no ∗
+
+Rosario Aragues ∗∗ ∗ Department of Electrical Engineering, Cinvestav-Guadalajara, Jalisco, 45019 M´ exico (e-mail: ariana.mendez@cinvestav.mx, antonio.ramirezt@cinvestav.mx)  
+
+> ∗∗
+
+Department of Computing and Systems Engineering - I3A, University of Zaragoza, Zaragoza 50009 Espa˜ na (e-mail: i.perez@unizar.es, raldana@unizar.es, raragues@unizar.es ) 
+
+Abstract: This paper studies event-triggered parameter estimation in sensor fusion systems where sensors transmit measurements to a gradient based estimator. We introduce a regressor-driven local triggering rule that requires no knowledge of the current parameter estimate and depends solely on the regressor signals. Under a persistent excitation condition on the aggregate regressor, we derive explicit design inequalities on the estimator gain and event thresholds that guarantee global exponential convergence. The analysis is based on a time-varying Lyapunov function. We further provide a sufficient condition on the regressor dynamics that enforces a uniform lower bound on inter-event times, excluding Zeno behavior. Simulations show substantial communication savings while preserving exponential convergence. 
+
+Keywords: Parameter estimator, event-triggered mechanism, sensor fusion, gradient estimator. 1. INTRODUCTION Parameter estimation is a data regression problem appear-ing in adaptive control, sensor networks, and unmanned surface vehicles (Shen et al., 2024). Precise knowledge of the unknown parameters is required to guarantee stabil-ity and closed loop performance in several applications (Olfati-Saber et al., 2007). In this article, we address the problem of estimating unknown parameters from measure-ments collected by a network of sensors, while aiming to reduce the overall use of the communication network. Several estimation algorithms exist in the literature. A standard approach relies on modeling the unknown pa-rameters as constant states of an underlying dynamical system. Therefore, one may apply a discrete-time Kalman filter (Kalman, 1960; Maybeck, 1982) or a continuous-time Kalman–Bucy filter (Golovan and Matasov, 1994). In both cases, the covariance of the estimation error evolves according to a Riccati equation, which guarantees                                     
+
+> ⋆This work was supported in part by the Secretar´ ıa de Ciencia, Humanidades, Tecnolog´ ıa e Innovaci´ on (SECIHTI), M´ exico, pre-viously administered by the Consejo Nacional de Humanidades, Ciencias y Tecnolog´ ıas (CONAHCYT) with grant number 1229622, and in part by projects PID2021-124137OB-I00 and PID2024-159279OB-I00 funded by MICIU/AEI/10.13039/501100011033 and by ERDF/EU, by project REMAIN S1/1.1/E0111 (Interreg Su-doe Programme, ERDF), and via project DGA T45 23R (Gob-ierno de Arag´ on). Grant reference BG24/00121 funded by MI-CIU/AEI/10.13039/501100011033. ©2026 IFAC. This work has been accepted to IFAC for publication under a Creative Commons Licence CC-BY-NC-ND. Accepted for presentation at the 23rd IFAC World Congress 2026.
+
+asymptotic convergence of the estimation error. To obtain exponential convergence, different estimators have been in-troduced, most notably gradient-based schemes (Ioannou and Sun, 1996; Sastry and Bodson, 2011). For this class of estimators, exponential convergence of the parameter estimates to their true values is guaranteed under the standard persistent excitation (PE) condition (Anderson, 1977). However, classical parameter estimation methods are primarily formulated for settings in which sensors and estimators can interact instantaneously. In contrast, sensor networks, where sensing units and pro-cessing units are often spatially distributed, arise in many modern applications. In such networks, the information available at any individual sensor is often insufficient to estimate the unknown parameters of interest. As a re-sult, the measurements collected across the network are transmitted to an estimator and processed collectively, a strategy commonly referred to as sensor fusion (Sasiadek, 2002). This approach is a core component in the design of autonomous vehicles and related systems (Koci´ c et al., 2018). When parameter estimation relies on a sensor network, reducing communication and computational load becomes essential. Event-triggering mechanisms (ETMs) are com-monly used for this purpose, since they restrict trans-missions to times when a triggering rule is met. Several classes of ETMs have been introduced in the literature, mostly in contexts such as state estimation or control. A standard example is the send on delta mechanism (Miskowicz, 2014), where a measurement is transmitted only when it deviates from the last transmitted value by arXiv:2607.09496v1 [eess.SY] 10 Jul 2026 more than a fixed threshold. This rule depends solely on local measurements. In (Diao et al., 2018), a send on delta strategy combined with recursive stochastic ap-proximation yields asymptotic convergence of the estima-tion error, but the analysis is restricted to binary valued measurements. Other ETMs include stochastic triggering rules (Shen et al., 2024), where transmission occurs when the deviation between successive measurements exceeds a random threshold. This setup considers joint state and parameter estimation by augmenting the parameter vec-tor into the state and applying a Kalman filter, which guarantees only asymptotic convergence. Dynamic ETMs, such as those in (Perez-Salesa et al., 2025), further reduce transmissions by comparing previously received informa-tion with a dynamic threshold and exploiting negative information between events. Event-triggered parameter es-timators have also been proposed (Geng and Zhao, 2025), typically using consensus plus innovation schemes with adaptive triggers based on prediction errors. These rules require each sensor to evaluate the predicted output, which in turn requires real-time access to the current parameter estimate. In general, these methods are designed for state estimation and rely on a Kalman filter structure, and thus achieve asymptotic stability. Motivated by this discussion, the contributions of this work are as follows. 
+
+• We propose an event-triggered gradient estimator for sensor fusion, where each sensor uses a local trigger based on changes in its regressor and the fusion unit runs a continuous–time gradient update with piecewise constant aggregated data. 
+
+• We derive explicit conditions on the estimator gain and local thresholds that ensure global exponential convergence under persistent excitation of the aggre-gate regressor, using a time–varying Lyapunov func-tion analysis. 
+
+• We provide a sufficient condition on the regressor dynamics that rules out Zeno behavior. 
+
+• We present numerical experiments showing that ex-ponential convergence is preserved with a substantial reduction in sensor transmissions. 2. PROBLEM STATEMENT We consider a sensor network with N agents. Each agent 
+
+i ∈ { 1, . . . , N } collects measurements 
+
+yi(t) = Ci(t) θ,
+
+where yi(t) ∈ Rpi is the measurement vector, Ci(t) ∈
+
+Rpi×n is a time-varying regressor, and θ ∈ Rn is the unknown parameter vector of interest. Local estimation of θ is often infeasible because an individ-ual regressor may not have enough richness or satisfy per-sistent excitation conditions. Moreover, individual agents may have limited computational capabilities to process all collective information, particularly for large N . Therefore, agents forward information to an aggregator node, which computes a global estimate of θ using all data received up to time t ≥ 0. To reduce network load, we adopt event-triggered com-munication so that transmissions occur only when a pre-scribed triggering condition is met. The goal is to design 
+
+Fig. 1. Parameter estimator using event-triggered sensor fusion. Spatially distributed sensors collect measure-ments and transmit them only when a local trigger-ing rule is satisfied. An estimator node receives the transmitted data and computes the estimate of the unknown parameters using all aggregated measure-ments. an estimator together with triggering mechanisms that ensure exponential convergence towards the origin for the estimation error, under standard persistent excitation as-sumptions on the aggregate regressor across all sensors. The overall architecture is illustrated in Fig. 1. 3. MAIN RESULTS We propose the following local event-triggering mechanism and estimator algorithm as follows: 
+
+Local event-triggering mechanism: 
+
+τ ik+1 = sup 
+
+n
+
+t ≥ τ ik :
+
+Ci(τ ik)⊤Ci(τ ik) − Ci(t)⊤Ci(t) ≥ ∆i
+
+o
+
+(1a) 
+
+Information from agent i used by the estimator: 
+
+˜Ci(t) = Ci(τ ik), for t ∈ [τ ik, τ ik+1 )˜yi(t) = yi(τ ik) for t ∈ [τ ik, τ ik+1 ) (1b) 
+
+Estimator: 
+
+˙ˆθ(t) = − γ ˜C(t)⊤  ˜C(t) ˆθ(t) − ˜y(t) (1c) where τ ik denotes the k-th triggering instant of sensor i,at which the sensor transmits yi(τ ik) and Ci(τ ik) to the aggregator node. Consequently, ˜ yi(t) and ˜Ci(t) represent the most recently received information from sensor i,and therefore remain piecewise constant between two successive triggering instants ( τ ik, τ ik+1 ) for each i. The aggregate quantities are defined as ˜C(t) = 
+
+
+
+˜C1(t)...˜CN (t)
+
+ , ˜y(t) = 
+
+
+
+˜y1(t)...˜yN (t)
+
+ , (2) which collect the latest information recovered from all sen-sors at time t and are used collectively in (1c). Moreover, ∆i ≥ 0 and γ > 0 are design parameters. The event-triggering condition in (1a) depends only on the local exogenous regressor Ci(t). Hence, the presence of undesirable Zeno behavior, i.e. triggering an infinite number of events in a finite time interval, depends only on the properties of this exogenous input. For the sake of generality in the main results, we will assume the absence of Zeno behavior. However, note that, in most practical applications, it is excluded due to the digital handling of signals, which forces a minimum inter-event time. In any case, in the following we characterize a practical condition under which Zeno behavior is avoided: 
+
+Proposition 1. Assume that there exist constants bi, c i > 0such that ∥Ci(t)∥ ≤ bi and ∥ ˙Ci(t)∥ ≤ ci for all t ≥ 0. Then, for all i ∈ { 1, . . . , N }, the event instants generated by (1a) satisfy the condition 
+
+τ ik+1 − τ ik ≥ τ , (3) for some τ > 0, i.e. there exists a minimum inter-event time. 
+
+Proof. Fix any i ∈ { 1, . . . , N }. Set Mi(t) = Ci(t)⊤Ci(t). Since ˙Mi(t) = ˙Ci(t)⊤Ci(t) + Ci(t)⊤ ˙Ci(t),
+
+we have ∥ ˙Mi(t)∥ ≤ 2∥Ci(t)∥ ∥ ˙Ci(t)∥ ≤ 2bici =: mi for all 
+
+t. We proceed by contradiction. Suppose that there exists no τ > 0 such that τ ik+1 − τ ik ≥ τ . Therefore, there exists 
+
+k ≥ 0 such that 0 < τ ik+1 − τ ik ≤ ∆i
+
+2mi
+
+where ∆ i > 0 is the fixed threshold in (1a). Define 
+
+M ik := Mi(τ ik+1 ) − Mi(τ ik)
+
+τ ik+1 − τ ik
+
+= ∆i
+
+τ ik+1 − τ ik
+
+≥ 2mi,
+
+therefore, for such k. On the other hand, by the mean value theorem, for every k there exists ξik ∈ [τ ik, τ ik+1 ] such that M ik = ∥ ˙Mi(ξik)∥ ≤ mi, which contradicts M ik ≥ 2mi.Thus, there exists a minimum inter-event time τ > 0. 2
+
+To analyze the convergence of the proposed estimator, we impose the following standard condition on the aggregate regressor in the absence of event-triggering: 
+
+Assumption 2. Let 
+
+C(t) = 
+
+
+
+C1(t)...
+
+CN (t)
+
+ .
+
+There exist constants m > 0, b > 0, and T > 0 such that, for all t ≥ 0, 
+
+mIn ⪯
+
+Z tt−T
+
+C(τ )⊤C(τ ) d τ, ∥C(t)∥ ≤ b. (4) The main result of this work is stated next. It establishes sufficient conditions on the design parameters ∆ i and γ
+
+that guarantee exponential convergence of the estimation error to the origin. 
+
+Theorem 3. Let Assumption 2 and the Proposition 1 hold. Define 
+
+β = γT 2b3
+
+2 ,k1 = 12γ
+
+ 2β2
+
+m + T
+
+
+
+,k2 = k1 + T 2b2
+
+2(5) and impose the design conditions 
+
+γ > 0, ∆i ≤ m
+
+4γk 2N . (6) Then, the origin for the estimation error ˜θ(t) := ˆθ(t)−θ is globally exponentially stable under the dynamics defined in (1). 4. CONVERGENCE ANALYSIS To prove Theorem 3, we introduce several technical lem-mas that support the convergence analysis. We begin by rewriting the estimation error dynamics in a form that isolates the effect of the event-triggering mechanism. 
+
+Lemma 4. Let the conditions of Theorem 3 hold. Then the estimation error ˜θ(t) = ˆθ(t) − θ evolves according to ˙˜θ(t) = −γ C(t)⊤C(t) ˜θ(t) + γ ∆(t) ˜θ(t), (7) where C(t) is the aggregate regressor defined in Assump-tion 2, and 
+
+∆(t) := C(t)⊤C(t) − ˜C(t)⊤ ˜C(t), (8) with ˜C(t) defined in (2) according to the received sensor information. 
+
+Proof. Given that the value of the matrices ˜C(t) and ˜y(t) from (2) is only updated at event instants, its value remains constant between the occurrence of two events. For the analysis, we define the errors induced by the event-triggered communication as εc(t) = ˜C(t) − C(t)and εy (t) = ˜ y(t) − y(t) in the interval t ∈ (τk, τk+1 ). Substituting in the estimator (1c), ˙ˆθ(t) = − γ  εc(t)+ C(t)⊤ (εc(t)+ C(t)) ˆθ(t)−(εy (t)+ y(t)) .
+
+Considering y(t) = C(t)θ, εy (t) = εc(t)θ, we have ˙ˆθ(t) = − γC(t)⊤C(t)( ˆθ(t) − θ)
+
+− γ
+
+
+
+C(t)⊤εc(t)+ εc(t)⊤ εc(t) + C(t)
+
+( ˆθ(t)−θ).
+
+Defining the estimation error as ˜θ(t) = ˆθ(t) − θ,˙˜θ(t) = −γC(t)⊤C(t) ˜θ(t)
+
+− γ
+
+
+
+C(t)⊤  ˜C(t) − C(t) +   ˜C(t) − C(t)⊤ ˜C(t)
+
+ ˜θ(t)= −γC(t)⊤C(t) ˜θ(t) + γ C(t)⊤C(t) − ˜C(t)⊤ ˜C(t) ˜θ(t).
+
+Then, which coincides with (7), completing the proof. 2
+
+Using the expression for ∆(t) in (8), we next characterize its uniform boundedness imposed by the event-triggering mechanism (1a). 
+
+Lemma 5. Let the conditions of Theorem 3 hold. Then the disturbance term (8) satisfies 
+
+∥∆(t)∥ ≤ N ∆, ∀ t ≥ 0with ∆ = max i{∆i} being the maximum event threshold from (1a). 
+
+Proof. Note that ∆(t) adds up all ∆i(t) = Ci(t)⊤Ci(t)−
+
+˜Ci(t)⊤ ˜Ci(t), in the form ∆(t) = PNi=1 ∆i(t). Every ∆i(t)is bounded as ∥∆i(t)∥ ≤ ∆i ≤ ∆, as a consequence of the event-triggering mechanism (1a). Then, we have 
+
+∥∆(t)∥ = ∥
+
+> N
+
+X
+
+> i=1
+
+∆i(t)∥ ≤ 
+
+> N
+
+X
+
+> i=1
+
+∥∆i(t)∥ ≤ N ∆completing the proof. 2Following the methodology presented in (Rueda-Escobedo and Moreno, 2021), adapted to the event-triggered multi-sensor setting considered here, we consider the Lyapunov function candidate 
+
+V ( ˜θ, t ) = ˜θ⊤P(t) ˜θ, (9) where P(t) is defined as 
+
+P(t) = 12γ
+
+ 2β2
+
+m + T
+
+
+
+In +
+
+Z tt−T
+
+(τ − t + T ) C(τ )⊤C(τ ) d τ, 
+
+(10) where In is the identity matrix of dimensions n × n. We first verify that V satisfies the required quadratic bounds for it to be a proper Lyapunov function. 
+
+Lemma 6. Let the conditions of Theorem 3 hold. Then the Lyapunov function (9) satisfies 
+
+k1∥ ˜θ∥2 ≤ V ( ˜θ, t ) ≤ k2∥ ˜θ∥2, ∀ t ≥ 0, ∀ ˜θ ∈ Rn. (11) 
+
+Proof. Considering the Assumption 2, and solving the integral of the second part of P(t) in (10): 
+
+Z tt−T
+
+(τ −t+T )C(τ )⊤C(τ )d τ ⪯
+
+Z tt−T
+
+(τ −t+T )∥C(t)∥2Indτ
+
+=
+
+Z tt−T
+
+(τ −t+T )b2Indτ = b2
+
+Z T
+
+> 0
+
+sInds = T 2b2
+
+2 .
+
+For the lower bound, note that 0 ≤ (τ − t + T ) ≤ T for 
+
+τ ∈ [t − T, t ]. Then, 
+
+T 2b2
+
+2 In ⪰
+
+Z tt−T
+
+(τ − t + T )C(τ )⊤C(τ )d τ ⪰ 0. (12) Defining k1 and k2 as in (5), P(t) is bounded by 
+
+k1 ≤ ∥ P(t)∥ ≤ k2 corresponding to (9), completing the proof. 2
+
+We now establish a key differential inequality relating (9), (10), and the nominal stabilizing term in (7). 
+
+Lemma 7. Let the conditions of Theorem 3 hold. Then, for V ( ˜θ, t ) and P(t) defined in (9)–(10), the inequality ˜θ⊤ ˙P(t) ˜θ − 2γ ˜θ⊤P(t)C(t)⊤C(t) ˜θ ≤ − m
+
+2 ∥ ˜θ∥2 (13) holds for all t ≥ 0, and all ˜θ ∈ Rn.
+
+Proof. Let, 
+
+ρ(t) := ˜θ⊤ ˙P(t) ˜θ − 2γ ˜θ⊤P(t)C(t)⊤C(t) ˜θ.
+
+Differentiate P(t) to obtain ˙P(t) = T C(t)⊤C(t) −
+
+Z tt−T
+
+C(τ )⊤C(τ ) d τ. 
+
+Replacing in ρ(t): 
+
+ρ(t) = ˜θ⊤
+
+
+
+T C(t)⊤C(t) −
+
+Z tt−T
+
+C(τ )⊤C(τ ) d τ
+
+
+
+˜θ
+
+− 2γ ˜θ⊤P(t)C(t)⊤C(t) ˜θ
+
+= ˜θ⊤
+
+
+
+−
+
+Z tt−T
+
+C(τ )⊤C(τ ) d τ
+
++ ( T In − 2γP(t)) C(t)⊤C(t)
+
+
+
+˜θ.
+
+From the second term, we have 
+
+T In − 2γP(t) = T In − 2γ
+
+ 12γ
+
+ 2β2
+
+m + T
+
+
+
+In
+
++
+
+Z tt−T
+
+(τ − t + T ) C(τ )⊤C(τ ) d τ
+
+
+
+= − 2β2
+
+m In − 2γ
+
+Z tt−T
+
+(τ − t + T ) C(τ )⊤C(τ ) d τ. 
+
+Substituting the expression above in ρ(t) yields 
+
+ρ(t) = ˜θ⊤
+
+
+
+−
+
+Z tt−T
+
+C(τ )⊤C(τ ) d τ −
+
+ 2β2
+
+m In
+
++ 2 γ
+
+Z tt−T
+
+(τ − t + T ) C(τ )⊤C(τ ) d τ
+
+
+
+C(t)⊤C(t)
+
+
+
+˜θ.
+
+Using the upper bound of the integral, described in (12), and the bound from Assumption 2, 
+
+ρ(t) ≤ − m∥ ˜θ∥2 − 2β2
+
+m ∥C(t) ˜θ∥2 + 2 γ
+
+ T 2b3
+
+2
+
+
+
+∥ ˜θ∥ ∥ C(t) ˜θ∥.
+
+Applying Young’s inequality, 
+
+∥ ˜θ∥ ∥ C(t) ˜θ∥ ≤ ∥ ˜θ∥2
+
+2ε + ε
+
+2 ∥C(t) ˜θ∥2,
+
+which results in 
+
+ρ(t) ≤
+
+ γT 2b3
+
+2ε − m
+
+
+
+∥ ˜θ∥2 +
+
+ γT 2b3ε
+
+2 − 2β2
+
+m
+
+
+
+∥C(t) ˜θ∥2.
+
+Choosing ε = 2βm with β = γT 2b3 
+
+> 2
+
+, we reach ρ(t) ≤− m 
+
+> 2
+
+∥ ˜θ∥2, completing the proof. 2
+
+4.1 Proof of Theorem 3
+
+First note that condition (3) ensures that the trajectory 
+
+θ(t) from (1c) exists for all t ≥ 0. Lemma 4 shows that the estimation error ˜θ(t) = ˆθ(t) − θ satisfies the perturbed dynamics (7), where the perturbation ∆(t) is defined in (8). Consider now the Lyapunov function V ( ˜θ, t ) defined in (9), with P(t) given by (10). Applying the product rule gives ˙V ( ˜θ(t), t ) = ˜θ(t)⊤ ˙P(t) ˜θ(t) + 2 ˜θ(t)⊤P(t) ˙˜θ(t).
+
+Using (7) in the second term yields ˙V ( ˜θ(t), t ) = ˜θ(t)⊤ ˙P(t) ˜θ(t) − 2γ ˜θ(t)⊤P(t)C(t)⊤C(t) ˜θ(t)+ 2 γ ˜θ(t)⊤P(t)∆(t) ˜θ(t).
+
+The first two terms exactly match the combination ap-pearing in Lemma 7, implying ˙V ( ˜θ(t), t ) ≤ − m
+
+2 ∥ ˜θ(t)∥2 + 2 γ ˜θ(t)⊤P(t)∆(t) ˜θ(t).
+
+Using the bound in Lemma 5 together with the upper bound in (11) from Lemma 6, we obtain 2γ ˜θ(t)⊤P(t)∆(t) ˜θ(t) ≤ 2γ ∥P(t)∥∥ ∆(t)∥∥ ˜θ(t)∥2
+
+≤ 2γk 2N ∆∥ ˜θ(t)∥2.
+
+Hence, ˙V ( ˜θ(t), t ) ≤ − 
+
+ m
+
+2 − 2γk 2N ∆
+
+
+
+∥ ˜θ(t)∥2 = −k2α∥ ˜θ(t)∥2,
+
+with 
+
+α = 1
+
+k2
+
+ m
+
+2 − 2γk 2N ∆
+
+
+
+,where condition α > 0 is ensured by the design condition on ∆ i in Theorem 3. Moreover, applying Lemma 6 again leads to: ˙V ( ˜θ(t), t ) ≤ − α V ( ˜θ(t), t ), ∀ t ≥ 0.
+
+By the standard comparison lemma and a final application of Lemma 6, this implies 
+
+k1∥ ˜θ(t)∥2 ≤ V ( ˜θ(t), t ) ≤ V ( ˜θ(0) , 0) exp( −αt ), ∀ t ≥ 0,
+
+obtaining global exponential decay of the estimation error ˜θ(t) towards the origin. Hence, the equilibrium ˜θ = 0
+
+of the estimation error dynamics is globally exponentially stable, completing the proof. 5. NUMERICAL EXAMPLE As an illustrative example, consider a network with N = 3 sensors and one estimator. The unknown parameter vector 
+
+θ ∈ Rn with n = 5 is drawn from a uniform distribution on [ −10 , 10] n. For each sensor i, the regressor matrix 
+
+Ci(t) ∈ Rpi×n, with pi = 2, has entries of the form 
+
+A + B sin( ωt ) + C cos( ωt ), where ω, A, B, C are sampled from uniform distributions over [0 , 3]. From simulations, we obtain T = 5, b = 6 .82, and m = 19, which satisfy Assumption 2. For simplicity, we set ∆ i = ∆ for all sensors in the experiments where ∆ := max   
+
+> i∈{ 1,...,N }
+
+∆i.
+
+Furthermore, we set γ = 0 .1. The resulting trajectories for this scenario are shown in Figure 2. Each component of the estimation vector ˆθ(t) ap-proaches the true parameter vector θ, and the estimation error converges to zero. This convergence occurs despite the estimator receiving measurements only at discrete event times, illustrated in the bottom panel of the figure, where sensors trigger at different rates according to their local dynamics. For this example we set ∆ = 2 .8. Next, we analyze the behavior of the algorithm as ∆ varies. Figure 3 shows that the number of triggering events decreases significantly as ∆ increases, as expected. Across all tested values, the estimates still converge to the true parameter vector. Convergence times, computed as inf {t ≥ 0 : ∥ ˆθ(t) − θ∥ ≤ 0.5},
+
+remain finite and grow with ∆, illustrating the tradeoff between convergence speed and communication effort. While larger values of ∆ were also tested, the design condition in (6) guaranteeing exponential stability requires ∆ ≤ 3.2 × 10 −4. ∆ ≤ 1.012 × 10 −4. This highlights the conservativeness of the theoretical bound. In practice, the estimator remains stable and convergent for much larger triggering thresholds. These observations indicate that a less conservative analysis is needed and will be pursued in future work. 6. CONCLUSION This work introduced an event-triggered gradient estima-tor for sensor fusion, based on a regressor-driven triggering rule that does not require local evaluation of parameter estimates. We established explicit conditions on the esti-mator gain and triggering thresholds that guarantee global exponential convergence under persistent excitation, and 0 1 2 3 4 5 6                         
+
+> Time
+> −5
+> 0
+> 5
+> 10
+> Estimation error
+> ˜θ1˜θ2˜θ3˜θ4˜θ5
+> 0123456
+> Time
+> Sensor trigger events
+> τ1
+> kτ2
+> kτ3
+> k
+> 0123456
+> Time
+> −10
+> −5
+> 0
+> 5
+> Estimated parameters
+> ˆθ1ˆθ2ˆθ3ˆθ4ˆθ5
+
+Fig. 2. The estimated parameters (top) converge to the actual values, which is verified by the estimation error (middle) converging to zero. Individual event-triggering instants for each sensor are shown using 
+
+γ = 0 .1 and ∆ = 2 .8 (bottom). 0.0 2.5 5.0 7.5 10 .0 12 .5 15 .0 17 .5 20 .0        
+
+> ∆
+> 0
+> 2000
+> 4000
+> 6000
+> Total number of events
+> 0.02.55.07.510 .012 .515 .017 .520 .0
+> ∆
+> 0
+> 20
+> 40
+> 60
+> Convergence time
+
+Fig. 3. Total number of events (top) and convergence time (bottom) with fixed γ = 0 .1 and ∆ ∈ [0 , 20]. The higher the threshold, the lower the total number of events sent (top) and, consequently, the longer the convergence time (bottom). derived a sufficient condition on the regressor dynam-ics ensuring a minimum inter-event time. The resulting scheme removes the need for continuous communication while retaining strong stability guarantees. Simulations show a communication–performance tradeoff and demon-strated that significant reductions in transmissions can be achieved without compromising convergence. As future work, we will investigate less conservative conditions for the triggering thresholds to narrow the gap between the theoretical guarantees and the behavior observed in prac-tice. REFERENCES Anderson, B. (1977). Exponential stability of linear equa-tions arising in adaptive identification. IEEE Transac-tions on Automatic Control , 22(1), 83–88. Diao, J.D., Guo, J., and Sun, C.Y. (2018). Event-triggered identification of fir systems with binary-valued output observations. Automatica , 98, 95–102. Geng, X. and Zhao, W. (2025). Distributed System Iden-tification for Linear Stochastic Systems Under an Adap-tive Event-Triggered Scheme. International Journal of Adaptive Control and Signal Processing , 39(3), 471–488. Golovan, A. and Matasov, A. (1994). The Kalman-Bucy filter in the guaranteed estimation problem. IEEE Transactions on Automatic Control , 39(6), 1282–1286. Ioannou, P.A. and Sun, J. (1996). Robust adaptive control ,volume 1. PTR Prentice-Hall Upper Saddle River, NJ. Kalman, R.E. (1960). A new approach to linear filtering and prediction problems. Journal of Basic Engineering ,82(1), 35–45. Koci´ c, J., Joviˇ ci´ c, N., and Drndarevi´ c, V. (2018). Sensors and sensor fusion in autonomous vehicles. In 2018 26th Telecommunications Forum (TELFOR) , 420–425. Maybeck, P.S. (1982). Stochastic models, estimation, and control , volume 3. Academic press. Miskowicz, M. (2014). Event-based sampling strategies in networked control systems. IEEE International Work-shop on Factory Communication Systems - Proceedings, WFCS .Olfati-Saber, R., Fax, J.A., and Murray, R.M. (2007). Consensus and cooperation in networked multi-agent systems. Proceedings of the IEEE , 95(1), 215–233. Perez-Salesa, I., Aldana-L´ opez, R., and Sag¨ u´ es, C. (2025). Bounding Uncertainty in State Estimation Under Dy-namic Event-Triggered Communication. IEEE Trans-actions on Systems, Man, and Cybernetics: Systems ,55(1), 209–220. Rueda-Escobedo, J.G. and Moreno, J.A. (2021). Strong lyapunov functions for two classical problems in adap-tive control. Automatica , 124, 109250. Sasiadek, J. (2002). Sensor fusion. Annual Reviews in Control , 26(2), 203–228. Sastry, S. and Bodson, M. (2011). Adaptive control: stabil-ity, convergence and robustness . Courier Corporation. Shen, H., Wen, G., Lv, Y., and Zhou, J. (2024). A Stochas-tic Event-Triggered Robust Unscented Kalman Filter-Based USV Parameter Estimation. IEEE Transactions on Industrial Electronics , 71(9), 11272–11282.

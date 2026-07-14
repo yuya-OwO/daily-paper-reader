@@ -1,0 +1,1230 @@
+Title: Implicit Neural Networks as Static Controllers: Certificates and Performance Separation
+
+URL Source: https://arxiv.org/pdf/2607.11122v1
+
+Published Time: Tue, 14 Jul 2026 02:36:25 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+> 1
+
+# Implicit Neural Networks as Static Controllers: Certificates and Performance Separation 
+
+Giuseppe C. Calafiore and Laurent El Ghaoui 
+
+Abstract —Implicit neural controllers (INCs) are static feed-back laws that are evaluated through an algebraic fixed point equation; they include as special cases neural network controllers. We propose a so-called implicit representation of neural networks as a key enabling device that exposes the controller as a trainable linear interconnection closed through a known static activation map, thereby making well-posedness and Lyapunov/IQC anal-ysis mathematically easy to handle. For finite-dimensional LTI plants, we first develop a rigorous analysis theory for a given INC, including Perron–Frobenius and norm conditions for well posedness, LMI/IQC certificates for exponential stability, and LMIs for discounted infinite-horizon quadratic performance. We then formulate synthesis as a certification-compatible heuristic search: training is carried out under explicit well-posedness constraints, implicit-differentiation formulas provide gradients, and the resulting controller is accepted only after independent post-training LMIs or regional admissibility checks are feasible. Finally, we establish constrained-control separation results: for a specific scalar unstable plant with hard actuator bounds, an INC achieves a strictly smaller discounted infinite-horizon cost than any admissible finite-order dynamic linear controller. Additional results cover quadratic state-input costs, comparison with linear static output feedback, and computable upper/lower-bound certificates. Numerical examples illustrate the mechanism and the resulting certified performance. 
+
+Index Terms —Neural network control, implicit models, stabil-ity, LTI systems, ReLU networks, constrained control, output feedback, linear matrix inequalities, integral quadratic con-straints. 
+
+I. I NTRODUCTION 
+
+# USING neural networks as controllers for dynamical sys-tems has a long history. However, so far, providing explicit stability and performance guarantees for neural control remains a challenge. A feedback law obtained by simulation or automatic differentiation is not easy to analyze mathemat-ically; this gap is the main obstacle addressed in this paper. The difficulty is partly due to how neural networks are represented and parametrized. The standard layered notation for neural networks is ideal for implementation, but it does not easily lend itself to mathematical analysis. For feedback control synthesis, this is a serious limitation; therefore, a representation that simplifies the notation is the required math-ematical entry point for certification-based neural controller synthesis. A key message of the present paper is that implicit neural models, introduced in [1], provide such a mathematically convenient representation of neural networks. A control law that uses such a model will be termed an implicit neural controller (INC). Rather than describing the neural map as a sequence of layers, an implicit model of a neural network defines a "hidden feature vector" as the solution of a fixed-point equation. The model maps an input v to an output z via the following equations: 
+
+η = ϕ(Aη + Bv ), (1a) 
+
+z = Cη + Dv, (1b) where v is an external input, η is the "hidden feature vector," and ϕ is a nonlinear "activation" vector-valued function such as a sigmoid, and matrices and vectors A, B, C, D contain the controller parameters. Note that the "hidden" vector η
+
+is only implicitly defined via a fixed-point equation. Perhaps surprisingly, the formalism contains standard feedforward deep networks as special cases, including convolutional, residual nets, LSTM, transformer and other architectures, see [1]. It also permits much more general network structures that have loops in the inference graph. The price of this additional modeling freedom is twofold. First, we need to guarantee that the solution to the fixed point equation exists and is unique, which will impose constraints on the network parameters. Second, the training problem is more complex, as gradient computation cannot be done via a simple backpropagation. A control theorist will immediately observe that we recover the familiar state-space models of LTI systems, upon replacing the activation function ϕ by the integration operator in eq. (1), see Figure 1. We also recover the classical models of uncertain systems used in robust control, when ϕ is replaced by an uncertainty block. This paper builds on this similarity to develop analysis and controller synthesis results for LTI systems with constraints. The paper is organized around three questions. First, given an implicit neural controller, can we certify that it is well posed, stabilizing, and performant for the given plant? Second, how can one design such a controller via a training algorithm? Third, can one prove that a simple neural static feedback law may provide a constrained-control advantage over linear feedback? 
+
+A. Contributions 
+
+Our main message is that the implicit representation turns a static neural controller into a certificate-ready feedback interconnection, and that actuator constraints create settings in which neural feedback has a provable advantage over every admissible finite-order dynamic linear controller. The main contributions are as follows. 1) Implicit state-space representation and analysis. 
+
+Equipped with a static neural feedback formulated in the fixed-point form (1), we derive Perron–Frobenius and arXiv:2607.11122v1 [eess.SY] 13 Jul 2026 2A BC D
+
+## φξ η
+
+## vz(v)) )      
+
+> Fig. 1. State-space models for LTI systems and implicit models representa-tions of neural networks use the same structural idea: a linear interconnection is closed through a block ϕ. In an LTI system the closing block ϕis an integral or a unit delay operator, whereas in an implicit model ϕis a static activation map. This similarity is what makes Lyapunov/IQC analysis for neural control possible.
+
+norm-based well-posedness tests, Lipschitz bounds, and LMI/IQC certificates for exponential stability and dis-counted infinite-horizon quadratic performance. These cer-tificates are first stated for the origin and zero biases. We then give an incremental version around an arbitrary equilibrium, thereby covering biased ReLU and saturation realizations. 2) Certification-compatible training algorithm. We provide a nonconvex, heuristic training algorithm in which pro-jected updates preserve well-posedness, implicit differenti-ation supplies gradients through a fixed point mechanism, and a train–certify–retrain gate accepts a controller only after a post-training LMI or independent regional check succeeds. 3) Comparison with linear controllers. We prove strict long-run constrained separation from all finite-order dynamic linear controllers for a scalar unstable plant, both for dis-counted state cost and for a range of quadratic state-input costs. We also prove separation from linear static output feedback, explain why no strict dominance statement can hold against arbitrary nonlinear static output feedback, and give computable upper/lower-bound certificates for general LTI comparisons. 
+
+B. Related Work 
+
+Early neuro-control work studied neural identifiers, adaptive neural controllers, and neural approximations of nonlinear feedback laws for systems whose dynamics are hard to model exactly [2]–[4]. More recent surveys and tutorials emphasize that automatic differentiation and modern machine-learning software make both discrete-time and continuous-time neural controllers easier to optimize, including neural ODE con-trollers, actor-only model-based control, and comparisons with MPC [5]. Deep reinforcement learning provides another broad route to neural feedback design, especially when accurate differentiable models are unavailable, but certification remains difficult for learned policies [6], [7]. A second line of work uses neural networks inside optimiza-tion and predictive-control architectures. Neural-network MPC dates back to early model-predictive schemes with neural plant models [8], [9], and recent differentiable-control layers include OptNet and differentiable MPC [10], [11]. Neural ODEs and related differentiable dynamical models make it possible to learn or optimize through continuous-time dynamics [12], while sparse identification and physics-informed or hybrid models have been used to support MPC in low-data regimes [13]. These methods are primarily design tools; the present paper focuses on a complementary question, namely what can be certified once a neural feedback law has been fixed. The implicit representation used here comes from implicit deep learning, where prediction rules are written as fixed-point equations and analyzed for well-posedness, robustness, sparsity, and trainability, see [1]. It is also related to deep equilibrium models, differentiable optimization layers, and other implicit layers in which the forward pass is defined as the solution of an equation or an optimization problem [10], [14]. Our contribution is to use this representation as a control-theoretic object: the neural controller is a linear interconnection closed through a known static nonlinearity. The certification tools are rooted in absolute stability, Lyapunov theory, the S-procedure, linear matrix inequalities, and integral quadratic constraints [15]–[18]. large modern literature applies convex relaxations, quadratic constraints, and semidefinite programming to verify neural networks and neural-network-controlled systems [19], [20]. Closest in spirit are quadratic-constraint certificates for neural-network controllers [21] and dissipativity-constrained neural-controller synthesis [22]. Our approach follows the same Lyapunov/IQC philosophy, but it exploits the implicit controller form directly: the activation appears as an explicit sector-bounded block, while well-posedness of the hidden algebraic loop is certified separately. Relative to this literature, the novelty is representation-centered. The controller is written in a realization form that exposes the hidden algebraic loop, gives a separate well-posedness test, permits hidden feedback during inference, and interfaces directly with plant-level Lyapunov certificates. The constrained separation theorem is a further analytical contribution: it identifies a hard-input mechanism by which saturated neural feedback can outperform globally admissible linear feedback. Finally, the separation results are connected to constrained linear control, invariant-set methods, and explicit MPC [23]– [26]. Explicit MPC shows that constrained linear-quadratic problems naturally generate continuous piecewise-affine feed-back laws. The present paper does not try to approximate MPC; instead, it isolates a simple analytical mechanism by which a saturated ReLU/INC law can be certified to outper-form globally admissible linear feedback. 
+
+C. Organization 
+
+Section II presents the implicit representation as a state-space language for neural controllers. Section III specializes it to the plant–INC interconnection. Section IV contains the 3
+
+first technical core of the paper, namely the analysis of a given INC: well-posedness, stability, and performance. Section V describes a certification-compatible training framework. Sec-tion VI contains the second technical core, namely separation and comparison results with linear controllers. Section VII gives numerical examples, and the final section concludes with limitations and open questions. 
+
+D. Notation 
+
+For a matrix M , |M | denotes componentwise absolute value and ∥M ∥∞ = max i
+
+P 
+
+> j
+
+|Mij |. If M ≥ 0, λpf (M ) is its Perron–Frobenius eigenvalue. The notation P ≻ 0 means that 
+
+P is symmetric positive definite, and He( Y ) = Y + Y ⊤. The ReLU is σ(r) = max {0, r }, and the leaky ReLU with negative slope ℓ ∈ [0 , 1] is σℓ(r) = max {r, ℓr }. The saturation is 
+
+sat( r) = max {− 1, min {r, 1}} . For Q ⪰ 0, ∥x∥2 
+
+> Q
+
+= x⊤Qx .II. I MPLICIT NEURAL CONTROLLERS 
+
+The implicit representation (1) has three ingredients: a linear interconnection parametrized by matrices; a fixed nonlinear map ϕ, and a hidden computational variable η. This structure is the key feature that makes the model useful for control. The model’s matrices are the trainable part; the activation is known; and the fixed-point equation exposes the exact algebraic loop that must be well posed before the map can be used as a feedback-control device. Ordinary feedforward deep neural networks are special cases of our setup. For a layered network hℓ+1 = ϕℓ(Wℓhℓ),one stacks the layer activations into η. The resulting matrix 
+
+W is strictly block triangular, so the fixed-point equation can be solved by backward substitution, which is just the usual forward pass. Hence feedforward architectures are implicit models with a nilpotent hidden interconnection. Allowing a more general matrix W removes the artificial requirement that hidden features be arranged in layers. The resulting model can contain loops in its inference graph, provided the fixed point remains unique. This last proviso is essential: in contrast with a feedforward network, an implicit neural model may have no fixed point or multiple fixed points for the same input. Well-posedness is therefore the neural analogue of requiring that an algebraic feedback interconnection define a unique input-output map. The Perron–Frobenius condition used below is a sufficient test that guarantees that the fixed point exists, is unique, and can be computed via fixed-point iteration. The same representation also explains why sector and IQC tools enter naturally. For ReLU, leaky ReLU, saturated-linear, and related activations, the activation input-output pair 
+
+(z, ϕ (z)) , equivalently (z, η ) on the graph η = ϕ(z), satisfies pointwise quadratic inequalities. Once the controller is written as a linear interconnection plus ϕ, these inequalities become static IQCs for the closed-loop plant-controller system. The LMI conditions derived later are therefore the standard Lya-punov/IQC mechanism applied to an implicit neural controller. In the remainder of the paper, (1) is used with the plant measurement as input and the actuator signal as output. This x k +1 = Ap x k + B p u ky k = Cp x kx k                             
+
+> ηk=φ(Wηk+Uy k+b)
+> uk=Ky k+Vηk+dyk
+> ηkukk,ηk
+> Implicit Neural Controller (INC) dynamic state Plant hidden fixed-point equation readout at each time is solved algebraically
+> Fig. 2. Feedback interconnection of the LTI plant (2) and the INC (4). Observe that the hidden variable ηkis not a dynamic controller state; it is the solution of a static fixed-point equation at time k.
+
+specialization gives a clean setting in which the representa-tional issue, the well-posedness issue, and the constrained-performance advantage can all be stated and proved exactly. III. C LOSED -L OOP SETTING : P LANT AND INC INTERCONNECTION 
+
+We now instantiate the representation of Section II as a static feedback law for an LTI plant. Consider the discrete-time LTI plant 
+
+xk+1 = Apxk + Bpuk, yk = Cpxk, (2) where xk ∈ Rn, uk ∈ Rm, and yk ∈ Rp. The full-state case is obtained by setting Cp = I. We also consider the continuous-time counterpart 
+
+˙x = Apx + Bpu, y = Cpx. (3) The static implicit controller is 
+
+ηk = ϕ(W η k + U y k + b), (4a) 
+
+uk = Ky k + V η k + d. (4b) The hidden vector ηk ∈ Rq is recomputed from yk at each time. In Sections IV-B–IV-C, we take b = d = 0 and assume 
+
+ϕ(0) = 0 , so that the origin is a closed-loop equilibrium. Biases and nonzero equilibria are handled by the incremental certificate in Section IV-D; the scalar saturation realization in Appendix A uses biases explicitly. Figure 2 shows the resulting closed-loop interconnection. It also indicates the two roles played by the equations in this section. For analysis, the plant and the INC matrices are fixed and one asks whether the interconnection is well posed, stable, and performant. During training, the plant is fixed and the INC matrices are varied numerically; after training, however, the resulting controller is again treated as fixed and must pass the independent certificates. 
+
+Assumption 1 (Componentwise nonexpansive activation) . The activation ϕ : Rq → Rq acts componentwise and satisfies 
+
+|ϕ(r) − ϕ(s)| ≤ | r − s|, ∀r, s ∈ Rq , (5) 
+
+with componentwise absolute values and inequalities. 
+
+ReLU, leaky ReLU with slope in [0 , 1] , tanh, and saturated-linear activations satisfy Assumption 1. The logistic sigmoid is nonexpansive after scaling but is not origin preserving unless 4
+
+it is centered; such biased or nonzero-equilibrium uses are covered by the incremental condition below. 
+
+Assumption 2 (Static sector condition) . The activation satis-fies ϕ(0) = 0 . There exist diagonal matrices 
+
+D0 = diag( mi), D1 = diag( mi),
+
+0 ≤ mi ≤ mi ≤ 1. (6) 
+
+such that, for every component, 
+
+ ϕi(zi) − mizi
+
+  mizi − ϕi(zi) ≥ 0, i = 1 , . . . , q. (7) Assumption 2 is the componentwise sector [D0, D 1]. The special case D0 = 0 , D1 = I is the usual sector [0 , 1] used for ReLU and saturation. A leaky ReLU with negative slope 
+
+ℓ satisfies it with D0 = ℓI and D1 = I.
+
+Assumption 3 (Incremental sector condition) . There exist the same diagonal matrices D0, D 1 as in Assumption 2 such that, for all r, s ∈ Rq ,
+
+ ϕi(ri) − ϕi(si) − mi(ri − si)
+
+×  mi(ri − si) − ϕi(ri) + ϕi(si) ≥ 0, (8) 
+
+for i = 1 , . . . , q .
+
+The incremental condition holds for componentwise slope-restricted nonlinearities. It is the version needed when biases are present or when the certified equilibrium is not the origin. IV. A NALYSIS OF A GIVEN INC The first key issue is analysis. Once the plant and controller matrices are fixed, the controller must define a unique static map, and the closed loop must admit verifiable stability and performance guarantees. This section treats these three questions in order. 
+
+A. Well-Posedness of the Controller Map 
+
+The equation η = ϕ(W η + U y + b) must define a unique 
+
+η for each measurement. The next theorem is the controller version of the Perron–Frobenius fixed-point test for implicit models. 
+
+Definition 1 (Well-posed implicit controller) . The matrix W
+
+is well posed for ϕ if, for every c ∈ Rq , the equation 
+
+η = ϕ(W η + c) (9) 
+
+has a unique solution. 
+
+Theorem 1 (Perron–Frobenius well-posedness) . Suppose As-sumption 1 holds. If 
+
+λpf (|W |) < 1, (10) 
+
+then the fixed-point equation in (4a) has a unique solution for every y and every bias b. Moreover, for the corresponding hidden map η(y),
+
+|η(y1) − η(y2)| ≤ (I − | W |)−1|U | | y1 − y2|. (11) 
+
+Consequently, the controller map π(y) = Ky + V η (y) + d is globally Lipschitz and 
+
+|π(y1)−π(y2)| ≤  |K| + |V |(I − | W |)−1|U | |y1−y2|. (12) 
+
+Proof. For fixed y, set c = U y + b. By Assumption 1, 
+
+|ϕ(W η 1 + c) − ϕ(W η 2 + c)| ≤ | W | | η1 − η2|.
+
+Since λpf (|W |) < 1, the map is a contraction in a suitable weighted infinity norm. Hence the fixed point exists and is unique. For two measurements, subtracting the two fixed-point equations gives 
+
+|η(y1) − η(y2)| ≤ | W | | η(y1) − η(y2)| + |U | | y1 − y2|.
+
+The matrix (I − | W |)−1 = P∞ 
+
+> j=0
+
+|W |j is componentwise nonnegative, which proves (11). The output bound follows immediately from (4b). 
+
+Remark 1 (Convex sufficient condition) . Since λpf (|W |) ≤∥W ∥∞, the row-sum constraint 
+
+∥W ∥∞ ≤ κ < 1 (13) 
+
+is a convex sufficient condition for well-posedness. This condi-tion is particularly convenient in projected-gradient training. 
+
+Remark 2 (Feedforward networks as implicit controllers) .
+
+Any feedforward ReLU controller can be written as (4) : stack the layer activations into η, and let W be strictly block triangular. Then λpf (|W |) = 0, so the controller is well posed. Thus the implicit class contains standard static ReLU controllers and extends them by allowing well-posed hidden feedback. B. Stability Certificates 
+
+We now set b = d = 0 . Define the stacked variable 
+
+s =
+
+xη
+
+
+
+, X = In 0 , H = 0 Iq
+
+ . (14) Then x = Xs , η = Hs , and 
+
+z = W η + U C px = Zs, Z = U C p W  . (15) The discrete-time closed-loop state update is 
+
+x+ = F s, F = Ap + BpKC p BpV  , (16) and the control is 
+
+u = Gs, G = KC p V  . (17) For a diagonal multiplier Λ ⪰ 0, define 
+
+MΛ = − 2Z⊤D0ΛD1Z + He  H⊤Λ( D0 + D1)Z
+
+− 2H⊤ΛH. (18) For every s satisfying η = ϕ(z), Assumption 2 gives 
+
+s⊤MΛs = 2( η − D0z)⊤Λ( D1z − η) ≥ 0. (19) This is a static IQC for the graph of the activation. Equa-tion (18) reduces to the usual [0 , 1] -sector multiplier when 
+
+D0 = 0 and D1 = I.
+
+Theorem 2 (Discrete-time exponential stability) . Suppose Assumptions 1 and 2 hold and λpf (|W |) < 1. If there exist 
+
+P ≻ 0, a diagonal Λ ⪰ 0, and ρ ∈ [0 , 1) such that 
+
+F ⊤P F − ρ2X⊤P X + MΛ ⪯ 0, (20) 5
+
+then the origin of (2) in feedback with the bias-free controller is globally exponentially stable. More precisely, 
+
+x⊤ 
+
+> k
+
+P x k ≤ ρ2kx⊤ 
+
+> 0
+
+P x 0, k = 0 , 1, 2, . . . . (21) 
+
+Proof. Well-posedness follows from Theorem 1. Let VP (x) = 
+
+x⊤P x . Along the closed-loop graph, 
+
+VP (x+) − ρ2VP (x) = s⊤(F ⊤P F − ρ2X⊤P X )s. 
+
+By (20) and (19), 
+
+VP (x+) − ρ2VP (x) ≤ − s⊤MΛs ≤ 0.
+
+Iteration proves the claim. For continuous time, define 
+
+Fc = Ap + BpKC p BpV  , ˙x = Fcs. (22) 
+
+Theorem 3 (Continuous-time exponential stability) . Suppose Assumptions 1 and 2 hold and λpf (|W |) < 1. If there exist 
+
+P ≻ 0, diagonal Λ ⪰ 0, and α > 0 such that 
+
+He( X⊤P F c) + αX ⊤P X + MΛ ⪯ 0, (23) 
+
+then the origin of (3) in feedback with the bias-free controller is globally exponentially stable and 
+
+x(t)⊤P x (t) ≤ e−αt x(0) ⊤P x (0) . (24) 
+
+Proof. The derivative of VP satisfies ˙VP = s⊤ He( X⊤P F c)s.The result follows from (23), (19), and Gronwall’s inequality. 
+
+Remark 3 (Certification versus design) . For fixed controller matrices and fixed decay rate, (20) and (23) are LMIs in 
+
+(P, Λ) . Joint optimization over controller parameters and Lyapunov variables is nonconvex, as expected for nonlinear controller design. C. Discounted Quadratic Performance 
+
+Let Q ⪰ 0, R ⪰ 0, and β ∈ (0 , 1] . Consider the discounted cost 
+
+Jβ (x0) = 
+
+> ∞
+
+X
+
+> k=0
+
+βk  x⊤ 
+
+> k
+
+Qx k + u⊤ 
+
+> k
+
+Ru k
+
+ . (25) 
+
+Theorem 4 (Discounted performance certificate) . Suppose Assumptions 1 and 2 hold and λpf (|W |) < 1. If there exist 
+
+P ≻ 0 and diagonal Λ ⪰ 0 such that 
+
+βF ⊤P F − X⊤P X + X⊤QX + G⊤RG + MΛ ⪯ 0, (26) 
+
+then every closed-loop trajectory satisfies 
+
+Jβ (x0) ≤ x⊤ 
+
+> 0
+
+P x 0. (27) 
+
+Consequently, if S0 = E[x0x⊤ 
+
+> 0
+
+] is the second-moment matrix of the initial condition, then 
+
+E[Jβ (x0)] ≤ tr( P S 0). (28) 
+
+Equivalently, if x0 has mean μ0 and centered covariance Σ0,the bound is tr( P Σ0) + μ⊤ 
+
+> 0
+
+P μ 0.Proof. For every closed-loop pair (x, η ), (26) and (19) imply 
+
+βV P (x+) − VP (x) + x⊤Qx + u⊤Ru ≤ 0. (29) Multiplying the inequality at time k by βk and summing from 
+
+0 to N gives 
+
+> N
+
+X
+
+> k=0
+
+βk(x⊤ 
+
+> k
+
+Qx k + u⊤ 
+
+> k
+
+Ru k)
+
+≤ VP (x0) − βN +1 VP (xN +1 ) ≤ VP (x0). (30) Letting N → ∞ proves (27). Taking expectations gives the final statement. 
+
+Remark 4 (Use in controller comparison) . Theorem 4 gives an upper bound on the neural controller cost. To prove superiority over a benchmark class, one needs a lower bound on the benchmark cost. Sections VI-A–VI-D provide such lower bounds for dynamic linear and linear static output-feedback controllers under hard input constraints. D. Biases and Incremental Certificates 
+
+Theorems 2–4 were stated for a bias-free origin equilibrium. Practical neural controllers often use biases, and the saturated ReLU realization in Appendix A is one such example. The fol-lowing incremental statement is the corresponding certificate about an arbitrary equilibrium. Let (x⋆, η ⋆, z ⋆, u ⋆) satisfy 
+
+x⋆ = Apx⋆ + Bpu⋆, y⋆ = Cpx⋆, (31a) 
+
+z⋆ = W η ⋆ + U y ⋆ + b, η⋆ = ϕ(z⋆), (31b) 
+
+u⋆ = Ky ⋆ + V η ⋆ + d. (31c) For any trajectory define deviations ˜x = x − x⋆, ˜η = η − η⋆,
+
+˜z = z − z⋆, ˜u = u − u⋆, and ˜s = [˜ x⊤ ˜η⊤]⊤. The same matrices F, G, Z, X, H map deviations: ˜x+ = F ˜s, ˜u = G˜s,and ˜z = Z ˜s.
+
+Theorem 5 (Incremental stability and performance) . Suppose Assumptions 1 and 3 hold and λpf (|W |) < 1. If (20) is feasible, then x⋆ is globally exponentially stable for the biased controller, with x − x⋆ in place of x. If (26) is feasible, then 
+
+> ∞
+
+X
+
+> k=0
+
+βk  ˜x⊤ 
+
+> k
+
+Q˜xk + ˜ u⊤ 
+
+> k
+
+R˜uk
+
+ ≤ ˜x⊤ 
+
+> 0
+
+P ˜x0. (32) 
+
+Proof. The incremental sector condition gives 
+
+2(˜ η − D0 ˜z)⊤Λ( D1 ˜z − ˜η) ≥ 0,
+
+which is exactly ˜s⊤MΛ ˜s ≥ 0. The proofs of Theorems 2 and 4 then apply verbatim to the deviation dynamics. 
+
+Remark 5 (Scope of the global certificates) . The LMIs above are global because the sector bounds are global. This is appropriate for slope-restricted activations and unconstrained inputs. Hard actuator constraints for unstable plants are inherently regional; in that setting the admissible initial set and the input constraint must be verified separately, as in the scalar theorem of Section VI-A or by a regional certificate. 6
+
+V. C ERTIFICATION -C OMPATIBLE TRAINING FRAMEWORK 
+
+The analysis results of Section IV are exact acceptance tests for a fixed controller, but they do not by themselves give a convex design problem. Indeed, the controller matrices enter the closed-loop matrices F, G, Z , while the certificate variables P and Λ enter the LMIs; optimizing all of them jointly is a nonconvex problem. This section therefore de-scribes a heuristic candidate-generation framework: training preserves well-posedness, produces controllers for subsequent certification, and leaves the final guarantee to a post-training test that is independent of the optimizer used to obtain the candidate. 
+
+Problem 1 (Certification-compatible INC training) . Given the plant (Ap, B p, C p), an admissible initial set or distri-bution, and an actuator set U, find INC parameters θ =(W, U, V, K, b, d ) such that: 1) the controller fixed point is well posed for every measure-ment in the design domain; 2) the controller respects the input constraints, either by construction or by an independent verification over the prescribed operating region; 3) the closed loop admits a stability certificate (20) , an incre-mental certificate from Theorem 5, or a regional certificate; 4) the certified bound, or a clearly labeled simulation estimate when no certificate is claimed, is small. A. Simulation objective and well-posedness constraints 
+
+Let μ be a probability distribution on admissible initial conditions. A finite-horizon surrogate for the design objective is 
+
+min  
+
+> θ
+
+JT (θ) := Ex0∼μ
+
+"T −1X
+
+> k=0
+
+ℓ(xk, π θ (Cpxk)) + Vf (xT )
+
+#
+
+s.t. ηk = ϕ(W η k + U y k + b), uk = Ky k + V η k + d, 
+
+∥W ∥∞ ≤ κ < 1.
+
+(33) The same template can be used with a discounted loss when the target certificate is Theorem 4. The constraint ∥W ∥∞ ≤
+
+κ < 1 is not the only possible well-posedness sufficient condition, but it is convex, simple to impose, and directly connected to Theorem 1. 
+
+Proposition 1 (Projected training preserves well-posedness) .
+
+Assume the activation satisfies Assumption 1. If every training update is followed by the row-wise projection 
+
+W ← Πκ(W ), (34a) 
+
+Πκ(W ) := arg min 
+
+∥ ¯W ∥∞≤κ
+
+¯W − W F , κ < 1, (34b) 
+
+then every controller produced during training is well posed. In particular, for every measurement y, the fixed point η =
+
+ϕ(W η + U y + b) is unique. Proof. The projection enforces ∥W ∥∞ ≤ κ < 1. Since 
+
+λpf (|W |) ≤ ∥ W ∥∞, Theorem 1 applies at every iterate. The projection is row separable because ∥W ∥∞ is the maximum row ℓ1-norm. 
+
+B. Differentiating through the implicit controller 
+
+Training (33) requires gradients through the algebraic infer-ence map. The next proposition gives the formulas used in the candidate-generation loop. 
+
+Proposition 2 (Implicit sensitivities and adjoints) . Fix ameasurement y and let η solve η = ϕ(W η + U y + b).Suppose λpf (|W |) < 1 and let Dϕ = diag( δi), where 
+
+δi = ϕ′
+
+> i
+
+(W η + U y + b)i at differentiability points; at ReLU kink points any δi ∈ [0 , 1] gives a valid generalized derivative. Then I − DϕW is nonsingular and 
+
+∂η ∂y = ( I − DϕW )−1DϕU, (35) 
+
+so the local controller Jacobian is 
+
+∂u ∂y = K + V (I − DϕW )−1DϕU. (36) 
+
+Moreover, for a scalar loss ℓ(u), let q = ∇uℓ. Define v as the unique solution of the adjoint fixed-point equation 
+
+v = Dϕ(W ⊤v + V ⊤q). (37) 
+
+Then 
+
+∇y ℓ = K⊤q + U ⊤v, ∇W ℓ = vη ⊤, ∇U ℓ = vy ⊤,
+
+(38a) 
+
+∇bℓ = v, ∇V ℓ = qη ⊤, ∇K ℓ = qy ⊤, ∇dℓ = q. 
+
+(38b) 
+
+Proof. Differentiating η = ϕ(W η + U y + b) gives (I −
+
+DϕW )dη = DϕU dy , which proves (35). Since 0 ⪯
+
+Dϕ ⪯ I componentwise, the nonnegative-matrix monotonicity of the Perron–Frobenius eigenvalue gives λpf (|DϕW |) ≤
+
+λpf (|W |) < 1; hence I − DϕW is nonsingular. Transposing the sensitivity relation yields the reverse-mode equation (37); the adjoint fixed point is unique by the same argument applied to |DϕW ⊤|. The parameter-gradient expressions then follow by writing the differential of u = Ky + V η + d and of the affine argument W η + U y + b.
+
+C. Certificate-aware retraining and the acceptance gate 
+
+After training, the candidate controller is certified by solving the relevant LMI with the controller matrices fixed. If the stability certificate is the target, define 
+
+νstab (θ; P, Λ) = λmax 
+
+ F ⊤P F − ρ2X⊤P X + MΛ
+
+. (39) If the performance certificate is the target, define 
+
+νperf (θ; P, Λ) = λmax 
+
+ βF ⊤P F − X⊤P X + X⊤QX 
+
++ G⊤RG + MΛ
+
+. (40) Feasibility corresponds to making the selected violation non-positive for some P ≻ 0 and diagonal Λ ⪰ 0. If certification fails, one can return to training with a certificate-aware penalty such as 
+
+JT (θ) + γcert max {0, ν perf (θ; P, Λ) }, (41) where (P, Λ) may be periodically recomputed by solving the SDP for the current controller. This remains an heuristic, but 7
+
+it makes the optimization aware of the certificate that will ultimately be required. 
+
+Proposition 3 (Certification gate) . Suppose the training loop returns parameters θ satisfying λpf (|W |) < 1. If (20) is feasible for the resulting closed loop, then the returned INC is well posed and exponentially stabilizing. If (26) is feasible, then it is well posed and satisfies the discounted-performance bound (27) . These guarantees are independent of the optimizer used to obtain θ.Proof. Well-posedness follows from Theorem 1. The stability and performance conclusions are exactly Theorems 2 and 4, applied after training with the matrices fixed. 
+
+Algorithm 1 (certification-compatible train–certify– retrain). 
+
+1) Choose an INC architecture, a well-posedness budget κ < 
+
+1, and, if hard input limits must hold globally, a saturated readout or another constraint-preserving parameterization. 2) Train by simulation using (33), differentiating through the fixed point using Proposition 2, and projecting W as in Proposition 1. 3) With the trained controller fixed, solve the stability, incre-mental, or performance LMI. 4) If certification fails, retrain with a penalty such as (41), tighten κ, change the architecture, or initialize from a certified linear controller. 5) Accept the controller only when Proposition 3 or an independent regional certificate applies. 
+
+D. Hard input constraints and regional checks 
+
+Sample-wise clipping or projection of controls during train-ing is useful as a heuristic, but it is not by itself a proof that 
+
+u(x) ∈ U for all states in a continuum. In this paper, hard input constraints are certified in one of two ways. First, the readout can impose the constraint by construction, for example through a componentwise saturation. Second, on a compact operating set X , one may independently verify 
+
+πθ (Cpx) ∈ U , Apx + Bpπθ (Cpx) ∈ X , ∀x ∈ X .
+
+(42) For feedforward ReLU or saturated piecewise-affine con-trollers, (42) can be checked exactly by activation-region enumeration when the dimension is modest, or conservatively by mixed-integer, interval, or polyhedral bounds. For implicit controllers with W̸ = 0 , the same verification must include the fixed-point equation; Theorem 1 supplies uniqueness, but not by itself input admissibility. The training framework is certificate-compatible in the sense that learning supplies candidate controllers, while the implicit representation supplies well-posedness, differentiation, and post-training certificate machinery. When no LMI or regional check is supplied, the result should be described as simulation evidence rather than as a certificate. VI. S EPARATION AND COMPARISON RESULTS 
+
+We now turn from analysis and training to comparison. The results in this section show that the INC class, under actuator constraints, can achieve a provable performance separation from linear controllers. 
+
+A. Long-Run Separation from Dynamic Linear Control 
+
+We now prove that a static ReLU controller can outperform every finite-order dynamic linear controller in an infinite-horizon performance index. The proof is by construction: we exhibit a scalar constrained plant, derive a first-move lower bound for all admissible dynamic linear controllers, and compute the exact cost of a saturated two-ReLU law. Consider the system 
+
+xk+1 = 32 xk + uk, |uk| ≤ 1, x0 ∼ Unif[ −1, 1] .
+
+(43) Let Cdyn be the class of finite-dimensional LTI dynamic controllers 
+
+ξk+1 = Acξk + Bcxk, (44a) 
+
+uk = Ccξk + Dcxk, (44b) with fixed initial controller state ξ0 independent of x0, satis-fying |uk| ≤ 1 for all k ≥ 0 and all x0 ∈ [−1, 1] . At k = 0 ,every such controller has 
+
+u0 = d + κx 0, (45) with |d| + |κ| ≤ 1. Define the discounted state cost 
+
+Jβ (π) = E
+
+> ∞
+
+X
+
+> k=0
+
+βkx2
+
+> k
+
+, β ∈ (0 , 1] . (46) 
+
+Theorem 6 (Infinite-horizon separation from dynamic linear control) . For the system (43) , every controller in Cdyn satisfies 
+
+Jβ ≥ 13 + β
+
+12 . (47) 
+
+The static two-ReLU controller 
+
+u = 1 − σ
+
+ 32 x + 1 
+
+
+
++ σ
+
+ 32 x − 1
+
+
+
+= − sat 
+
+ 32 x
+
+
+
+(48) 
+
+satisfies |u| ≤ 1 and has 
+
+JNN  
+
+> β
+
+= 13 + β
+
+36 . (49) 
+
+Therefore 
+
+JNN  
+
+> β
+
+< inf 
+
+> π∈C dyn
+
+Jβ (π) ∀β ∈ (0 , 1] . (50) 
+
+The certified gap is at least β/ 18 .Proof. For any dynamic linear controller, the first input satis-fies |d| + |κ| ≤ 1. Since x0 is symmetric with variance 1/3,
+
+E[x21] = E
+
+" 32 + κ
+
+
+
+x0 + d
+
+2#
+
+= ( 32 + κ)2
+
+3 + d2. (51) The minimum subject to |d| + |κ| ≤ 1 is attained at d = 0 ,
+
+κ = −1, and equals 1/12 . Since all future terms in (46) are nonnegative, 
+
+Jβ ≥ E[x20] + βE[x21] ≥ 13 + β
+
+12 .8
+
+For (48), x1 = 0 when |x0| ≤ 2/3, and |x1| = 1 .5|x0| − 1
+
+when 2/3 < |x0| ≤ 1. Hence 
+
+E[x21] = 
+
+Z 12/3
+
+(1 .5x − 1) 2 dx = 136 . (52) Moreover, |x1| ≤ 1/2 < 2/3, so the next control action is 
+
+u1 = −1.5x1 and x2 = 0 . Thus all state costs after k = 1 
+
+vanish, proving (49). The strict gap is (1 /3 + β/ 12) − (1 /3 + 
+
+β/ 36) = β/ 18 .
+
+Remark 6 (Why controller memory does not help) . The memory ξk of a dynamic linear controller can affect inputs for k ≥ 1, but its first move is affine in x0. The hard input constraint forces this affine map to have slope at most one in magnitude over [−1, 1] . The ReLU controller uses slope 
+
+−1.5 near the origin and saturates near the boundary. The unavoidable first-step cost lower bound for dynamic linear control cannot be recovered later because the infinite-horizon cost is nonnegative term by term. B. Quadratic input penalty 
+
+The same idea yields a conventional state-input index in-equality. Define 
+
+Jβ,r (π) = E
+
+> ∞
+
+X
+
+> k=0
+
+βk(x2 
+
+> k
+
++ ru 2
+
+> k
+
+), r ≥ 0. (53) 
+
+Theorem 7 (State-input performance separation) . For the plant (43) and β ∈ (0 , 1] , the controller (48) satisfies 
+
+JNN  
+
+> β,r
+
+= 13 + β
+
+36 + r
+
+ 59 + β
+
+16 
+
+
+
+. (54) 
+
+Every admissible finite-dimensional dynamic linear controller satisfies 
+
+Jβ,r ≥ 13 + r
+
+3 + β
+
+12 (55) 
+
+whenever 0 ≤ r ≤ β/ 2. Consequently, the static ReLU con-troller strictly beats every admissible dynamic linear controller whenever 
+
+0 ≤ r < 8β
+
+32 + 9 β . (56) 
+
+For β = 1 , this condition is r < 8/41 .Proof. For a dynamic linear controller, using only the costs at 
+
+k = 0 and the state cost at k = 1 ,
+
+Jβ,r ≥ 13 + E[r(d + κx 0)2] + βE
+
+" 32 + κ
+
+
+
+x0 + d
+
+2#
+
+(57) 
+
+= 13 + ( r + β)d2 + 13 rκ 2 + β
+
+ 32 + κ
+
+2!
+
+. (58) Minimization over |d| + |κ| ≤ 1 gives d = 0 . If r ≤ β/ 2, the constrained minimizer in κ is κ = −1, yielding (55). For the ReLU controller, x2 = 0 . We already have E[x21] = 1/36 . Also, 
+
+E[u20] = 
+
+Z 2/30
+
+(1 .5x)2 dx +
+
+Z 12/3
+
+1 dx = 59 , (59) and, since u1 = −1.5x1,
+
+E[u21] = 94 E[x21] = 116 . (60) This proves (54). The inequality (54) <(55) is equivalent to (56); this threshold is always below β/ 2, so the lower bound applies. 
+
+C. Comparison with Static Output Feedback 
+
+Static output feedback (SOF) can describe different con-troller classes. We distinguish three cases. 
+
+Proposition 4 (No dominance over arbitrary nonlinear SOF) .
+
+Let CnlSOF be the class of all admissible static nonlinear output-feedback laws u = μ(y), and let CINC be the subclass representable by (4) . Then 
+
+CINC ⊆ C nlSOF . (61) 
+
+Consequently, no controller in CINC can be proved strictly superior to the best controller in CnlSOF without imposing additional restrictions on the nonlinear SOF class. Proof. For every well-posed set of matrices in (4), the input 
+
+u is a single-valued function of the current measurement 
+
+y. Hence it is a static nonlinear output-feedback law. The inclusion implies inf μ∈C nlSOF J(μ) ≤ inf π∈C INC J(π) for any common cost and constraints. Thus meaningful strict comparison should be made against a proper subclass. The simplest is linear static output feedback. 
+
+Theorem 8 (Separation from linear static output feedback) .
+
+Consider the scalar plant (43) with measured output y = x.Let the benchmark class be all linear static output-feedback laws u = F y satisfying |F x | ≤ 1 for all |x| ≤ 1. Imposing the same trajectory-wise input admissibility can only restrict this benchmark class, and the minimizing gain identified below is trajectory-wise admissible. Then, for every β ∈ (0 , 1] ,
+
+inf  
+
+> F
+
+E
+
+> ∞
+
+X
+
+> k=0
+
+βkx2 
+
+> k
+
+= 13(1 − β/ 4) . (62) 
+
+The static two-ReLU output-feedback law u = − sat(1 .5y)
+
+has cost 1/3 + β/ 36 , and hence has strictly smaller cost than every admissible linear static output-feedback controller. Proof. The input constraint gives |F | ≤ 1. The closed-loop state is xk = (1 .5 + F )kx0. Therefore, for gains whose discounted series is finite, 
+
+Jβ (F ) = E[x20]1 − β(1 .5 + F )2 . (63) Gains for which the series diverges have infinite cost and cannot improve the infimum. Among the finite-cost gains, the denominator is maximized, and the cost minimized, by minimizing |1.5 + F | over [−1, 1] , which gives F = −1. This gain keeps |xk| ≤ 1 and |uk| ≤ 1 for all x0 ∈ [−1, 1] . This proves (62). The ReLU cost is given by Theorem 6. The gap is 
+
+13(1 − β/ 4) −
+
+ 13 + β
+
+36 
+
+
+
+= β(8 + β)144(1 − β/ 4) > 0. (64) 9
+
+A truly output-feedback version is obtained by embedding the scalar unstable coordinate in a larger system. 
+
+Corollary 1 (An output-feedback embedding) . Consider 
+
+x1,k +1 
+
+x2,k +1 
+
+
+
+=
+
+1.5 00 α
+
+  x1,k 
+
+x2,k 
+
+
+
++
+
+10
+
+
+
+uk, yk = x1,k , (65) 
+
+with |α| < 1. If the performance index contains P 
+
+> k
+
+βkx21,k ,and any term involving x2 is independent of u, then the static implicit output-feedback controller u = − sat(1 .5y) has strictly smaller cost than every admissible linear static output-feedback law u = F y , in the same sense as Theorem 8. D. A General Long-Run Comparison Certificate 
+
+The scalar separation rests on a general principle: a finite-dimensional dynamic linear output-feedback controller has an affine first move in the measured output, whereas static ReLU controllers can implement saturated continuous piecewise-affine policies. This yields a lower bound for the linear class that can be compared with an LMI-certified upper bound for an admissible implicit neural controller. Let X ⊂ Rn be a compact initial set, x0 ∼ μ supported on 
+
+X , y = Cpx, and U = {u : Huu ≤ hu} be a compact input polytope. Consider the state-only discounted cost 
+
+Jβ (π) = E
+
+> ∞
+
+X
+
+> k=0
+
+βkx⊤ 
+
+> k
+
+Qx k, Q ⪰ 0. (66) For a finite-dimensional LTI dynamic output-feedback con-troller with fixed initial controller state, 
+
+ξk+1 = Acξk + Bcyk, uk = Ccξk + Dcyk, (67) the first action has the form 
+
+u0 = Dy Cpx0 + d, (68) where Dy = Dc and d = Ccξ0. If the benchmark is full-state feedback, one sets Cp = I. Alternatively, replacing Dy Cp
+
+by an arbitrary free matrix D only relaxes the lower-bound problem and is conservative in favor of the linear benchmark. Admissibility at the first step requires (Dy , d ) ∈ A y 
+
+> aff
+
+, where 
+
+Ay 
+
+> aff
+
+≜ {(Dy , d ) : Hu(Dy Cpx + d) ≤ hu,
+
+∀x ∈ X } . (69) Define the affine first-move lower bound 
+
+Llin ≜ E[x⊤ 
+
+> 0
+
+Qx 0]+ β min  
+
+> (Dy,d )∈A y
+> aff
+
+E
+
+h
+
+∥Apx0 + Bp(Dy Cpx0 + d)∥2
+
+> Q
+
+i
+
+.
+
+(70) Because all future state costs are nonnegative, every input-admissible dynamic linear output-feedback controller has 
+
+Jβ ≥ Llin .
+
+Theorem 9 (Certified long-run superiority) . Let πNN be a well-posed static implicit neural controller. Assume that it is admissible on the closed-loop trajectories issuing from X ,namely 
+
+HuπNN (Cpxk) ≤ hu, k ≥ 0, x0 ∈ X , (71) 
+
+either by construction or by an independent regional certifi-cate. Suppose Theorem 4, with R = 0 , returns a matrix P ≻ 0
+
+such that 
+
+tr( P S 0) < L lin , (72) 
+
+where S0 = E[x0x⊤ 
+
+> 0
+
+]. Then πNN has strictly smaller expected discounted cost than every admissible finite-dimensional dy-namic linear output-feedback controller in the benchmark class. Proof. By admissibility, πNN belongs to the same constrained comparison problem. By Theorem 4, E[Jβ (πNN )] ≤ tr( P S 0).By construction of Llin , every admissible dynamic linear output-feedback controller has E[Jβ ] ≥ Llin . The strict in-equality (72) proves the claim. 
+
+Remark 7 (Computation) . If X is a polytope with ver-tices vi, then (69) is equivalent to finitely many inequalities 
+
+Hu(Dy Cpvi + d) ≤ hu. The minimization in (70) is then a convex quadratic program for empirical distributions, for distributions represented by moments, and for uniform distri-butions approximated by quadrature or samples. If the relaxed full-state form u0 = Dx 0+d is used, the resulting lower bound is no larger than the output-feedback one and therefore still gives a valid, benchmark-favorable comparison. 
+
+Proposition 5 (Static ReLU representation of PWA policies) .
+
+Every continuous piecewise-affine policy with finitely many regions can be represented exactly by a finite ReLU network. Consequently, it can be represented as a well-posed static implicit neural controller. Proof. Each scalar continuous piecewise-affine function can be expressed as the difference of two convex piecewise-affine functions. Each convex piecewise-affine function is the maximum of finitely many affine functions. The identity 
+
+max {r, s } = r + σ(s − r) (73) shows that finite maxima of affine functions can be represented by ReLU networks. Vector outputs are handled component-wise. A feedforward ReLU network is embedded in (4) by stacking its layer activations into η, yielding a strictly block-triangular matrix W and hence λpf (|W |) = 0 .
+
+E. General Linear Static Output-Feedback Comparison 
+
+For a general LTI plant with output y = Cpx, the implicit output-feedback controller is 
+
+η = ϕ(W η + U y ), u = Ky + V η. (74) The LMI definitions in Sections IV-B–IV-C already include this case through Z = [ U C p W ], F = [ Ap + BpKC p BpV ],and G = [ KC p V ].For a linear static output-feedback controller u = F y =
+
+F C px, the discounted quadratic cost, when the closed-loop matrix AF = Ap + BpF C p is Schur in the discounted sense, is 
+
+Jβ,F (x0) = x⊤ 
+
+> 0
+
+PF x0, (75) where PF solves 
+
+PF = Q + C⊤ 
+
+> p
+
+F ⊤RF C p + βA ⊤ 
+
+> F
+
+PF AF . (76) 10 
+
+Let FSOF be the set of linear static output-feedback gains satisfying the prescribed stability and input constraints. If the implicit neural controller admits the certified upper bound 
+
+tr( PNN S0) from Theorem 4, and if one can compute or lower-bound 
+
+LSOF ≤ inf  
+
+> F∈F SOF
+
+tr( PF S0), (77) then 
+
+tr( PNN S0) < L SOF (78) certifies strict superiority over all gains in FSOF . The scalar theorem of Section VI-C is the closed-form instance of this comparison. VII. N UMERICAL EXAMPLES 
+
+This section reports three reproducible numerical illustra-tions. The first is a fully certified example with a nonzero hidden interconnection W . The second visualizes the analytic scalar separation of Theorem 6. The third is a two-state constrained example; it is useful diagnostically, but the per-formance number for the saturated law is a sampled estimate and is labeled as such. 
+
+A. A certified implicit controller 
+
+Consider the scalar plant 
+
+xk+1 = 1 .2xk + uk, yk = xk, (79) with discounted stage cost x2 
+
+> k
+
++ 0 .05 u2 
+
+> k
+
+and β = 0 .98 . The controller has two hidden units, leaky-ReLU activation ϕ(r) = max {r, 0.5r}, and 
+
+W =
+
+0.3 0.20.2 0.3
+
+
+
+, U =
+
+ 1
+
+−1
+
+
+
+,V = −0.7 0.7 , K = 0 .
+
+(80) Thus λpf (|W |) = ∥W ∥∞ = 0 .5 < 1, so the hidden fixed point is unique. Over x ∈ [−1, 1] , fixed-point iteration from zero reached tolerance 10 −10 in at most 25 iterations. The leaky ReLU satisfies the sector condition with D0 =0.5I, D1 = I. The feasibility problem is two-dimensional in this example when Λ = λI 2 is imposed. A direct scalar search over (P, λ ), followed by a double-precision eigenvalue check of the rounded matrices, gives 
+
+P = 1 .3006 , Λ = 0 .7749 I2,λmax (LMI) = −2.23 × 10 −5. (81) Hence 
+
+Jβ (x0) ≤ 1.3006 x20, E[Jβ ] ≤ 0.4335 (82) for x0 ∼ Unif[ −1, 1] . Table I gives the reproducibility data used for this certificate. No training optimizer is used in this example; it is a feasibility demonstration for the analysis certificate with W̸ = 0 .The exact cost can also be computed analytically. For x > 0,the active slope matrix is D+ = diag(1 , 0.5) , and 
+
+η = ( I − D+W )−1D+U x =
+
+ 1.3043 
+
+−0.4348 
+
+
+
+x. (83)                   
+
+> TABLE I REPRODUCIBILITY DATA FOR THE NONZERO -WCERTIFICATE .
+> quantity value
+> λpf (|W|)0.5
+> fixed-point method Picard iteration from zero fixed-point tolerance 10 −10
+> max. iterations on [−1,1] 25
+> LMI search direct 2-D search; Λ = λI 2
+> reported rounded values P= 1 .3006 , λ = 0 .7749
+> max. eigenvalue after round-ing
+> −2.23 ×10 −5
+
+Thus u = V η = −1.2174 x and x+ = −0.01739 x. For x < 0,the active slope matrix is D− = diag(0 .5, 1) , which yields the same effective gain by symmetry. Therefore 
+
+Jβ (x0) = 1 + 0 .05(1 .2174) 2
+
+1 − 0.98(0 .01739) 2 x20 = 1 .0744 x20. (84) With the same U, V, K but W = 0, the effective gain is 
+
+−1.05 , the closed-loop multiplier is 0.15 , and the exact cost is 
+
+1.0789 x20; the corresponding LMI value is P = 1 .3570 , hence 
+
+E[Jβ ] ≤ 0.4523 . The improvement is modest, however, the point of the example is not to establish a broad performance advantage of implicit hidden feedback, but to demonstrate that the LMI/IQC machinery certifies a truly implicit fixed-point controller, not only feedforward special cases (those with 
+
+W = 0 ). 
+
+B. Scalar separation visualized 
+
+Figure 3 illustrates the mechanism behind Theorem 6. The nonlinear controller uses the linear gain −1.5 near the origin and saturates at the input limits near the edge of the interval. The best admissible linear first move has slope −1. The middle panel shows that the static ReLU controller reaches the origin in at most two steps for the displayed initial conditions, while the linear feedback contracts more slowly. The right panel compares the exact discounted costs: the static ReLU/INC cost remains strictly below both the dynamic-linear lower bound and the best linear static output-feedback cost for every discount factor shown. 
+
+C. Two-state constrained LTI example 
+
+We next consider 
+
+Ap =
+
+1.10 1.00 0 1.02 
+
+
+
+, Bp =
+
+0.20 0.50 
+
+
+
+, (85) with |uk| ≤ 1, x0 ∼ Unif([ −0.8, 0.8] 2), discount β = 0 .98 ,and stage cost x⊤ 
+
+> k
+
+xk + 0 .05 u2
+
+> k
+
+. The nonlinear controller is the saturated discounted-LQR law 
+
+uk = sat( KLQR xk), KLQR = −1.3749 −2.6490  .
+
+(86) This law is a static ReLU controller, hence a special case of the implicit architecture with W = 0 , because 
+
+sat( v) = σ(v + 1) − σ(v − 1) − 1. (87) 11 1 0 1 
+
+> state x
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> input  u
+
+saturating high gain    
+
+> static ReLU/INC
+> linear first move
+> 0510
+> time k
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> state
+
+closed-loop trajectories               
+
+> INC x0= 0.25
+> INC x0= 0.60
+> INC x0= 1.00
+> linear x0= 0.25
+> linear x0= 0.60
+> linear x0= 1.00
+> 0.0 0.5 1.0
+> discount
+> 0.350
+> 0.375
+> 0.400
+> 0.425
+> 0.450
+> expected cost
+
+long-run separation  
+
+> static ReLU/INC
+> dynamic-linear lower bound
+> best linear SOF
+> Fig. 3. Analytic scalar separation. Left: the static ReLU/INC law uses high gain near the origin and saturates at the admissible input limits. Middle: representative closed-loop trajectories. Right: exact discounted costs and lower bounds as functions of the discount factor.
+
+As a linear benchmark, we performed a dense two-variable search over static gains F satisfying 
+
+|F x | ≤ 1, ∀x ∈ [−0.8, 0.8] 2, (88) or equivalently 0.8( |F1| + |F2|) ≤ 1. For each feasible linear gain, the discounted cost was computed exactly by the Lyapunov equation 
+
+PF = I + 0 .05 F ⊤F + β(Ap + BpF )⊤PF (Ap + BpF ), (89) and the expected cost was tr( PF S0), where S0 = (0 .8) 2I/ 3.The best gain found in this dense search over the feasible diamond is 
+
+F ⋆ = −0.3535 −0.8965  , J(F ⋆) = 3 .3472 . (90) Scaling the unconstrained LQR gain just enough to satisfy the same initial-set input bound gives cost 
+
+3.5639 . For the reported linear gain, the numerical check 
+
+max 0≤k≤100 0.8 F (Ap + BpF )k 
+
+> 1
+
+= 1 .0000 is attained at 
+
+k = 0 ; this is a consistency check for the plotted initial-set trajectories, not a proof of global optimality of the search. By Monte Carlo integration with 2 × 10 5 initial states, the saturated static INC law gives 
+
+JINC = 1 .3579 ± 0.0071 , (91) where the interval is two standard errors. The improvement is not due to a larger sampled input: both controllers respect 
+
+|uk| ≤ 1 on the simulated grid shown in Fig. 4. The gain comes from using the unconstrained LQR action when it is feasible and clipping only where the actuator bound is active. Since the nonlinear cost is estimated by sampling and the linear gain is the best found in a dense search rather than a certified global optimizer, this experiment should be read as an illustration of the constrained gain-scheduling mechanism, rather than as a theorem comparable to Theorem 6. VIII. C ONCLUSION 
+
+This paper presented implicit neural controllers as state-space-like objects for certified neural feedback. The central point is that the implicit representation turns a neural controller into a familiar control interconnection: trainable linear equa-tions closed through a known static nonlinearity. This exposes the hidden algebraic loop, gives checkable well-posedness conditions, and allows Lyapunov/IQC certificates to be written directly on the plant-controller interconnection. For the static LTI setting studied here, Perron–Frobenius and norm conditions ensure that the controller fixed point is well posed. Static and incremental sector IQCs lead to LMI tests for exponential stability and discounted infinite-horizon quadratic performance, including biased controllers around arbitrary equilibria. The constrained separation theorems show that static nonlinear neural feedback can be provably superior to dynamic linear feedback in a long-run performance index. The key structural advantage is actuator-aware gain scheduling: a ReLU controller can use high gain near the origin and saturate near the boundary, whereas a globally admissible linear controller must use a single conservative affine move. The presented theory clearly has its limitations. The LMI/IQC conditions are analysis certificates, not a convex synthesis theory. The train–certify–retrain loop can propose useful controllers, but feasibility is checked only after the controller is fixed; hence, it is an heuristic design approach, with no guarantee of correct outcome. Also, the global sector LMIs can be conservative, especially for ReLU or saturation when the open-loop plant is unstable: regional multipliers, activation-pattern arguments, or explicit input-admissibility checks are then needed. Several directions also remain open: scalable design conditions with reduced conservatism, regional certificates for implicit controllers with W̸ = 0 , disturbance and robustness margins, observer-plus-implicit-readout archi-tectures, and extensions to dynamic implicit neural controllers. APPENDIX ABIAS -A UGMENTED RELU R EALIZATION OF SATURATION 
+
+The saturation used in (48) is realized as an implicit model with two hidden units: 
+
+η1 = σ(1 .5x + 1) , η2 = σ(1 .5x − 1) , (92) 
+
+u = 1 − η1 + η2. (93) Thus W = 0 , U = [1 .5 1 .5] ⊤, b = [1 −1] ⊤, V = [ −1 1] , K =0, and d = 1 . Since W = 0 , well-posedness is immediate. 12 0.5 0.0 0.5 1.0 1.5 
+
+x1
+
+0.5 
+
+0.0 
+
+0.5 
+
+> x2
+
+trajectory from (0.8, 0.8) 
+
+> saturated INC
+> best found linear
+> initial state
+
+0 10 20 30 40 
+
+time k
+
+1.0 
+
+0.5 
+
+0.0 
+
+0.5 
+
+1.0 
+
+> input  uk
+
+input constraint 
+
+> saturated INC
+> best found linear
+
+0 10 20 30 40 50 
+
+time k
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+> mean state norm over grid
+
+regional convergence 
+
+> saturated INC
+> best found linear
+
+sat. INC 
+
+(sampled) 
+
+best found 
+
+linear 
+
+scaled LQR 
+
+(exact) 
+
+0
+
+1
+
+2
+
+3
+
+4 
+
+> expected discounted cost
+> 1.358
+> 3.347 3.564
+
+performance comparison 
+
+Fig. 4. Two-state constrained LTI example. Top left: representative state trajectory from (0 .8, 0.8) . Top right: input traces, showing saturation of the INC and feasibility of the linear benchmark. Bottom left: mean state norm over a uniform grid of initial states. Bottom right: expected discounted cost. The saturated static INC has lower sampled cost than the best static linear gain found in the dense search and a scaled LQR gain on this benchmark. 
+
+APPENDIX BEQUIVALENT IQC M ATRIX FORM 
+
+The generalized sector IQC can be written as 
+
+2( η − D0z)⊤Λ( D1z − η) ≥ 0. (94) Equivalently, 
+
+zη
+
+⊤  −2D0ΛD1 D0Λ + Λ D1
+
+ΛD1 + D0Λ −2Λ 
+
+  zη
+
+
+
+≥ 0, (95) where the diagonal matrices commute. Since z = Zs and 
+
+η = Hs , this is exactly s⊤MΛs ≥ 0. In the special case 
+
+D0 = 0 , D1 = I, this reduces to 
+
+zη
+
+⊤ 0 ΛΛ −2Λ 
+
+  zη
+
+
+
+≥ 0. (96) REFERENCES [1] L. El Ghaoui, F. Gu, B. Travacca, A. Askari, and A. Y. Tsai, “Implicit deep learning,” SIAM Journal on Mathematics of Data Science , vol. 3, no. 3, pp. 930–958, 2021. [2] K. S. Narendra and K. Parthasarathy, “Identification and control of dynamical systems using neural networks,” IEEE Transactions on Neural Networks , vol. 1, no. 1, pp. 4–27, 1990. [3] W. T. Miller, P. J. Werbos, and R. S. Sutton, Eds., Neural Networks for Control . Cambridge, MA, USA: MIT Press, 1995. [4] F. L. Lewis, S. Jagannathan, and A. Yesildirak, Neural Network Control of Robot Manipulators and Nonlinear Systems . London, U.K.: Taylor & Francis, 1999. [5] L. Böttcher, “Control of dynamical systems with neural networks,” 
+
+Nonlinear Dynamics , vol. 114, Art. no. 79, 2026, doi: 10.1007/s11071-025-11937-z. [6] V. Mnih, K. Kavukcuoglu, D. Silver, A. A. Rusu, J. Veness, M. G. Bellemare, A. Graves, M. Riedmiller, A. K. Fidjeland, G. Ostrovski, et al. , “Human-level control through deep reinforcement learning,” Nature ,vol. 518, pp. 529–533, 2015. [7] J. Degrave, F. Felici, J. Buchli, M. Neunert, B. Tracey, F. Carpanese, T. Ewalds, R. Hafner, A. Abdolmaleki, D. de las Casas, et al. , “Magnetic control of tokamak plasmas through deep reinforcement learning,” 
+
+Nature , vol. 602, pp. 414–419, 2022. [8] J. Saint-Donat, N. Bhat, and T. J. McAvoy, “Neural net based model predictive control,” International Journal of Control , vol. 54, no. 6, pp. 1453–1468, 1991. [9] A. Draeger, S. Engell, and H. Ranke, “Model predictive control using neural networks,” IEEE Control Systems Magazine , vol. 15, no. 5, pp. 61–66, 1995. [10] B. Amos and J. Z. Kolter, “OptNet: Differentiable optimization as a layer in neural networks,” in Proc. International Conference on Machine Learning , 2017, pp. 136–145. [11] B. Amos, I. Jimenez, J. Sacks, B. Boots, and J. Z. Kolter, “Differentiable MPC for end-to-end planning and control,” in Advances in Neural Information Processing Systems , 2018, pp. 8289–8300. [12] R. T. Q. Chen, Y. Rubanova, J. Bettencourt, and D. Duvenaud, “Neural ordinary differential equations,” in Advances in Neural Information Processing Systems , 2018. [13] E. Kaiser, J. N. Kutz, and S. L. Brunton, “Sparse identification of nonlinear dynamics for model predictive control in the low-data limit,” 
+
+Proceedings of the Royal Society A , vol. 474, no. 2219, 2018, Art. no. 20180335. [14] S. Bai, J. Z. Kolter, and V. Koltun, “Deep equilibrium models,” in 
+
+Advances in Neural Information Processing Systems , 2019. [15] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan, Linear Matrix Inequalities in System and Control Theory . Philadelphia, PA, USA: SIAM, 1994. 13 
+
+[16] A. Megretski and A. Rantzer, “System analysis via integral quadratic constraints,” IEEE Transactions on Automatic Control , vol. 42, no. 6, pp. 819–830, 1997. [17] H. K. Khalil, Nonlinear Systems , 3rd ed. Upper Saddle River, NJ, USA: Prentice Hall, 2002. [18] G. E. Dullerud and F. Paganini, A Course in Robust Control Theory: A Convex Approach . New York, NY, USA: Springer, 2000. [19] A. Raghunathan, J. Steinhardt, and P. Liang, “Semidefinite relaxations for certifying robustness to adversarial examples,” in Advances in Neural Information Processing Systems , 2018, pp. 10877–10887. [20] M. Fazlyab, M. Morari, and G. J. Pappas, “Safety verification and robustness analysis of neural networks via quadratic constraints and semidefinite programming,” IEEE Transactions on Automatic Control ,vol. 67, no. 1, pp. 1–15, 2022. [21] H. Yin, P. Seiler, and M. Arcak, “Stability analysis using quadratic con-straints for systems with neural network controllers,” IEEE Transactions on Automatic Control , vol. 67, no. 4, pp. 1980–1987, 2022. [22] N. Junnarkar, M. Arcak, and P. Seiler, “Synthesizing neural network controllers with closed-loop dissipativity guarantees,” Automatica , to appear, arXiv:2404.07373, 2026. [23] E. G. Gilbert and K. T. Tan, “Linear systems with state and control constraints: The theory and application of maximal output admissible sets,” IEEE Transactions on Automatic Control , vol. 36, no. 9, pp. 1008– 1020, 1991. [24] S. Tarbouriech, G. Garcia, J. M. G. da Silva Jr., and I. Queinnec, Stability and Stabilization of Linear Systems with Saturating Actuators . London, U.K.: Springer, 2011. [25] A. Bemporad, M. Morari, V. Dua, and E. N. Pistikopoulos, “The explicit linear quadratic regulator for constrained systems,” Automatica , vol. 38, no. 1, pp. 3–20, 2002. [26] J. B. Rawlings, D. Q. Mayne, and M. M. Diehl, Model Predictive Control: Theory, Computation, and Design , 2nd ed. Madison, WI, USA: Nob Hill, 2017. [27] S. Boyd and L. Vandenberghe, Convex Optimization . Cambridge, U.K.: Cambridge University Press, 2004. [28] R. A. Horn and C. R. Johnson, Matrix Analysis , 2nd ed. Cambridge, U.K.: Cambridge University Press, 2012.

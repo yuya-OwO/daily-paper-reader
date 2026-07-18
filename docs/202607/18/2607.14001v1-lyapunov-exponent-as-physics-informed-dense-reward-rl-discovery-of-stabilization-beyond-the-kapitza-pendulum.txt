@@ -1,0 +1,314 @@
+Title: Lyapunov Exponent as Physics-Informed Dense Reward: RL Discovery of Stabilization Beyond the Kapitza Pendulum
+
+URL Source: https://arxiv.org/pdf/2607.14001v1
+
+Published Time: Thu, 16 Jul 2026 01:20:54 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Lyapunov Exponent as Physics-Informed Dense Reward: RL Discovery of Stabilization Beyond the Kapitza Pendulum 
+
+# Slava Andrejev 
+
+We suggest using the Lyapunov characteristic exponent (LCE) as a dense reward signal for the reinforce-ment learning problem of stabilizing the inverted pendulum with vertical motion. With LCE, the agent not only successfully found the oscillatory motion known as the Kapitza pendulum but also damped the pendulum’s pivoting, leaving it in a strictly upright position. 
+
+# 1 Introduction 
+
+One of the classic problems for testing reinforcement learning methods is the inverted pendulum problem. In the textbook formulation, a mass on a light, rigid stick is attached to a cart on a rail, with the mass point-ing upward. An RL agent must find a strategy for cart movement to keep the pendulum upright. Besides this straightforward way of balancing the pendulum with a horizontal motion, we can also set it upright with a vertical motion. If we oscillate the pivot point up and down fast enough, the pendulum will have an equilibrium point at the top. This type of pendulum, with an oscillating pivot, is called the Kapitza pendulum. To restore justice, Pyotr Kapitza didn’t discover it; he found a brilliant way to describe its motion [1]. The fact that this pendulum has a stable equilibrium upright has been known before [2]. A fair question to ask is: if we apply the reinforcement learning methods we use for the inverted pendulum on a cart to a pendulum with the pivot moving up and down, will the AI agent find the Kapitza pendulum? In one attempt [3], the authors used the Deep Deterministic Policy Gradient (DDPG) method [4]. The agent failed to find oscillatory movement. It either let the pendulum fall most of the time at the end of an episode, or started accelerating downward without bound. The authors hypothesized that the reward sparsity was the reason for the failure. They used the squared angle with vertical as a reward signal. They didn’t verify their hypothesis. To improve their result, we suggest using the maxi-mal Lyapunov Characteristic Exponent (LCE) [5] as a reward signal. From here on, we will omit “maximal”. Whenever we write LCE, we will assume the maximal LCE. The LCE is an important parameter of a dynami-cal system. It measures how fast infinitesimally close trajectories in the phase space diverge. For the purpose of stabilization, a negative LCE indicates the system is stable. If the LCE is positive, infinitesimally small pertur-bations of the initial state grow and diverge chaotically. For the inverted pendulum, the LCE is positive. As a consequence, we cannot balance the inverted pendu-lum; we have to apply some form of control to keep the system upright. If we compute an average LCE over a window, it will give the agent a direct signal about whether the system is stable over time. The squared angle with vertical does not carry this integral information. If the pendulum falls in the middle of an episode, we don’t know how well we performed before the fall. We just get a large negative reward with no indication that oscillatory movement would have led to a stable system. This work will explore whether an agent, armed with LCE as a reward signal, can discover inverted pendulum stabilization with vertical movement of the pivot point. 
+
+# 2 Motion Equations 
+
+Figure 1 shows the physical model of our pendulum. It is not difficult to show that the Lagrangian of the system is 
+
+𝐿 = 𝑚 2 (̇𝑥 2𝑐 +̇ 𝑦 2𝑐 + 𝑙 2̇ 𝜑 2 + 2𝑙̇𝜑 (̇𝑥 𝑐 cos 𝜑 +̇ 𝑦 𝑐 sin 𝜑)) − − 𝑚𝑔𝑙 cos 𝜑 ,1Lyapunov Exponent as Dense Reward  
+
+> 𝑚
+> 𝑦
+> 𝑥
+> 𝑙 𝜑
+> Figure 1: Pendulum model.
+
+where 𝑥 𝑐 and 𝑦 𝑐 are the coordinates of the pivot point. Using the Euler–Lagrange equation for 𝜑 , we will get ̈𝜑 +̈ 𝑥 𝑐 
+
+𝑙 cos 𝜑 +̈ 𝑦 𝑐 − 𝑔 𝑙 sin 𝜑 = 0 .Since we have only vertical motion, ̈ 𝑥 𝑐 = 0 , and ̈ 𝑦 𝑐 will be our action (RL, not physical action), which we will denote as 𝑎 . Finally, ̈𝜑 + 𝑎 − 𝑔 𝑙 sin 𝜑 = 0 . (1) For simplicity, we will measure acceleration in units of 𝑔 and distance in units of 𝑙 . With this choice, the natural time scale becomes √𝑙/𝑔 seconds. (1) will take the following form ̈𝜑 = (1 − 𝑎) sin 𝜑 , (2) where 𝑎(𝑡) =̈ 𝑦 𝑐 (𝑡) .
+
+# 3 The Maximal LCE 
+
+We will follow Benettin et al. [6, 7] in briefly describing the LCE theory and the numerical method for computing the LCE. We have a compact connected Riemannian manifold 
+
+𝑀 and a diffeomorphism Φ of 𝑀 onto itself. At each point 𝑥 ∈ 𝑀 , 𝑇 𝑥 𝑀 is the tangent space of 𝑀 at point 𝑥 . A flow {Φ 𝑡 } is a one-parameter family of diffeomorphisms satisfying Φ𝑠+𝑡 = Φ 𝑠 ∘ Φ 𝑡 , and Φ0 = 𝟏 . 𝑑Φ 𝑡 𝑥 ∶ 𝑇 𝑥 𝑀 → 𝑇 Φ𝑡 𝑥 𝑀 is a linear map telling us how infinitesimally nearby points get stretched and rotated when we apply 
+
+Φ. Finally, {𝑑Φ 𝑡 𝑥 } is a family of linear maps. For any nonzero vector 𝑔 ∈ 𝑇 𝑥 𝑀 one can define 
+
+𝜒 (𝑔) = lim sup 
+
+> 𝑡→∞
+
+1𝑡 ln ‖𝑑Φ 𝑡 𝑥 𝑔‖ . (3) This number is called the LCE of vector 𝑔 with respect to the family 𝑑Φ 𝑡 𝑥 . It can be shown [6] that {𝜒 (𝑔)} 𝑔∈𝑇 𝑥 𝑀 
+
+has at most 𝑛 = dim 𝑇 𝑥 𝑀 different values. These values are 𝜈 1 > 𝜈 2 > … > 𝜈 𝑠 , with 1 ⩽ 𝑠 ⩽ 𝑛 .All 𝑔 that produce 𝜈 𝑠 in (3) form a linear space 𝐿 𝑠 .Those 𝑔 that produce 𝜈 𝑠 and 𝜈 𝑠−1 form a linear space 
+
+𝐿 𝑠−1 ⊃ 𝐿 𝑠 . We can continue this process until we reach 
+
+𝐿 1. Therefore, we have 
+
+𝐿 𝑠 ⊂ 𝐿 𝑠−1 ⊂ … ⊂ 𝐿 1 = 𝑇 𝑥 𝑀 ,and for a vector 𝜈 ∈ 𝐿 𝑖 ∖ 𝐿 𝑖+1 
+
+𝜈 𝑖 = lim 
+
+> 𝑡→∞
+
+1𝑡 ln ‖𝑑Φ 𝑡 𝑥 𝜈‖ , 1 ⩽ 𝑖 ⩽ 𝑠 . (4) If we randomly choose vector 𝑔 ∈ 𝑇 𝑥 𝑀 and plug it to (4) , we will obtain the maximal LCE 𝜈 1 because 𝑔 has zero probability to end up in 𝐿 2, ..., 𝐿 𝑠 . This is the basis of computing the maximal LCE numerically as it is shown in [7]. For numeric computation, we have to take care of the exponential growth of the evolving tangent vector 
+
+𝑑Φ 𝑡 𝑥 𝜈 . To avoid floating point overflow, Benettin et al. [7] suggest periodically renormalizing the tangent vector after some fixed time 𝑠 . That is, we choose a random 𝜈 ∈ 𝑇 𝑥 𝑀 with ‖𝜈‖ = 1 and compute recursively 
+
+𝑤 0 = 𝜈 ∈ 𝑇 𝑥 𝑀 ,
+
+𝛼 𝑘 = ‖𝑑Φ 𝑠 𝑥 (𝑘−1)𝑠 𝑤 𝑘−1 ‖ ,
+
+𝑤 𝑘 = 𝑑Φ 𝑠 𝑥 (𝑘−1)𝑠 𝑤 𝑘−1 
+
+𝛼 𝑘 
+
+.Finally, 
+
+𝜈 1 = lim 
+
+> 𝑘→∞
+
+1𝑘𝑠 
+
+> 𝑘
+
+∑
+
+> 𝑖=1
+
+ln 𝛼 𝑖 . (5) An ODE for 𝑑Φ 𝑡 𝑥 can be derived using the Jacobian matrix. If we have a dynamic system ̇ 𝑥 = 𝑓 (𝑥) , then Φ𝑡 𝑥 
+
+is a solution that maps the initial condition 𝑥(0) = 𝑥 to 
+
+𝑥(𝑡) . We can write this fact down as 
+
+𝑑 𝑑𝑡 Φ𝑡 𝑥 = 𝑓 (Φ 𝑡 𝑥 ) . (6) 
+
+𝑑Φ 𝑡 𝑥 by definition is the spatial derivative of Φ𝑡 𝑥 with respect to the initial condition. If we apply the spatial derivative to (6) and use the chain rule, we will get an ODE for 𝑑Φ 𝑡 𝑥 
+
+𝑑 𝑑𝑡 [𝑑Φ 𝑡 𝑥 ] = 𝐷𝑓 (𝑥) ⋅ 𝑑Φ 𝑡 𝑥 ,where 𝐷𝑓 is the Jacobian matrix. 2Slava Andrejev For the case of the inverted pendulum, 𝑀 consists of pairs 𝑥 = (𝜑,̇ 𝜑) . From (1), the Jacobian matrix is 
+
+𝐷𝑓 = [ 0 1 
+
+> 1𝑙
+
+(𝑔 − 𝑎 (𝑡)) cos 𝜑 0].Similarly, 𝑇 𝑥 𝑀 is a linear space of pairs (𝛿,̇ 𝛿) . Using the Jacobian above, we get ̈𝛿 = 𝑔 − 𝑎 (𝑡) 𝑙 𝛿 cos 𝜑 . (7) With the units we introduced earlier, this equation be-comes ̈𝛿 = (1 − 𝑎) 𝛿 cos 𝜑 . (8) Instead of using a random initial vector 𝑤 0 = (𝛿 0,̇ 𝛿 0)
+
+for an LCE estimate in (5) , we can directly derive an approximation of the direction of the maximum ‖𝑤 0‖
+
+change. We set our pendulum at some small initial angle 
+
+𝜑 0 and let it go. The solution of (2) for small angles is 
+
+𝜑 ≈ 𝜑 0 cosh (𝑡) ≈ 𝜑 0.Since ‖𝑤 0‖ = 1 , we can write a solution of (8) as 
+
+𝛿 (𝑡) = cos 𝛼 0 cosh (𝑘𝑡) + sin 𝛼 0
+
+𝑘 sinh (𝑘𝑡) ,where 
+
+𝑘 = √ cos 𝜑 0,and 𝛼 0 is the initial direction of 𝑤 0. We need to find 𝛼 0
+
+that maximizes ‖(𝛿,̇ 𝛿)‖ .
+
+𝑑 𝑑𝛼 0
+
+‖(𝛿,̇ 𝛿)‖ 2 = 1 − 𝑘 4
+
+𝑘 2 sin (2𝛼) sinh 2(𝑘𝑡)+ 1 + 𝑘 2
+
+𝑘 sinh (2𝑘𝑡) cos (2𝛼) .From which it follows that at 
+
+𝛼 0 = 𝜋 2 − 12 atan ( 2𝑘 cosh (𝑘𝑡) (1 − 𝑘 2) sinh (𝑘𝑡) )
+
+we will observe the maximum increase of ‖𝑤 0‖. 𝑡 in the above will be the time period over which we estimate the LCE. 
+
+# 4 LCE Solution For a Pendulum With an Oscillating Pivot 
+
+Let’s verify that a solution for (2) and (8) with a constant angle 𝜑 and negative LCE exists. We assume that 𝑎(𝑡) 
+
+and 𝑦 𝑐 (𝑡) are fast-oscillating periodic functions of period 
+
+𝑇 . Following [8], we further require that the changes in 
+
+𝜑 are small, and we separate 𝜑 into slow and fast parts, 
+
+𝜑 = 𝜑 𝑠 + 𝜑 𝑓 . (9) Angle 𝜑 𝑓 is a periodic function and its value over one period of oscillation remains small. Angle 𝜑 𝑠 can have any value but during the same time 𝑇 it doesn’t change much. If we average these values over the period 𝑇 and mark this average with a bar, we get 
+
+𝜑 ≅ 𝜑 𝑠 , 𝜑 𝑓 ≅ 0 . (10) If we substitute (9) into (2) , drop the slow ̈ 𝜑 𝑠 , and expand 
+
+sin 𝜑 , we get ̈𝜑 𝑓 = (1 − 𝑎) ( sin 𝜑 𝑠 + 𝜑 𝑓 cos 𝜑 𝑠 ) .Since 𝜑 𝑓 is small, we can leave out 𝜑 𝑓 cos 𝜑 𝑠 , and the term 
+
+1 ⋅ sin 𝜑 𝑠 is a slow drift, which belongs to 𝜑 𝑠 . Therefore, ̈𝜑 𝑓 = −𝑎 sin 𝜑 𝑠 ,and 
+
+𝜑 𝑓 = −𝜂 sin 𝜑 𝑠 , (11) where 𝜂(𝑡) is the zero-mean shift of 𝑦 𝑐 , 𝜂 = 𝑦 𝑐 − 𝑦 𝑐 , due to the requirement 𝜑 𝑓 = 0 from (10) . The next step is to use (11) in (2) and (9), ̈𝜑 𝑠 +̈ 𝜑 𝑓 = (1 − 𝑎) ( sin 𝜑 𝑠 + 𝜑 𝑓 cos 𝜑 𝑠 ) ,and average the result over one period 𝑇 ,̈𝜑 𝑠 = sin 𝜑 𝑠 + 𝑎𝜂 cos 𝜑 𝑠 sin 𝜑 𝑠 .After integration by parts, ̈𝜑 𝑠 = sin 𝜑 𝑠 −̇ 𝜂 2 cos 𝜑 𝑠 sin 𝜑 𝑠 .This gives a necessary condition for stabilizing the pen-dulum at a nonzero constant angle 𝜑 𝑠 ,̇𝜂 2 = cos −1 𝜑 𝑠 . (12) We can follow a similar technique for 𝛿 in (8) . We sepa-rate it into slow and fast parts, 
+
+𝛿 = 𝛿 𝑠 + 𝛿 𝑓 .Finding 𝛿 𝑓 is very similar to finding 𝜑 𝑓 ,
+
+𝛿 𝑓 = −𝜂𝛿 𝑠 cos 𝜑 𝑠 .3Lyapunov Exponent as Dense Reward The slow part is more convoluted, ̈𝛿 𝑠 = 𝛿 𝑠 cos 𝜑 𝑠 + 𝛿 𝑓 cos 𝜑 𝑠 − 𝑎𝛿 𝑓 cos 𝜑 𝑠 −𝜑 𝑓 𝛿 𝑠 sin 𝜑 𝑠 − 𝜑 𝑓 𝛿 𝑓 sin 𝜑 𝑠 +𝑎𝛿 𝑠 𝜑 𝑓 sin 𝜑 𝑠 + 𝑎𝛿 𝑓 𝜑 𝑓 sin 𝜑 𝑠 .Dropping the terms that vanish after averaging over 𝑇 ,̈𝛿 𝑠 = 𝛿 𝑠 cos 𝜑 𝑠 − 𝑎𝛿 𝑓 cos 𝜑 𝑠 − 𝜑 𝑓 𝛿 𝑓 sin 𝜑 𝑠 +𝑎𝛿 𝑠 𝜑 𝑓 sin 𝜑 𝑠 + 𝑎𝛿 𝑓 𝜑 𝑓 sin 𝜑 𝑠 .Finally, let’s remove the higher order terms and average, ̈𝛿 𝑠 = 𝛿 𝑠 (cos 𝜑 𝑠 −̇ 𝜂 2 cos 2𝜑 𝑠 +̈ 𝜂𝜂 2 sin 2 𝜑 𝑠 cos 𝜑 𝑠 ) .If we assume that 𝜑 𝑠 = const and take into account (12) ,̈𝛿 𝑠 = 𝛿 𝑠 
+
+sin 2 𝜑 𝑠 
+
+cos 𝜑 𝑠 
+
+(1 +̈ 𝜂𝜂 2 cos 2 𝜑 𝑠 ) . (13) A generic solution is 
+
+𝛿 𝑠 = 𝐴𝑒 −𝑘𝑡 + 𝐵𝑒 𝑘𝑡 ,where 
+
+𝑘 = 𝜈 1 = |sin 𝜑 𝑠 |√cos 𝜑 𝑠 
+
+(1 +̈ 𝜂𝜂 2 cos 2 𝜑 𝑠 )1/2 (14) is the maximal LCE. We’ve made several important discoveries. First, from (14) , it follows that for 𝜑 𝑠 = 0 , the minimum LCE is zero. This means that truly upright stabilization is impossible. The upright equilibrium cannot damp oscillations. It makes intuitive sense: we cannot create any torque by vertical movement if 𝜑 = 0 . We can also see it in (11) ; if 
+
+𝜑 𝑠 = 0 , then the fast term 𝜑 𝑓 vanishes. Second, we can see from (13) that the only way to stabilize the pendulum is to have ̈ 𝜂𝜂 2 ≠ 0 . This can only happen if the pivot motion is asymmetric, that is, the upward motion has a different acceleration profile than the downward motion. Finally, with strictly periodic motion, when ̈ 𝜂𝜂 2 =
+
+const , true stabilization is also impossible. To achieve stabilization and have negative LCE, we must have a damping term in (13), ̈𝜂𝜂 2 ∼ −̇𝛿 𝑠 .Therefore, we can expect that if we use the LCE as a reward signal, the agent will essentially go beyond the Kapitza pendulum. To make the LCE negative, it proba-bly will stabilize the pendulum at some small, nonzero angle, and the pivot motion won’t be a single cycle peri-odic motion. In the stationary mode, fast oscillation will be accompanied by slow periodic movement (periodic because of the time symmetry), and in the transition phase, the agent may try to damp the oscillations of 𝜑 𝑠 
+
+by tracking ̇ 𝛿 𝑠 .
+
+# 5 Learning Method 
+
+Our environment consisted of the inverted pendulum described by (1) . The length of the pendulum rod was 30 cm . ODE (1) was combined with (7) into one system of equations to solve them simultaneously. Note that the immediate output of (7) at time 𝑡 is useless; we have to see how it evolves through time and use (5) to derive the LCE. To do that, we calculated the maximal LCE according to (5) over a short time window of 0.25 s. For training, we used Soft Action-Critic (SAC) al-gorithm [9] from Stable Baselines 3 [10]. We ran 1 s episodes, and each sample in an episode increased time by 5 ms . Action in each sample was acceleration 𝑎 from (1). Since the reward in our environment was calculated from the LCE over a time window, the state had to in-clude all values of the pendulum speed and location over the LCE window. That is, our window had 50 time steps, and at each step we recorded 𝑦 𝑐 ,̇ 𝑦 𝑐 , sin 𝜑 ,
+
+cos 𝜑 , and ̇ 𝜑 . Therefore, the state was a set of 250 val-ues: {(𝑦 𝑐,𝑖 ,̇ 𝑦 𝑐,𝑖 , sin 𝜑 𝑖 , cos 𝜑 𝑖 ,̇ 𝜑 𝑖 ), 𝑖 = 1 … 50} , where 𝑖 is the index of a time step inside the window. To reset the environment, we set the pendulum at a small random angle within ±5.7° and let it fall for the duration of the LCE time window, filling in all 𝜑 and ̇ 𝜑 
+
+in the initial state. The SAC implementation was used with default pa-rameters, except the learning rate 𝛼 = 1 × 10 −4 . The default parameters were: discount 𝛾 = 0.99 , soft update rate for target networks 𝜏 = 5 × 10 −3 , replay buffer size 
+
+1 × 10 6, batch size 256, train frequency was one gradi-ent step per environment step, target entropy −1 , and 100 random steps before training began. The imple-mentation used fully connected neural networks with two hidden layers, 256 neurons each, for all function approximations: actor, critics, and target critics. We couldn’t use pure LCE as a reward signal. The agent would have found a trivial solution: spatially un-bounded acceleration down with 𝑎 > 𝑔 . To encourage the agent to stay in the center, we added a smooth neg-ative reward that was almost constant when 𝑦 𝑐 stayed 4Slava Andrejev 
+
+0 200 400 600 800 1,000 
+
+−1,500 
+
+−1,000 
+
+−500 
+
+0
+
+Evaluation number Reward  
+
+> Figure 2: Training progress.
+
+within ±𝑦 max and rapidly increased when the agent went outside these bounds: 
+
+𝑟 𝑡 = −𝜈 1 − 100 (𝑦 𝑐 /𝑦 max )20 
+
+1 + (𝑦 𝑐 /𝑦 max )20 . (15) If the agent went outside the ±𝑦 max bounds, we termi-nated the episode with 𝑟 𝑡 = −1000 . We had 𝑦 max =10 cm in our experiments. 
+
+# 6 Results 
+
+Figure 2 shows the training progress. The quick rise indicates that the agent rapidly learned how to stay within the ±𝑦 max boundary. Then it slowly learned how to stabilize the pendulum. The work of the trained agent is shown in fig. 3a. The agent’s performance is remarkable. Not only did it find a mode that provides an equilibrium point at the top, it damped the angular oscillations, significantly improving upon the Kapitza pendulum. For comparison, the same picture shows how the Kapitza pendulum behaves when we oscillate the pivot point with the same frequency as the trained model. The Kapitza pendulum started from 1° and continued oscillating. The agent started from 10° with the pendulum falling. It stopped the fall at 15° and then brought the pendulum to oscillations as small as 
+
+±0.01° (see fig. 3d). Note that training episodes were 2 s . In this time span, the pendulum has not yet stabilized. At the end of the episode the agent was still damping the oscilla-tions. However, the learned policy was general enough to let the agent keep the pendulum upright outside the training window. Since in the previous work [3] the authors used the DDPG learning algorithm, we verified whether SAC would stabilize the inverted pendulum with the same reward signal as they used. We changed 𝜈 1 in (15) to 𝑐𝜑 2,and 𝑐 = 25 was selected to keep the reward roughly the same order of magnitude as the LCE. The result is shown in fig. 4. We can see that the agent managed to keep the pendulum upright, but the pendulum moves chaotically around the equilibrium with a far larger amplitude than the pendulum driven by an agent that was trained on the LCE signal. 
+
+# 7 Conclusion 
+
+We suggested a physics-informed reward signal based on the LCE in an attempt to let the agent discover the Kapitza pendulum. The trained model outperformed it. Not only did it find an equilibrium point at the top, it also managed to damp the oscillations and bring the pendulum to almost a halt with residual oscillations of 
+
+±0.01° .The remaining question is why the stable mode keeps the pendulum at 0.25° from vertical. Is it a fundamental constant that minimizes the LCE? Can we make it zero? Can we stabilize the pendulum at an arbitrary angle from vertical? 
+
+# References                    
+
+> [1] Пётр Леонидович Капица. «Маятник с вибриру-ющим подвесом». В: Успехи физических наук 44 (1951), с. 7—20. [2] Harold Jeffreys and Bertha Swirles Jeffreys. Methods of Mathematical Physics . 2nd ed. Cambridge Univer-sity Press, 1950. Chap. Solution of Linear Differential Equations of the Second Order, pp. 488–489. [3] Slava Andrejev and Nate Ruble. “RL Discovery of Kapitza Pendulum.” Course project, CS-541: Artificial Intelligence, Portland State University. 2023. [4] Timothy P. Lillicrap et al. “Continuous Control with Deep Reinforcement Learning.” In: Computing Re-search Repository abs/1509.02971 (2015). doi: 10 . 48550/arXiv.1509.02971 . url: https://arxiv. org/abs/1509.02971 .[5] A. M. Lyapunov. “The general problem of the sta-bility of motion.” In: International Journal of Con-trol 55.3 (1992), pp. 531–534. doi: 10 . 1080 / 00207179208934253 .[6] Giancarlo Benettin et al. “Lyapunov Characteristic Ex-ponents for smooth dynamical systems and for Hamil-tonian systems; a method for computing all of them. Part 1: Theory.” In: Meccanica 15.1 (1980), pp. 9–20. issn: 1572-9648. doi: 10.1007/BF02128236 .
+
+5Lyapunov Exponent as Dense Reward 
+
+0 2 4 6 8 10 
+
+−5 
+
+0
+
+5
+
+10 
+
+Time, s 
+
+> 𝜑 , °
+> LCE pendulum
+> Kapitza pendulum
+
+(a) Vertical angle for the LCE pendulum and the Kapitza pendulum for comparison. The initial position of the latter was 1°. 
+
+0 0.5 1 1.5 2
+
+−5 
+
+0
+
+5
+
+⋅10 −2 
+
+Time, s 
+
+> 𝑦 𝑐  , m
+
+(b) The agent is damping oscillations at the beginning of an episode. 
+
+9 9.2 9.4 9.6 9.8 10 
+
+−2 
+
+−1 
+
+0
+
+1 ⋅10 −2 
+
+Time, s 
+
+> 𝑦 𝑐  , m
+
+(c) Pivot point vertical motion in stable mode. 
+
+9 9.2 9.4 9.6 9.8 10 
+
+0.24 
+
+0.25 
+
+0.26 
+
+0.27 
+
+Time, s 
+
+> 𝜑 , °
+
+(d) Residual 𝜑 oscillations in stable mode. 
+
+Figure 3: Inverted pendulum stabilization with a trained agent. 
+
+0 2 4 6 8 10 
+
+−5 
+
+0
+
+5
+
+10 
+
+Time, s   
+
+> 𝜑 , °
+> 𝑟 𝑡 = 𝜈 1
+> 𝑟 𝑡 = 𝜑 2
+
+Figure 4: Comparison of models trained with the LCE and 𝜑 2 reward signals. [7] Giancarlo Benettin et al. “Lyapunov Characteristic Exponents for smooth dynamical systems and for Hamiltonian systems; A method for computing all of them. Part 2: Numerical application.” In: Meccanica 
+
+15.1 (1980), pp. 21–30. issn: 1572-9648. doi: 10.1007/ BF02128237 .[8] L. D. Landau and E. M. Lifshitz. “§30. Motion in a rapidly oscillating field.” In: Mechanics . 3rd ed. Vol. 1. Course of Theoretical Physics. Elsevier, 1976, pp. 93– 95. isbn: 978-0-7506-2896-9. [9] Tuomas Haarnoja et al. “Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor.” In: Proceedings of the 35th International Conference on Machine Learning . 2018, pp. 1861–1870. [10] Antonin Raffin et al. “Stable-Baselines3: Reliable Rein-forcement Learning Implementations.” In: Journal of Machine Learning Research 22.268 (2021), pp. 1–8. url: 
+
+https://jmlr.org/papers/v22/20-1364.html .
+
+6

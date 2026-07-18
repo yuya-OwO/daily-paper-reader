@@ -1,0 +1,1154 @@
+Title: Heuristic Learning for Active Flow Control Using Coding Agents
+
+URL Source: https://arxiv.org/pdf/2607.11565v1
+
+Published Time: Tue, 14 Jul 2026 03:17:39 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# HEURISTIC LEARNING FOR ACTIVE FLOW CONTROL USING 
+
+# CODING AGENTS 
+
+Paul Garnier 
+
+Mines Paris - PSL University Centre for Material Forming (CEMEF) CNRS 
+
+paul.garnier@minesparis.psl.eu 
+
+Jonathan Viquerat 
+
+Independent Researcher 
+
+jonathanviquerat@gmail.com 
+
+Elie Hachem 
+
+Mines Paris - PSL University Centre for Material Forming (CEMEF) CNRS 
+
+elie.hachem@minesparis.psl.eu 
+
+July 14, 2026 
+
+## ABSTRACT 
+
+Active flow control involves nonlinear dynamics, partial observations, and computationally expensive simulations, making controller design particularly challenging. Deep reinforcement learning (DRL) has emerged as a powerful framework for such problems, but its success typically relies on large numbers of simulator interactions and produces neural-network policies whose decision process often remains difficult to interpret. In this work, we investigate a different paradigm: instead of optimizing neural-network parameters, we use modern coding agents to search directly for explicit executable feedback laws. We introduce a constrained heuristic-learning protocol in which an agent iteratively proposes, evaluates, and revises controller implementations while interacting exclusively through the public benchmark interface. The proposed framework is evaluated on 13 active flow-control benchmarks spanning one, two, and three-dimensional problems and compared against the strongest available DRL baselines under identical simulation budgets. The discovered heuristic controllers match or outperform the best DRL policy in 10 of the 13 environments while remaining compact, interpretable, and directly inspectable. Beyond aggregate performance, the resulting controllers reveal physically meaningful feedback mechanisms, transfer successfully across more challenging configurations, and remain competitive under varying Reynolds and Rayleigh numbers, actuator counts, and observation sparsity. These results suggest that heuristic learning through coding agents constitutes a credible and complementary alternative to conventional reinforcement learning, combin-ing competitive performance with physically interpretable controller representations. Prompts and source code are available at https://github.com/DonsetPG/fluid-heuristic-learning .
+
+Keywords active flow control · fluid dynamics · heuristic learning · coding agents · reinforcement learning benchmarks ·
+
+interpretable control 
+
+## 1 Introduction 
+
+Active flow control remains one of the central challenges in computational fluid dynamics. The objective is to determine a feedback strategy capable of modifying the evolution of a nonlinear flow using only partial observations and a limited set of admissible actuators. Such control problems are characterized by high-dimensional state spaces, nonlinear dynamics, delayed responses, and expensive numerical simulations, making them particularly difficult to solve with classical optimization techniques. Over the last decade, deep reinforcement learning (DRL) has therefore emerged as a arXiv:2607.11565v1 [cs.LG] 13 Jul 2026 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 natural framework for flow control, as it does not require an adjoint solver, the differentiability of the complete simulation chain, or a prescribed functional form for the controller. Instead, a neural policy interacts with the environment by (i) receiving a reduced set of observations from the full flow state, (ii) processing them into one or several actions, (iii) applying these actions through the admissible control channels, and (iv) receiving a scalar reward that measures the quality of its behavior while optimizing a long-term estimate of this reward. This simple interaction loop has led to a rapid sequence of successes across a broad range of fluid mechanics applications, including stabilization and drag reduction in the cylinder wake using synthetic jets (Rabault et al., 2019), control of falling-film instabilities (Belus et al., 2019), thermal control in Rayleigh–Bénard convection (Beintema et al., 2020; Hachem et al., 2021), collective swimming strategies (Novati et al., 2017; Verma et al., 2018), direct aerodynamic shape optimization (Viquerat et al., 2021), and experimental bluff-body flow control (Fan et al., 2020). These studies demonstrated that DRL can discover highly non-trivial feedback strategies directly from interaction with the environment, and in several cases recover controllers whose underlying physical mechanisms can be interpreted a posteriori. Despite these successes, the flexibility of DRL comes at a cost. Training a controller typically requires a very large number of rollouts, each involving the solution of a CFD problem over hundreds or thousands of time steps. Although this computational burden can be partially alleviated through parallel environment sampling (Rabault and Kuhnle, 2019; Viquerat and Hachem, 2023), it remains one of the main bottlenecks of the approach. Furthermore, the resulting controller is generally represented by a neural network. While such policies may achieve excellent performance, their internal decision process often remains difficult to interpret, analyze, modify, or transfer to related configurations. Reproducibility also remains an important concern: relatively small variations in reward formulation, observation selection, action smoothing, random initialization, or implementation details can affect the final learned policy (Andrychowicz et al., 2020; Viquerat et al., 2022). These limitations do not question the relevance of DRL for flow control; rather, they motivate a complementary scientific question: can explicit, human-readable control laws be discovered automatically while remaining competitive with state-of-the-art reinforcement learning? Recent advances in large language models (LLMs) suggest that such a possibility may now be within reach. Since the introduction of neural attention mechanisms (Bahdanau et al., 2015) and the Transformer architecture (Vaswani et al., 2017), LLMs have rapidly evolved from language-processing systems into increasingly capable reasoning and programming assistants (Chen et al., 2021; Jimenez et al., 2024). More recently, coding agents such as Claude Code (Anthropic, 2026a) and Codex (OpenAI, 2025) have demonstrated the ability to execute long-horizon workflows that may span hours or even days (OpenAI, 2026a; Anthropic, 2026b). Rather than optimizing millions of neural-network parameters through gradient descent, these systems make it possible to search directly in the space of executable programs. This shift opens a fundamentally different perspective for flow control. Instead of learning an implicit policy encoded in neural-network weights, a coding agent can iteratively propose explicit feedback laws, evaluate them through numerical simulations, analyze their performance, and refine the corresponding controller based on observed successes and failures. The resulting search process no longer explores a parameter space, but a space of interpretable algorithms composed of filters, delays, feedback gains, state machines, or other physically meaningful operations. Such explicit controllers can be inspected, modified, transferred, and analyzed by fluid dynamicists, potentially restoring an important level of interpretability that is often sacrificed in purely neural approaches. The present work investigates whether this new paradigm can serve as a practical alternative for active flow control. More specifically, we study whether modern coding agents can autonomously discover explicit feedback controllers that remain competitive with state-of-the-art DRL while respecting exactly the same observations, actions, rewards, and interaction budget. To ensure a fair comparison, the agents are constrained to interact exclusively through the public benchmark interface and are prohibited from accessing hidden simulator information or modifying the environment itself. This paper makes four main contributions: 1. We introduce a reproducible heuristic-learning protocol in which coding agents autonomously search for explicit feedback controllers under strict public-interface constraints and invalid-policy filtering. 2. We evaluate this protocol on thirteen fluid-dynamics control benchmarks using multiple coding agents, and compare the resulting controllers against the strongest available DRL baselines. 3. We show that automatically discovered heuristic controllers frequently match or outperform DRL while remaining compact, explicit, and physically interpretable. 4. We investigate the robustness and generalization of the proposed approach through transfer learning, variable-dimensional action spaces, and sparse observation settings. 2HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 The remainder of the paper is organized as follows. Section 2 reviews previous work on DRL for flow control, benchmark suites, and program synthesis approaches. Section 3 introduces the control formulation, while Section 4 presents the proposed heuristic-learning protocol. Section 5 describes the benchmark suite and the experimental setup. Section 6 reports the main results together with additional analyses, and Section 7 examines representative controllers to better understand the physical strategies discovered by the coding agents. 
+
+## 2 Related Work 
+
+2.1 Deep reinforcement learning for flow control 
+
+Deep reinforcement learning has progressively established itself as one of the principal paradigms for active flow control by reformulating the control problem as a sequential interaction between an agent and its environment. In this framework, the environment may consist of a numerical solver, a reduced-order model, or a physical experiment. The agent receives partial observations of the flow, selects control actions, modifies boundary conditions, source terms, body motion, geometry, or material parameters, and finally receives a reward that quantifies the quality of the chosen strategy. One of the earliest and most influential demonstrations was the stabilization of the two-dimensional cylinder wake using synthetic jets, where a PPO policy successfully reduced drag while suppressing the von Kármán vortex street (Rabault et al., 2019). Beyond its physical results, this work introduced a reusable CFD–DRL coupling that later benefited from efficient parallel environment sampling (Rabault and Kuhnle, 2019). Since then, similar formulations have been extended to different Reynolds numbers, alternative actuation mechanisms, weakly turbulent regimes, sparse and noisy observations, and even experimental setups (Tang et al., 2020; Ren et al., 2021; Fan et al., 2020). More broadly, DRL has been successfully applied to falling-film stabilization, conjugate heat transfer, swimming strategies, microfluidics, turbulence-related problems, aerodynamic shape optimization, and many other fluid-mechanics applications (Belus et al., 2019; Beintema et al., 2020; Garnier et al., 2021; Hachem et al., 2024). Although the targeted physical systems differ considerably, several methodological choices have become common throughout the literature. Most studies rely on model-free actor–critic algorithms, with PPO being the dominant on-policy baseline, while TD3 and related off-policy methods are occasionally considered for comparison (Schulman et al., 2017; Fujimoto et al., 2018; Viquerat et al., 2022). Observations are typically restricted to a limited number of probes or physically meaningful quantities extracted from the full flow field, whereas rewards are designed as low-dimensional proxies of engineering objectives such as drag, lift, heat transfer, concentration variance, or interface deformation. These design choices strongly influence the resulting controller. Sensor placement, reward shaping, control frequency, action smoothing, random initialization, and implementation details all affect learning dynamics and final performance. It is now well recognized that two implementations of the same DRL algorithm may produce significantly different results on an identical benchmark, motivating recent efforts toward standardized environments, open-source implementations, and reproducible evaluation protocols (Andrychowicz et al., 2020). In the present work, DRL serves exclusively as a reference methodology. We deliberately preserve the same environ-ments, observations, actions, rewards, and evaluation protocols, but replace neural-network optimization by the search for explicit executable controllers. This allows the comparison to focus solely on the representation and discovery of the control law rather than on differences in the underlying control problem. 
+
+2.2 Benchmark suites 
+
+Benchmarking plays a particularly important role in reinforcement learning, where algorithmic performance is often highly dependent on the considered environments. Classical benchmarks such as Atari, MuJoCo, and OpenAI Gym have been instrumental in the development of modern RL algorithms, yet they do not reproduce many of the constraints encountered in computational fluid dynamics, including expensive numerical rollouts or partially observed spatio-temporal fields(Bellemare et al., 2013; Todorov et al., 2012; Brockman et al., 2016). Consequently, improvements demonstrated on generic RL benchmarks do not necessarily translate into advances for flow-control applications. BEACON was introduced to provide a lightweight common ground for this purpose (Viquerat et al., 2024). It contains seven self-contained one- and two-dimensional environments with different physics, observation spaces, action spaces, control types, and CPU requirements. The design constraints are practical: Python implementation, Gym-like interface, low enough cost to allow training on a workstation, and reference curves for standard DRL algorithms. The suite therefore plays the role of a first filter. It is broad enough to include problems such as falling films, thermal convection, mixing or sloshing, yet computationally cheap enough to quickly screen algorithmic issues and inefficiencies before moving to more CPU-expensive environments. 3HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 FluidGym (Becktepe et al., 2026) targets larger active-flow-control problems in a single PyTorch stack, with differen-tiable environments, GPU acceleration, standardized evaluation protocols, and baselines for modern RL algorithms. This makes it closer to the large-scale setting in which poor sample efficiency and brittle controller design become limiting factors. In the following experiments, we use BEACON for fast and diverse iteration and FluidGym to test whether the same heuristic-learning protocol still behaves sensibly when each evaluation is substantially more costly. 
+
+2.3 Programmatic policies and coding-agent search 
+
+The objective of the present work is fundamentally different from conventional reinforcement learning. Rather than optimizing the parameters of a neural policy, we seek to automatically construct explicit executable controllers through an iterative program-synthesis process. Our approach is therefore more closely related to recent work on language-model optimization and autonomous code generation than to classical policy-gradient methods. A first line of research treats natural language as the optimization medium itself. Methods such as Feedback Descent, GEPA, ProTeGi, Self-Refine, TextGrad, and OPRO iteratively improve candidate solutions by storing critiques, textual gradients, pairwise preferences, rollout summaries, or optimization histories directly in textual form (Lee et al., 2025; Agrawal et al., 2025; Pryzant et al., 2023; Madaan et al., 2023; Yuksekgonul et al., 2024; Yang et al., 2023). Rather than updating numerical parameters through gradient descent, these approaches progressively refine future proposals by accumulating structured textual experience. Our setting introduces an additional requirement: every generated proposal must immediately become a valid flow controller, interact exclusively through the official environment interface, satisfy all actuator constraints, survive deterministic rollout evaluation, and remain sufficiently transparent to be inspected by a fluid dynamicist. A second family of methods considers executable programs as the optimization object. Systems such as OpenEvolve, AlphaEvolve, and FunSearch repeatedly modify source code, execute the resulting programs, evaluate their performance, and preserve only successful variants (Sharma, 2025; Novikov et al., 2025; Lehman et al., 2022; Romera-Paredes et al., 2024). More recently, ADAS and AFlow extended this philosophy beyond individual programs by allowing entire agent architectures or workflow graphs to evolve during optimization (Hu et al., 2025; Zhang et al., 2025a). These approaches are structurally the closest to the framework proposed here. In all cases, language models propose modifications, execution provides objective feedback, and subsequent revisions are guided by observed successes and failures. Our contribution specializes this general paradigm to feedback control in computational fluid dynamics, where generated programs must additionally satisfy strict physical and interface constraints. Finally, our work is also related to broader research on memory, meta-learning, and adaptive optimization. MemEvolve and meta-learned agentic memory investigate how an autonomous agent should retain, retrieve, and exploit previ-ous experiences throughout long optimization processes (Zhang et al., 2025b; Xiong et al., 2026). Earlier work on self-referential learning systems, learning-to-learn, learned optimizers, MAML, prototypical networks, and in-context learning similarly addresses the broader question of how previous experience can accelerate future adaptation (Schmid-huber, 1993; Thrun and Pratt, 1998; Andrychowicz et al., 2016; Finn et al., 2017; Snell et al., 2017; Akyürek et al., 2023). Unlike these approaches, however, the present work does not adapt model parameters. Instead, it searches directly in the space of explicit control programs, allowing every candidate policy to remain executable, inspectable, and physically interpretable throughout the optimization process. 
+
+## 3 Problem Formulation 
+
+The control problems considered throughout this work follow the standard reinforcement-learning formulation. An agent repeatedly interacts with a controlled dynamical system, observes part of its state, applies an admissible control action, and receives a scalar reward measuring the quality of the resulting behavior. In the present context, the environment corresponds to a numerical fluid-dynamics simulator, while the agent represents the controller to be optimized. The interaction loop is illustrated in Figure 1. Formally, the problem is modeled as a Markov decision process. At each iteration, the following sequence of operations is performed: 1. At iteration t, the environment is in state st ∈ S , where S denotes the state space. 2. The controller receives an observation wt, which may represent only a partial observation of st, and computes an action at ∈ A , where A is the admissible action space. 3. The environment evolves according to the controlled dynamics, producing the next state st+1 .4. The environment returns both the next observation wt+1 and a scalar reward rt ∈ R quantifying the quality of the selected action. 4HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026            
+
+> (a) Reinforcement learning (b) Heuristic learning Policy network
+> πϕ(a|s)
+> Environment
+> st→st+1
+> Optimizer updates weights ϕ
+> at
+> st+1 , r t
+> gradient Readable controller
+> at=hθ(wt)
+> Simulator flow rollout Traces and score
+> rt, C D, E, ...
+> Code edit rules, gains, features actions evidence diagnose new θ
+
+Figure 1: Comparison between the standard reinforcement-learning interaction loop and heuristic learning, where the agent revises an explicit rule-based policy from rollout outcomes. Repeating this interaction generates a trajectory 
+
+τ = ( s0, a 0, s 1, a 1, . . . ) ,
+
+which terminates once the episode reaches its prescribed horizon. The objective of reinforcement learning is to determine a policy π maximizing the expected discounted cumulative reward, 
+
+J(π) = Eτ ∼π
+
+" TX
+
+> t=0
+
+γtrt
+
+#
+
+, (1) where T denotes the episode length and γ ∈ [0 , 1] is the discount factor controlling the relative importance of immediate and future rewards. Modern DRL algorithms differ primarily in the manner by which this optimization problem is solved. On-policy approaches update the controller exclusively from trajectories generated by the current policy, whereas off-policy methods additionally reuse previously collected experience. Throughout this work, the proposed methodology is compared against two widely adopted representatives of these families: Proximal Policy Optimization (PPO), a robust on-policy algorithm based on constrained policy updates, and Soft Actor-Critic (SAC), an off-policy algorithm combining actor–critic learning with entropy regularization to improve exploration and sample efficiency. Importantly, the optimization objective itself remains unchanged in the present work. The observations, actions, rewards, simulators, and evaluation protocols are exactly the same as those used by conventional DRL. The only difference lies in the representation of the controller. Instead of optimizing the parameters of a neural-network policy, we search directly for an explicit executable control law that maps the publicly available observations to admissible actions. Consequently, the comparison isolates the effect of the controller representation itself while preserving an identical control problem and evaluation criterion. The following section introduces the proposed heuristic-learning framework used to perform this search. 
+
+## 4 Heuristic-Learning Protocol 
+
+The objective of the proposed heuristic-learning framework is to replace the optimization of neural-network parameters by the optimization of explicit executable control laws. Rather than updating a policy through gradient descent, a coding agent iteratively designs, evaluates, and revises controller implementations based solely on their observed performance. Throughout this process, the simulator, reward function, environment dynamics, and control interface remain fixed. The agent is only allowed to modify the controller source code. Consequently, the optimization problem is identical to that encountered in DRL; only the representation of the controller and the search procedure differ. The complete protocol is summarized in Algorithm 1. The restriction to explicit heuristics is a deliberate experimental choice rather than a limitation of the underlying coding agents. Modern coding agents are capable of generating substantially more complex software, including neural-network implementations. Such controllers are intentionally excluded from the present study in order to preserve interpretability, reproducibility, and direct inspection of the resulting control strategies. Each candidate controller is represented by an executable program c together with an explicit internal memory mt. At every control step, the controller receives only the information publicly exposed by the benchmark environment and computes an admissible action according to 5HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 
+
+at = πc(o≤t, r <t , m t), mt+1 = Uc(mt, o t, r t, a t),
+
+where ot denotes the public observation, rt the reward returned by the environment, at the action applied through the official control interface, πc the controller implemented by program c, and Uc its explicit memory-update rule. Histories such as o≤t and r<t contain only information available before the current action is selected. 
+
+Figure 2: Presentation of the different environments. Abstract schematic on the left reproduced from Becktepe et al. (2026). The controller memory is itself subject to the same information constraints. It may store quantities derived exclusively from publicly available observations, including moving averages, delayed buffers, filtered signals, or previously observed states, but never hidden simulator variables or future information. For an environment family E,a seed set S, and a benchmark score J, the objective of the search is therefore 
+
+c⋆ ∈ arg max 
+
+> c∈C valid
+
+Ee∼E , s ∼S [J(c; e, s )] .
+
+The coding agent A performs this optimiza-tion by repeatedly modifying controller source code according to 
+
+ck+1 = A(ck, τ k, J (ck), Lk),
+
+where τk denotes the rollout trace associated with controller ck, and Lk is a public search ledger recording all information accumulated during previous evaluations. The ledger contains controller scores, action trajectories, rollout diagnostics, plots, physical metrics, ablation studies, failed hypotheses, transferred controllers, and previously identified invalid solutions. Unlike gradient-based optimization, the search therefore progresses through explicit reasoning over accumulated experimental evidence. Each optimization cycle follows five successive stages. First, the agent inspects the public benchmark interface, including the observation structure, admissible action range, reward definition, reset procedure, diagnostics, and episode horizon. Second, it proposes a compact executable controller, for example a feedback law, delayed filter, finite-state machine, spatial projection, phase scheduler, or hybrid combination of these components. Although larger implementations are technically possible, only explicit train-free controllers are retained in the present study. Third, the controller is evaluated through deterministic rollouts, during which scores, diagnostics, actions, failures, and consumed simulation steps are recorded. Fourth, these observations are used to revise controller parameters or structure, including gains, clipping, delays, memory variables, spatial aggregation, or logical conditions. Finally, the surviving controllers are simplified through successive ablations before being validated on replay trajectories, unseen random seeds, longer horizons, transferred environments, or dedicated stress tests. An overview of the complete optimization cycle is provided in Table 1. 
+
+4.1 Explicit constraints 
+
+To ensure a fair comparison with DRL, the heuristic-learning framework is subject to three explicit protocol constraints. 
+
+Search budget accounting. Each heuristic search receives exactly the same total simulation budget as the corre-sponding DRL experiment. Whenever the coding agent terminates an evaluation early because a controller is clearly ineffective, the consumed simulation steps are nevertheless fully charged against the available budget. Consequently, heuristic learning may evaluate more candidate controllers than DRL, but never benefits from additional interactions with the environment. 
+
+Prompt-induced protocol violations. The coding agent is treated as an experimental operator whose actions must remain strictly confined to the public benchmark interface. Any attempt to modify the simulator, clone the environment for look-ahead evaluation, alter the reward definition, access hidden simulator variables, or bypass the official actuator interface is considered invalid and discarded before evaluation. 6HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 
+
+Algorithm 1 Heuristic-learning loop over executable controller code  
+
+> 1:
+
+Input: environments E, public interfaces I, scoring function J, coding agent A, simulator budget B 
+
+> 2:
+
+Initialize: controller set C with no-control, simple feedback, or transferred seed policies  
+
+> 3:
+
+Initialize: public ledger L ← ∅  
+
+> 4:
+
+for c ∈ C do  
+
+> 5:
+
+if c passes static validity checks then  
+
+> 6:
+
+(J(c), τ c) ← EVALUATE (c, E, I) 
+
+> 7:
+
+L ← L ∪ { c, J (c), τ c, VALIDITY (c)} 
+
+> 8:
+
+else  
+
+> 9:
+
+L ← L ∪ { c, INVALID } 
+
+> 10:
+
+end if  
+
+> 11:
+
+end for  
+
+> 12:
+
+while simulator budget B remains do  
+
+> 13:
+
+A reads the public ledger L 
+
+> 14:
+
+A proposes candidate controllers {c1, . . . , c k} 
+
+> 15:
+
+for ci in {c1, . . . , c k} do  
+
+> 16:
+
+if ci passes public-interface and source-code checks then  
+
+> 17:
+
+(J(ci), τ i) ← EVALUATE (ci, E, I) 
+
+> 18:
+
+L ← L ∪ { ci, J (ci), τ i, VALIDITY (ci)} 
+
+> 19:
+
+else  
+
+> 20:
+
+L ← L ∪ { ci, INVALID } 
+
+> 21:
+
+end if  
+
+> 22:
+
+end for  
+
+> 23:
+
+end while 
+
+Table 1: Heuristic-learning loop used in the experiments. Prompts and run commands are provided in the supplementary material.         
+
+> Stage Role Interface probe Inspect observation shape, action bounds, reward scale, reset behavior, public diagnostics, and episode horizon. Policy proposal Write a compact executable controller such as a feedback law, delayed filter, finite-state machine, spatial projection, schedule, or hybrid strategy. Evaluation Execute fixed-seed rollouts and record scores, physical diagnostics, action traces, and failure cases. Early rejection Interrupt weak candidate evaluations once public diagnostics indicate poor performance while accounting for all consumed simulation steps. Revision Update controller parameters or structure using the accumulated rollout evidence. Simplification Remove unnecessary branches through ablation while preserving interpretability. Validation Evaluate the surviving controllers on held-out seeds, longer horizons, transferred environments, or replay diagnostics.
+
+Validity constraints. A controller is considered valid only if it satisfies all of the following conditions: • it relies exclusively on publicly available observations, rewards, and admissible actions; • it interacts with the environment solely through the official control interface; • it neither accesses nor modifies hidden simulator state; • it neither trains nor loads opaque learned policies, including pretrained neural-network checkpoints. Explicit numerical algorithms, filters, or analytical controllers are permitted provided that they operate exclusively on public information and remain fully inspectable; • it leaves the benchmark unchanged by preserving the original reward function, episode horizon, and environ-ment dynamics throughout evaluation. 
+
+## 5 Experimental Setup 
+
+The proposed heuristic-learning framework is evaluated on the benchmark suites provided by FluidGym (Becktepe et al., 2026) and BEACON (Viquerat et al., 2024). These environments provide standardized flow-control problems 7HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 −1 0 1 2   
+
+> Score relative to no control, scaled by |best DRL - no control|
+> Sloshing
+> TCF 3D
+> both
+> Lorenz
+> Vortex
+> Burgers
+> Shkadov
+> Rayleigh
+> Mixing
+> RBC
+> medium
+> Cylinder jet
+> medium
+> Cylinder jet
+> easy
+> RBC
+> easy
+> Cylinder rot.
+> easy
+> +1.66 PPO
+> +1.39 MA-PPO
+> +1.15 PPO
+> +1.10 PPO
+> +1.06 PPO
+> +1.02 PPO
+> +1.01 PPO
+> +1.00 PPO
+> +1.00 SAC
+> +0.95 SAC
+> +0.84 SAC
+> +0.24 SAC
+> +0.06 SAC
+> Codex against the strongest DRL baseline in each environment
+> Codex >= best DRL
+> Codex < best DRL
+> Best DRL
+
+Figure 3: Aggregate comparison between the best coding-agent heuristic and the best DRL baseline on each environment. Scores are normalized by the improvement from the initial DRL control level to the best DRL score, so positive values indicate a heuristic above the best DRL result. together with publicly available DRL baselines, allowing a direct comparison between conventional reinforcement learning and the proposed program-synthesis approach. All DRL reference results were reproduced from the official open-source implementations 1 to ensure consistency of the reported comparisons. The heuristic-learning experiments were conducted using several state-of-the-art coding agents in order to evaluate the robustness of the proposed protocol across different underlying language models. Unless stated otherwise, GPT-5.5 operating through Codex with xhigh reasoning effort (OpenAI, 2026b,c,d) is used as the primary agent and is referred to as Codex . Additional experiments were performed using Claude Opus 4.7 with xhigh reasoning effort (Anthropic, 2026c,d) (denoted Claude ), Fable 5 with xhigh reasoning effort (Anthropic, 2026e) (denoted Fable ), and Gemini 3 Pro (Google, 2025; Google Developers Blog, 2025) (denoted Gemini ). The corresponding command-line interfaces were Codex CLI (OpenAI, 2026e), Claude Code (Anthropic, 2026a), and Gemini CLI (Google Cloud, 2026). To ensure a fair comparison with DRL, every coding agent was allocated exactly the same simulation budget as the corresponding reinforcement-learning baseline, measured in total environment interactions. Consequently, all reported differences arise from the controller representation and search strategy rather than from additional access to the simulator. The complete catalogue of benchmark environments is presented in Appendix A and summarized in Table 2. 
+
+## 6 Main Results 
+
+We first evaluate the proposed heuristic-learning framework on the complete benchmark suite comprising 13 flow-control environments. Across all cases, the search successfully discovers a non-trivial explicit controller. We begin by comparing the best heuristic obtained on each benchmark with the strongest available DRL baseline, before analyzing the optimization trajectories and convergence behavior. Against the best-performing DRL algorithm on each environment 2, heuristic learning achieves a higher score in 8 environments, matches the best DRL performance in 2 environments, and performs below the strongest baseline in the remaining 3 environments. The complete comparison is reported in Figure 3. Overall, the proposed approach reaches or exceeds the best DRL performance in 10 of the 13 benchmark problems while producing explicit, fully inspectable controller implementations rather than neural-network policies. Among the strongest results are the three-dimensional turbulent-channel configuration TCFSmall3D-both-easy-v0 .In this benchmark, the discovered heuristic not only reaches the performance of the best DRL controller but further improves the normalized score by approximately 50%. Expressed in physical terms, this corresponds to a drag reduction 
+
+> 1
+
+https://github.com/safe-autonomous-systems/fluidgym and https://github.com/jviquerat/beacon 
+
+> 2
+
+Among PPO, SAC, and TD3. 
+
+8HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 approaching 40%, compared with approximately 30% obtained by the strongest DRL baseline. The corresponding drag histories and control actions are presented in Figure 4. The two-dimensional cylinder-jet benchmark introduced by Rabault et al. (2019) provides a complementary perspective. Although the heuristic remains slightly below the best DRL score on the original evaluation horizon, it nevertheless captures the essential feedback mechanism required to substantially reduce drag relative to the uncontrolled flow, as illustrated in Figure 4. To further assess the robustness of the discovered controller, we extended the evaluation horizon from the original 80 time steps to 400 time steps without modifying the controller itself. Under these longer rollouts, the PPO controller progressively loses stability shortly after the original training horizon, whereas both the heuristic controller and the SAC policy remain stable throughout the entire simulation. This behavior suggests that the explicit controller has captured a feedback strategy that generalizes beyond the nominal optimization horizon rather than simply exploiting properties specific to the original episode length. The corresponding validation trajectories are shown in Figure 5. Beyond the final scores, the optimization trajectories provide additional insight into the search dynamics. Figure 6 reports the evolution of the best score as a function of the number of consumed environment interactions for all benchmark problems. Across the suite, heuristic learning consistently exhibits higher sample efficiency during the early stages of optimization, avoiding the prolonged cold-start phase typically observed with DRL. Although small variations are observed during the initial search depending on the explored candidate controllers, repeated runs consistently converge toward similar final heuristic, indicating that the proposed search procedure is robust despite its inherently exploratory nature. 
+
+6.1 Agent comparison 
+
+Beyond evaluating the proposed heuristic-learning framework, the same experimental protocol also provides a controlled benchmark for comparing different coding agents. Since every agent receives exactly the same benchmark environments, source code, prompts, interaction budget, and evaluation procedure, the only varying component is the underlying language model. This allows differences in performance to be attributed directly to the coding capabilities of the agents themselves. Overall, Claude improves upon Gemini by approximately 50%, while Codex further improves upon Claude by roughly another 50%. The recently released Fable 5 performs only slightly below Codex. 
+
+Scores We compare four coding agents: Codex, Claude, Gemini, and Fable. All agents operate under the same heuristic-learning harness and are evaluated on the seven BEACON environments. The resulting normalized scores are presented in Figure 7. Gemini consistently performs below both Claude and Codex across the benchmark suite. Among the seven environments, Claude outperforms Codex once and matches its performance once, whereas Codex achieves the highest score in the remaining five environments, often by a substantial margin. Averaged over the complete benchmark suite, the normalized scores are 1.13 for Codex, 0.98 for Fable, 0.88 for Claude, and 0.50 for Gemini. 
+
+Cost analysis Besides controller quality, computational cost is an important practical consideration. We therefore compare the different coding agents in terms of token consumption and API cost. On the Shkadov benchmark, Codex 0 500 1000      
+
+> Episode Step t
+> 0
+> 10
+> 20
+> 30
+> 40
+> Drag Reduction (%)
+> 050
+> Episode Step t
+> −0.5
+> 0.0
+> 0.5
+> at
+> Control Action
+> 050
+> Episode Step t
+> 3.1
+> 3.2
+> 3.3
+> CD
+> Drag Coefficient
+
+3D Turbulent Channel 2D Cylinder Jet       
+
+> Heuristic MA-PPO (S) MA-SAC (S) Baseflow PPO SAC Heuristic
+
+Figure 4: Drag reduction obtained by the heuristic controllers in the turbulent-channel and cylinder-control cases. We also present the control actions for the Cylinder case. 9HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 used 244 thousand fresh input tokens, 21.0 million cached input tokens, and 74 thousand output tokens, corresponding to a total cost of $13.95. Under the same conditions, Claude required 114 thousand fresh input tokens, 141 thousand cache-write tokens, 19 million cache-read tokens, and 62 thousand output tokens, for a total cost of $12.68. Fable exhibited the lowest overall usage, with only 57 thousand cache-write tokens, 2.29 million cache-read tokens, and 40 thousand output tokens, resulting in a total cost of $5.42. Across the complete benchmark suite, Codex costs $11.90 per environment on average, compared with $12.79 for Claude. When normalized by the obtained benchmark score, Codex requires $10.53 per score unit, Claude $14.53, and Fable only $9.13. Under this metric, Fable 5 provides the most favorable performance-to-cost ratio among the evaluated coding agents. The average computational costs are summarized in Figure 7. 
+
+6.2 Other experiments 6.2.1 Transfer Learning 
+
+Transfer learning is routinely investigated in reinforcement learning for fluid mechanics by adapting a controller developed for a simpler configuration to a more challenging one. We adopt the same philosophy here. Instead of transferring neural-network parameters, however, the transferred object consists of the explicit controller source code together with its accumulated search ledger, which initializes a new heuristic-learning process. Three representative transfer scenarios were considered. First, the controller developed for the cylinder-jet benchmark at Re = 100 was transferred to CylinderJet2D-medium-v0 at Re = 250 . Although the frozen controller performs poorly ( −0.6180 ), only a limited amount of additional search is required to recover a controller reaching 0.2433 . Second, the spatial temperature controller obtained on RBC2D-easy-v0 was transferred to RBC2D-medium-v0 , corresponding to an increase of the Rayleigh number from 8 × 10 4 to 4 × 10 5. The frozen transfer achieves a score of 0.4971 , while the adapted controller ultimately reaches 0.6937 . Finally, the Shkadov controller originally designed for five actuators was transferred to a ten-actuator configuration, requiring only limited adaptation to recover and eventually exceed the original performance. The transferred Shkadov controller preserves the overall feedback structure. The adapted policy retains the same mean, slope, curvature, and last-point features while modifying only a small number of numerical parameters: the delay changes from 11 to 8, the feedback gain from 0.3475 to 0.28 , the smoothing coefficient from 0.84 to 0.90 , and the taper from 0.95 j to 1.03 j . These limited modifications make the adaptation process fully interpretable, since the transferred controller differs from the original through only a handful of explicitly identifiable constants. After approximately 500 episodes, the adapted controller also surpasses the strongest DRL baseline. The complete transfer process is illustrated in Figure 8. 0 50 100 150 200 250 300 350 400 
+
+> Step
+> 3.1
+> 3.2
+> 3.3
+> 3.4
+> 3.5
+> Drag coefficient  CD
+> SAC
+> PPO
+> Heuristic
+> original 80-step horizon
+> CylinderJet2D easy: drag over a 400-step validation rollout
+
+Figure 5: Long-horizon 400-step validation drag on CylinderJet2D-easy-v0 . SAC, PPO, and the heuristic are compared with per-step mean traces and uncertainty bands. 10 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 0 10 20 30 40 50 
+
+> −1.25
+> −1.00
+> −0.75
+> −0.50
+> −0.25
+> 0.00
+> Score
+> Codex
+> SAC
+
+Cylinder rot. easy       
+
+> 010 20 30 40 50
+> −2.0
+> −1.5
+> −1.0
+> −0.5
+> 0.0 Codex
+> SAC
+
+Cylinder jet easy       
+
+> 010 20 30 40 50
+> −2.0
+> −1.5
+> −1.0
+> −0.5
+> 0.0
+> 0.5 Codex
+> SAC
+
+Cylinder jet medium      
+
+> 010 20 30 40 50
+> −0.25
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> Score
+> Codex
+> SAC
+
+RBC easy      
+
+> 010 20 30 40 50
+> −1.0
+> −0.5
+> 0.0
+> 0.5
+> Codex
+> SAC
+
+RBC medium      
+
+> 020 40 60 80 100
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> Codex
+> MA-PPO
+
+TCF 3D both       
+
+> 0100 200 300 400 500 600
+> −3
+> −2
+> −1
+> 0
+> Score
+> Codex
+> PPO
+
+Shkadov        
+
+> 0100 200 300 400 500 600
+> −225
+> −200
+> −175
+> −150
+> −125
+> −100 Codex
+> PPO
+
+Rayleigh      
+
+> 0500 1000 1500 2000
+> 200
+> 250
+> 300
+> 350
+> 400
+> 450
+> 500 Codex
+> PPO
+
+Lorenz      
+
+> 0100 200 300 400 500
+> Steps (k)
+> −6
+> −4
+> −2
+> 0
+> Score
+> Codex
+> PPO
+
+Burgers      
+
+> 050 100 150 200
+> Steps (k)
+> −6
+> −4
+> −2
+> 0Codex
+> PPO
+
+Sloshing      
+
+> 0200 400 600 800 1000
+> Steps (k)
+> 0
+> 20
+> 40
+> 60
+> Codex
+> PPO
+
+Vortex    
+
+> Codex heuristic Best DRL curve Other DRL No control
+
+Figure 6: Score evolution as a function of consumed environment steps. DRL curves are shown together with the coding-agent heuristic trajectories, with the last available heuristic value extended when the diagnostic used fewer steps than the DRL reference. 
+
+6.2.2 Increasing action and observation dimension 
+
+We next investigate whether the proposed heuristic-learning framework remains effective when the dimensionality of the observations or actions is increased. 
+
+Using full mesh fields Providing additional information does not necessarily simplify the search problem. To evaluate this effect, we modified CylinderJet2D-easy-v0 so that the controller received full-field diagnostics derived from the public computational mesh, including wake deficit, pressure skew, vorticity skew, divergence proxies, and mesh-based pressure and shear summaries. The best controller exploiting these richer observations achieved a score of −0.3333 , while the selected default controller reached −0.3478 . Although both outperform the uncontrolled flow, neither matches the original public-sensor heuristic ( −0.1244 ) nor the SAC baseline ( 0.0005 ). During the search, 11 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 Sloshing         
+
+> Lorenz
+> Vortex
+> Burgers
+> Shkadov
+> Mixing
+> Rayleigh
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> 1.50
+> 1.75
+> Relative score
+> 1.66
+> 1.15 1.10 1.06 1.02 1.00
+> 0.92 0.92
+> 0.52
+> 0.11
+> 0.31
+> 0.61
+> 0.96
+> 0.09
+> 1.69
+> 0.72
+> 0.17
+> 1.02
+> 0.87
+> 1.00
+> 0.70
+> 1.66
+> 0.75
+> 0.37
+> 1.06 1.02 1.00 1.01
+> Codex
+> Gemini
+> Claude
+> Fable
+> Codex avg 1.13
+> Gemini avg 0.50
+> Claude avg 0.88
+> Fable avg 0.98
+> rayleigh
+> shkadov
+> burgers
+> vortex
+> 0
+> 5
+> 10
+> 15
+> 20
+> Estimated cost (USD)  $16.32
+> $13.95
+> $7.28
+> $10.04
+> $20.28
+> $12.68 $12.10
+> $6.08
+> $12.31
+> $5.42
+> $4.64
+> $14.14
+> Codex
+> Claude
+> Fable
+> Codex avg $11.90
+> Claude avg $12.79
+> Fable avg $9.13
+
+Figure 7: Agent comparison on the BEACON environments. Each bar reports the normalized score reached by the corresponding coding agent, ordered from left to right by the Codex score. We also present the cost per environment on the right. 0 25 50 75 100 125 150 175 200 
+
+> Transitions (k)
+> −4.0
+> −3.5
+> −3.0
+> −2.5
+> −2.0
+> −1.5
+> −1.0
+> −0.5
+> 0.0
+> Score
+> PPO 5 jets
+> PPO 10 jets
+> Codex 5 jets
+> 10-jet transfer
+
+Policy score under wider actuation       
+
+> 0100 200 300 400 500
+> Logged adaptation episodes
+> −1.2
+> −1.0
+> −0.8
+> −0.6
+> −0.4
+> Worst seed score  first viable, 210 eps
+> selected, 370 eps best worst seed
+> validation 0--49: 50/50 seeds
+> worst -0.490, mean -0.397
+
+10-actuator adaptation search 
+
+Figure 8: Shkadov actuator transfer from 5 to 10 jets. The left panel compares the 5-jet and 10-jet PPO references with the 5-jet heuristic and the selected 10-jet transfer point. The right panel shows the adaptation search that selected the transferred 10-actuator controller. several additional quantities—including recirculation metrics, pressure gradients, and mesh-shear summaries—were explored, but none consistently survived the validation stage. These experiments suggest that increasing the amount of available information does not automatically translate into better explicit controllers and may instead enlarge the search space. 
+
+More actuators We also investigate a more challenging optimization problem by allowing the dimensionality of the action space itself to vary. Rather than fixing the number of control inputs, the Rayleigh–Bénard benchmark was modified so that the controller first selected the number of actuators before optimizing the corresponding control law. Consequently, the search simultaneously explored controller structure and action-space dimensionality. In the observed optimization trajectories, the coding agent first explored the different actuator configurations before progressively identifying the most promising regions of the search space and refining the corresponding feedback laws. Despite this substantially more difficult optimization problem, the heuristic-learning framework remained capable of identifying effective control strategies. 
+
+6.2.3 Sparse observations 
+
+Finally, we investigate the opposite situation by progressively reducing the amount of available information. Figure 9 compares heuristic learning with a TD3 controller on the Rayleigh–Bénard benchmark while decreasing the number of observations from 192 to 144, 96, 48, and finally 12. As expected, TD3 gradually deteriorates as observations become sparser, with a pronounced performance drop at only 12 sensors. Heuristic learning exhibits a similar degradation only in this most restrictive configuration, while recovering nearly identical performance to the full-observation case for 144, 96, and 48 observations. Moreover, across all observation levels, the heuristic search reaches competitive controllers substantially earlier than TD3. These experiments indicate that explicit heuristic search remains remarkably robust 12 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 Red probes carry T, u, v with 4-step history; bottom blocks are fixed actuators. 
+
+Observation grids 
+
+> 12 sensors
+> 144 obs
+> 8 sensors
+> 96 obs
+> 4 sensors
+> 48 obs
+> 1 sensor
+> 12 obs
+
+Figure 9: Sparse-observation control. The left panel shows the sensor layouts and the bottom actuators; the right panels compare TD3 against the fresh heuristic line searches at 200k transitions. under partial observations and is capable of identifying effective feedback laws even when only limited information is available. 
+
+## 7 Policy Anatomy 
+
+The previous section established that heuristic learning is capable of producing controllers that are competitive with state-of-the-art DRL. We now examine the structure of several representative policies in order to better understand the feedback mechanisms discovered during the search. Rather than treating the generated programs as opaque software artifacts, we analyze them as explicit control laws whose individual components can be interpreted physically. Pseudo-code implementations of all reported controllers are provided in Appendix B. We first consider the Shkadov falling-film benchmark, then the three-dimensional turbulent-channel case, and finally compare the learned heuristic with a PPO controller on the cylinder-jet benchmark. 
+
+7.1 Shkadov: delayed shape feedback 
+
+The Shkadov benchmark provides a particularly instructive example because the control problem is inherently convective. The controller observes upstream flow-rate windows, whereas the objective is defined through the downstream film-height error. Consequently, a purely reactive controller is fundamentally suboptimal: by the time an upstream disturbance has been detected and an actuation command is applied, the corresponding wave has already propagated downstream. The discovered five-actuator controller naturally compensates for this transport delay through a delayed local feedback law. For each actuator-local upstream window qj , it first extracts four physically interpretable features, 13 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 
+
+μj = mean( qj − 1) ,sj = qj [−1] − qj [0] ,κj = qj [mid] − 12 (qj [0] + qj [−1]) ,ℓj = qj [−1] − 1.
+
+These quantities are then combined into a delayed shape descriptor, 
+
+σj = μj − 0.5847514 sj + 0 .9217264 κj − 0.2278599 ℓj .
+
+The resulting control action is 
+
+˜aj,t = clip  −0.3475133 σj,t −11 0.95 j + 0 .0263648 , −1, 1 ,
+
+followed by a 0.05 deadband and exponential smoothing, 
+
+aj,t = 0 .16 ˜ aj,t + 0 .84 aj,t −1.
+
+The numerical coefficients themselves should not be interpreted as a physical model of falling-film dynamics. The important observation is the structure of the discovered controller. The coding agent independently identifies that successful control requires maintaining a compact description of the local wave geometry before applying the corre-sponding actuation after an appropriate transport delay. The dominant contribution of the curvature term κj indicates that local wave shape is more informative than the absolute signal itself, while the eleven-step delay approximately synchronizes upstream sensing with downstream actuation. Interestingly, these mechanisms emerge directly from the optimization process without being prescribed by the user. 
+
+7.2 Turbulent channel flow: local wall feedback 
+
+The benchmark TCFSmall3D-both-easy-v0 provides a substantially more challenging interpretability test. Unlike the Shkadov case, the controller no longer receives a small vector of probe measurements but instead observes complete wall fields on both channel walls. Let the public wall observations be reshaped as (ui, v i) over the two wall grids. The controller first normalizes each wall independently, 
+
+ˆui = ui − uwall 
+
+std( uwall ) + 10 −4 , ˆvi = vi − vwall 
+
+std( vwall ) + 10 −4 .
+
+It then constructs the local feedback signal 
+
+si = −0.263671875 ˆ vi + 0 .2109375 ˆ ui,
+
+before applying one nearest-neighbour smoothing pass on each wall, subtracting the mean action independently on each surface, and clipping the resulting commands to the admissible interval [−0.30 , 0.30] .Ablation studies reveal that every component of this controller contributes to its final performance. Removing the normalization step causes the score to collapse toward 0.02 –0.05 , indicating that relative rather than absolute velocity fluctuations are the relevant control variables. Eliminating the positive contribution of the streamwise residual reduces the score to approximately 0.10 –0.16 . Likewise, suppressing the smoothing operation, the mean-free projection, or the centering procedure consistently degrades performance, while reversing the sign convention on the upper wall also fails. Finally, replacing the complete wall feedback by a scalar wall-stress signal proved insufficient. Together, these ablations suggest that the controller relies on a genuinely distributed local wall-feedback mechanism rather than on a single global flow indicator. The remaining policies are detailed in Appendix B. 14 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 
+
+7.3 Comparison with PPO based policies 
+
+Finally, we compare the explicit heuristic with policies obtained through conventional deep reinforcement learning on CylinderJet2D-easy-v0 . To this end, we constructed a dataset of 400 observation–action pairs sampled from random trajectories, heuristic rollouts, DRL rollouts, and mixed-policy simulations. This allows the different controllers to be evaluated on identical flow states rather than through aggregate performance alone. Although PPO and the heuristic differ in overall score and long-term stability, their instantaneous control decisions are noticeably more similar than those produced by SAC. The mean absolute action difference between PPO and the heuristic is 0.2852 , compared with 0.3406 between SAC and the heuristic, while PPO and SAC differ by 0.1728 .Furthermore, PPO reproduces the heuristic action within 0.05 on 21 .75% of the evaluated states, whereas SAC reaches the same agreement on only 14 .5% . The complete comparison is presented in Figure 10. The phase-resolved analysis further indicates that the heuristic and PPO become increasingly similar once the controlled wake reaches its quasi-stationary regime, whereas larger discrepancies are observed during the initial transient. The PCA representation provides a complementary interpretation. States originating from random trajectories lie farther from the region explored by the learned controllers, and the action disagreement increases accordingly. Rather than indicating contradictory control strategies, these results suggest that the heuristic and PPO have learned compatible feedback mechanisms on the portion of state space encountered during successful control, while differing primarily in how they extrapolate outside this on-policy region. Early Middle Late        
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> Mean absolute action difference
+> 0.37
+> 83% >0.1
+> 0.26
+> 71% >0.1 0.22
+> 46% >0.1
+> Action disagreement by episode phase
+> −30 −20 −10 010 20 30
+> PC1
+> −20
+> −10
+> 0
+> 10
+> 20
+> PC2
+> State origin in PCA space
+> PPO
+> SAC
+> Heuristic
+> Random
+> Mixed
+
+Figure 10: Same-state comparison between PPO and the heuristic on CylinderJet2D-easy-v0 . The first panel reports the action gap by episode phase, while the second panel locates the disagreement in the first two principal components of the stored state bank. 
+
+## 8 Conclusion 
+
+This work investigated whether modern coding agents can serve as practical search procedures for discovering explicit controllers in active flow control. Using identical environments, observations, actions, rewards, and environment-step budgets, the proposed heuristic-learning framework reached or exceeded the strongest available DRL baseline in 10 of the 13 benchmark environments. Unlike conventional reinforcement learning, however, the outcome of the optimization is not a neural-network policy but an explicit executable controller whose feedback structure, gains, delays, and filtering operations remain directly accessible to human inspection. Beyond the benchmark scores, the experiments demonstrate that explicit controller synthesis provides valuable physical insight. In both the Shkadov and turbulent-channel benchmarks, the discovered heuristics reduce to compact feedback structures that naturally reflect the underlying flow physics. The emergence of delayed shape feedback for convecting falling films and normalized local wall feedback for turbulent channel flow suggests that heuristic learning is capable not only of optimizing performance, but also of recovering meaningful control mechanisms. Furthermore, the transfer experiments show that these controllers can often be adapted to more challenging configurations through the modification of only a few interpretable parameters, rather than requiring the complete retraining of a policy. The present study also highlights the importance of rigorous evaluation protocols. Increasing the amount of available information does not necessarily simplify controller discovery, while severe observation sparsity ultimately limits performance. More importantly, the validity of the search depends on carefully constraining the coding agent to the public benchmark interface. Without such safeguards, an autonomous agent may exploit implementation details or simulator loopholes rather than discovering admissible control strategies. We therefore believe that future work on 15 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 agent-based scientific discovery should place increasing emphasis on transparent experimental protocols, reproducible search procedures, and systematic reporting of prompts, search ledgers, rejected candidates, and controller ablations. More broadly, this work suggests that explicit program synthesis constitutes a credible alternative to parameter optimization for a class of fluid-control problems. Rather than searching in the high-dimensional space of neural-network weights, heuristic learning searches directly in the space of executable feedback laws. As coding agents continue to improve, this paradigm may progressively transform how controllers are designed, analyzed, and transferred, combining the optimization capabilities of modern AI with the interpretability and physical insight traditionally sought in computational fluid dynamics. 
+
+## Acknowledgments 
+
+We thank OpenAI for support during the experiments. Funded/Co-funded by the European Union (ERC, CURE, 101045042). Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Council. Neither the European Union nor the granting authority can be held responsible for them. 
+
+## References 
+
+Jean Rabault, Miroslav Kuchta, Atle Jensen, Ulysse Réglade, and Nicolas Cerardi. Artificial neural networks trained through deep reinforcement learning discover control strategies for active flow control. Journal of Fluid Mechanics ,865:281–302, 2019. doi: 10.1017/jfm.2019.62. Vincent Belus, Jean Rabault, Jonathan Viquerat, Zhizhao Che, Elie Hachem, and Ulysse Reglade. Exploiting locality and translational invariance to design effective deep reinforcement learning control of the 1-dimensional unstable falling liquid film. AIP Advances , 9(12):125014, 2019. doi: 10.1063/1.5132378. Gerben Beintema, Alessandro Corbetta, Luca Biferale, and Federico Toschi. Controlling rayleigh–bénard convection via reinforcement learning. Journal of Turbulence , 21(9–10):585–605, 2020. doi: 10.1080/14685248.2020.1797059. Elie Hachem, H. Ghraieb, Jonathan Viquerat, Aurélien Larcher, and Philippe Meliga. Deep reinforcement learning for the control of conjugate heat transfer. Journal of Computational Physics , 436:110317, 2021. doi: 10.1016/j.jcp.2021. 110317. Guido Novati, Siddhartha Verma, Dmitry Alexeev, Diego Rossinelli, Wim M. van Rees, and Petros Koumoutsakos. Synchronisation through learning for two self-propelled swimmers. Bioinspiration & Biomimetics , 12(3):036001, 2017. doi: 10.1088/1748-3190/aa6311. Siddhartha Verma, Guido Novati, and Petros Koumoutsakos. Efficient collective swimming by harnessing vortices through deep reinforcement learning. Proceedings of the National Academy of Sciences , 115(23):5849–5854, 2018. doi: 10.1073/pnas.1800923115. Jonathan Viquerat, Jean Rabault, Alexander Kuhnle, Hassan Ghraieb, Aurélien Larcher, and Elie Hachem. Direct shape optimization through deep reinforcement learning. Journal of Computational Physics , 428:110080, 2021. doi: 10.1016/j.jcp.2020.110080. Dixia Fan, Liu Yang, Zhicheng Wang, Michael S. Triantafyllou, and George Em Karniadakis. Reinforcement learning for bluff body active flow control in experiments and simulations. Proceedings of the National Academy of Sciences ,117(42):26091–26098, 2020. doi: 10.1073/pnas.2004939117. Jean Rabault and Alexander Kuhnle. Accelerating deep reinforcement learning strategies of flow control through a multi-environment approach. Physics of Fluids , 31(9):094105, 2019. doi: 10.1063/1.5116415. Jonathan Viquerat and Elie Hachem. Parallel bootstrap-based on-policy deep reinforcement learning for continuous fluid flow control applications. Fluids , 8(7):208, 2023. doi: 10.3390/fluids8070208. Marcin Andrychowicz, Anton Raichuk, Piotr Sta´ nczyk, Manu Orsini, Sertan Girgin, Raphael Marinier, Léonard Hussenot, Matthieu Geist, Olivier Pietquin, Marcin Michalski, Sylvain Gelly, and Olivier Bachem. What matters in on-policy reinforcement learning? a large-scale empirical study, 2020. Jonathan Viquerat, Philippe Meliga, Aurélien Larcher, and Elie Hachem. A review on deep reinforcement learning for fluid mechanics: An update. Physics of Fluids , 34(11):111301, 2022. doi: 10.1063/5.0128446. Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. Neural machine translation by jointly learning to align and translate. In International Conference on Learning Representations , 2015. URL https://arxiv.org/abs/1409. 0473 .16 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Lukasz Kaiser, and Illia Polosukhin. Attention is all you need. In Advances in Neural Information Processing Systems , volume 30, 2017. URL https://papers.neurips.cc/paper/7181-attention-is-all-you-need .Mark Chen, Jerry Tworek, Heewoo Jun, Qiming Yuan, Henrique Ponde de Oliveira Pinto, Jared Kaplan, Harri Edwards, Yuri Burda, Nicholas Joseph, Greg Brockman, et al. Evaluating large language models trained on code. arXiv preprint arXiv:2107.03374 , 2021. URL https://arxiv.org/abs/2107.03374 .Carlos E. Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, and Karthik R. Narasimhan. SWE-bench: Can language models resolve real-world github issues? In The Twelfth International Conference on Learning Representations , 2024. URL https://openreview.net/forum?id=VTF8yNQM66 .Anthropic. Claude code by anthropic. https://www.anthropic.com/product/claude-code , 2026a. Accessed: 2026-05-19. OpenAI. Introducing codex. https://openai.com/index/introducing-codex/ , May 2025. Published May 16, 2025. OpenAI. Introducing the codex app. https://openai.com/index/introducing-the-codex-app/ , February 2026a. Published February 2, 2026; updated March 4, 2026. Anthropic. Long-running claude for scientific computing. https://www.anthropic.com/research/ long-running-Claude , March 2026b. Published March 23, 2026. Hongwei Tang, Jean Rabault, Alexander Kuhnle, Yan Wang, and Tongguang Wang. Robust active flow control over a range of reynolds numbers using an artificial neural network trained through deep reinforcement learning. Physics of Fluids , 32(5):053605, 2020. doi: 10.1063/5.0006492. Feng Ren, Jean Rabault, and Hui Tang. Applying deep reinforcement learning to active flow control in weakly turbulent conditions. Physics of Fluids , 33(3):037121, 2021. doi: 10.1063/5.0037371. Paul Garnier, Jonathan Viquerat, Jean Rabault, Aurélien Larcher, Alexander Kuhnle, and Elie Hachem. A review on deep reinforcement learning for fluid mechanics. Computers & Fluids , 225:104973, 2021. doi: 10.1016/j.compfluid. 2021.104973. Elie Hachem, Aditya Vishwasrao, M. Renault, Jonathan Viquerat, and Philippe Meliga. Reinforcement learning for cooling rate control during quenching. International Journal of Numerical Methods for Heat & Fluid Flow , 34(8), 2024. John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms, 2017. Scott Fujimoto, Herke Hoof, and David Meger. Addressing function approximation error in actor-critic methods. In 
+
+Proceedings of the 35th International Conference on Machine Learning , volume 80 of Proceedings of Machine Learning Research , pages 1587–1596, 2018. Marc G. Bellemare, Yavar Naddaf, Joel Veness, and Michael Bowling. The arcade learning environment: An evaluation platform for general agents. Journal of Artificial Intelligence Research , 47:253–279, 2013. doi: 10.1613/jair.3912. Emanuel Todorov, Tom Erez, and Yuval Tassa. MuJoCo: A physics engine for model-based control. In 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 5026–5033, 2012. doi: 10.1109/IROS.2012. 6386109. Greg Brockman, Vicki Cheung, Ludwig Pettersson, Jonas Schneider, John Schulman, Jie Tang, and Wojciech Zaremba. Openai gym, 2016. Jonathan Viquerat, Philippe Meliga, Pablo Jeken, and Elie Hachem. Beacon, a lightweight deep reinforcement learning benchmark library for flow control. Applied Sciences , 14(9):3561, 2024. doi: 10.3390/app14093561. Jannis Becktepe, Aleksandra Franz, Nils Thuerey, and Sebastian Peitz. Plug-and-play benchmarking of reinforcement learning algorithms for large-scale flow control, 2026. URL https://arxiv.org/abs/2601.15015 .Yoonho Lee, Joseph Boen, and Chelsea Finn. Feedback descent: Open-ended text optimization via pairwise comparison. In arXiv preprint arXiv:2511.07919 , 2025. Lakshya A Agrawal, Shangyin Tan, Dilara Soylu, Noah Ziems, Rishi Khare, Krista Opsahl-Ong, Arnav Singhvi, Herumb Shandilya, Michael J Ryan, Meng Jiang, et al. Gepa: Reflective prompt evolution can outperform reinforcement learning. arXiv preprint arXiv:2507.19457 , 2025. Reid Pryzant, Dan Iter, Jerry Li, Yin Tat Lee, Chenguang Zhu, and Michael Zeng. Automatic prompt optimization with “gradient descent” and beam search. arXiv preprint arXiv:2305.03495 , 2023. 17 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 Aman Madaan, Niket Tandon, Prakhar Gupta, Skyler Hallinan, Luyu Gao, Sarah Wiegreffe, Uri Alon, Nouha Dziri, Shrimai Prabhumoye, Yiming Yang, et al. Self-refine: Iterative refinement with self-feedback. Advances in neural information processing systems , 36:46534–46594, 2023. Mert Yuksekgonul, Federico Bianchi, Joseph Boen, Sheng Liu, Zhi Huang, Carlos Guestrin, and James Zou. Textgrad: Automatic "differentiation" via text, 2024. URL https://arxiv.org/abs/2406.07496 .Chengrun Yang, Xuezhi Wang, Yifeng Lu, Hanxiao Liu, Quoc V Le, Denny Zhou, and Xinyun Chen. Large language models as optimizers. In The Twelfth International Conference on Learning Representations , 2023. Asankhaya Sharma. Openevolve: an open-source evolutionary coding agent. https://github. com/algorithmicsuperintelligence/openevolve , 2025. URL https://github.com/ algorithmicsuperintelligence/openevolve . GitHub repository. Alexander Novikov, Ngân V ˜u, Marvin Eisenberger, Emilien Dupont, Po-Sen Huang, Adam Zsolt Wagner, Sergey Shirobokov, Borislav Kozlovskii, Francisco JR Ruiz, Abbas Mehrabian, et al. Alphaevolve: A coding agent for scientific and algorithmic discovery. arXiv preprint arXiv:2506.13131 , 2025. Joel Lehman, Jonathan Gordon, Shawn Jain, Kamal Ndousse, Cathy Yeh, and Kenneth O. Stanley. Evolution through large models, 2022. URL https://arxiv.org/abs/2206.08896 .Bernardino Romera-Paredes, Mohammadamin Barekatain, Alexander Novikov, Matej Balog, M Pawan Kumar, Emilien Dupont, Francisco JR Ruiz, Jordan S Ellenberg, Pengming Wang, Omar Fawzi, et al. Mathematical discoveries from program search with large language models. Nature , 625(7995):468–475, 2024. Shengran Hu, Cong Lu, and Jeff Clune. Automated design of agentic systems. In The Thirteenth International Conference on Learning Representations , 2025. URL https://openreview.net/forum?id=t9U3LW7JVX .Jiayi Zhang, Jinyu Xiang, Zhaoyang Yu, Fengwei Teng, Xionghui Chen, Jiaqi Chen, Mingchen Zhuge, Xin Cheng, Sirui Hong, Jinlin Wang, Bingnan Zheng, Bang Liu, Yuyu Luo, and Chenglin Wu. Aflow: Automating agentic workflow generation, 2025a. URL https://arxiv.org/abs/2410.10762 .Guibin Zhang, Haotian Ren, Chong Zhan, Zhenhong Zhou, Junhao Wang, He Zhu, Wangchunshu Zhou, and Shuicheng Yan. Memevolve: Meta-evolution of agent memory systems. arXiv preprint arXiv:2512.18746 , 2025b. Yiming Xiong, Shengran Hu, and Jeff Clune. Learning to continually learn via meta-learning agentic memory designs. In OpenReview , 2026. URL https://api.semanticscholar.org/CorpusID:285454009 .Jurgen Schmidhuber. A neural network that embeds its own meta-levels. In IEEE International Conference on Neural Networks , 1993. Sebastian Thrun and Lorien Pratt. Learning to learn: Introduction and overview. In Learning to learn , pages 3–17. Springer, 1998. Marcin Andrychowicz, Misha Denil, Sergio Gomez, Matthew W Hoffman, David Pfau, Tom Schaul, Brendan Shilling-ford, and Nando De Freitas. Learning to learn by gradient descent by gradient descent. Advances in neural information processing systems , 29, 2016. Chelsea Finn, Pieter Abbeel, and Sergey Levine. Model-agnostic meta-learning for fast adaptation of deep networks. In 
+
+International Conference on Machine Learning , 2017. Jake Snell, Kevin Swersky, and Richard S. Zemel. Prototypical networks for few-shot learning. In Advances in Neural Information Processing Systems , 2017. Ekin Akyürek, Dale Schuurmans, Jacob Andreas, Tengyu Ma, and Denny Zhou. What learning algorithm is in-context learning? investigations with linear models, 2023. URL https://arxiv.org/abs/2211.15661 .OpenAI. Introducing gpt-5.5. https://openai.com/index/introducing-gpt-5-5/ , April 2026b. Published April 23, 2026. OpenAI. Using gpt-5.5. https://developers.openai.com/api/docs/guides/latest-model , 2026c. Ac-cessed: 2026-05-19. OpenAI. Codex models. https://developers.openai.com/codex/models , 2026d. Accessed: 2026-05-19. Anthropic. Introducing claude opus 4.7. https://www.anthropic.com/news/claude-opus-4-7 , April 2026c. Published April 16, 2026. Anthropic. Model configuration. https://code.claude.com/docs/en/model-config , 2026d. Claude Code documentation; accessed: 2026-05-19. Anthropic. Claude fable 5 and claude mythos 5. https://www.anthropic.com/news/ claude-fable-5-mythos-5 , 2026e. Accessed: 2026-06-10. 18 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 Google. A new era of intelligence with gemini 3. https://blog.google/products-and-platforms/products/ gemini/gemini-3/ , November 2025. Published November 18, 2025. Google Developers Blog. 5 things to try with gemini 3 pro in gemini cli. https://developers.googleblog.com/ 5-things-to-try-with-gemini-3-pro-in-gemini-cli/ , November 2025. Published November 18, 2025. OpenAI. Codex cli. https://developers.openai.com/codex/cli , 2026e. Accessed: 2026-05-19. Google Cloud. Gemini cli. https://docs.cloud.google.com/gemini/docs/codeassist/gemini-cli , 2026. Accessed: 2026-05-19. 
+
+## A Environment Suite 
+
+The benchmark suite contains 13 environments: 6 larger FluidGym flow-control cases and 7 compact BEACON control cases. Table 2 reports the task definition, principal physical parameters, default episode horizon, and action-step clock used for budget accounting. 
+
+## B Heuristics 
+
+Each algorithm writes the deployed control law, not the search loop that found it. The operator clip( x, ℓ, u ) clips elementwise to [ℓ, u ]. The operator interp( ·) maps sensor columns to actuator locations. All controllers use public observations and their own recurrent state unless an open-loop schedule is stated explicitly. 19 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 Table 2: Environment characteristics and rollout clocks. Steps are action steps per full default episode. ∆tenv is FluidGym step_length or BEACON dt_act .
+
+Environment Description Characteristics Steps ∆tenv 
+
+CylinderRot2D-easy-v0 2D cylinder wake controlled by wall rotation. Re = 100 , resolution 24 , 1 rotation actuator. 80 0.25 
+
+CylinderJet2D-easy-v0 2D cylinder wake controlled by synthetic jets. Re = 100 , resolution 24 , 1 jet pair. 80 0.25 
+
+CylinderJet2D-medium-v0 Higher-Reynolds-number jet control for the cylin-der wake. 
+
+Re = 250 , resolution 32 , 1 jet pair. 80 0.25 
+
+RBC2D-easy-v0 Rayleigh-Bénard convection controlled by bottom heaters. 
+
+Ra = 8 × 10 4, P r = 0 .7, 12 heaters. 200 1.0
+
+RBC2D-medium-v0 Harder Rayleigh-Bénard convection transfer case. Ra = 4 × 10 5, P r = 0 .7, 12 heaters. 200 1.0
+
+TCFSmall3D-both-easy-v0 3D turbulent channel flow with both-wall actua-tion. 
+
+Re τ = 180 , grid 64 × 65 × 64 , both walls. 1000 0.6 wall units 
+
+shkadov-v0 Falling-film height and flow-rate stabilization. δ = 0 .1, 5 jets, A = 5 , σ = 5 × 10 −4. 400 0.05 
+
+rayleigh-v0 2D convection controlled by bottom temperature segments. 
+
+Ra = 10 4, P r = 0 .71 , 10 segments, 
+
+C = 0 .75 .100 2.0
+
+lorenz-v0 Forced Lorenz attractor with reward for keeping 
+
+x < 0.
+
+(σ, ρ, β ) = (10 , 28 , 8/3) , 3 discrete actions. 500 0.05 
+
+burgers-v0 1D Burgers inlet-noise damping with point forc-ing. 
+
+L = 2 , xp = 1 , A = 10 , σ = 0 .1,
+
+u⋆ = 0 .5.200 0.05 
+
+sloshing-v0 1D tank sloshing controlled by cart acceleration. L = 2 .5, g = 9 .81 , A = 5 ,
+
+α = 5 × 10 −4.200 0.05 
+
+vortex-v0 Vortex-induced oscillator with amplitude and phase forcing. 
+
+Re = 50 , m = 10 , γ = 0 .023 , 2 action coordinates. 800 0.5
+
+mixing-v0 2D passive-scalar mixing driven by wall-shear actions. 
+
+Re = 100 , P e = 10 4, 4 discrete wall-shear actions. 100 0.5
+
+Algorithm 2 CylinderRot2D-easy-v0 : PID lift proxy with a small carrier 
+
+Require: Observation ot, public info it, previous lift proxy ℓt−1, integral It−1
+
+1: Constants: A = 0 .1544 , b = 0 .014 , kℓ = −1.0, kd = −0.60 , ki = 0 , Ap = 0 .005 , f = 0 .055 
+
+2: Split ot into first and last halves, then ℓt ← mean( ofirst 
+
+t ) − mean( olast 
+
+t )
+
+3: dt ← ℓt − ℓt−1
+
+4: It ← clip( It−1 + ℓt, −50 , 50) 
+
+5: ut ← b − kℓℓt − kddt − kiIt + Ap sin(2 πf t )
+
+6: return clip( ut, −A, A )
+
+Algorithm 3 CylinderJet2D-easy-v0 : full-observation lift-proxy feedback 
+
+Require: Flattened observation ot, previous proxy st−1
+
+1: Constants: g = 0 .19925 , kd = 1 .45 , b = −0.3933337627 , learned vector w, action bounds [−1, 1] 
+
+2: st ← clip( b + w⊤ot, −1, 1) 
+
+3: ∆st ← 0 if t = 0 , else st − st−1
+
+4: ct ← st + kd∆st
+
+5: ut ← − gc t
+
+6: return clip( ut, −1, 1) 
+
+Algorithm 4 CylinderJet2D-medium-v0 : lift PID feedback 
+
+Require: Observation ot, public info it, previous lift proxy st−1, previous difference ∆st−1, integral It−1
+
+1: Constants: g = 0 .18 , kd = 1 .625 , ki = 0 .009 , Imax = 4 .0
+
+2: st ← public lift from it if present, otherwise the observation asymmetry proxy 
+
+3: ∆st ← 0 if t = 0 , else st − st−1
+
+4: ∆2st ← 0 if t = 0 , else ∆st − ∆st−1
+
+5: It ← clip( It−1 + st, −Imax , I max )
+
+6: ct ← st + kd∆st + kiIt
+
+7: ut ← − gc t
+
+8: return clip( ut, −1, 1) 
+
+20 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 
+
+Algorithm 5 RBC2D-easy-v0 : spatial thermal contrast feedback 
+
+Require: Observation vector ot with 3 channels, action count n
+
+1: Constants: gain g = 5 .0, channel weights (1 , 0, 0) , contrast power p = 0 .5, smoothing α = 0 
+
+2: Reshape each channel into rows and n actuator blocks 
+
+3: for j = 1 , . . . , n do 
+
+4: mj ← mean of channel-0 sensors assigned to actuator j
+
+5: end for 
+
+6: rj ← mj − mean( m1: n)
+
+7: sj ← sgn( rj )|rj |p for each actuator j
+
+8: uj ← − gs j
+
+9: ut ← ut − mean( ut)
+
+10: return clip( ut, −1, 1) 
+
+Algorithm 6 RBC2D-medium-v0 : smoothed spatial thermal contrast feedback 
+
+Require: Observation vector ot, previous action ut−1, action count n
+
+1: Constants: gain g = 5 .0, channel weights (1 , 0, 0) , contrast power p = 0 .5, smoothing α = 0 .3
+
+2: Compute the local block means m1: n exactly as in Algorithm 5 
+
+3: rj ← mj − mean( m1: n)
+
+4: sj ← sgn( rj )|rj |p
+
+5: ˜uj ← − gs j
+
+6: ˜ut ← ˜ut − mean(˜ ut)
+
+7: ut ← αu t−1 + (1 − α)˜ ut
+
+8: return clip( ut, −1, 1) 
+
+Algorithm 7 TCFSmall3D-both-easy-v0 : local wall-velocity feedback 
+
+Require: Wall observation ot with local (u, v ) features on bottom and top walls 
+
+1: Constants: α = 0 .263671875 , βu = 0 .2109375 , c = 0 .3, one smoothing pass, mean-free per wall 
+
+2: Split ot into bottom and top wall grids, each with local streamwise velocity u and wall-normal velocity v
+
+3: for each wall separately do 
+
+4: Center and normalize u and v
+
+5: s ← − αv + βuu
+
+6: Smooth s once with nearest-neighbor averaging on the wall grid 
+
+7: s ← s − mean( s)
+
+8: end for 
+
+9: return clip( s, −c, c ) on both walls 
+
+Algorithm 8 shkadov-v0 : delayed shape feedback with 5 jets 
+
+Require: Observation ot reshaped as 5 actuator-local upstream windows qj,t 
+
+1: Constants: ws = −0.5847514 , wc = 0 .9217264 , wl = −0.2278599 , g = 0 .3475133 , delay D = 11 
+
+2: Constants: smoothing α = 0 .84 , taper ρ = 0 .95 , bias b = 0 .0263648 , deadband δ = 0 .05 
+
+3: for j = 1 , . . . , 5 do 
+
+4: mj ← mean( qj,t − 1) 
+
+5: rj ← qlast  
+
+> j,t
+
+− qfirst 
+
+> j,t
+
+6: cj ← qmid  
+
+> j,t
+
+− 12 (qfirst  
+
+> j,t
+
++ qlast  
+
+> j,t
+
+)
+
+7: ℓj ← qlast  
+
+> j,t
+
+− 1
+
+8: sj,t ← clip( mj + wsrj + wccj + wlℓj , −5, 5) 
+
+9: end for 
+
+10: Store st in a buffer and read ¯st = st−D , using the oldest available item during startup 
+
+11: ˜uj,t ← − g¯sj,t ρj−1 + b
+
+12: ˜uj,t ← 0 when |˜uj,t | < δ 
+
+13: ut ← αu t−1 + (1 − α) clip(˜ ut, −1, 1) 
+
+14: return clip( ut, −1, 1) 
+
+21 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 
+
+Algorithm 9 rayleigh-v0 : 15-actuator local-plume feedback 
+
+Require: Observation history ot reshaped into temperature T , horizontal velocity u, vertical velocity v 
+
+> 1:
+
+Constants: n = 15 , gT = 7 .64563216 , gv = 18 .0, g∆T = 0 .21760451 , g∆v = 0 .12628452  
+
+> 2:
+
+Constants: spatial smoothing 0.7, temporal smoothing 0.04918578 , saturation 0.75 , deadband 0.1 
+
+> 3:
+
+Compress the selected middle-y profile over the front history window into columns Tx and vx 
+
+> 4:
+
+Interpolate Tx and vx to the 15 actuator centers  
+
+> 5:
+
+Compute front-window finite differences ∆Tx and ∆vx, then interpolate them to actuator centers  
+
+> 6:
+
+˜uj ← − (gT Tj + gv vj + g∆T ∆Tj + g∆v ∆vj ) 
+
+> 7:
+
+Smooth ˜u1: n spatially with nearest neighbors  
+
+> 8:
+
+˜u ← ˜u − mean(˜ u) 
+
+> 9:
+
+˜uj ← 0 when |˜uj | < 0.1 
+
+> 10:
+
+˜u ← clip(˜ u, −0.75 , 0.75)  
+
+> 11:
+
+ut ← 0.04918578 ut−1 + (1 − 0.04918578)˜ u 
+
+> 12:
+
+return ut
+
+Algorithm 10 lorenz-v0 : thresholded recovery controller 
+
+Require: Observation ot = ( xt, y t, z t, ˙xt, . . . ) and dwell counter h 
+
+> 1:
+
+Constants: guard score γ = −5.83480325 , recovery threshold xr = −6.08078423 , w ˙x = 0 .77296558  
+
+> 2:
+
+Constants: guard action ag = 0 , recovery action ar = 2 , cruise action ac = 2 , dwell D = 1  
+
+> 3:
+
+if h > 0 then  
+
+> 4:
+
+h ← h − 1 
+
+> 5:
+
+return previous action  
+
+> 6:
+
+end if  
+
+> 7:
+
+qt ← xt + w ˙x ˙xt 
+
+> 8:
+
+if xt > x r then  
+
+> 9:
+
+at ← ar 
+
+> 10:
+
+else if qt > γ then  
+
+> 11:
+
+at ← ag 
+
+> 12:
+
+else  
+
+> 13:
+
+at ← ac 
+
+> 14:
+
+end if  
+
+> 15:
+
+h ← D 
+
+> 16:
+
+return at
+
+Algorithm 11 sloshing-v0 : derivative modal damping 
+
+Require: Free-surface observation ot, previous modal projection pt−1, previous action ut−1 
+
+> 1:
+
+Constants: mode m = 1 , gain g = 20 .0, sign +1 , smoothing α = 0 .4, saturation 1.0 
+
+> 2:
+
+bi ← sin( mπx i) on the observation grid, normalized to unit norm  
+
+> 3:
+
+pt ← o⊤ 
+
+> t
+
+b 
+
+> 4:
+
+dt ← 0 if t = 0 , else pt − pt−1 
+
+> 5:
+
+˜ut ← − gd t 
+
+> 6:
+
+˜ut ← clip(˜ ut, −1, 1)  
+
+> 7:
+
+ut ← αu t−1 + (1 − α)˜ ut 
+
+> 8:
+
+return ut
+
+Algorithm 12 vortex-v0 : bounded piecewise-linear phase schedule 
+
+Require: Number of action steps T , knot vector κ1:18  
+
+> 1:
+
+Constants: amplitude action a = 0 .9999516206  
+
+> 2:
+
+Knots: 
+
+κ = ( −0.2568 , −0.3801 , −0.4728 , −0.5179 , −0.5573 , −0.5804 ,
+
+−0.6006 , −0.6100 , −0.6143 , −0.6177 , −0.6200 , −0.6218 ,
+
+−0.6231 , −0.6220 , −0.6203 , −0.6221 , −0.6144 , −0.5729)  
+
+> 3:
+
+Interpolate κ linearly over steps 0, . . . , T − 1 to get phase sequence ϕt 
+
+> 4:
+
+for t = 0 , . . . , T − 1 do  
+
+> 5:
+
+ut ← (a, clip( ϕt, −1, 1))  
+
+> 6:
+
+Apply ut to the environment  
+
+> 7:
+
+end for 
+
+22 HEURISTIC LEARNING FOR FLUID DYNAMICS - J ULY 14, 2026 
+
+Algorithm 13 mixing-v0 : alternating shear word 
+
+Require: Step index t
+
+1: Constants: word (1 , 2) and dwell D = 4 
+
+2: k ← ⌊ t/D ⌋ mod 2 
+
+3: if k = 0 then 
+
+4: return action 1
+
+5: else 
+
+6: return action 2
+
+7: end if 
+
+23

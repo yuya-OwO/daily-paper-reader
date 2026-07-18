@@ -1,0 +1,1667 @@
+Title: Lyapunov Guidance: A Unified Framework for Stabilizing Generative Flows
+
+URL Source: https://arxiv.org/pdf/2607.14272v1
+
+Published Time: Fri, 17 Jul 2026 00:15:41 GMT
+
+Number of Pages: 25
+
+Markdown Content:
+> 1
+
+# Lyapunov Guidance: A Unified Framework for Stabilizing Generative Flows 
+
+Jingdong Zhang, Xinze Li, Yize Jiang, Luan Yang, Minkai Xu, Junhong Liu 
+
+Abstract —Flow matching has emerged as an effective frame-work for learning complex data distributions, but adapting pretrained flow models to new tasks often requires computa-tionally expensive retraining. Post-training guidance provides a more efficient alternative, but existing methods are largely heuristic and offer no explicit stability guarantees. We address this limitation by proposing LyaGuide, a unified Lyapunov-guided framework that formulates flow guidance as a Lyapunov control problem. Our main theoretical result establishes an equivalence between guided flow matching and Lyapunov control, thereby unifying common guidance strategies, such as classifier guidance, reward guidance, and energy-based guidance, within a single control-theoretic framework. To enforce the Lyapunov condition, we introduce a pseudo-projection operator with a closed-form expression that endows learned or heuristic guidance terms with explicit stability guarantees. LyaGuide supports two practical settings: a model-driven setting, where the target guidance distribution is specified through a known Lyapunov function, and a data-driven setting, where the guidance is adapted from task-specific downstream data. LyaGuide is compatible with existing guidance methods, introduces minimal additional computational overhead, and is straightforward to integrate in practice. Extensive experiments on synthetic benchmarks, image inverse problems, reinforcement learning planning, and energy-based modeling demonstrate consistent improvements in sample quality, guidance fidelity, and robustness, while maintaining computational efficiency. 
+
+Index Terms —Guided Generative Modeling, Flow Matching, Lyapunov Control, Pseudo-Projection 
+
+I. I NTRODUCTION 
+
+Generative modeling has achieved substantial progress with the development of diffusion models [1]–[3] and their de-terministic counterparts based on flow matching [4]–[6]. By learning a time-dependent vector field that transports a simple base distribution to a complex data distribution, flow matching provides a mathematically principled and computationally effi-cient alternative to stochastic diffusion processes. Despite this success, adapting a pretrained flow model to downstream tasks remains challenging. A direct solution is to retrain or fine-tune the model using task-specific data, but such strategies are often computationally expensive and require task-dependent opti-mization. Post-training guidance offers a more flexible alterna-tive by modifying the inference dynamics without retraining the underlying model. However, existing guidance methods 
+
+J. Zhang is with Department of Mathematics and I-X, Imperial College London, London, United Kingdom. E mail: j.zhang1@imperial.ac.uk L. Yang is with Research Institute of Intelligent Complex Systems, Fudan University, Shanghai, China. Email: luanyang23@m.fudan.edu.cn M. Xu is with Department of Computer Science, Stanford University, Stanford, United States. Email: minkai@cs.stanford.edu X. Li, Y. Jiang and J. Liu are with MicroCyto, Beijing, China. Email: lixinze,jiangyize,liujunhong@microcyto.cn 
+
+are largely heuristic or approximation based [7], [8], and they usually lack explicit guarantees on the stability and reliability of the guided generation process. This limitation is particularly restrictive in applications where guidance must incorporate heterogeneous forms of prior information, such as class la-bels [2], [3], structural constraints in molecular design [9], and reward functions in reinforcement learning [10]. These observations motivate the development of a unified theoretical framework for guided flow models that can accommodate diverse conditioning mechanisms while providing principled stability guarantees. Although the aforementioned guidance scenarios arise in different application domains, they share a common objec-tive: to modify the generative dynamics so that the resulting trajectories are biased toward regions that better satisfy task-specific preferences or constraints. In classifier guidance and classifier-free guidance, the additional signal is induced by label information [2], [3]; in molecular and structural design, the guidance is often induced by domain-dependent energies or constraints rooted in physical and biological knowledge, such as salt bridges, hydrogen bonds, and hydrophobic inter-actions [9]; in reinforcement learning and planning, it is often encoded through predefined reward functions or value-related objectives [10]. Similar ideas also appear in image inverse problems, where the generation process is guided toward data-consistent solutions under measurement constraints [11]–[13]. Despite their empirical success, these methods are usually de-veloped in a task-specific manner, with guidance terms derived from heterogeneous objectives and implemented through sep-arate heuristics. As a result, it remains unclear what common principle underlies these seemingly different strategies, when such guidance can be interpreted as a principled modification of the generative dynamics, and how one can impose reliable guarantees on the resulting guided process. This viewpoint is closely related to a long-standing theme in control theory of dynamical systems, where the central objective is to steer temporal trajectories toward desired target states. In classical settings, Lyapunov stability theory provides a principled foundation for designing stabilizing policies for linear and polynomial systems, including linear quadratic regulation (LQR) [14] and semidefinite-programming-based sum-of-squares (SOS) methods [15]. For more intricate high-dimensional and nonlinear dynamics, recent advances have increasingly combined control theory with machine learn-ing [16]. In particular, neural controllers have been developed together with certificate functions, such as Lyapunov func-tions, LaSalle invariants, barrier certificates, and contraction metrics [17]–[22]. These developments suggest that guided arXiv:2607.14272v1 [cs.LG] 15 Jul 2026 2
+
+generation can be studied from a control-theoretic perspective, in which the guidance term is interpreted as a control input that reshapes the generative dynamics toward task-preferred regions, while certificate functions provide a principled mech-anism for analyzing stability and convergence. In this work, we develop a unified framework for flow guid-ance from the perspective of Lyapunov control theory [23]– [25]. Our central idea is to interpret the energy or potential function that defines the conditional distribution as a Lya-punov function, and to view the added guidance term as a control input that stabilizes the generative dynamics toward task-preferred regions. Based on this perspective, our main theoretical result in Theorem 2 establishes an equivalence between guided flow matching and Lyapunov control, which in turn provides a common interpretation for a broad class of existing guidance strategies, including classifier guidance, energy-based guidance, and reward-guided generation, as con-cluded in Proposition 2 and illustrated in Fig. 1. Beyond this conceptual unification, we further introduce a pseudo-projection operator that enforces the Lyapunov condition for a candidate guidance term through a closed-form correction, thereby providing a principled mechanism for stabilizing learned or heuristic guidance functions. At the same time, the pseudo-projection operator is easy to incorporate into existing flow guidance methods, requiring only a minimal modifi-cation to the implementation. In this way, our framework connects theoretical interpretability, rigorous stability analysis, and practical compatibility with existing guidance methods. A practical challenge in this framework is how to obtain the Lyapunov function V that encodes task-specific prior knowledge. In some applications, V can be specified explic-itly. Examples include classifier guidance, where V (x) ∝− log p(y|x) is induced by label information in image gen-eration [2], and molecular or structural design, where V may be constructed from domain-dependent energies or constraints derived from physical and biological knowledge [9]. In many other applications, however, such prior knowledge is not analytically available and can only be inferred implicitly from limited downstream supervision [10], [26], [27]. To address both situations within a unified framework, we consider two practical settings: a model-driven setting, which is particu-larly suitable for developers who can explicitly specify the Lyapunov function from domain knowledge, and a data-driven setting, which is more suitable for user-side deployment where the Lyapunov function must be inferred from limited task-specific data and then used to construct guidance policies. This distinction allows LyaGuide to cover both analytically defined guidance objectives and scenarios in which the task prior must be estimated from data. 
+
+Contributions. The main contributions of this work are summarized as follows:  
+
+> •
+
+We establish a unified theoretical framework that for-mulates guided flow matching as a Lyapunov control problem, and prove an equivalence between guided flow matching and Lyapunov control. This result provides a common control-theoretic interpretation of representa-tive guidance settings, including classifier guidance, re-ward guidance, energy-based guidance, and image inverse problems.  
+
+> •
+
+We introduce a pseudo-projection operator with a closed-form expression to enforce the Lyapunov condition for candidate guidance terms. This operator provides a prin-cipled mechanism for stabilizing learned or heuristic guidance functions, while remaining easy to integrate into existing flow-guidance methods.  
+
+> •
+
+Building on the proposed theory, we develop LyaGuide ,which supports both model-driven and data-driven set-tings, thereby covering scenarios with explicitly specified priors as well as scenarios where task-specific priors must be learned from limited downstream data. Exten-sive experiments on synthetic benchmarks, image inverse problems, reinforcement learning planning, and energy-based modeling demonstrate that LyaGuide consistently improves guidance quality, sample quality, and robustness while maintaining computational efficiency. II. R ELATED WORK 
+
+A. Guidance in Generative Models. 
+
+Guidance has become a central mechanism in controllable generative modeling. In diffusion models, classifier guid-ance [2] and classifier-free guidance [3] are two of the most influential approaches, with subsequent extensions incorporat-ing reward-based and energy-based priors [10], [28], [29]. For flow matching, recent work has studied guidance directly at the vector-field level and shown how importance reweighting on the joint distribution induces pathwise changes in the marginal dynamics [8]. More closely related to our perspective, Sprague et al. [30] introduced stochastic stability considerations into flow matching. Compared with these approaches, our frame-work provides a unified control-theoretic interpretation of diverse guidance strategies and introduces a pseudo-projection operator to enforce Lyapunov inequalities during inference. In addition, Albergo et al. [31] and Chen et al. [32] pro-posed alternative generative formulations based on stochastic interpolants and phase-space bridges, respectively. While these methods also reveal connections between generative dynamics and control-inspired principles, they reformulate the generative process itself, whereas our goal is to provide a general-purpose guidance framework that can be directly applied to pretrained flow models. 
+
+B. Learning Certificates. 
+
+Learning certificate functions has become an important direction in the intersection of machine learning, control, and dynamical systems. In score-based modeling, the score 
+
+∇ log p(x) = −∇ V (x) can be viewed as a learnable vector field induced by an implicit potential [1], [33], while energy-based models directly parametrize an energy function [29], [34]. In parallel, few-shot or preference-based priors have been explored in reinforcement learning and generative guid-ance [10], [26], but typically without explicit Lyapunov cer-tificates. Beyond generative modeling, Liu et al. [35] studied physics-informed neural networks for learning and verifying Lyapunov functions in PDE systems, and Kang et al. [36] 3
+
+developed stable neural ODEs with Lyapunov-stable equilib-ria. These works are conceptually related to our data-driven setting, where a Lyapunov candidate Vθ is learned from sparse supervision and then incorporated into the guidance design. Our framework differs in that it is tailored to generative modeling and combines learned certificate functions with an explicit projection-based stabilization mechanism. 
+
+C. Diffusion Models and Flow Matching for Inverse Problems. 
+
+Diffusion models and flow matching have been widely used in inverse problems as powerful generative priors. In diffusion-based formulations, a learned score model is combined with the likelihood term induced by the forward operator, enabling posterior sampling for image restoration, compressed sensing, and medical imaging tasks [1], [13], [37], [38]. Flow matching offers a deterministic counterpart that learns a continuous transport field through the continuity equation [4]–[6], and has recently been extended to inverse problems through likelihood-guided transport, pseudoinverse-based correction, and plug-and-play reconstruction schemes [39]–[42]. These works show that pretrained generative flows can be adapted to satisfy mea-surement constraints at inference time, often with improved efficiency relative to diffusion-based samplers. While our framework is developed from a general per-spective, it is also directly applicable to inverse-problem settings. In particular, LyaGuide can be combined in a plug-and-play manner with existing flow-based inverse-problem methods to improve their guidance quality and sampling robustness, while potentially accelerating the sampling process through Lyapunov-induced contraction. From this viewpoint, our framework also reveals an essential underlying principle behind these seemingly different techniques: they all seek an appropriate pair of a potential function V and a guidance field u so that the generative dynamics are steered toward the ground-truth distribution under measurement constraints that can be encoded in Lyapunov conditions. 
+
+D. Meta-learning and Task-specific Adaptation Modules. 
+
+Meta-learning aims to enable models to generalize rapidly to new tasks with limited data or adaptation. Among existing approaches, a representative line of work avoids modifying the entire network and instead introduces lightweight task-adaptive modules to adjust inference while keeping the base model fixed. Typical examples include feature-wise transfor-mations and conditional modulation layers such as FiLM [43], residual adapters and efficient multi-domain parameteriza-tions [44], [45], as well as modular or fast-adaptation meta-learning architectures [46], [47]. Related ideas have also been developed in parameter-efficient transfer learning through adapter-based modules [48]. These methods are usually de-veloped within a meta-training/meta-testing paradigm over a distribution of tasks. By contrast, our method focuses on post-training adaptation of generative flows to new conditioning objectives by introducing Lyapunov-guided correction terms without retraining or task-specific fine-tuning. While sharing the general goal of lightweight adaptation, our approach is distinguished by its control-theoretic formulation and by the Guided flow  
+
+> Fig. 1. Lyapunov(energy) landscape for 8-Gaussian guidance from initial (black dashed) to target data (red dashed).
+
+explicit stability guarantees provided through the proposed projection mechanism. III. P RELIMINARIES 
+
+A. Flow Matching 
+
+Flow matching [4] is an ODE-based training framework for generative modeling, which learns continuous-time dynamics that transforms a simple prior distribution to a complex data distribution. Formally, let p0 and p1 denote the source and target distributions over Rd, respectively. Flow matching aims to learn a time-dependent vector field u(x, t ) ≜ ut(x) : Rd ×
+
+[0 , 1] → Rd that pushes p0 to p1 along a continuous path 
+
+{pt}t∈[0 ,1] , such that the flow ϕt governed by the ODE: 
+
+dϕ t(x)
+
+dt = ut(ϕt(x)) , ϕ0(x) = x, (1) transfers x ∼ p0 to a sample ϕ1(x) ∼ p1.To learn a neural field ˆuθ (x, t ) that matches the continuous path {pt}t∈[0 ,1] , a convenient way to define targets is via a latent variable z ∼ p(z) that indexes conditional bridges 
+
+pt(xt | z) together with conditional vector fields ut|z (xt | z).This induces the marginal path and vector field pt(xt) = R pt(xt | z) p(z) dz , ut(xt) = R ut|z (xt | z) p(z | xt) dz ,and it is known that ut generates the marginal path pt
+
+(see [4]). To avoid the intractable term p(z | xt) in ut(xt),conditional flow matching (CFM) proposes to train the model with an equivalent and tractable conditional objective [4], [6]: Lcond (θ) = Et∼U (0 ,1) , z ∼p(z), xt∼pt(xt|z)
+
+h
+
+ˆuθ (xt, t ) −
+
+ut|z (xt|z) 22
+
+i
+
+, whose minimizer coincides with that of con-ditional loss while remaining simulation-free and easy to estimate. 
+
+B. Lyapunov Control Theory 
+
+To begin with, we consider the feedback-controlled dynamic system of the following general form: 
+
+˙x = ft(x, u(x)) , x ∈ Rd, u ∈ Rm, (2) where ft is the Lipschitz-continuous vector field acting on some prescribed open set x ∈ D ⊂ Rd. The solution 4
+
+initiated at time t0 from x0 is denoted by xt(t0, x0). We assume that the stationary target position of the controlled system is the origin, i.e. ft(0, 0) = 0. One major problem in control theory is to design stabilizing controller u(x) [49] such that lim  
+
+> t→∞
+
+xt(t0, x0) = 0, for any initial value x0 ∈ D .The following stability theory has been employed to devise the control policy that can stabilize the system when the equilibrium 0 is unstable. 
+
+Theorem 1. [50] Suppose that there exists a continuously differentiable function V : D → R that satisfies the following conditions: (i) V (0) = 0, (ii) V (x) ≥ c∥x∥p for some constants c, p > 0, (iii) and Lf V < −δV , for some δ > 0. 
+
+> 1
+
+Then, the system is exponentially stable at the origin, that is, lim sup t→∞ 1 
+
+> t
+
+log ∥x(t; t0, x0)∥ ≤ − δp . Here V is called a Lyapunov function. For a given dynamic system (2), the design of appropri-ate control policies that satisfies the Lyapunov condition in Theorem 1 has been a central topic [17]–[19], [51]. 
+
+Problem Statement. We assume that flow matching has already learned a base vector field u transferring the noise distribution p0 to the data distribution p1. For downstream tasks, this vector field must be adapted to generate task-specific conditional distributions 1 
+
+> Z
+
+p1(x)e−J(x), which is achieved by introducing a Lyapunov function V that relates to energy distribution e−J and encodes task-related priors, and thus the guided field u + c rigorously samples from the target distribution, where c is a guidance control term to be designed such that it encodes the information of the Lyapunov function 
+
+V , i.e., satisfies the Lyapunov condition. There are mainly two scenarios depending on how prior knowledge is provided, which are described in detail as follows. 
+
+Scenario 1 (Developers-Oriented). Domain knowledge can be explicitly formulated as an analytical potential V (x),making the conditioning objective transparent. Typical examples include classifier guidance with class labels [2], [3], structural constraints in protein design [9], and reward functions in reinforcement learning [10]. Despite their different forms, we provide a unified framework to equate flow matching guidance in Scenario 1 with the Lyapunov control problem (see Section IV-C1), and further introduce an efficient and training-free guidance policy grounded in this theoretical framework (see Section IV-B). 
+
+Scenario 2 (Users-Oriented). Prior knowledge is implicit and can only be learned through few-shot learning with some data–score pairs {(xi, V i)}ni=1 , without an explicit conditioner. In contrast to Scenario 1, the challenge here is to infer a Lyapunov function and corresponding control from sparse or noisy supervision. We address this problem in Section IV-C2. IV. M ETHODOLOGY 
+
+A. A Unified Lyapunov Guidance Framework for Flow Match-ing 
+
+To incorporate diverse forms of prior knowledge into the inference stage of flow matching, we propose a unified            
+
+> 1LfVrepresent the Lie derivative of Valong the direction f, i.e., LfV=
+> ∇V·ft.
+
+Lyapunov guidance framework that interprets guidance as a control policy derived from Lyapunov theory. Specifically, we consider the guided vector field as ut + ct, where ut
+
+is the learned base transport field from noise distribution to data distribution, and ct is an auxiliary control term that steers the dynamics toward a conditional target distribution. To align with the common Lyapunov condition, we first introduce 
+
+local Lyapunov condition that formalizes how the controlled dynamics can converge to a desired conditional mode with diverse high-density regions, i.e., attractors. We then propose the first main theorem showing that guided flow matching is equivalent to a Lyapunov control system, with the energy func-tion acting as a Lyapunov function. This equivalence provides a rigorous justification for viewing guidance in generative modeling through the lens of stability theory. Inspired by Theorem 1, we extend the traditional Lyapunov condition to the following local Lyapunov condition for mul-tiple equilibria. 
+
+Proposition 1 (Lyapunov condition for multi-attractor ).
+
+For the controlled dynamics ˙x = ut(x) + ct(x) under con-troller ct(xt), suppose there exists a continuous differentiable function V : D → R that satisfies the following conditions: 
+
+(i) for each local minimum point x∗ of V , let Vx∗ (x) = 
+
+V (x) − V (x∗), there exists a ε-neighborhood O(x∗, ε ) such that Vx∗ (x) ≥ c∥x−x∗∥p, ∀x ∈ O(x∗, ε ) for some constants 
+
+c, p > 0, (ii) and ∇V (x) · (ut(x) + ct(x)) < −δV ,∀x ∈
+
+O(x∗, ε ), for some δ > 0. Then, the system is locally exponentially stable at x∗, that is, ∥xt − x∗∥ ≤ ∥ x0∥e− δp t.Here, V is still denoted as a Lyapunov function. The above local condition enables us to view the guidance process in flow matching as the synthesis of a stabilizing controller that enforces local convergence toward high-density regions of a target conditional distribution. With this for-mulation, the energy function commonly used in conditional generative modeling plays the role of a Lyapunov function that shapes the convergence geometry. Our main theorem is presented as follows. 
+
+Theorem 2 (Equivalence between Guided Flow Matching and Lyapunov Control ). For the flow model ut(xt) that generates the probability path pt(x), finding the guidance 
+
+ct(xt) to the vector field ut(xt) to perform conditional sampling p′
+
+> t
+
+(x) = 1 
+
+> Zt
+
+pt(x)e −J(x) is equivalent to finding the controller that satisfies the local Lyapunov condition, where energy function J(x) contributes to Lyapunov function as 
+
+V ∝ (J + c) for some constant c, e.g., V = J. More specifically, the equivalence means that there exists a control that both generates the guided probability path and satisfies the local Lyapunov stability condition, thereby accelerating the sampling dynamics of guided flows. The detailed proof is provided in Appendix B-B. The key idea is to rewrite the guided probability path through a weighted continuity equation associated with the target density: 
+
+∇·  p′ 
+
+> t
+
+ct
+
+ = p′
+
+> t
+
+
+
+ut · ∇ J + ∂t log Zt
+
+
+
+.
+
+Starting from the reweighted path, one derives a weighted divergence equation for the guidance term, which characterizes 5
+
+how the additional control should modify the base vector field so that the resulting flow is consistent with the desired conditional distribution. Based on this relation, the guidance is further decomposed into a normal component along ∇V
+
+and a tangential component along the level sets of V . The normal component is chosen to enforce the Lyapunov decrease condition, while the tangential component is used to match the weighted divergence equation. This yields a control that is simultaneously guidance-compatible and Lyapunov-stable, establishing the equivalence. Theorem 2 establishes the equivalence between guided flow matching and Lyapunov control, where the guidance term is viewed as a control input and the energy function serves as a Lyapunov function. In particular, it reveals a two-way relation between guidance-compatible controls, characterized by the weighted divergence equation, and Lyapunov-stable controls, characterized by monotone decay of V . Although both directions are valid in principle, constructing a guidance-compatible control from a Lyapunov-stable one requires solv-ing the coupled PDE system, 
+
+∇V (x) · wt(x) = 0 , ∀x ∈ O(x∗, ε ), ∀ local minima x∗,
+
+∇ · (p′
+
+> t
+
+wt) = p′
+
+> t
+
+ϕt − ∇ · (p′
+
+> t
+
+ct),
+
+which is generally expensive in high dimensions. By contrast, starting from an existing guidance term is much simpler: Theorem 3 shows that Lyapunov stability can be enforced by a pointwise projection that modifies only the component along 
+
+∇V . This observation underlies LyaGuide, which exploits the tractable direction of the equivalence to obtain a guidance term that is both stable and efficient. To illustrate the wide applicability of the framework, we identify several representative guidance paradigms where the associated energy function and the conditional distribution naturally serve as Lyapunov functions, so that the guidance terms can be interpreted as controllers that minimize V (x)
+
+during generation. 
+
+Proposition 2. The following commonly used guidance strate-gies in generative modeling can all be interpreted as Lyapunov control within our unified framework:  
+
+> •
+
+Classifier Guidance : Given a trained classifier p(y|x),the Lyapunov function for guided distribution p(x|y)
+
+specified on conditioner y is Vy (x) = − log p(y|x). 
+
+> •
+
+Reward Guidance : In reinforcement learning tasks with reward function R(x), the Lyapunov function for guided distribution 1 
+
+> Z
+
+pt(x)eR(x) concentrates probability mass in high-reward regions is V (x) = −R(x). 
+
+> •
+
+Energy-Based Model (EBM) Guidance : For a target EBM p(x) ∝ e−E(x), the Lyapunov function is naturally 
+
+V (x) = −E(x). 
+
+> •
+
+Image inverse problems. Let the forward operator be 
+
+y = H(x) + ε with ε ∼ N (0 , σ 2I). Then for p(y|x) ∝
+
+exp  − 12σ2 ∥H(x)−y∥22
+
+ and a natural Lyapunov function is Vy (x) = 12σ2 ∥H(x) − y∥22, yielding guided sampling 
+
+p′
+
+> t
+
+(x) ∝ pt(x) exp   − Vy (x) that enforces data consis-tency [38]. 𝜋 
+
+## 𝑥 !
+
+## 𝑥 "
+
+## 𝑥 !#"
+
+## 𝑥 $
+
+> …
+
+# G
+
+## 𝑥 %
+
+# 𝜋 ∗           
+
+> Fig. 2. Illustration of the pseudo projection πand exact projection π∗. Here the grey dot is the candidate control c, the purple dot is the projected element
+> π∗(ct)of cin the target space U(V), and the yellow dot is the pseudo projected element π(ct).
+
+In Appendix B-C, we provide proof of the proposition and further discuss the relationship between existing guidance methods and our framework. 
+
+Variants of LyaGuide. The Proposition 1 establishes ex-ponential stability of the controlled system, so we denote the corresponding method as LyaGuide-ES . Under a weaker condition that δ = 0 in Theorem 2, the equilibrium remains stable in the sense of asymptotic stability, i.e., lim t→∞ ∥xt −
+
+x∗∥ = 0 . In this case, V is also a valid Lyapunov function. In addition, we can also modify the Lyapunov condition for a stronger exponential convergence. Therefore, two natural variants of LyaGuide arise by either relaxing or strengthening the Lyapunov condition:  
+
+> •
+
+LyaGuide-AS (Asymptotic Stability). Setting δ = 0 
+
+reduces the condition to ∇V (x) · (ut(x) + ct(x)) < 0,which guarantees asymptotic convergence lim t→∞ ∥xt −
+
+x∗∥ = 0 . This yields a weaker but broadly applicable guidance mechanism.  
+
+> •
+
+LyaGuide-CS (Component-wise Stability). A stronger requirement is that each component marked by subscript 
+
+i satisfies ∇V (x)i(ut(x) + ct(x)) i ≤ − δV (x). This enforces descent along all directions and provides stricter stability guarantees for the guided flow. These two variants offer flexible trade-offs between stabil-ity and practical applicability. Empirically, LyaGuide-ES and LyaGuide-CS demonstrate superior performance and greater robustness across tasks, and we therefore recommend them as the default variants in practice (see Appendix B-E). 
+
+B. Pseudo Projection Operation for Lyapunov Guarantee 
+
+Given the equivalence between the guided flow matching and Lyapunov control, we show how we can better design the guidance term from the perspective of Lyapunov principle. Before the introduction of Lyapunov guidance, we propose a novel pseudo projection method that efficiently corrects the guidance term learned by neural networks. As in neural control, the candidate guidance function in flow may not rig-orously satisfy the Lyapunov condition across the entire state space, since it is often learned from finite data or heuristically 6
+
+constructed. To address this limitation, we propose a projection operator that enforces the Lyapunov condition by projecting any candidate guidance into the admissible set of Lyapunov-stable controls. 
+
+Theorem 3 (Lyapunov Guarantee for Guidance) . For a can-didate controller c and the guidance controller space U(V ) = 
+
+{u : ∇V ·(ut +ct)+ δV ≤ 0} that rigorously satisfies the local Lyapunov condition in Proposition 1, define the projection operator as 
+
+π(ct, U(V )) ≜ ct − max 
+
+ 0,∇V (x)·(ut(x)+ ct(x))+ δV (x)
+
+  
+
+> ∥∇ V(x)∥2
+
+∇V (x).
+
+Then π(ct, U(V )) is locally Lipschitz continuous and thus the guided flow under π(ct, U(V )) is well defined, and 
+
+π(ct, U(V )) ∈ U (V ).The proof is provided in Appendix B-C1. Fig. 2 shows the idea behind the pseudo projection, that any candidate guid-ance function can be systematically corrected via the pseudo projection operation, yielding a valid Lyapunov guidance that rigorously satisfies the stability condition across the state space. Therefore, our approach enjoys theoretical guarantees of conditional sampling via Lyapunov stability even when the initial candidate does not. Combining Theorem 2 with Theorem 3, we obtain a rigorous stability guarantee for flow model with projected guidance. 
+
+Exact Projection vs. Pseudo Projection. We refer to the operator in Theorem 3 as a pseudo projection , because for a feedback controller c, it is not the exact solution of the classical projection problem [52]: 
+
+π∗(c) ∈ arg min  
+
+> ˜c
+
+∥c − ˜c∥C(Rd),
+
+s.t. ∇V (x) · (ut(x) + c(x)) ≤ − δV, ∀x ∈ D .
+
+In general, obtaining a closed-form expression of the exact projection operator π is intractable. A common alternative is to solve a simplified quadratic program (QP) at each state 
+
+x [53]: 
+
+˜π(c)( x) ∈ arg min  
+
+> ˜c(x)
+
+∥c(x) − ˜c(x)∥,
+
+s.t. ∇V (x) · (ut(x) + c(x)) ≤ − δV (x).
+
+Although this guarantees the Lyapunov condition for each state x, it requires solving an online optimization problem. In the context of flow matching, the dimensionality of the state space can be very high (e.g., images, molecular structures, or protein conformations). In such cases, solving a QP in every integration step would be prohibitively expensive. In contrast, the pseudo projection in Theorem 3 has an explicit analytical form, making it more efficient in practice while still ensuring that the guidance satisfies the Lyapunov condition. 
+
+C. Lyapunov Guidance for Different Scenarios 
+
+Building on the equivalence between guided flow matching and Lyapunov control established in Section IV-A, we now specify the guidance policies for two different practical sce-narios. 
+
+1) Scenario 1: Explicit Prior Knowledge: When domain knowledge can be analytically represented, the Lyapunov func-tion V (x) is directly available. For such tasks, V (x) acts as a certificate function that encodes domain-specific constraints, while the control term c(x, t ) is designed according to the Lyapunov condition in Proposition 1, ensuring that the guided flow is exponentially stable toward the high-density regions of the conditional distribution. According to the projection operation described in Sec-tion IV-B, we begin with a candidate guidance function and then enforce the Lyapunov condition by projecting it onto the admissible function space. Within the flow matching literature, a common choice of candidate is based on the gradient of the Lyapunov function, ct(x) ∝ −∇ V (x), which is closely re-lated to the score function of the prior energy distribution [33]. The complete procedure is summarised in Algorithm 1. 
+
+2) Scenario 2: Implicit Prior Knowledge via Few-Shot Learning: When explicit formulations of prior knowledge are unavailable, we assume access to a small set of preference data–score pairs {(xi, V i)}ni=1 , where Vi represents a task-specific score or energy evaluated at xi. Our first goal is to recover a Lyapunov function VθV (x) from these pairs by minimizing a supervised regression loss: LV (θV ) =
+
+> 1
+> n
+
+Pni=1 
+
+ VθV (xi) − Vi
+
+2.
+
+a) Local-minima-aware training of V : According to Proposition 1, the Lyapunov function V should correctly identify task-relevant local minima, i.e., low-energy and high-density regions where the Lyapunov guidance becomes active. To bias the learner toward these regions when only few-shot supervision (xi, V i) is available, we adopt a soft importance weighting on the targets, 
+
+wi = exp( −α V i)
+
+Pnj=1 exp( −α V j ) ,
+
+which places greater emphasis on low-V samples. We then estimate VθV via a weighted regression, optionally augmented with a smoothness regularizer, so that the learned potential captures the correct local minima structure needed for Lya-punov guidance. 
+
+LV (θV ) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+wi
+
+ VθV (xi) − Vi
+
+2. (3) 
+
+b) Control design.: Once a valid Lyapunov function VθV
+
+is obtained, the corresponding guidance control can then be derived in two ways: either by explicit synthesis according to the Lyapunov framework, 
+
+c(x, t ) = arg min  
+
+> c
+
+∇VθV (x) · (ut(x) + c(x, t )) + δV θV (x),
+
+or by integrating VθV into existing guidance methods (e.g. classifier or reward guidance) to regularize their dynamics via a Lyapunov-inspired penalty. In this work we employ the training algorithm gϕ posed in [8] for learning the guidance. This two-stage design separates the estimation of the im-plicit energy landscape from the design of the guidance control, enabling user-provided supervision to be incorporated flexibly into flow matching. Although we present a two-stage procedure here (first learning V , then designing c), in practice 7
+
+V and c can also be optimized jointly under a Lyapunov-inspired loss, as applied in [18], [19], [54] V. E XPERIMENTS 
+
+We evaluate LyaGuide on a diverse set of benchmarks covering both low-dimensional and high-dimensional gener-ative tasks, including synthetic conditional generation, image inverse problems, offline reinforcement learning planning, and energy-based modeling. Across all experiments, our goal is to assess whether the proposed Lyapunov-guided correction can consistently improve existing guidance methods without retraining the underlying generative model. Unless otherwise specified, we compare each original guidance baseline with its LyaGuide-enhanced counterpart under the same base flow model and task setting, so that the effect of the proposed projection mechanism can be isolated. 
+
+A. Experimental Setup 
+
+For synthetic experiments, we consider the standard 2D benchmarks used in prior work, including uniform-to-8Gaussians and circle-to-S-curve. Following the setup in [8], the base flow model is trained with displacement interpolation using a 4-layer MLP with hidden dimension 128, optimized by Adam with learning rate 10 −4 for 20k iterations and batch size 512. In Scenario 1, we compare against a wide range of existing guidance methods reported in [8] as our baseline: contrastive energy guidance (CEG) [55], Monte Carlo guidance ( gMC ), learned guidance ( gϕ), covariance-based approximations (gcov -A and gcov -G), and simplified Monte Carlo ( gsim -MC ). We also include contrastive guidance, which drives the flow toward unexpected regions, and gradient-based guidance commonly used in generative modeling [9] for comparison. Each of these methods is first applied in its original form, and then we treat their guidance terms as candidates in Algorithm 1 and refine them with our proposed LyaGuide-ES. We also provide some detailed analysis results for LyaGuide-AS and LyaGuide-CS in Appendix B-E. In the few-shot setting (Scenario 2), the supervision size varies from 128 to 1024 preference data–score pairs, and the Lyapunov candidate Vθ is parameterized by a 3-layer MLP with hidden width 64 and trained by weighted regression. For image inverse problems, we follow the standard proto-col on CelebA-HQ for box inpainting, Gaussian deblurring, and super-resolution. We use both conditional flow matching (CFM) and optimal-transport conditional flow matching (OT-CFM) as the base models, and evaluate reconstruction quality using FID, LPIPS, PSNR, and SSIM on 3000 test samples. Baseline guidance methods are compared with and without LyaGuide under identical task settings, and the hyperpa-rameters of the pseudo-projection operator are fixed across all inverse-problem tasks to demonstrate robustness without additional tuning. For RL planning, we follow the standard D4RL Locomotion protocol and evaluate guided planning performance under both CFM and OT-CFM backbones. Following [8], performance is measured by the average normalized return over five runs. In all experiments, we retain the original implementation of each baseline guidance method and introduce LyaGuide only as a post-training correction, thereby isolating its effect on stability, convergence, and sample quality. 
+
+B. Synthetic Benchmarks a) Scenario 1: We first evaluate our approach on the synthetic datasets introduced in [8], where the source distribu-tion p0 is chosen as uniform (resp. circle) distribution and the target distribution p1 is an 8-Gaussian mixture (resp. S-curve). For each dataset, we design a task-specific energy function V
+
+to encode prior knowledge, as shown in Fig. 3 (first column on the left). As shown in Fig. 3, all methods benefit from our Lyapunov guidance, where the guided trajectories become more stable and align more closely with the ground truth distribution. Specifically, for the first task (8-Gaussian mixture), we can see that most of the methods fail to sample correct trajec-tories without the guidance of LyaGuide, of which the best performance achieved by gcov -A, gcov -G and Gradient is still defective, while noise at the four corners of the diagonals drops off drastically or even disappears after application of LyaGuide. Similar effect can be observed for the second task (S-curve distribution), where the LyaGuide optimized methods exhibit sharper mode coverage and fewer spurious samples compared to the original versions. These results demonstrate that LyaGuide provides an effective and practical way to improve guidance quality, consistently achieving gains across all baselines and energy functions. 
+
+b) Boundary effects of Pseudo Projection: We also note that there are two subtleties in the second task. First, CEG+Lya shows little difference with CEG, as the original samples already lie in the trough of V ; since our projection encourages trajectories toward the trough, no further adjustment occurs. Second, Contrast+Lya does not preserve the exact masked S-curve shape. Instead, samples concentrate along the boundary of the trough of V , consistent with our projection principle: enforcing the Lyapunov inequality {x : ∇V (x) · (ut(x) + 
+
+ct(x)) ≤ − δV (x)}. Thus, data near the peaks of V are guided toward the nearest trough boundary, rather than the lower-left or upper-right arms of the S-curve. 
+
+c) Scenario 2: We next evaluate LyaGuide in Scenario 2, where explicit prior knowledge is not available and only a small set of preference data–score pairs is provided. Following the setup in Section IV-C2, we learn a Lyapunov function 
+
+VθV first and then derive the guidance control either through explicit synthesis or by integrating into existing methods. We consider synthetic benchmarks with three tasks, and vary the number of supervision pairs {(xi, V i)} from 128 to 1024. As shown in Fig. 4, even with very sparse supervision, LyaGuide successfully recovers meaningful Lyapunov land-scapes whose minima align with the high-density regions of the target distribution. Compared to the baseline gϕ, the LyaGuide method enforces stability throughout the trajectory, yielding better guided flows that concentrate around the cor-rect modes while suppressing spurious samples. We further perform the ablation study on data size in Appendix B-E. 8w/o  guidance  CEG  𝑔 sim −MC  𝑔 cov −A 𝑔 cov −G 𝑔 MC  𝑔 𝜙  Contrast  
+
+> With LyaGuide -ES
+> Gradient
+> 0
+> 1
+
+𝑉  
+
+> 𝒙 1𝒙 0
+> 0
+
+𝑉 
+
+𝑉 
+
+𝑥  𝑦        
+
+> With LyaGuide -ES
+> Ground Truth
+> CEG 𝑔 sim −MC 𝑔 cov −A𝑔 cov −G𝑔 MC Contrast Gradient Ground Truth
+
+𝑉 
+
+𝑥  𝑦       
+
+> 𝑔 𝜙
+> 1
+> Fig. 3. Scenario 1 results on synthetic dataset. For each target distribution, the top (resp. bottom) row correspond to the methods without (resp. with) LyaGuide. We visualize the start/end points and the flow trajectories. LyaGuide siginificantly improves the performance across different methods. 𝑔 𝜙 LyaGuide Learned 𝑉
+> 𝒙 1𝒙 0
+> 0
+> 1
+> 0
+> 1
+> 0
+> Guidance Data 512
+> Fig. 4. Scenario 2 results with dataset size = 512 .
+
+d) Acceleration of Inference Speed: To evaluate how the sampling horizon of flow matching influences the behaviour of LyaGuide, we perform an early-inference-termination study on the 8-Gaussian mixture task. Instead of integrating the flow dynamics up to t = 1 , we interrupt the evolution at intermediate times and compute the Wasserstein-2 distance between the current particle distribution and the target mixture. Figure 6 reports the mean and standard deviation over five independent trials. Across all eight guidance mechanisms, LyaGuide exhibits substantially faster convergence than their unguided counterparts. Even at early inference times (e.g., 
+
+t ≈ 0.4), the guided trajectories have already contracted much closer to the target distribution, while the baseline flows remain noticeably farther away. This indicates that the Lyapunov-structured correction not only improves final sample quality but also accelerates the transient approach to the target distribution. In addition, the performance gap remains robust across guidance types, demonstrating that LyaGuide consistently enhances the efficiency of flow-matching infer-ence and reduces the reliance on long integration horizons. The acceleration effect comes from projection-induced contraction along the normal direction of the Lyapunov level sets, which suppresses oscillatory motion along the tangent direction. 
+
+e) Ablation study: We further examine the influence of the scaling parameters δ and k on the behaviour of LyaGuide. The results are summarised in Fig. 5 and Table I. The parameter δ affects both the Lyapunov convergence rate and the projection strength, making it a global hyperparameter. Empirically, LyaGuide is robust across a wide range of δ,where larger values lead to stronger contraction toward low-energy regions but may reduce exploration. A moderate choice of δ ∈ (0 , 1] consistently provides a good balance between sta-bility and diversity. The coefficient k influences only gradient-based guidance methods by adjusting the strength of the initial guidance term −k∇V . Increasing k generally improves the stability and quality of gradient-based guidance without affecting other methods. Overall, the method demonstrates low sensitivity to both parameters within reasonable ranges. 9Without  LyaGuide        
+
+> CEG 𝑔 sim −MC 𝑔 cov −A𝑔 cov −G𝑔 MC 𝑔 𝜙 Contrast Gradient
+
+𝒙 1 𝒙 0
+
+𝛿  = 0.2 
+
+𝛿  = 0.4 
+
+𝛿  = 0.6 
+
+𝛿  = 0.8 
+
+𝛿  = 1.0 
+
+𝛿  = 1.5 
+
+𝛿  = 2.0    
+
+> Fig. 5. Ablation study in 8-Gaussian task. We investigate the effect of the Lyapunov convergence rate δto the performance of the LyaGuide sampling. The first row corresponds to the results of the orginal methods without LyaGuide, the other rows correspond to the results of LyaGuide with different choices of
+> δ.
+
+C. Image Inverse Problems 
+
+We further validate LyaGuide on high-dimensional image inverse problems, which have become a standard benchmark for assessing guidance quality in flow matching [8], [38]. The objective is to reconstruct a clean image x from acorrupted observation y = H(x) + ε, where H is a known degradation operator and ε denotes Gaussian noise. In contrast to pseudoinverse-guided diffusion [38], our projection-based scheme offers a lightweight alternative that strictly enforces stability during sampling. We conduct experiments on the CelebA-HQ dataset under the box-inpainting setting, where a central square region of each image is masked and the generative model is required to reconstruct the missing content from the visible context. We adopt the standard evaluation protocol used in [8] and report FID, LPIPS, PSNR, and SSIM over 3000 test samples. As shown in Table II, LyaGuide consistently improves all baseline guidance methods across these metrics, indicating better reconstruction fidelity, perceptual quality, and sample realism. Beyond box inpainting, we further evaluate the pro-posed framework on two additional inverse problems, namely super-resolution and Gaussian deblurring. Similar performance gains are observed in both cases, demonstrating that the benefit of Lyapunov-guided correction is not restricted to a single degradation model. Detailed quantitative results for these additional tasks are provided in Appendix B-E. 10 
+
+TABLE I ABLATION STUDY ON GRADIENT -BASED METHOD IN 8-G AUSSIAN GENERATION . W ASSERSTEIN -2 DISTANCES BETWEEN THE TARGET DATA AND THE SAMPLED DATA UNDER DIFFERENT COMBINATIONS OF THE HYPERPARAMETER δ AND k ARE SHOWN .Original Gradient Method LyaGuide-ES LyaGuide-CS 
+
+k = 0 .5 k = 1 .0 k = 1 .5 k = 0 .5 k = 1 .0 k = 1 .5 k = 0 .5 k = 1 .0 k = 1 .5
+
+δ = 0 .2 0.29 0.24 0.18 0.28 0.25 0.16 0.33 0.2 0.34 
+
+δ = 0 .4 0.34 0.19 0.25 0.28 0.28 0.3 0.33 0.24 0.09 
+
+δ = 0 .6 0.42 0.19 0.28 0.39 0.27 0.31 0.41 0.17 0.18 
+
+δ = 0 .8 0.3 0.33 0.25 0.3 0.33 0.25 0.4 0.24 0.21 
+
+δ = 1 .0 0.32 0.26 0.26 0.35 0.22 0.24 0.32 0.2 0.17 
+
+δ = 1 .5 0.29 0.17 0.16 0.33 0.16 0.2 0.42 0.27 0.25 
+
+δ = 2 .0 0.45 0.19 0.29 0.37 0.23 0.31 0.41 0.2 0.34 0 0.5 1.0                      
+
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> W-2 Distance
+> CEG
+> CEG+LyaGuide
+> 00.5 1.0
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> gsim MC
+> gsim MC +LyaGuide
+> 00.5 1.0
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> gcov A
+> gcov A+LyaGuide
+> 00.5 1.0
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> gcov G
+> gcov G+LyaGuide
+> 00.5 1.0
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> gMC
+> gMC +LyaGuide
+> 00.5 1.0
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> g
+> g+LyaGuide
+> 00.5 1.0
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> Contrast
+> Contrast+LyaGuide
+> 00.5 1.0
+> Inference Time
+> 0
+> 0.3
+> 0.6
+> Gradient
+> Gradient+LyaGuide
+
+Fig. 6. Inference-time vs. Wasserstein-2 distance on the 8-Gaussian mixture task (1024 test samples). Curves show the mean over five runs, and shaded regions denote standard deviations. TABLE II IMAGE INVERSE PROBLEM RESULTS ON CELEB A-HQ (B OX INPAINTING TASK ). T HE BEST AND RUNNER -UP RESULTS ARE HIGHLIGHTED WITH BOLD 
+
+> AND UNDERLINE
+
+, RESPECTIVELY .Original Methods LyaGuide-ES LyaGuide-CS FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑ FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑ FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑
+
+OT-CFM 
+
+gcov-A 7.3387 0.1907 25.5984 0.8431 7.4039 0.1898 25.6935 0.8442 6.4722 0.1739 25.6217 0.8562 
+
+gsim-A 19.8569 0.2309 26.4127 0.7950 19.8852 0.2309 26.4741 0.7950 12.7344 0.1921 26.3142 0.842 
+
+ΠGDM 30.3839 0.3200 20.8253 0.7193 30.3839 0.3200 20.8253 0.7193 26.785 0.291 21.3654 0.7473 
+
+gMC 18.6635 0.2391 26.9492 0.8124 24.1950 0.2396 26.9624 0.8129 16.0392 0.2283 27.0681 0.8200 CFM 
+
+gcov-A 7.6629 0.1922 25.8612 0.8414 7.6819 0.1918 25.9367 0.8419 6.9783 0.1764 25.8155 0.854 
+
+gsim-A 9.7060 0.1935 26.0867 0.8263 9.6002 0.1935 26.1094 0.8263 6.8763 0.1629 26.0592 0.8508 
+
+gcov-G 19.8022 0.2379 27.0087 0.8138 24.3271 0.2379 27.0017 0.8145 22.0999 0.2293 27.0301 0.8206 
+
+ΠGDM 19.0847 0.2323 25.6418 0.8093 19.0619 0.2336 25.9002 0.8074 14.1461 0.2003 26.112 0.8439 
+
+D. LyaGuide on RL Planning 
+
+To further strengthen the empirical validity of our frame-work and broaden the range of benchmarks, we additionally evaluate LyaGuide on standard offline RL planning tasks in the D4RL Locomotion suite [56], following the experimental protocol used in prior work [8], [10], [57]. In this setting, gen-erative models are used as planners by sampling from reward-reweighted distributions proportional to exp( R(x)) [10], [58], where R(x) denotes the return of a trajectory or action sequence. This formulation naturally aligns with our guidance framework by setting the energy function as J(x) = −R(x),so that reward-guided planning can be interpreted as a special case of Lyapunov-guided conditional generation. We directly compare each baseline guidance method and its LyaGuide-enhanced counterpart under both CFM and OT-CFM genera-tive models, and report the average normalized score over five runs as the evaluation metric. The results are summarized in Table III, and show consistent performance improvements across nearly all tasks and guid-ance types. In particular, LyaGuide yields higher normalized returns for HalfCheetah, Hopper, and Walker2d under the Medium-Expert, Medium, and Medium-Replay settings. Aver-aged over all tasks, LyaGuide improves the strongest baseline by a clear margin under both CFM and OT-CFM. These results indicate that the proposed Lyapunov-guided correction improves the contractive behavior of guidance dynamics in planner-based RL, leading to more reliable trajectory optimiza-tion and higher-quality action-sequence generation. 
+
+E. Performing LyaGuide to EBM tasks 
+
+In Prop. 2 we show that our LyaGuide framework works to the EBM tasks. To validate the efficacy, we evaluate the effect of applying LyaGuide on the vector field used in Energy Matching (EM) [59], while keeping all experimental configurations identical to the original EM setup. Recall that EM sampling consists of two stages: a deterministic gradient-driven ODE phase followed by a stochastic Langevin refine-ment phase. In our method, we apply LyaGuide directly to 11 
+
+TABLE III RESULTS OF THE D4RL L OCOMOTION EXPERIMENTS . T HE BEST RESULTS ARE HIGHLIGHTED WITH BOLD .CFM OT-CFM 
+
+gcov-A gcov-G gsim-MC gMC gϕ gcov-A gcov-G gsim-MC gMC gϕ
+
+Without LyaGuide Medium-Expert HalfCheetah 44.9 50.3 62.7 58.9 43.0 50.4 49.3 47.7 80.2 60.5 Hopper 88.9 84.3 96.9 103.5 84.7 92.6 111.1 74.9 108.4 75.5 Walker2d 64.5 95.7 83.7 86.2 78.0 76.4 75.8 94.4 102.5 56.5 Medium HalfCheetah 41.1 43.1 42.5 40.6 43.1 43.4 42.3 34.4 41.6 42.4 Hopper 67.5 83.6 73.6 71.8 69.2 70.6 67.3 63.7 70.9 66.1 Walker2d 75.5 68.5 74.7 78.2 50.8 75.4 77.4 77.3 78.7 67.6 Medium-Replay HalfCheetah 35.4 33.8 26.1 34.3 29.7 30.1 31.2 19.5 34.3 29.2 Hopper 44.7 50.3 46.4 56.2 44.9 48.4 57.5 49.9 63.4 50.3 Walker2d 47.5 48.1 47.4 53.5 38.6 53.6 45.7 30.8 59.0 43.3 Average of Baselines 56.7 61.9 61.5 64.8 53.5 60.1 61.9 54.7 71.0 54.6 With LyaGuide Medium-Expert HalfCheetah 56.7 65.6 58.8 88.0 58.5 50.6 61.6 57.9 88.6 64.2 Hopper 102.6 104.2 84.2 112.2 85.8 103.5 102.8 75.7 111.3 99.4 Walker2d 78.4 84.4 80.4 98.4 92.5 79.7 88.0 87.3 105.5 76.1 Medium HalfCheetah 42.3 42.32 43.7 43.0 42.6 40.6 41.8 42.0 44.3 43.1 Hopper 81.8 75.8 75.8 75.9 71.5 74.8 74.7 61.8 73.0 72.0 Walker2d 72.9 76.6 75.8 79.9 79.1 70.8 76.8 78.5 79.6 73.8 Medium-Replay HalfCheetah 32.6 36.8 35.7 38.5 30.4 28.9 35.5 26.5 41.3 25.3 Hopper 58.2 64.1 54.4 59.5 53.5 60.8 59.6 59.5 73.4 47.6 Walker2d 51.3 64.9 45.0 65.6 54.7 62.1 53.4 52.2 69.0 43.0 Average of LyaGuide 64.1 68.3 61.5 73.5 63.2 63.5 66.0 60.5 76.2 60.5 
+
+the underlying vector field −∇ V used in both phases, without altering any other aspects of the sampling procedure. Figure 7 reports the results on the synthetic two-moon dataset. Under the same accuracy criterion, LyaGuide con-sistently requires substantially fewer integration steps and achieves a noticeable reduction in total sampling time com-pared to the EM baseline. Moreover, when fixing the transition time parameter τ ∗ in phase 1 to values relatively far from 1 (we choose 0.7 here), LyaGuide leads to trajectories that re-main significantly closer to the target distribution, as reflected by faster decay of the Wasserstein-2 distance. These results demonstrate that incorporating LyaGuide into EM yields more contractive dynamics, accelerates convergence toward high-density regions, and improves sampling efficiency while pre-serving the original EM design. VI. C ONCLUSION AND DISCUSSION 
+
+In this work, we introduce LyaGuide, a unified framework that reformulates guidance in flow matching as a Lyapunov control problem. By establishing a theoretical equivalence between guided flows and Lyapunov control law, we show that diverse guidance strategies can be interpreted within a single control-theoretic perspective. To rigorously enforce stability, we also propose a pseudo projection operator with a closed-form expression, which guarantees that any candidate guidance satisfies the Lyapunov condition. Notably, the projection is simple to integrate into existing guidance pipelines and in-troduces minimal implementation overhead. This work opens new opportunities for control-inspired generative modelling, particularly in domains where explicit priors are scarce but limited supervision can be leveraged, making the framework 
+
+Fig. 7. Upper left: Sampling time under different phase 1 duration τ ∗. Upper right: Wasserstein-2 distance between the sampled data and the converged data along the sampling trajectories, blue and red curves correspond to 10 trajectories under different τ ∗. Bottom: Diagram of the sampling process, black dots are initial samples, olive dots are converged samples, blue dots are samples at time τ ∗ = 0 .7, red curves are the sampling trajectories. 
+
+especially suitable for deploying pre-trained models on indi-vidual systems. 12 
+
+a) Both stable and generating the guided probability path: The results in Theorem 2 characterize the existence of a control/guidance that simultaneously satisfies: (i) the weighted continuity equation (Eq. (12) in Appendix) that generates the guided probability path, (we denote such controllers form a space Ug ) and (ii) the local Lyapunov decrease condition (such controllers form a space Us) . The pseudo-projection in Theorem 3 is designed exclusively to enforce the Lyapunov inequality. Since the projection is a pointwise modification of the vector field, it does not impose any constraint on the weighted divergence term ∇· (p′ 
+
+> t
+
+ut), and thus does not preserve the weighted continuity equation in general. Our idea is to project a guidance term c ∈ U g into the subspace Ug ∩ U s to enforce stability for the guidance term, thereby accelerating the sampling process and enhancing the sampling robustness. How to develop a projection operator or an alternative correction that enforces both Lyapunov stability and the weighted diver-gence constraint remains an open problem and a promising direction for future work. 
+
+b) Fixed-Time Lyapunov Control: Our framework cur-rently relies on asymptotic convergence with exponential stability instead of finite convergence time. Since generative models operate with fixed inference time, a natural question is whether fixed-time Lyapunov control can be incorporated to regulate convergence within this horizon. While classical fixed-time theory [25], [60] guarantees bounded-time stability, its direct use may neglect the data distribution p1(x) = q(x)
+
+and disrupt the Lipschitz continuity of neural ODEs. Future work could therefore explore fixed-time Lyapunov methods or design distribution-level Lyapunov functionals that couple 
+
+q(x) with the task-specific energy J(x), enabling faithful generation with controlled convergence speed. 
+
+c) On the Role of the Potential V : Our guarantees hinge on the availability or learnability of a potential V that mean-ingfully encodes task priors. When V is poorly specified or underfitted, guidance may bias samples toward suboptimal re-gions, a limitation shared with classifier/EBM/reward guidance in diffusion [2], [3], [10]. Scenario 2 mitigates this by learning 
+
+Vθ from few-shot supervision with a Lyapunov penalty, but the expressiveness–regularity trade-off remains: overly flexible Vθ
+
+may violate smoothness or curvature required for stabilization and overly rigid Vθ may underfit complex priors, how to address such issue in learning Lyapunov function remains unknown. ACKNOWLEDGMENTS 
+
+We thank Ruiqi Feng for comments on an earlier version of this manuscript. APPENDIX AALGORITHMS 
+
+The score-based candidate guidance in Algorithm 1 pro-vides an efficient approximation to the ideal guidance, al-though its performance depends on the choice of the initial parameter k. A better candidate may be obtained by iteratively running the algorithm with different values of k and selecting 
+
+Algorithm 1 LyaGuide: Training-free Approach  
+
+> 1:
+
+Input: Learned vector field ut in flow matching, explicit Lyapunov function V (x) for prior knowledge, guidance parameter δ, initial parameter set k. 
+
+> 2:
+
+Candidate guidance : E.g., ct(x) = −k∇V (x) ▷
+
+user-defined  
+
+> 3:
+
+Pseudo projection operation for rigorous satisfaction of Lyapunov condition 1:  
+
+> 4:
+
+LyaGuide-ES: c∗ 
+
+> t
+
+(x) = ct(x) − max(0 ,∇V ·(ut+ct)+ δV )  
+
+> ∥∇ V∥2
+
+·∇V 
+
+> 5:
+
+LyaGuide-AS: c∗ 
+
+> t
+
+(x) = ct(x) − max(0 ,∇V ·(ut+ct))   
+
+> ∥∇ V∥2
+
+· ∇ V 
+
+> 6:
+
+LyaGuide-CS: c∗ 
+
+> t
+
+(x)i = (cθc (x, t )) i −
+
+> max
+
+(0,(∇V )i(u+c)i+δV )  
+
+> ∥∇ V∥2
+
+· ∇ V 
+
+> 7:
+
+Output: Guided vector field ft(x) = ut(x) + c∗ 
+
+> t
+
+(x) for conditional flow matching. the best outcome. More generally, any other method for gen-erating a guidance term can be seamlessly integrated into our framework [8]. In particular, one may train a neural network to approximate the candidate guidance, as we demonstrate in Scenario 2 below. 
+
+Algorithm 2 LyaGuide: Training-based Approach 
+
+Input: Preference data-score pairs D = {(xi, V i)}ni=1 ,learning rate β, initial parameters θ0, θ = ( θV , θc), learned flow ut from take noisy distribution p0 to data distribution 
+
+p1, guidance parameter δ.
+
+while not converged do 
+
+(xi, V i) ∼ D ▷ sample data and score Compute Lyapunov Loss L(θV ) from (3) 
+
+θV ← θV − β∇θ L(θV ) ▷ Learn Lyapunov function Train θc with any existing learning-based guidance method 
+
+end while Pseudo projection operation : LyaGuide-ES: c∗ 
+
+> t
+
+(x) = cθc (x, t ) −
+
+> max
+
+(0,∇VθV ·(u+c)+ δV θV )  
+
+> ∥∇ VθV∥2
+
+· ∇ VθV
+
+LyaGuide-AS: c∗ 
+
+> t
+
+(x) = cθc (x, t ) − max (0,∇VθV ·(u+c))  
+
+> ∥∇ VθV∥2
+
+·∇VθV
+
+LyaGuide-CS: c∗ 
+
+> t
+
+(x)i = (cθc (x, t )) i −
+
+> max
+
+(0,(∇VθV )i(u+c)i+δV θV )  
+
+> ∥∇ VθV∥2
+
+· ∇ VθV
+
+Output: Guided vector field ft(x) = ut(x) + c∗ 
+
+> t
+
+(x) for conditional flow matching. APPENDIX BPROOFS 
+
+A. Notations 
+
+Denote by ∥ · ∥ the L2-norm for any given vector in 
+
+Rd. Denote by ∥ · ∥ C(D) the maximum norm on continuous function space C(D). For A = ( aij ), a matrix of dimension 
+
+d×r, denote by ∥A∥2F = Pdi=1 
+
+Prj=1 a2 
+
+> ij
+
+the Frobenius norm. Denote max( a, 0) by (a)+. Denote x · y as the inner product of two vectors. 13 
+
+B. Proof of Theorem 2 
+
+Theorem 4 (Equivalence between Guided Flow Matching and Lyapunov Control) . For the flow model ut(xt) that generates the probability path pt(x), finding the guidance 
+
+ct(xt) to the vector field ut(xt) to perform conditional sampling p′
+
+> t
+
+(x) = 1 
+
+> Zt
+
+pt(x)e −J(x) is equivalent to finding the controller that satisfies the local Lyapunov condition, where energy function J(x) contributes to Lyapunov function as 
+
+V ∝ (J + c) for some constant c, e.g., V = J. More specifically, the equivalence means that there exists a control that both generates the guided probability path and satisfies the local Lyapunov stability condition, thereby accelerating the sampling dynamics of guided flows. 
+
+Proof. Let pt be the probability path governed by the continuity equation 
+
+∂tpt(x) + ∇·  pt(x) ut(x) = 0 , (4) where ut is the trained flow model. For energy J(x), define the reweighted path as 
+
+p′
+
+> t
+
+(x) = 1
+
+Zt
+
+e−J(x) pt(x), Zt =
+
+Z
+
+e−J(x) pt(x) d x.
+
+(5) We assume sufficient smoothness, and either periodic bound-ary conditions or vanishing flux at infinity so that boundary integrals of divergences vanish. 
+
+Step 1. By definition (5) we have, 
+
+∂tp′ 
+
+> t
+
+= ∂t
+
+ e−J
+
+Zt
+
+pt
+
+
+
+= e−J
+
+Zt
+
+∂tpt + pt ∂t
+
+ e−J
+
+Zt
+
+
+
+= e−J
+
+Zt
+
+∂tpt −  ∂t log Zt
+
+ e−J
+
+Zt
+
+pt
+
+| {z }  
+
+> =p′
+> t
+
+(J independent of t)= e−J
+
+Zt
+
+∂tpt −  ∂t log Zt
+
+ p′
+
+> t
+
+. (6) Substituting the continuity equation (4) into (6) yields 
+
+∂tp′ 
+
+> t
+
+= − e−J
+
+Zt
+
+∇· (ptut) −  ∂t log Zt
+
+ p′
+
+> t
+
+. (7) On the other hand, for the transport term, 
+
+∇·  p′
+
+> t
+
+ut
+
+ = ∇· 
+
+ e−J
+
+Zt
+
+pt ut
+
+
+
+= e−J
+
+Zt
+
+∇· (ptut) (8) 
+
++ ( ptut)· ∇ 
+
+ e−J
+
+Zt
+
+
+
+= e−J
+
+Zt
+
+∇· (ptut) − e−J
+
+Zt
+
+pt ut · ∇ J (9) 
+
+= e−J
+
+Zt
+
+∇· (ptut) − p′ 
+
+> t
+
+ut · ∇ J. (10) Adding (7) and (10) gives 
+
+∂tp′ 
+
+> t
+
++ ∇·  p′
+
+> t
+
+ut
+
+ = − p′ 
+
+> t
+
+ut · ∇ J −  ∂t log Zt
+
+ p′
+
+> t
+
+. (11) If we want p′ 
+
+> t
+
+to be generated by the controlled field ut + ct,i.e. 
+
+∂tp′ 
+
+> t
+
++ ∇·  p′
+
+> t
+
+(ut + ct) = 0 ,
+
+then comparing with (11) we obtain the weighted divergence equation for ct:
+
+∇·  p′ 
+
+> t
+
+ct
+
+ = p′
+
+> t
+
+
+
+ut · ∇ J + ∂t log Zt
+
+
+
+. (12) Integrating (12) over Rd and using divergence theorem, 
+
+Z
+
+> Rd
+
+∇·  p′
+
+> t
+
+ct
+
+ dx = 0 ⇐⇒ 
+
+Z
+
+> Rd
+
+p′
+
+> t
+
+
+
+ut·∇ J +∂t log Zt
+
+
+
+dx = 0 .
+
+The identity holds because 
+
+∂t log Zt = 1
+
+Zt
+
+∂t
+
+Z
+
+e−J pt dx
+
+= 1
+
+Zt
+
+Z
+
+e−J ∂tpt dx
+
+= − 1
+
+Zt
+
+Z
+
+e−J ∇· (ptut) d x
+
+= − 1
+
+Zt
+
+Z
+
+∇·  e−J ptut
+
+ dx
+
++ 1
+
+Zt
+
+Z
+
+(ptut)· ∇ (e−J ) d x
+
+= 1
+
+Zt
+
+Z
+
+(ptut)·  − e−J ∇J dx
+
+= −
+
+Z
+
+p′ 
+
+> t
+
+ut · ∇ J dx,
+
+where the divergence integral vanishes by the boundary as-sumption. Hence the right-hand side of (12) has zero integral and (12) admits solutions ct (e.g. ct = ∇ψt with a weighted Neumann problem for ψt). 
+
+Step 2: Constructing a Lyapunov-compatible control. We claim that a solution ct to (12) can be chosen so that J relates to a local Lyapunov function as V = −J under the controlled flow ut + ct. Decompose 
+
+ct(x) = c⊥ 
+
+> t
+
+(x) + c⊤ 
+
+> t
+
+(x), (13) 
+
+c⊥ 
+
+> t
+
+(x) = αt(x) ∇V (x)
+
+∥∇ V (x)∥ , ∇V (x)· c⊤ 
+
+> t
+
+(x) ≡ 0, (14) with the convention αt(x) = 0 at critical points {x :
+
+∇V (x) = 0 }. Choose 
+
+αt(x) = − ut(x)· ∇ V (x)
+
+∥∇ V (x)∥ − δt(x) V
+
+∥∇ V (x)∥ , δ t(x) ≥ 0.
+
+Then along any trajectory xt driven by ut + ct,
+
+ddt V (xt) = ∇V (xt)· ut(xt) + ct(xt) = − γt(xt)V (xt),
+
+so V is locally Lyapunov. The tangential component c⊤ 
+
+> t
+
+is then chosen to satisfy the residual of (12): 
+
+∇·  p′
+
+> t
+
+c⊤
+
+> t
+
+ = p′
+
+> t
+
+ ut · ∇ J + ∂t log Zt
+
+ − ∇·  p′
+
+> t
+
+c⊥
+
+> t
+
+,
+
+which admits solutions c⊤ because both sides have zero integral. 
+
+Step 3: From Lyapunov control to guided control. Con-versely, suppose there exists a control ct with 
+
+V = J, ∇V (x)· ut(x) + ct(x) ≤ − δV. 
+
+Define 
+
+ϕt(x) := ∂t log Zt + ut(x)· ∇ V (x),14 
+
+and the guided control ˜c should be a solution of 
+
+∇·  p′ 
+
+> t
+
+˜ct
+
+ = p′ 
+
+> t
+
+ϕt.
+
+To enforce the Lyapunov control can also satisfy the diver-gence equation, we correct the Lyapunov control as ˜c = c+w,where w obeys to the following equations: 
+
+∇V (x) · wt(x) = 0 , ∀x ∈ O(x∗, ε ), ∀ local minima x∗,
+
+(15) 
+
+∇ · (p′
+
+> t
+
+wt) = p′
+
+> t
+
+ϕt − ∇ · (p′
+
+> t
+
+ct). (16) By Step 1, equation (16) is solvable under the mild boundary condition R 
+
+> Rd
+
+∇· (p′
+
+> t
+
+wt) d x = 0 . The purpose of equation (15) is to ensure that the modified control ˜ct satisfies the Lyapunov decrease condition. Since (15) is only required to hold in a small neighborhood of the local minimum of V , there remains substantial freedom to adjust wt by adding any element of the nullspace of the weighted divergence operator Lt(·) = ∇· (p′
+
+> t
+
+·).Steps 2 and 3 provide two opposite directions for con-structing a control (or guidance term) that simultaneously satisfies both the Lyapunov inequality and the divergence constraint (12). However, the proof reveals that starting from a Lyapunov-stable control and attempting to enforce the diver-gence equation requires solving the coupled PDEs (15)–(16), which is generally more difficult. In practice, it is considerably easier to begin with a guidance term that already satisfies the divergence equation (12), and then impose Lyapunov stability via the projection operation in Theorem 3. The above derivations can easily be applied to the case V =
+
+kJ with k > 0.Combing the above three steps, we complete the proof. ■
+
+a) Intuitive explanation of the theory: The Theorem 2 reveals a useful conceptual symmetry between guidance-compatible controls (those satisfying the weighted divergence equation) and Lyapunov-stable controls (those ensuring mono-tone contraction of the Lyapunov function). In principle, starting from a Lyapunov-stable control, one can always con-struct a guidance-compatible control by solving an appropriate correction equation so that the divergence constraint (12) is satisfied. Conversely, given any guidance term, one can adjust its normal component along ∇V to enforce Lyapunov decrease while leaving the divergence structure intact. However, these two directions are not equally tractable. The conversion from Lyapunov stability to guidance requires solving coupled PDE system (15),(16) that simultaneously enforces tangency to the level sets of V and corrects the weighted divergence. This construction is mathematically valid but typically costly and impractical for high-dimensional learn-ing problems. The reverse direction is substantially simpler and forms the basis of LyaGuide. Modern flow-matching or score-based models already produce guidance terms that satisfy the di-vergence equation by construction. Given such a guidance field, Theorem 3 shows that we can impose Lyapunov stability without solving any PDE by projecting the field onto the Lyapunov-stable set at each point. The projection adjusts only the normal component of the guidance vector along ∇V ,guaranteeing strict decay of sampling trajectory along V while preserving the original divergence structure. This two-way relationship explains why LyaGuide is both principled and efficient: the theory ensures that stable and divergence-compatible controls are mutually reachable, whereas the algorithm exploits the easy direction—projecting guidance to stability—to obtain a control that satisfies both properties simultaneously. 
+
+C. Proof and Analysis of Proposition 2 
+
+Proposition 3. The following commonly used guidance strate-gies in generative modeling can all be interpreted as Lyapunov control within our unified framework:  
+
+> •
+
+Classifier Guidance : Given a trained classifier p(y|x),the Lyapunov function for guided distribution p(x|y)
+
+specified on conditioner y is Vy (x) = − log p(y|x). 
+
+> •
+
+Reward Guidance : In reinforcement learning tasks with reward function R(x), the Lyapunov function for guided distribution 1 
+
+> Z
+
+pt(x)eR(x) concentrates probability mass in high-reward regions is V (x) = −R(x). 
+
+> •
+
+Energy-Based Model (EBM) Guidance : For a target EBM p(x) ∝ e−E(x), the Lyapunov function is naturally 
+
+V (x) = −E(x). 
+
+> •
+
+Image inverse problems. Let the forward operator be 
+
+y = H(x) + ε with ε ∼ N (0 , σ 2I). Then p(y|x) ∝
+
+exp  − 12σ2 ∥H(x)−y∥22
+
+ and a natural Lyapunov function is Vy (x) = 12σ2 ∥H(x) − y∥22, yielding guided sampling 
+
+p′
+
+> t
+
+(x) ∝ pt(x) exp   − Vy (x) that enforces data consis-tency [38]. 
+
+Proof.  
+
+> •
+
+Classifier Guidance and image inverse problems. :Taking J(x) = − log p(y|x), we compute  
+
+> 1
+> Z
+
+pt(x)e−J(x) = pt(x)p(y|x)
+
+R pt(x)p(y|x) dx (17) 
+
+= pt(x) p(x,y )
+
+> p(x)
+
+R pt(x) p(x,y ) 
+
+> p(x)
+
+dx (18) 
+
+= p(x|y). (19) Thus the guided distribution is exactly conditional sam-pling.  
+
+> •
+
+Reward Guidance : With J(x) = −R(x), the guided law is 
+
+p′
+
+> t
+
+(x) = 1 
+
+> Z
+
+pt(x)eR(x),
+
+which emphasizes regions of higher reward. This is equivalent to Lyapunov control with V (x) = −R(x),where the control term reduces V (x) along the trajectory, steering toward reward-maximizing states.  
+
+> •
+
+EBM Guidance : If the target distribution is p(x) ∝
+
+e−E(x), then 
+
+p′
+
+> t
+
+(x) = 1 
+
+> Z
+
+pt(x)e−E(x),
+
+which matches the EBM density. Interpreting V (x) = 
+
+E(x) as Lyapunov function, the control enforces descent in V (x), aligning the flow with low-energy modes. 
+
+■15 
+
+1) Proof of Theorem 3: 
+
+Theorem 5 (Lyapunov Guarantee for Guidance) . For a can-didate controller c and the guidance controller space U(V ) = 
+
+{u : ∇V ·(ut +ct)+ δV ≤ 0} that rigorously satifies the local Lyapunov condition in Proposition 1, define the projection operator as 
+
+π(ct, U(V )) ≜ ct − max 
+
+ 0,∇V (x)·(ut(x)+ ct(x))+ δV (x)
+
+  
+
+> ∥∇ V(x)∥2
+
+∇V (x).
+
+Then π(ct, U(V )) is locally Lipschitz continuous and thus the guided flow under π(ct, U(V )) is well defined, and 
+
+π(ct, U(V )) ∈ U (V ).
+
+Proof. The local Lipschitz continuity of the projected func-tion naturally comes from the local Lipschitz continuity of the considered functions u, c and V . We directly check the inequality constraint in U(V ) is satisfied by the projection element, that is 
+
+Lu+c∗ V c∗=π(c,U(V )) ≤ δ − V. 
+
+Since the controller has affine actuator, from the definition of the Lie derivative operator, we have                                         
+
+> Lu+c∗Vc∗=π(c,U(V)) =∇V·(u+c−max(0 ,Lu+cV+δV )
+> ∥∇ V∥2· ∇ V)=∇V·(u+c)− ∇ V·max(0 ,Lu+cV+δV )
+> ∥∇ V∥2· ∇ V
+> =Lu+cV−max(0 ,Lu+cV+δV )≤ − δV.
+
+■
+
+Remark 1. To avoid ambiguity, we distinguish two different notions that are sometimes both informally referred to as “local stability.” In the classical control-theoretic sense, local stability describes the situation where a given equilibrium is stable only within a neighborhood, in contrast to global stability where the same equilibrium attracts all trajectories. In the present work, however, the more relevant distinction is between a single-equilibrium setting and a multi-equilibrium (or multi-modal) setting. Generative modeling typically belongs to the latter case: the target distribution often contains multiple modes, and the corresponding potential V admits multiple local minimizers. In such a setting, the appropriate objective is not to enforce a single globally attracting equilibrium, which would collapse all modes, but rather to ensure that each minimizer is locally sta-ble within its own basin of attraction. Accordingly, LyaGuide uses the Lyapunov function to induce local contraction around the appropriate mode once the trajectory enters its basin, rather than to solve a single global optimization problem. When the target distribution has only one minimizer, the same pseudo-projection mechanism reduces to the standard single-equilibrium case and yields global stability. Therefore, the use of a local Lyapunov function here reflects the multi-modal structure of the generative problem, rather than a limita-tion of the framework. Moreover, as illustrated in Fig. 6, such local contraction also accelerates convergence and reduces the Wasserstein-2 distance throughout inference. 
+
+D. Notes on robustness of the initial value 
+
+In this section, we discuss the influence of the initial value to the guided generative modelling. We note that in the original flow model, the initial data is sampled from the initial distribution p0. For the guided flow, we still sample the initial value from p0, which is common in flow matching community [4], [6], [8]. However, according to the continuity equation, to generate p′ 
+
+> t
+
+in Theorem 2, the initial distribution should be p′ 
+
+> 0
+
+= 1 /Z 0e−J(x)p0 instead of p0. So we investigate how the choice of initial distribution influence the generation effect from the perspective of distribution convergence. 
+
+Theorem 6 (Robustness to Initial Distribution) . Let ut(x) be the learned vector field and ct(x) the guidance control de-rived from Lyapunov function V (x). Assume the guided field 
+
+ft(x) = ut(x) + ct(x) satisfies the local Lyapunov condition with rate δ > 0. Then, for any two initial distributions p0
+
+and p⋆
+
+> 0
+
+, the corresponding marginals pt and p⋆t along the flow satisfy 
+
+W2(pt, p ⋆t ) ≤ e−δt W2(p0, p ⋆
+
+> 0
+
+), ∀t ∈ [0 , 1] .
+
+In particular, even if the actual inference starts from a different initial law p0 (e.g. Gaussian noise) instead of the theoretical 
+
+p⋆
+
+> 0
+
+, the terminal distribution at t = 1 remains exponentially close to the desired guided distribution p⋆ 
+
+> 1
+
+∝ q(x)e−J(x).
+
+Lemma 1 (Lyapunov-guided field implies contraction) . Let 
+
+ft(x) = ut(x) + ct(x) with a Lyapunov-based guidance 
+
+ct(x) = −Kt(x)∇V (x), where V ∈ C 2 and Kt(x) ∈ Rd×d is symmetric positive definite. Fix a forward-invariant sublevel set Sρ := {x : V (x) ≤ ρ}. Assume on Sρ:1) Strong convexity of V : ∇2V (x) ⪰ mI for some m > 0;2) Uniform gain: Kt(x) ⪰ κI for some κ > 0;3) Bounded symmetric Jacobian of ut: 12
+
+ ∇ut(x) + 
+
+∇ut(x)⊤ ⪯ LI for some L ∈ R;4) (Optional) Slowly-varying gain: ∥∇ Kt(x)∥ ≤ B (if 
+
+Kt depends on x). Then, for all x, y ∈ S ρ and t ∈ [0 , 1] ,
+
+x − y, f t(x) − ft(y) ≤ −δ ∥x − y∥2,
+
+with 
+
+δ = κm − L − ε, (20) 
+
+ε =
+
+(0, if Kt is constant in x;
+
+B sup z∈S ρ ∥∇ V (z)∥, otherwise . (21) In particular, if κm > L + ε, the contraction condition (22) holds on Sρ.
+
+Proof. By the mean-value integral along the segment γ(θ) = 
+
+y + θ(x − y),
+
+ft(x) − ft(y) = 
+
+Z 10
+
+∇ft(γ(θ)) dθ 
+
+
+
+(x − y).
+
+Hence 
+
+⟨x−y, f t(x)−ft(y)⟩ =
+
+Z 10
+
+x−y, sym ∇ft(γ(θ)) ( x−y) dθ, 16 
+
+where sym A = 12 (A + A⊤). It suffices to upper bound 
+
+sym ∇ft. Compute 
+
+∇ft = ∇ut − ∇  Kt∇V  = ∇ut − (∇Kt)∇V ⊤ + Kt∇2V .
+
+Taking symmetric parts yields 
+
+sym ∇ft ⪯ LI − Kt∇2V + sym  (∇Kt)∇V ⊤.
+
+On Sρ, by (A1)–(A3): Kt∇2V ⪰ κmI and sym(( ∇Kt)∇V ⊤)
+
+has operator norm ≤ ∥∇ Kt∥ ∥∇ V ∥ ≤ B sup Sρ ∥∇ V ∥.Therefore 
+
+sym ∇ft ⪯  L − κm + εI. 
+
+Integrating along γ(θ) gives ⟨x − y, f t(x) − ft(y)⟩ ≤ − (κm −
+
+L − ε)∥x − y∥2, which proves the claim with δ = κm − L − ε.
+
+■
+
+Theorem 7 (Robustness to the Initial Distribution) . Assume 
+
+ct = −Kt∇V and conditions (A1)–(A4) in Lemma 1 hold on a forward-invariant sublevel set; then (22) follows with 
+
+δ = κm − L − ε.Let ut be the learned vector field and ct the guidance control derived from a Lyapunov function V , and denote the guided field by ft := ut +ct. Assume there exists δ > 0 and a domain 
+
+D ⊂ Rd that is forward invariant under ft such that 
+
+x−y, f t(x)−ft(y) ≤ − δ ∥x−y∥2, ∀ x, y ∈ D , ∀t ∈ [0 , 1] .
+
+(22) Let pt and p⋆t be the marginals obtained by pushing forward 
+
+p0 and p⋆ 
+
+> 0
+
+along the flow of ft, respectively. Then, for all 
+
+t ∈ [0 , 1] ,
+
+W2(pt, p ⋆t ) ≤ e−δt W2(p0, p ⋆
+
+> 0
+
+) .
+
+In particular, taking p⋆ 
+
+> 0
+
+as the “theoretical” initialization (e.g. the marginal induced by the conditional path), any inference initialized from a different prior p0 (e.g. a Gaussian) remains exponentially close to the target guided law at t = 1 .
+
+Proof. Let Φt, 0 : D → D denote the flow map associated with the ODE ˙x = ft(x), i.e., xt = Φ t, 0(x0). Fix any two initial states x0, y 0 ∈ D and consider the distance D(t) :=  
+
+> 12
+
+∥xt − yt∥2 where xt = Φ t, 0(x0) and yt = Φ t, 0(y0). Then 
+
+˙D(t) = xt−yt, f t(xt)−ft(yt) ≤ − δ ∥xt−yt∥2 = − 2δ D (t),
+
+where we used (22). By Gr¨ onwall’s inequality, 
+
+∥xt − yt∥ ≤ e−δt ∥x0 − y0∥, ∀t ∈ [0 , 1] .
+
+Now let γ0 be any coupling in Π( p0, p ⋆
+
+> 0
+
+). Push it forward through the product flow to obtain a coupling γt := (Φ t, 0 ×
+
+Φt, 0)#γ0 ∈ Π( pt, p ⋆t ). Then 
+
+Z
+
+∥x − y∥2 dγ t(x, y ) = 
+
+Z
+
+Φt, 0(x0) − Φt, 0(y0) 2 dγ 0(x0, y 0)
+
+≤ e−2δt 
+
+Z
+
+∥x0 − y0∥2 dγ 0(x0, y 0).
+
+Taking the infimum over all initial couplings γ0 ∈ Π( p0, p ⋆
+
+> 0
+
+)
+
+yields 
+
+W 22 (pt, p ⋆t ) ≤ e−2δt W 22 (p0, p ⋆
+
+> 0
+
+),
+
+and the stated bound follows by taking square roots. ■
+
+Remark 2 (Link to Lyapunov condition) . The contractivity assumption (22) is implied locally if the Lyapunov control is taken as ct(x) = −Kt(x)∇V (x) with Kt(x) ⪰ κI , and 
+
+V is m-strongly convex on a forward-invariant sublevel set (so that ∇2V ⪰ mI there), while the symmetric part of ∇ut
+
+is bounded above by LtI with κm − Lt ≥ δ > 0. Then 
+
+> 12
+
+ ∇ft + ∇f ⊤
+
+> t
+
+ ⪯ − δI , which is equivalent to (22). This result formalizes the robustness of guided flow match-ing with respect to the choice of the initial distribution. Although the theoretical formulation involves the marginal initialization p⋆ 
+
+> 0
+
+= R p0(x | x1)q(x1), dx 1, in practice one typically samples directly from a Gaussian prior p0. The contraction guaranteed by the Lyapunov condition ensures that the discrepancy between p0 and p⋆ 
+
+> 0
+
+vanishes exponentially fast along the trajectory. Consequently, by the terminal time t = 1 ,the generated distribution p1 is already arbitrarily close to the target law, making inference from p0 both valid and effective. 
+
+E. Experimental Configurations and Additional Experiments 1) Synthetic Data Experiments.: For the 2D synthetic benchmarks (uniform-to-8Gaussians, circle-to-S-curve and 8Gaussians-to-Moons), we follow the setup of [8]. The flow model is trained with displacement interpolation and a 4-layer MLP with hidden dimension 128, using Adam optimizer with learning rate 10 −4. Each experiment is trained for 20k iterations with batch size 512. Guidance baselines include Monte Carlo ( gMC ), covariance-based guidance ( gcov-A , gcov-G ), contrastive energy guidance (CEG), and learned guidance gϕ.For each method, we apply our pseudo projection operation (LyaGuide-ES/AS/CS) in the inference stage. 
+
+Few-shot Supervision (Scenario 2). In Scenario 2, we subsample preference data–score pairs with sizes varying from 128 to 1024. The Lyapunov candidate Vθ is parameterized as an MLP with 3 hidden layers (width 64) and trained using weighted regression. We emphasize low-score samples to encourage convexity around minima. Once Vθ is learned, the corresponding guidance control is synthesized using either explicit descent or integrated into gϕ.
+
+Ablation study. In this section we investigate the effects of the parameters δ, k to the performance of LyaGuide. The parameter δ appears both in the Lyapunov convergence rate in Proposition 3.1 and in the explicit projection term in Theorem 4.1. This dual influence makes δ a global hyperpa-rameter affecting all initial methods when incorporated into LyaGuide. From Figure 5, we observe that the method is overall robust to δ across a broad range of values. As δ
+
+increases, the generated samples concentrate more strongly near the minima of the Lyapunov function V , i.e., the low-energy region. This stronger contraction improves convergence but also reduces the probability of visiting low-density regions, thereby decreasing exploration capability. In other words, a large δ induces over-contraction, which may excessively bias sampling towards high-density areas. Therefore, δ can be tuned according to practical needs: a smaller δ enhances exploration, while a larger δ yields stronger stability and contraction. However, as shown in both Figure 5 and Table I, excessively large δ may cause LyaGuide to underperform compared to the original guidance. Based on our empirical findings, a practical 17 Without  LyaGuide          
+
+> CEG 𝑔 sim −MC 𝑔 cov −A𝑔 cov −G𝑔 MC 𝑔 𝜙 Contrast Gradient
+> 𝒙 1𝒙 0
+> LyaGuide -ES
+> LyaGuide -AS
+> LyaGuide -CS
+> Fig. 8. Scenario 1 results in 8-Gaussian task with different variants of LyaGuide.
+
+recommendation is to choose δ ∈ [0 , 1] , which consistently yields a good balance between exploration and stability. 
+
+Sensitivity with respect to k (gradient-based guidance only). The control coefficient k only affects gradient-based guidance methods (e.g., energy- or score-based guidance), since it appears in the initial guidance term −k∇V prior to applying LyaGuide. Therefore, we evaluate k exclusively on gradient-based variants, as reported in Table I. The results show that increasing k generally improves sample quality, as stronger control in the Lyapunov direction facilitates more effective contraction of the gradient flow. This benefit persists across different δ values, although extreme δ can diminish the improvement. These observations confirm that k acts as a refinement factor for stabilising gradient-based methods, rather than as a global sensitivity parameter. 
+
+Brief Summary. The parameter δ influences both Lyapunov convergence and the projection step, and the method exhibits low sensitivity to its variation. Larger δ improves convergence but reduces exploration; thus, we recommend choosing δ ∈
+
+[0 , 1] . The parameter k affects only gradient-based guidance, and larger k generally improves performance, as shown in Table I. 18 𝑔 𝜙  LyaGuide Learned  𝑉  
+
+> 𝒙 1𝒙 0
+
+0
+
+1
+
+0
+
+1
+
+0
+
+Guidance Data 1024 
+
+Fig. 9. Scenario 2 results on synthetic data with dataset size = 1024 .19 𝑔 𝜙  LyaGuide Learned  𝑉  
+
+> 𝒙 1𝒙 0
+
+0
+
+1
+
+0
+
+1
+
+0
+
+Guidance  Data 256 
+
+Fig. 10. Scenario 2 results on synthetic data with dataset size = 256 .20 𝑔 𝜙  LyaGuide Learned  𝑉  
+
+> 𝒙 1𝒙 0
+
+0
+
+1
+
+0
+
+1
+
+0
+
+Guidance  Data 128 
+
+Fig. 11. Scenario 2 results on synthetic data with dataset size = 128 .21 
+
+TABLE IV IMAGE INVERSE PROBLEM RESULTS ON CELEB A-HQ (S UPER -R ESOLUTION TASK ). Original Methods LyaGuide-ES LyaGuide-CS FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑ FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑ FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑
+
+OT-CFM 
+
+gcov-A 30.2284 0.3713 22.9642 0.5988 30.2183 0.3712 22.9707 0.5992 27.5309 0.3630 22.8065 0.6132 
+
+gsim-A 31.8224 0.3718 23.8667 0.6069 31.5397 0.3705 23.8698 0.6091 27.5309 0.3630 22.8065 0.6132 
+
+ΠGDM 22.9596 0.2826 26.9492 0.7584 23.0441 0.2827 26.9462 0.7582 23.7278 0.2854 26.9099 0.7554 
+
+gMC 24.1797 0.5521 8.7411 0.3628 24.9576 0.5538 8.8167 0.3637 25.3356 0.5430 9.0702 0.3848 CFM 
+
+gcov-A 31.9606 0.3769 22.7715 0.5897 32.0031 0.3769 22.7778 0.5902 31.2359 0.3741 22.7429 0.5948 
+
+gsim-A 32.6209 0.3745 23.6848 0.6005 31.9223 0.3712 23.6621 0.6061 27.7175 0.3564 23.4357 0.6312 
+
+ΠGDM 25.7605 0.2900 26.8810 0.7470 25.9728 0.2897 26.8811 0.7473 26.7152 0.2933 26.8322 0.7434 
+
+gMC 26.5714 0.5555 8.9762 0.3588 28.1408 0.5566 9.0434 0.3595 27.7506 0.5456 9.3742 0.3836 TABLE V IMAGE INVERSE PROBLEM RESULTS ON CELEB A-HQ (G AUSSIAN DEBLURRING TASK ). Original Methods LyaGuide-ES LyaGuide-CS FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑ FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑ FID ↓ LPIPS ↓ PSNR ↑ SSIM ↑
+
+OT-CFM 
+
+gcov-A 15.7897 0.2738 26.0362 0.7202 14.9309 0.2699 26.2131 0.7247 11.9049 0.2534 26.2578 0.7375 
+
+gsim-A 14.7355 0.2506 27.8596 0.7721 14.9201 0.2507 27.8551 0.7720 14.7920 0.2500 27.8420 0.7719 
+
+ΠGDM 20.4083 0.2514 28.6943 0.7827 19.8694 0.2492 28.7049 0.7838 20.3166 0.2517 28.6720 0.7820 
+
+gMC 24.5336 0.5524 8.7690 0.3640 28.0601 0.5156 10.5469 0.4110 27.5108 0.5388 9.2243 0.3913 CFM 
+
+gcov-A 16.6399 0.2830 25.5352 0.6989 16.0158 0.2792 25.6866 0.7031 13.1084 0.2641 25.7225 0.7161 
+
+gsim-A 15.2263 0.2591 27.5387 0.7587 15.2263 0.2591 27.5387 0.7587 15.6122 0.2585 27.4902 0.7581 
+
+ΠGDM 20.7786 0.2593 28.3883 0.7709 20.3063 0.2557 28.5493 0.7750 20.6238 0.2591 28.4349 0.7709 
+
+gMC 26.4901 0.5556 9.0386 0.3612 31.1472 0.5276 10.3195 0.3959 30.0128 0.5410 9.5963 0.3917 
+
+2) Image Inverse Problems: For CelebA-HQ image inpaint-ing, deblurring, and super-resolution tasks, we adopt the same experimental protocol as [8], [38]. Conditional flow matching (CFM) and optimal-transport CFM (OT-CFM) are used as base models. Evaluation metrics include FID, LPIPS, PSNR, and SSIM over 3000 test samples. Baselines ( gMC , gcov-A , ΠGDM, etc.) are compared with and without LyaGuide projection. Hyperparameters for the pseudo projection are fixed across all tasks, demonstrating robustness without extra tuning. 22 
+
+Fig. 12. The visualization of the image inverse problems with the base flow matching model of mini-batch optimal transport conditional flow matching (OT-CFM). Four rows show the results of four baselines with the corresponding LyaGuide results in box-inpainting task. 23 
+
+Fig. 13. The visualization of the image inverse problems with the base flow matching model of conditional flow matching (CFM). Four rows show the results of four baselines with the corresponding LyaGuide results in box-inpainting task. 24 
+
+REFERENCES [1] Y. Song, J. Sohl-Dickstein, D. P. Kingma, A. Kumar, S. Ermon, and B. Poole, “Score-based generative modeling through stochastic differ-ential equations,” in International Conference on Learning Representa-tions , 2021. [2] P. Dhariwal and A. Nichol, “Diffusion models beat gans on image synthesis,” Advances in neural information processing systems , vol. 34, pp. 8780–8794, 2021. [3] J. Ho and T. Salimans, “Classifier-free diffusion guidance,” in NeurIPS 2021 Workshop on Deep Generative Models and Downstream Applica-tions .[4] Y. Lipman, R. T. Chen, H. Ben-Hamu, M. Nickel, and M. Le, “Flow matching for generative modeling,” in 11th International Conference on Learning Representations, ICLR 2023 , 2023. [5] X. Liu, C. Gong et al. , “Flow straight and fast: Learning to generate and transfer data with rectified flow,” in The Eleventh International Conference on Learning Representations , 2023. [6] A. Tong, N. Malkin, G. Huguet, Y. Zhang, J. Rector-Brooks, K. Fatras, G. Wolf, and Y. Bengio, “Conditional flow matching: Simulation-free dynamic optimal transport,” arXiv preprint arXiv:2302.00482 , vol. 2, no. 3, 2023. [7] W. Fan, A. Y. Zheng, R. A. Yeh, and Z. Liu, “Cfg-zero*: Improved classifier-free guidance for flow matching models,” CoRR , 2025. [8] R. Feng, C. Yu, W. Deng, P. Hu, and T. Wu, “On the guidance of flow matching,” in Forty-second International Conference on Machine Learning , 2025. [9] Z. Zhang, M. Zitnik, and Q. Liu, “Generalized protein pocket generation with prior-informed flow matching,” Advances in neural information processing systems , vol. 37, pp. 38 559–38 589, 2024. [10] M. Janner, Y. Du, J. Tenenbaum, and S. Levine, “Planning with diffusion for flexible behavior synthesis,” in International Conference on Machine Learning . PMLR, 2022, pp. 9902–9915. [11] Y. Song, L. Shen, L. Xing, and S. Ermon, “Solving inverse problems in medical imaging with score-based generative models,” arXiv preprint arXiv:2111.08005 , 2021. [12] B. Kawar, M. Elad, S. Ermon, and J. Song, “Denoising diffusion restoration models,” Advances in neural information processing systems ,vol. 35, pp. 23 593–23 606, 2022. [13] H. Chung, J. Kim, M. T. Mccann, M. L. Klasky, and J. C. Ye, “Diffusion posterior sampling for general noisy inverse problems,” in The Eleventh International Conference on Learning Representations .[14] H. K. Khalil, “Nonlinear systems third edition,” Patience Hall , vol. 115, 2002. [15] P. A. Parrilo, Structured Semidefinite Programs and Semialgebraic Geometry Methods in Robustness and Optimization . California Institute of Technology, 2000. [16] H. Tsukamoto, S.-J. Chung, and J.-J. E. Slotine, “Contraction theory for nonlinear stability analysis and learning-based control: A tutorial overview,” Annual Reviews in Control , vol. 52, pp. 135–169, 2021. [17] Y.-C. Chang, N. Roohi, and S. Gao, “Neural lyapunov control,” in 
+
+Proceedings of the 33rd International Conference on Neural Information Processing Systems , 2019, pp. 3245–3254. [18] J. Zhang, Q. Zhu, and W. Lin, “Neural stochastic control,” in Advances in Neural Information Processing Systems , 2022. [19] L. Yang, J. Zhang, Q. Zhu, and W. Lin, “Neural event-triggered control with optimal scheduling,” arXiv preprint arXiv:2507.14653 , 2025. [20] J. Zhang, Q. Zhu, W. Yang, and W. Lin, “Sync: Safety-aware neural control for stabilizing stochastic delay-differential equations,” in The Eleventh International Conference on Learning Representations , 2022. [21] Z. Qin, K. Zhang, Y. Chen, J. Chen, and C. Fan, “Learning safe multi-agent control with decentralized neural barrier certificates,” in 
+
+International Conference on Learning Representations , 2020. [22] D. Sun, S. Jha, and C. Fan, “Learning certified control using contraction metric,” in Conference on Robot Learning . PMLR, 2021, pp. 1519– 1539. [23] Z. Artstein, “Stabilization with relaxed controls,” Nonlinear Analysis: Theory, Methods & Applications , vol. 7, no. 11, pp. 1163–1173, 1983. [24] E. D. Sontag, “A ‘universal’construction of artstein’s theorem on nonlin-ear stabilization,” Systems & control letters , vol. 13, no. 2, pp. 117–123, 1989. [25] A. Polyakov, “Nonlinear feedback design for fixed-time stabilization of linear control systems,” IEEE Transactions on Automatic Control ,vol. 57, no. 8, pp. 2106–2110, 2012. [26] K. Lee, X. Li, Q. Wang, J. He, J. Ke, M.-H. Yang, I. Essa, J. Shin, F. Yang, and Y. Li, “Calibrated multi-preference optimization for align-ing diffusion models,” in Proceedings of the Computer Vision and Pattern Recognition Conference , 2025, pp. 18 465–18 475. [27] K. Black, M. Janner, Y. Du, I. Kostrikov, and S. Levine, “Training diffu-sion models with reinforcement learning,” in The Twelfth International Conference on Learning Representations , 2023. [28] H. Zhang and T. Xu, “Towards controllable diffusion models via reward-guided exploration,” arXiv preprint arXiv:2304.07132 , 2023. [29] Y. LeCun, S. Chopra, R. Hadsell, M. Ranzato, F. Huang et al. , “A tutorial on energy-based learning,” Predicting structured data , vol. 1, no. 0, 2006. [30] C. I. Sprague, A. Elofsson, and H. Azizpour, “Incorporating stability into flow matching,” in ICML 2024 Workshop on Structured Probabilistic Inference {\ &} Generative Modeling , 2024. [31] M. S. Albergo, M. Rizzi, and K. Cranmer, “Stochastic interpolant: A new framework for generative modeling,” in International Conference on Machine Learning (ICML) , 2023. [32] T. Chen, J. Gu, and L. Dinh, “Generative modeling with phase stochas-tic bridges,” in International Conference on Learning Representations (ICLR) , 2023. [33] Y. Song and S. Ermon, “Generative modeling by estimating gradients of the data distribution,” Advances in neural information processing systems , vol. 32, 2019. [34] Y. Du and I. Mordatch, “Implicit generation and modeling with energy based models,” Advances in neural information processing systems ,vol. 32, 2019. [35] J. Liu, Y. Meng, and M. Fitzsimmons, “Physics-informed neural network lyapunov functions: Pde characterization, learning, and verification,” 
+
+Journal of Machine Learning Research , vol. 24, no. 210, pp. 1–36, 2023. [36] Q. Kang, Y. Song, Q. Ding, and W. P. Tay, “Stable neural ode with lyapunov-stable equilibrium points for defending against adversarial attacks,” Advances in Neural Information Processing Systems , vol. 34, pp. 14 925–14 937, 2021. [37] Y. Wang, J. Yu, and J. Zhang, “Zero-shot image restoration using denoising diffusion null-space model,” in The Eleventh International Conference on Learning Representations .[38] J. Song, A. Vahdat, M. Mardani, and J. Kautz, “Pseudoinverse-guided diffusion models for inverse problems,” in International Conference on Learning Representations , 2023. [39] A. Pokle, M. J. Muckley, R. T. Chen, and B. Karrer, “Training-free linear image inverses via flows,” arXiv preprint arXiv:2310.04432 , 2023. [40] Y. Zhang, P. Yu, Y. Zhu, Y. Chang, F. Gao, Y. N. Wu, and O. Leong, “Flow priors for linear inverse problems via iterative corrupted trajectory matching,” Advances in Neural Information Processing Systems , vol. 37, pp. 57 389–57 417, 2024. [41] S. Martin, A. Gagneux, P. Hagemann, and G. Steidl, “Pnp-flow: Plug-and-play image restoration with flow matching,” in International Con-ference on Learning Representations , 2025. [42] Y. Yan, Y. Zhang, X. Meng, and Z. Zhao, “Fig: Flow with interpolant guidance for linear inverse problems,” in The Thirteenth International Conference on Learning Representations , 2025. [43] E. Perez, F. Strub, H. De Vries, V. Dumoulin, and A. Courville, “Film: Visual reasoning with a general conditioning layer,” in Proceedings of the AAAI conference on artificial intelligence , vol. 32, no. 1, 2018. [44] S.-A. Rebuffi, H. Bilen, and A. Vedaldi, “Learning multiple visual domains with residual adapters,” in NeurIPS , 2017. [45] ——, “Efficient parametrization of multi-domain deep neural networks,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2018, pp. 8119–8127. [46] C. Finn, P. Abbeel, and S. Levine, “Model-agnostic meta-learning for fast adaptation of deep networks,” in ICML , 2017. [47] A. A. Rusu, D. Rao, J. Sygnowski, R. Pascanu, S. Osindero, and R. Hadsell, “Meta-learning with latent embedding optimization,” in 
+
+ICLR , 2019. [48] N. Houlsby, A. Giurgiu, S. Jastrzebski, B. Morrone, Q. De Laroussilhe, A. Gesmundo, M. Attariyan, and S. Gelly, “Parameter-efficient transfer learning for nlp,” in International conference on machine learning .PMLR, 2019, pp. 2790–2799. [49] N. Wiener, Cybernetics or Control and Communication in the Animal and the Machine . MIT press, 2019. [50] X. Mao, Stochastic differential equations and applications . Elsevier, 2007. [51] C. Dawson, S. Gao, and C. Fan, “Safe control with learned certificates: A survey of neural lyapunov, barrier, and contraction methods for robotics and control,” IEEE Transactions on Robotics , 2023. 25 
+
+[52] D. A. Deenen, B. Sharif, S. van den Eijnden, H. Nijmeijer, M. Heemels, and M. Heertjes, “Projection-based integrators for improved motion control: Formalization, well-posedness and stability of hybrid integrator-gain systems,” Automatica , vol. 133, p. 109830, 2021. [53] Y. Chow, O. Nachum, A. Faust, E. Duenez-Guzman, and M. Ghavamzadeh, “Lyapunov-based safe policy optimization for continuous control,” arXiv preprint arXiv:1901.10031 , 2019. [54] J. Zhang, L. Yang, Q. Zhu, and W. Lin, “Fessnc: Fast exponentially sta-ble and safe neural controller,” in International Conference on Machine Learning . PMLR, 2024, pp. 60 076–60 098. [55] C. Lu, H. Chen, J. Chen, H. Su, C. Li, and J. Zhu, “Contrastive energy prediction for exact energy-guided diffusion sampling in offline rein-forcement learning,” in International Conference on Machine Learning .PMLR, 2023, pp. 22 825–22 855. [56] J. Fu, A. Kumar, O. Nachum, G. Tucker, and S. Levine, “D4rl: Datasets for deep data-driven reinforcement learning,” arXiv preprint arXiv:2004.07219 , 2020. [57] R. T. Chen and Y. Lipman, “Flow matching on general geometries,” in 
+
+12th International Conference on Learning Representations, ICLR 2024 ,2024. [58] S. Levine, “Reinforcement learning and control as probabilistic infer-ence: Tutorial and review,” arXiv preprint arXiv:1805.00909 , 2018. [59] M. Balcerak, T. Amiranashvili, A. Terpin, S. Shit, L. Bogensperger, S. Kaltenbach, P. Koumoutsakos, and B. Menze, “Energy matching: Unifying flow matching and energy-based models for generative mod-eling,” in The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025. [60] A. Polyakov, D. Efimov, and W. Perruquetti, “Finite-time and fixed-time stabilization: Implicit lyapunov function approach,” Automatica , vol. 51, pp. 332–340, 2015.

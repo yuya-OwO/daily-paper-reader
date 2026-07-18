@@ -1,0 +1,2353 @@
+Title: Lifting-Free Quadratic Sum-Of-Squares Programming
+
+URL Source: https://arxiv.org/pdf/2607.13701v1
+
+Published Time: Thu, 16 Jul 2026 00:55:36 GMT
+
+Number of Pages: 25
+
+Markdown Content:
+LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING ∗
+
+GABRIEL F. MACHADO , ROSS DRUMMOND , AND MORGAN JONES †
+
+Abstract. Quadratic Sum-Of-Squares (QSOS) optimization problems appear in system identifi-cation and machine learning, but standard Schur-complement and second-order cone liftings enlarge conic dimensions and create computational bottlenecks for interior-point methods. This paper in-troduces a lifting-free regularization that preserves the original conic structure by adding a norm penalty to SOS variables, yielding closed-form primal updates and an unconstrained, concave dual with Lipschitz-continuous gradient. Accelerated first-order methods efficiently maximize this dual, and convergence analysis shows non-asymptotic recovery of the solution. Numerical experiments on constrained regression problems show the proposed method can be 40% faster than existing solvers such as SCS and handle larger problems than MOSEK, with memory scaling only in the number of equality constraints. 
+
+Key words. Sum-Of-Squares optimization, quadratic conic programming, first-order methods, regularization, semidefinite programming. 
+
+MSC codes. 90C22, 90C25, 65K05 
+
+1. Introduction. Sum-Of-Squares (SOS) optimization [48, 28, 7] is at the heart of modern polynomial optimization, with applications including control theory [31, 8], system identification [24, 36] and machine learning [11, 6, 5]. A standard SOS program minimizes a linear function subject to constraints on polynomials being sum-of-squares. However, applications such as constrained regression and polynomial system identification [1, 32] naturally involve the minimization of quadratic objective functions. This gives rise to the following class of Quadratic Sum-Of-Squares (QSOS) programs, (QSOS) min  
+
+> ξ
+> 12
+
+ξ⊤ 
+
+> f
+
+Qξ f + w⊤ξ
+
+s.t. q0,j (x) + 
+
+> r
+
+X
+
+> i=1
+
+pi(x)qi,j (x) = 0 , j = 1 , . . . , m eq ,t0,j (x) + 
+
+> r
+
+X
+
+> i=1
+
+pi(x)ti,j (x) is sum-of-squares , j = 1 , . . . , m sos ,pi(x) is sum-of-squares , i = ˆ r + 1 , . . . , r, 
+
+where x ∈ Rnx , ξ = ξ⊤ 
+
+> f
+
+ξ⊤
+
+> sos
+
+⊤ ∈ Rn is the vector formed from the coefficients 
+
+ξf ∈ Rnf of polynomials pi(x) for i = 1 , . . . , ˆr and of coefficients ξsos ∈ Rn−nf of sum-of-squares polynomials pi(x) for i = ˆ r+1 , . . . , r , qi,j (x) and ti,j (x) are given poly-nomials with constant scalar coefficients. In this formulation, w is a n-dimensional vector, Q is a symmetric nf × nf matrix, and both represent the weighting factors of the quadratic objective function. In SOS optimization, a linear SOS program is recovered when Q = 0, and this can be parsed into a Semidefinite Programming (SDP) problem [30, 7, 26], a class of linear Conic Programming (CP) problems with many important applications [54, 33]. Many methods have now been proposed to solve SDP problems; including (i) path-following 
+
+> ∗
+
+Submitted to the editors DATE. 
+
+> †
+
+School of Electrical and Electronic Engineering, University of Sheffield, Amy John-son Building, Mappin Street, Sheffield, S1 3JD, UK ({gfmachado1, ross.drummond, mor-gan.jones }@sheffield.ac.uk). 1arXiv:2607.13701v1 [math.OC] 15 Jul 2026 2 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+(barrier function) methods [41, 42] and (ii) homogeneous self-dual embedding (HSDE) [56], commonly implemented using interior-point methods (IPMs) [52, 18, 55, 2, 39]. Whilst widely adopted, the computational time and memory complexity of IPMs scale poorly with the number of decision variables and constraints, as forming and factorizing large (and possibly dense) matrix variables can be numerically expensive [33]. First-order solvers based on augmented Lagrangian methods have been proposed for large SDP problems (see Section 12.2 in [12]). Methods such as the Alternating Direction Method of Multipliers (ADMM) [16, 14, 13] decompose the SDP into sim-pler subproblems, and are widely used when solving SDP problems with first-order methods [53, 45]. Unlike IPMs, first-order methods may not require significant com-putational effort and storage per iteration, allowing them to solve large problems faster, though potentially yielding inaccurate solutions [47]. Quadratic Sum-Of-Squares (QSOS) programs can be written as Quadratic Conic Programming (QCP) problems with convex quadratic objectives and feasible sets defined by affine constraints and positive semidefinite cones. One way of solving such QCP problems involves a reduction to a conic optimization problem with a linear objective and a lifted constraint space. This is done by eliminating the quadratic objective and including a quadratic inequality constraint, transformed into either a second-order cone constraint or a semidefinite constraint. Both lifting approaches increase the decision variable space and introduce additional conic constraints. In high-dimensional polynomial optimization problems, where polynomial variables have large degree in many variables, the number of decision variables grows combinatorially. Consequently, second-order cone constraints increase the size of linear systems solved at each iteration, and large positive semidefinite constraints require computationally expensive factorizations. These limitations motivate an alternative method that solves QCP problems directly, without increasing the cone dimension or incurring the cost of involved matrix operations. Several specialized solvers, including COSMO [15], SCS [43], and Clarabel [17], can directly handle quadratic objectives without reducing to a linear CP. COSMO extends operator splitting methods [50] and applies ADMM [38]. Clarabel builds upon solving a specialized HSDE [3] with an IPM, and SCS also uses HSDE, but with ADMM. For large problems with positive semidefinite constraints, their speed-ups rely not only on numerical methods but also on exploiting structure or sparsity patterns [51, 57, 58]. These solvers inherit structural limitations that become pro-nounced in large SOS problems, such as lifted spaces due to the addition of slack variables (see (2.2)). COSMO relies on operator splitting and requires carefully engi-neered decompositions, while Clarabel and SCS depend on solving a HSDE whose size grows with the conic structure. All three methods repeatedly apply PSD projections or factorization-based updates that scale poorly with the number and dimension of SOS constraints. Their performance is highly sensitive to problem conditioning and sparsity patterns, and they may fail or become prohibitively slow on dense or high-dimensional SOS instances. These limitations motivate the need for a lifting-free approach that avoids augmented Lagrangians, slack variables, and large conic embed-dings, and instead provides closed-form primal solutions together with non-asymptotic convergence guarantees. 
+
+Main Contributions. This paper presents a novel method for solving quadratic SOS programs that owns: 1. Lifting-free regularization preserving conic structure and yielding closed-form primal solutions (see Section 3); LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 32. Explicit non-asymptotic convergence guarantees (Theorem 4.5) using Nes-terov’s accelerated gradient ascent (Algorithm 3.1); 3. Practical scalability and reliability demonstrated on constrained regression problems, outperforming SCS and MOSEK in failure rate, speed, and memory usage (see Section 5). 
+
+Related Work. QCP problems appear in the nearest correlation matrix problem [22] and in Semidefinite Least-Squares (SDLS) problems [34]. Algorithm 3.3 in [22] can be interpreted as a simple dual gradient method, whereas Algorithm 1 in [34] uses a quasi-Newton optimizer. In [20], Algorithm 2.1 is a dual-based first-order method introducing the SDLS MATLAB package [19], consisting of projection steps for conic feasibility problems such as SOS decompositions. These works compare Schur-complement and second-order cone liftings and report that both approaches can be inferior due to dimensional growth. Higham’s analysis is performed on a problem already in regularized form, whereas our method applies regularization directly to general programs in the form of (QSOS). Our convexity and smoothness arguments build upon the dual-based analysis framework of [34], adapted to (QSOS). Feasibility-oriented SOS methods [20] differ substantially: feasibility problems do not require handling regularization in the objective, and their quasi-Newton scheme contrasts with our use of accelerated gradient methods enabling non-asymptotic convergence guarantees. Regularization methods for large-scale SDP problems stabilize the linear SDP problem with small perturbations in the data, typically adding quadratic regulariza-tion terms to the objective or constraints. Connections between primal Moreau-Yosida regularization and dual augmented Lagrangian methods appear in [35], and aug-mented primal–dual methods using regularization appear in [27]. These approaches motivate our lifting-free regularization framework, which dualizes only affine con-straints, avoids augmented Lagrangians, and yields closed-form primal updates to-gether with non-asymptotic convergence guarantees. 
+
+Paper Structure. Section 2 reviews standard reformulations of quadratic SOS programs and their scalability limitations. Section 3 introduces the regularized prob-lem (Reg-QCP), derives its dual, and presents Algorithm 3.1. Section 4 provides convergence analysis. Section 5 presents numerical experiments. Section 6 concludes and outlines future work. 
+
+Notation. The n-dimensional Euclidean space is denoted by Rn, and the set of 
+
+n×n symmetric matrices by Sn. The cone of positive semidefinite matrices is Sn 
+
+> +
+
+⊂ Sn.For a vector v ∈ Rn, ∥v∥2 is the Euclidean norm and ∥v∥∞ the infinity norm. For a matrix X ∈ Rm×n, ∥X∥2 denotes the spectral norm, ∥X∥F the Frobenius norm, and 
+
+σmin (X) denotes its smallest singular value. The operator vec( X) stacks the columns of X into a vector. For symmetric X ∈ Sn, svec( X) extracts the upper triangular part scaled by √2 for off-diagonal entries, and smat( ·) is its inverse. The identity 
+
+∥X∥F = ∥ svec( X)∥2 shows that ( Sn, ∥ · ∥ F) is isometric to ( Rn(n+1) /2, ∥ · ∥ 2). The Euclidean projection onto a closed convex set C ⊂ Rd is PC (z) = arg min x∈C ∥x−z∥2.When C = Sn
+
+> +
+
+, the projection is taken in ( Sn, ∥ · ∥ F) and coincides with the Euclidean projection after applying svec( ·). For a convex cone K, its polar cone is K◦ = {y :
+
+y⊤x ≥ 0, ∀ x ∈ K}.
+
+2. Reformulating Quadratic SOS Programs. When Q = 0 in (QSOS), linear SOS programs can be parsed into Semidefinite Programming (SDP) problems [48, 49, 7], and the equivalence between SOS and positive semidefinite constraints 4 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+underlies the standard conic formulation [30, 26], 
+
+Aξ = b, ξ ∈ K, 
+
+where A ∈ Rm×n, b ∈ Rm, K ⊂ Rn is a nonempty closed convex cone, and 
+
+ξ = ξ⊤ 
+
+> f
+
+ξ⊤
+
+> sos
+
+⊤ ∈ Rn collects free polynomial coefficients and SOS polynomials coefficients. Applying this representation to (QSOS) yields a Quadratic Conic Program (QCP) of the form (QCP) min  
+
+> ξ
+> 12
+
+ξ⊤ 
+
+> f
+
+Qξ f + w⊤ξ s.t. Aξ = b, ξ ∈ K. 
+
+Lifting Quadratic SOS Programs into Linear Conic Programs. A com-mon approach is to lift the quadratic objective into a linear conic form by introducing an auxiliary variable γ ≥ 0 satisfying 12 ξ⊤ 
+
+> f
+
+Qξ f ≤ γ. This inequality can be encoded either as a second-order cone constraint or as a semidefinite constraint. For the SOCP lifting, the Cholesky factorization Q = EE ⊤ yields (2.1) ξ⊤ 
+
+> f
+
+Qξ f = ξ⊤ 
+
+> f
+
+EE ⊤ξf = ∥E⊤ξf∥22 ≤ 2γ, 
+
+which defines a rotated second-order cone [29]. The lifted problem becomes (SOCP) min   
+
+> γ, ξ
+
+γ + w⊤ξ s.t. Aξ = b,
+
+2E⊤ξf
+
+γ − 2
+
+
+
+> 2
+
+≤ γ + 2 , ξ ∈ K, γ ≥ 0.
+
+Alternatively, the Schur complement encodes the same inequality as the linear matrix inequality [52, 9] 2γ − ξ⊤ 
+
+> f
+
+EE ⊤ξf ≥ 0 ⇐⇒ 
+
+ 2γ ξ⊤ 
+
+> f
+
+EE⊤ξf I
+
+
+
+∈ Snf+1 + ,
+
+yielding an SDP lifting with an additional ( nf + 1) × (nf + 1) positive semidefinite constraint, (SDP) min   
+
+> γ, ξ
+
+γ + w⊤ξ s.t. Aξ = b,
+
+ 2γ ξ⊤ 
+
+> f
+
+EE⊤ξf I
+
+
+
+∈ Snf+1 + , ξ ∈ K, γ ≥ 0.
+
+Both liftings increase the decision variable dimension from n to n + 1 and intro-duce conic constraints whose sizes scale as O(n) for (SOCP) and O(n2) for (SDP). In high-dimensional polynomial optimization, where the number of coefficients grows combinatorially, these liftings create computational bottlenecks: SOCP constraints enlarge the linear systems solved at each iteration, and SDP constraints require ex-pensive factorizations. Consequently, both approaches become inefficient for large QSOS problems, motivating a lifting-free method that solves (QCP) directly without increasing cone dimension or incurring additional matrix operations. 
+
+Quadratic Conic Program Solvers. Several specialized solvers, including COSMO [15], SCS [43], and Clarabel [17], are able to directly handle quadratic ob-jectives without reducing to a linear CP. These methods solve problems of the form (2.2) min   
+
+> ξ,s
+> 12
+
+ξ⊤ eQξ + w⊤ξ s.t. eAξ + s = eb, s ∈ eK, LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 5typically using operator splitting or homogeneous self-dual embeddings. Comparing (2.2) with (QCP), there are key structural differences lying in the quadratic term of the objective and how the constraints are defined. In the first, the matrix eQ acts on the full decision variable ξ ∈ Rn, whereas in (QCP) the quadratic term 12 ξ⊤ 
+
+> f
+
+Qξ f acts only on the free variables ξf ∈ Rnf , with the SOS variables ξ(j)sos ,
+
+j = 1 , . . . , m sos , constrained to a product of positive semidefinite cones. Secondly, the conic constraint ξ ∈ K in (QCP) requires the SOS variables to lie in a product of positive semidefinite cones, which in the standard form must be enforced through the slack variable as s ∈ eK. This means the equality constraints must simultaneously encode both the original affine constraints and the positive semidefinite cone mem-bership. The latter requires introducing additional equality constraints, which link the SOS variables to slack variables to the original conic constrained variables. Despite avoiding explicit SOCP/SDP liftings, these solvers still inherit structural limitations in large SOS problems. Enforcing PSD constraints requires slack variables and repeated projections or factorizations, and the HSDE size grows with the conic structure. As the number and dimension of SOS blocks increase, these operations scale poorly and performance becomes sensitive to conditioning and sparsity patterns. Consequently, COSMO, SCS, and Clarabel may fail or slow down significantly on dense or high-dimensional SOS instances. These limitations motivate our lifting-free approach that preserves the original conic structure, avoids slack variables and augmented Lagrangians, and yields closed-form primal updates together with non-asymptotic convergence guarantees. 
+
+3. Regularization Method for Quadratic SOS Programs. The previous section reviewed lifting-based reformulations of quadratic conic programs and high-lighted how second-order cone and semidefinite approaches increase conic dimensions and computational cost. This motivates a lifting-free strategy. Instead of adding new constraints, the objective of (QCP) is modified, leading to the regularized problem (Reg-QCP) min  
+
+> ξ
+> 12
+
+ξ⊤ 
+
+> f
+
+Qξ f + w⊤ξ + ρ
+
+> 2
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos ∥22 s.t. Aξ = b, ξ ∈ K, 
+
+where ρ > 0 and Q is positive definite. The penalty term regularizes variables associated with positive semidefinite cones and yields a dual problem solvable via first-order methods. As shown in Section 4, solutions of (Reg-QCP) converge to those of (QCP). The method proceeds by: 1. Dualizing only the affine constraints; 2. Deriving closed-form minimizers of the Lagrangian subproblem; 3. Establishing concavity, differentiability, and Lipschitz smoothness of the dual function; 4. Applying accelerated gradient ascent to maximize the dual. Algorithm 3.1 provides an overview of our proposed solution method. Our al-gorithm solves the dual problem in (3.4) and returns the solutions to (Reg-QCP) analytically. At each iteration k, the dual iterate λ is computed using the gradient in (3.14) evaluated at the extrapolation point y. The algorithm terminates either when the maximum number of iterations is reached or when the termination criteria are satisfied (see Section 4). The next subsections present a sequential derivation of each component of the algorithm. 6 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+Algorithm 3.1 Dual-based accelerated gradient for (Reg-QCP) 
+
+1: Input: Q, w, A, b, ρ > 0, ϵabs > 0, ϵrel > 0, N ≥ 1, η = 1 /L 
+
+2: Initialize: λ(0) ← 0, y(0) ← λ(0) , t(0) ← 1
+
+3: for k = 0 to N − 1 do 
+
+4: if k > 0 then 
+
+5: t(k) ← 12 +
+
+q 14 + ( t(k−1) )2
+
+6: λ(k) ← y(k−1) + η ∇g(y(k−1) )
+
+7: if ∇g(y(k−1) )⊤(λ(k) − λ(k−1) ) < 0 then 
+
+8: t(k) ← 1
+
+9: λ(k−1) ← λ(k)
+
+10: end if 
+
+11: y(k) ← λ(k) + t(k−1) −1 
+
+> t(k)
+
+(λ(k) − λ(k−1) )
+
+12: end if 
+
+13: Compute ∇g(y(k)) using (3.14) 
+
+14: r(k)prim ← ∥∇ g(y(k))∥∞
+
+15: Recover ξ(k)f = Sξf (y(k)) and ξ(j,k )sos = Sξ(j)sos 
+
+(y(k))
+
+16: Compute f (k) 
+
+> ρ
+
+and g(k)
+
+17: r(k)gap ← | y(k)⊤∇g(y(k))|
+
+18: if r(k)prim < ϵ abs + ϵrel max {∥ y(k)∥∞, 1} and r(k)gap < ϵ abs + ϵrel max {| f (k) 
+
+> ρ
+
+|, |g(k)|} 
+
+then 
+
+19: break 
+
+20: end if 
+
+21: end for 
+
+22: Output: primal solution from y(k) and dual solution λ = y(k)
+
+3.1. Partial Lagrangian Dualization. We define the partial Lagrangian of (Reg-QCP) as 
+
+L (ξ, λ) := 12 ξ⊤ 
+
+> f
+
+Qξ f + w⊤ξ + ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos ∥22 − λ⊤(Aξ − b),
+
+where ξ = ξ⊤ 
+
+> f
+
+ξ⊤
+
+> sos
+
+⊤ is the vector of decision variables (primal variables) and 
+
+λ ∈ Rm is the vector of Lagrange multipliers (dual variables). This is a partial Lagrangian because only the affine constraints are dualized and the conic constraints on the primal variables remain [34]. Conformal decompositions of A and w
+
+(3.1) A =
+
+h
+
+Af A(1) sos · · · A(msos )sos 
+
+i
+
+, w =
+
+h
+
+w⊤ 
+
+> f
+
+w(1) sos 
+
+> ⊤
+
+· · · w(msos )sos 
+
+i⊤
+
+separate the partial Lagrangian additively as L (ξ, λ) = Lf(ξf, λ)+ Pmsos  
+
+> j=1
+
+Lsos (ξ(j)sos , λ), with Lf and Lsos defined, respectively, as 
+
+Lf(ξf, λ) := 12 ξ⊤ 
+
+> f
+
+Qξ f + w⊤ 
+
+> f
+
+ξf − λ⊤(Afξf − b),(3.2a) 
+
+Lsos (ξ(j)sos , λ) := ρ
+
+2 ∥ξ(j)sos ∥22 + w(j)sos 
+
+> ⊤
+
+ξ(j)sos − λ⊤A(j)sos ξ(j)sos , for all j = 1 , . . . , m sos .(3.2b) LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 7Consequently, the dual problem of (Reg-QCP) is defined as max  
+
+> λ∈Rm
+
+min  
+
+> ξ∈K
+
+L (ξ, λ) ≡ max  
+
+> λ∈Rm
+
+min 
+
+> ξ∈K
+
+Lf(ξf, λ) + 
+
+> msos
+
+X
+
+> j=1
+
+Lsos (ξ(j)sos , λ)
+
+ .
+
+In this dual problem, the Lagrangian subproblem consists of minimizing the par-tial Lagrangian over the primal variables. Define the dual function g : Rm → R as (3.3) g(λ) = min 
+
+> ξ∈K
+
+Lf(ξf, λ) + 
+
+> msos
+
+X
+
+> j=1
+
+Lsos (ξ(j)sos , λ)
+
+ ,
+
+then the dual problem of (Reg-QCP) is equivalent to the unconstrained optimization problem (3.4) max  
+
+> λ∈Rm
+
+g(λ).
+
+Next, it is shown that the Lagrangian subproblem has a closed-form solution that allows the dual function to be written explicitly in terms of the dual variables. 
+
+3.2. Closed-form Solutions for the Lagrangian Subproblem. The La-grangian subproblem decomposes additively into independent subproblems min 
+
+> ξ∈K
+
+Lf(ξf, λ) + 
+
+> msos
+
+X
+
+> j=1
+
+Lsos (ξ(j)sos , λ)
+
+ ≡ min 
+
+> ξf∈Rnf
+
+Lf(ξf, λ) + 
+
+> msos
+
+X
+
+> j=1
+
+min 
+
+> ξ(j)sos ∈Shj
+> +
+
+Lsos (ξ(j)sos , λ).
+
+For fixed dual variables λ, define the corresponding minimizers of these indepen-dent subproblems as 
+
+Sξf (λ) := arg min 
+
+> ξf∈Rnf
+
+Lf(ξf, λ),(3.5a) 
+
+Sξ(j)sos 
+
+(λ) := arg min 
+
+> ξ(j)sos ∈Shj
+> +
+
+Lsos (ξ(j)sos , λ), for all j = 1 , . . . , m sos .(3.5b) Each of the independent subproblems admits a closed-form solution, as stated in the following lemmas. 
+
+Lemma 3.1. The minimizer Sξf (λ) defined in (3.5a) is given by 
+
+(3.6) Sξf (λ) = Q−1(A⊤ 
+
+> f
+
+λ − wf).
+
+Proof. By completing the square of Lf(ξf, λ) in (3.2a), it holds that (3.7) 
+
+Lf(ξf, λ) = 12 Q1/2ξf − Q−1/2  A⊤ 
+
+> f
+
+λ − wf
+
+ 22
+
+− 12 Q−1/2  A⊤ 
+
+> f
+
+λ − wf
+
+ 22
+
++ λ⊤b,
+
+where only the first term involves ξf. Hence, it holds the following equivalence, arg min 
+
+> ξf∈Rnf
+
+Lf(ξf, λ) = arg min 
+
+> ξf∈Rnf
+
+12 Q1/2ξf − Q−1/2  A⊤ 
+
+> f
+
+λ − wf
+
+ 22
+
+.8 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+This problem is analogue to a least-squares problem min β 12 ∥Θβ − Ψ∥22 , with 
+
+β = ξf, Θ = Q1/2, and Ψ = Q−1/2(A⊤ 
+
+> f
+
+λ − wf), which has a well-known closed form solution defined by β⋆ = ( Θ⊤Θ)−1Θ⊤Ψ. Therefore, the solution to the minimization of Lf(ξf, λ) over ξf is given by (3.6). 
+
+Lemma 3.2. The minimizer Sξ(j)sos 
+
+(λ) defined in (3.5b) is given by 
+
+(3.8) Sξ(j)sos 
+
+(λ) = PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+
+
+, for all j = 1 , . . . , m sos .
+
+Proof. By completing the square of Lsos (ξ(j)sos , λ) in (3.2b), it holds that (3.9) Lsos (ξ(j)sos , λ) = ρ
+
+2 ξ(j)sos − 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+− 12
+
+1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+,
+
+for all j = 1 , . . . , m sos , where only the first term involves ξ(j)sos . Hence, the following equivalence holds, arg min 
+
+> ξ(j)sos ∈Shj
+> +
+
+Lsos (ξ(j)sos , λ) = arg min 
+
+> ξ(j)sos ∈Shj
+> +
+
+ρ
+
+2 ξ(j)sos − 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+.
+
+Therefore, the problem of minimizing Lsos (ξ(j)sos , λ) over ξ(j)sos is equivalent to the following optimization problem, min 
+
+> ξ(j)sos ∈Shj
+> +
+
+ρ
+
+2 ξ(j)sos − 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+.
+
+Since ξ(j)sos = svec( Ξ(j)), by the isometry between the spaces ( Rhj (hj +1) /2, ∥·∥ 2) and (Shj , ∥·∥ F), this is equivalent to min Ξ(j)∈Shj 
+
+> +
+> ρ
+> 2
+
+Ξ(j) − smat 
+
+
+
+> 1
+> ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 2F
+
+,which corresponds to computing a nearest symmetric positive semidefinite matrix. Thus, the minimizer of this problem is obtained by projecting smat( ρ−1(A(j)sos 
+
+> ⊤
+
+λ −
+
+w(j)sos )) ∈ Shj onto the positive semidefinite cone Shj 
+
+> +
+
+. This projection operation admits a closed-form expression of the form PSh 
+
+> +
+
+(M ) = V D +V ⊤, where M = V DV ⊤ is the eigenvalue decomposition and D+ = max( D, 0) (see Section 2 in [21], Theorem 2.4 in [34]). Then, the solution of minimizing Lsos (ξ(j)sos , λ) over ξ(j)sos for all j = 1 , . . . , m sos 
+
+is given by (3.8). We now can simplify the dual function g in (3.3) by removing the minimization through substituting the closed-form expressions for Sξf (λ) and Sξ(j)sos 
+
+(λ) given in Lemma 3.1 and Lemma 3.2, (3.10) 
+
+g(λ) = − 12 λ⊤AfQ−1A⊤ 
+
+> f
+
+λ + λ⊤ AfQ−1wf + b − 12 w⊤ 
+
+> f
+
+Q−1wf
+
++
+
+> msos
+
+X
+
+> j=1
+
+ρ
+
+2 PShj
+
+> +
+
+ 1
+
+ρ
+
+ A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+
+
+− 1
+
+ρ
+
+ A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+− 12
+
+1
+
+ρ
+
+ A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+!
+
+.LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 9We next present Moreau’s decomposition theorem and a corollary, allowing the latter to be applied into (3.10) to further simplify the expression of the dual function. 
+
+Theorem 3.3 (Section III, Theorem 3.2.5 in [23], Proposition 1 in [37]). Let K
+
+be a closed convex cone in the Hilbert space (H, ⟨· , ·⟩ ) and a closed and convex polar cone K◦ = {a ∈ H : ⟨a, b⟩ ≤ 0, ∀ b ∈ K}. For x, y, z ∈ H, the following statements are equivalent: 
+
+1. z = x + y, x ∈ K, y ∈ K◦, and ⟨x, y⟩ = 0 ;
+
+2. x = PK (z) and y = PK◦ (z).
+
+Corollary 3.4. Consider the closed convex cone Sh 
+
+> +
+
+⊂ Sh and Z ∈ Sh. The following equality holds, 
+
+PSh 
+
+> +
+
+(Z) − Z 2F
+
+− ∥ Z∥2F = − PSh 
+
+> +
+
+(Z) 2F
+
+.(3.11) 
+
+Proof. The set Sh equipped with the Frobenius inner product ⟨A, B⟩F define the Hilbert space ( Sh, ⟨· , ·⟩ F). It holds that, (3.12) 
+
+PSh 
+
+> +
+
+(Z) − Z 2F
+
+− ∥ Z∥2F = PSh 
+
+> +
+
+(Z) 2F
+
+− 2
+
+D
+
+PSh 
+
+> +
+
+(Z), Z
+
+E
+
+> F
+
+= PSh 
+
+> +
+
+(Z) 2F
+
+− 2
+
+D
+
+PSh 
+
+> +
+
+(Z), PSh 
+
+> +
+
+(Z)
+
+E
+
+> F
+
+− 2
+
+D
+
+PSh 
+
+> +
+
+(Z), PSo,h 
+
+> +
+
+(Z)
+
+E
+
+> F
+
+= − PSh 
+
+> +
+
+(Z) 2F − 2
+
+D
+
+PSh 
+
+> +
+
+(Z), PSo,h 
+
+> +
+
+(Z)
+
+E
+
+> F
+
+.
+
+Since from Theorem 3.3, ⟨P Sh 
+
+> +
+
+(Z), PSo,h 
+
+> +
+
+(Z)⟩F = 0, it follows that (3.11) holds. Moreover, by the isometry between the spaces ( Rh(h+1) /2, ∥ · ∥ 2) and ( Sh, ∥ · ∥ F), it holds that 
+
+PSh 
+
+> +
+
+(z) − z 22
+
+− ∥ z∥22 = − PSh 
+
+> +
+
+(z) 22
+
+.
+
+Therefore, the results of Corollary 3.4 establish the following equivalent form of the dual function 
+
+g(λ) = − 12 λ⊤AfQ−1A⊤ 
+
+> f
+
+λ + λ⊤  AfQ−1wf + b − 12 w⊤ 
+
+> f
+
+Q−1wf−
+
+ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+,
+
+(3.13) which depends solely on the dual variable λ.
+
+3.3. Smoothness of the Dual Problem. The following lemma proves concav-ity and differentiability of the dual function g in (3.13). 
+
+Lemma 3.5. The dual function g, defined in (3.13) , is concave and differentiable on Rm.Proof. Note that the separability of g in (3.13) allows for a sequential analysis of the concavity and differentiability of each term. In fact, it holds that the expression for g comprises a subtraction of a quadratic form in λ, a linear function in λ, a 10 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+constant, and a sum of norms of projections onto positive semidefinite cones. Each of these components is analyzed separately. The term − 12 λ⊤AfQ−1A⊤ 
+
+> f
+
+λ is concave if the matrix AfQ−1A⊤ 
+
+> f
+
+is positive semi-definite. Because Q ∈ Snf
+
+> ≻0
+
+, its inverse is also positive definite and admits a decom-position Q−1 = B⊤B. Let ˆB = BA ⊤ 
+
+> f
+
+, then AfQ−1A⊤ 
+
+> f
+
+= ˆB⊤ ˆB ∈ Sm 
+
+> +
+
+. Hence, the quadratic part is concave. The linear term λ⊤  AfQ−1wf + b is both concave and convex, and the constant term − 12 w⊤ 
+
+> f
+
+Q−1wf does not affect concavity. Moreover, the quadratic, linear, and constant terms are clearly differentiable on Rm.Next, for each j = 1 , . . . , m sos , the function ρ 
+
+> 2
+
+PShj
+
+> +
+
+
+
+> 1
+> ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+is the squared norm of a projection, which is known to be convex and differentiable (see Theorem 3.1 in [34]). Consequently, its negative − ρ 
+
+> 2
+
+PShj
+
+> +
+
+
+
+> 1
+> ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+is concave and differentiable. Since a sum of concave functions is concave, and each of the four components above is concave, it follows that g is concave on Rm. The same argument proves that 
+
+g is differentiable on Rm.The dual function g in (3.13) is L-smooth on Rm, as proved in the following theorem. 
+
+Theorem 3.6. The gradient ∇g : Rm → Rm of the dual function g in (3.13) is defined by 
+
+(3.14) 
+
+∇g(λ) = −AfQ−1A⊤ 
+
+> f
+
+λ + AfQ−1wf + b −
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+
+
+.
+
+The gradient ∇g is Lipschitz continuous with constant L given by 
+
+L = AfQ−1A⊤  
+
+> f2
+
++ 1
+
+ρ
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos A(j)sos 
+
+> ⊤
+> 2
+
+.(3.15) 
+
+Proof. By linearity of the differentiation, it holds that (3.16) 
+
+∇g(λ) = −AfQ−1A⊤ 
+
+> f
+
+λ + AfQ−1wf + b − ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∂∂λ PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+.
+
+Theorems 2.2 and 3.2 in [34] proved that (3.17) − 12
+
+∂∂y ∥P K (c + A∗y)∥2 = −AP K (c + A∗y) .
+
+Set y = λ, A = 1 
+
+> ρ
+
+A(j)sos , c = − 1 
+
+> ρ
+
+w(j)sos , and K = Shj 
+
+> +
+
+for all j = 1 , . . . , m sos , it follows that (3.18) 
+
+− ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∂∂λ PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+ 22
+
+= −
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+λ − w(j)sos 
+
+
+
+.LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 11 Substituting this into (3.16) yields (3.14) for the gradient of the dual function. Next, we want to show that the gradient of the dual function ∇g(λ) is Lipschitz-continuous, and to compute a tight Lipschitz constant. The gradient expression in (3.14) has two parts: a linear term coming from the free variables and a projection term coming from the conic constrained variables. We treat each part separately. The free-variable contribution to the gradient is −AfQ−1A⊤ 
+
+> f
+
+λ. Then, for any 
+
+α, β ∈ Rm, by Cauchy-Schwarz, (3.19) −AfQ−1A⊤ 
+
+> f
+
+α + AfQ−1A⊤ 
+
+> f
+
+β 2 ≤ AfQ−1A⊤  
+
+> f2
+
+∥α − β∥2 .
+
+The projection of symmetric matrices onto the cone Sh 
+
+> +
+
+is nonexpansive in the Frobenius norm and, due to the isometry between the spaces ( Rh(h+1) /2, ∥ · ∥ 2) and (Sh, ∥ · ∥ F), it holds that (3.20) 
+
+PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+α − w(j)sos 
+
+
+
+− P Shj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+β − w(j)sos 
+
+
+
+> 2
+
+≤ 1
+
+ρ A(j)sos 
+
+> ⊤
+
+(α − β) 2
+
+.
+
+Now, define ∆ ∈ Rm as follows ∆ := 
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos 
+
+
+
+PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+α − w(j)sos 
+
+
+
+− P Shj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+β − w(j)sos 
+
+ 
+
+,
+
+and Γ := Pmsos  
+
+> j=1
+
+A(j)sos A(j)sos 
+
+> ⊤
+
+. The Euclidean norm of ∆ is ∥∆∥2 = max ∥z∥2=1 z⊤∆, with z ∈ Rm. For any ∥z∥2 = 1 it follows that, (3.21) 
+
+z⊤∆ = 
+
+> msos
+
+X
+
+> j=1
+
+
+
+A(j)sos 
+
+> ⊤
+
+z
+
+⊤h
+
+PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+α − w(j)sos 
+
+
+
+− P Shj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+β − w(j)sos 
+
+i
+
+> C.S.
+
+≤
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos 
+
+> ⊤
+
+z 2
+
+PShj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+α − w(j)sos 
+
+
+
+− P Shj
+
+> +
+
+ 1
+
+ρ
+
+
+
+A(j)sos 
+
+> ⊤
+
+β − w(j)sos 
+
+
+
+> 2(3.20)
+
+≤ 1
+
+ρ
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos 
+
+> ⊤
+
+z 2
+
+A(j)sos 
+
+> ⊤
+
+(α − β) 2C.S. 
+
+≤ 1
+
+ρ
+
+
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos 
+
+> ⊤
+
+z 22
+
+ 
+
+> 1/2
+
+
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos 
+
+> ⊤
+
+(α − β) 22
+
+
+
+> 1/2
+
+= 1
+
+ρ
+
+ z⊤Γz1/2 
+
+(α − β)⊤Γ( α − β)
+
+1/2
+
+≤ 1
+
+ρ ∥Γ∥1/22 ∥Γ∥1/22 ∥α − β∥2 = 1
+
+ρ ∥Γ∥2 ∥α − β∥2,
+
+where C.S is the Cauchy-Schwarz inequality and the last inequality comes from 
+
+z⊤Γz ≤ ∥ Γ∥2∥z∥22 for ∥z∥2 = 1. This inequality implies that, (3.22) ∥∆∥2 ≤ 1
+
+ρ ∥Γ∥2∥α − β∥2 = 1
+
+ρ
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos A(j)sos 
+
+> ⊤
+> 2
+
+∥α − β∥2 ,12 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+which, by the definition of ∆, defines the Lipschitz constant of the sum of projections in (3.14). By combining the bounds in (3.19) and (3.22), it holds (3.23) ∥∇ g(α) − ∇ g(β)∥2 ≤
+
+ AfQ−1A⊤  
+
+> f2
+
++ 1
+
+ρ
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos A(j)sos 
+
+> ⊤
+> 2
+
+ ∥α − β∥2
+
+which results in (3.15) for the Lipschitz constant L of the gradient. Because the dual function g is concave and differentiable with Lipschitz gradi-ent, the unconstrained maximization problem in Opt. (3.4) can be solved efficiently using Algorithm 3.1. In this algorithm, we employ an accelerated gradient scheme on this maximization problem and, once an optimal (or nearly optimal) dual vari-able is obtained, the corresponding primal solution of (Reg-QCP) is recovered via the closed-form expressions in (3.6) and (3.8). The next section provides the convergence of Algorithm 3.1 with respect to how the solutions of (Reg-QCP) are approached. In particular, it is shown that the dual iterates converge at the optimal rate, the primal variables become asymptotically feasible, and the objective value of the regularized problem (Reg-QCP) converges to that of the original problem of (QCP). 
+
+4. Convergence Analysis. The accelerated gradient method in Algorithm 3.1 is selected specifically for its optimal convergence rate among first-order methods. The following lemma provides this rate, demonstrating how fast the dual objective value approaches its optimum. 
+
+Theorem 4.1 (Convergence of the Accelerated Gradient Scheme). Consider the concave dual function g in (3.13) whose gradient is L-Lipschitz continuous. Let λ⋆
+
+be a maximizer of g. For any initial point λ(0) ∈ Rm, step size η ∈ (0 , 1/L ], and initialization 
+
+t(0) = 1 , y(0) = λ(0) ,
+
+the iterates generated by the accelerated gradient ascent scheme 
+
+t(k) = 12 +
+
+r 14 +  t(k−1) 2, λ(k) = y(k−1) + η∇g(y(k−1) ),
+
+y(k) = λ(k) + t(k−1) − 1
+
+t(k)
+
+ λ(k) − λ(k−1) ,
+
+for k = 1 , 2, . . . satisfy the convergence bound after N iterations 
+
+g(λ⋆) − g(λ(N )) ≤ 2L∥λ(0) − λ⋆∥22
+
+(N + 1) 2 ,
+
+provided η = 1 /L .Proof. The proof follows similar arguments from the classical accelerated scheme in [40], adapted for the maximization of smooth concave functions. From this convergence theorem, Algorithm 3.1 inherits the convergence rate of 
+
+O(1 /N 2) for solving the unconstrained concave dual problem in Opt. (3.4), when selecting a step-size η = 1 /L , where L is the gradient’s Lipschitz constant in (3.15). LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 13 The gradient in (3.14) can be written using the closed-form primal solutions in (3.6) and (3.8), (4.1) ∇g(λ) = −
+
+AfSξf (λ) + 
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos Sξ(j)sos 
+
+(λ) − b
+
+ ,
+
+which is exactly the negative of the affine constraint evaluated at primal solutions. Then, the convergence of the dual objective value established in Theorem 4.1 has a direct and significant consequence for the recovered primal solutions, since they are recovered once the dual problem is solved. In Algorithm 3.1, the norm of the gradient of the dual function serves as a measure of primal feasibility with respect to the affine constraints. In the following theorem, it is proved that the norm of the gradient, and consequently the affine constraint violation, vanishes as the number of iterations increases. 
+
+Theorem 4.2 (Asymptotic Feasibility of Primal Iterates). As the number of dual optimization iterations increases, the primal iterates achieve feasibility for (Reg-QCP) . This progress is measured by the norm of the dual function’s gradient given in 
+
+(4.1) , which drives the constraint violation to zero 
+
+(4.2) AfSξf (λ(N )) + 
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos Sξ(j)sos 
+
+(λ(N )) − b
+
+> 2
+
+→ 0 as N → ∞ .
+
+Proof. For a concave function g with an L-Lipschitz continuous gradient, the difference between the optimal value g(λ⋆) and the value at any point λ(N ) is bounded below by the squared norm of the gradient at that point 12L ∥∇ g(λ(N ))∥22 ≤ g(λ⋆) − g(λ(N )).
+
+Combining this inequality with the bound in Theorem 4.1 yields (4.3) ∥∇ g(λ(N ))∥2 ≤ 2L∥λ(0) − λ⋆∥2
+
+(N + 1) .
+
+As N → ∞ , the right-hand side vanishes, which precisely corresponds to the feasibility of the primal iterates with respect to the affine constraints of (Reg-QCP) defined in (4.1). We next prove that the dual function g in (3.13) is coercive, which is a powerful property that can be further used to establish boundedness for dual iterates in Algo-rithm 3.1. The latter allows us to derive a non-asymptotic bound for suboptimality in terms of how close the objective of (Reg-QCP) is from the optimum value of the original problem of (QCP). 
+
+Theorem 4.3 (Coercivity of the Dual Function). Assume that the Slater condi-tion holds for (Reg-QCP) ; i.e., there exists a primal point ( ¯ξf, ¯ξ(1) sos , . . . , ¯ξ(msos )sos ) such that 
+
+(4.4) Af ¯ξf +
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos ¯ξ(j)sos = b, ¯ξ(j)sos ∈ Shj
+
+> ≻0
+
+, for all j = 1 , . . . , m sos .14 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+Assume also that the matrices 
+
+(4.5) Z(j) = A(j)sos A(j)sos  
+
+> ⊤
+
+∈ Sm, for all j = 1 , . . . , m sos ,
+
+are each invertible. Then the dual function g in (3.13) is coercive, satisfying 
+
+g(λ) ≤ − β1∥λ∥2 + β2, for all λ ∈ Rm,(4.6) 
+
+where β1 > 0 and β2 > 0 are given by 
+
+(4.7) β1 = 12
+
+> msos
+
+X
+
+> j=1
+
+σmin (smat( ¯ξ(j)sos )) 
+
+q
+
+σmin (Z(j)),
+
+(4.8) 
+
+β2 = 12 Q1/2 ¯ξf + Q−1/2wf
+
+> 22
+
++ ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+
+
+¯ξ(j)sos 2
+
++ 12 σmin 
+
+
+
+smat   ¯ξ(j)sos 
+
+2
+
++
+
+> msos
+
+X
+
+> j=1
+
+w(j)sos  
+
+> ⊤
+
+¯ξ(j)sos .
+
+Proof. Since g(λ) ≤ L (ξ, λ) holds for any ξ ∈ K, it suffices to construct a λ-dependent primal point ˆξ ∈ K such that L( ˆξ, λ) satisfies the bound in (4.6). Let δ(j) = 12 σmin (smat( ¯ξ(j)sos )) pσmin (Z(j)) > 0, where positivity follows from the Slater condition in (4.4). Define ˆξf = ¯ξf and the perturbed variables ˆξ(j)sos = ¯ξ(j)sos + δ(j)
+
+∥λ∥2
+
+A(j)sos 
+
+> ⊤
+
+Z(j)−1λ, for all j = 1 , . . . , m sos .
+
+It is now shown that ∥ ˆξ(j)sos ∥2 is bounded by a constant independent of λ and that ˆξ(j)sos ∈ Shj
+
+> ≻0
+
+, so that ˆξ ∈ K is a feasible point. By the triangle inequality and Cauchy-Schwarz, (4.9) 
+
+∥ ˆξ(j)sos ∥2 ≤ ∥ ¯ξ(j)sos ∥2 + δ(j)
+
+∥λ∥2
+
+A(j)sos 
+
+> ⊤
+
+Z(j)−1λ 2
+
+= ∥ ¯ξ(j)sos ∥2 + δ(j)
+
+∥λ∥2
+
+q
+
+λ⊤Z(j)−1λ
+
+≤ ∥ ¯ξ(j)sos ∥2 + δ(j)
+
+q
+
+σmin 
+
+ Z(j) .
+
+where the last inequality follows from λ⊤Z(j)−1λ ≤ ∥ λ∥22/σ min (Z(j)). Substitut-ing δ(j) gives 
+
+∥ ˆξ(j)sos ∥2 ≤ ∥ ¯ξ(j)sos ∥2 + 12 σmin (smat( ¯ξ(j)sos )) .
+
+which is a constant independent of λ.For any v ∈ Rhj , decompose the quadratic form as 
+
+v⊤ smat( ˆξ(j)sos )v = v⊤ smat( ¯ξ(j)sos )v + δ(j)
+
+∥λ∥2
+
+v⊤ smat( A(j)⊤ 
+
+> sos
+
+Z(j)−1λ)v.LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 15 A lower bound for the perturbation term is obtained using σmin (M ) ≥ −∥ M ∥F
+
+for any symmetric matrix M ,(4.10) 
+
+δ(j)
+
+∥λ∥2
+
+v⊤ smat 
+
+
+
+A(j)sos 
+
+> ⊤
+
+Z(j)−1λ
+
+
+
+v ≥ − δ(j)
+
+∥λ∥2
+
+A(j)sos 
+
+> ⊤
+
+Z(j)−1λ 2
+
+∥v∥22
+
+≥ − δ(j)
+
+q
+
+σmin 
+
+ Z(j) ∥v∥22,
+
+where the last inequality follows from the norm bound derived above. Therefore, using v⊤ smat( ¯ξ(j)sos )v ≥ σmin (smat( ¯ξ(j)sos )) ∥v∥22 and substituting δ(j), it holds that (4.11) 
+
+v⊤ smat 
+
+ ˆξ(j)sos 
+
+
+
+v ≥
+
+σmin 
+
+
+
+smat 
+
+ ¯ξ(j)sos 
+
+ 
+
+− δ(j)
+
+q
+
+σmin 
+
+ Z(j) ∥v∥22
+
+= 12 σmin 
+
+
+
+smat 
+
+ ¯ξ(j)sos 
+
+ 
+
+∥v∥22
+
+> 0,
+
+which proves that ˆξ(j)sos ∈ Shj
+
+> ≻0
+
+, and hence ˆξ ∈ K.Substituting ˆξ into the affine constraint gives 
+
+A ˆξ − b = Af ¯ξf +
+
+> msos
+
+X
+
+> j=1
+
+A(j)sos ¯ξ(j)sos − b
+
+| {z }  
+
+> =0(Slater condition)
+
++
+
+> msos
+
+X
+
+> j=1
+
+δ(j)
+
+∥λ∥2
+
+A(j)sos A(j)sos 
+
+> ⊤
+
+| {z } 
+
+> =Z(j)
+
+Z(j)−1λ =
+
+Pmsos  
+
+> j=1
+
+δ(j)
+
+∥λ∥2
+
+λ,
+
+so that the constraint term in the partial Lagrangian evaluates to (4.12) −λ⊤(A ˆξ − b) = −
+
+> msos
+
+X
+
+> j=1
+
+δ(j)∥λ∥2 = −β1∥λ∥2.
+
+Since ˆξf = ¯ξf and ∥ ˆξ(j)sos ∥2 is bounded above by a constant, all the remaining terms in L( ˆξ, λ) are upper bounded by a constant independent of λ. Completing the square in the free variable terms using Q ∈ Snf 
+
+> ≻0
+
+gives 12 ¯ξ⊤ 
+
+> f
+
+Q ¯ξf + w⊤ 
+
+> f
+
+¯ξf = 12 ∥Q1/2 ¯ξf + Q−1/2wf∥22 − 12 ∥Q−1/2wf∥22 ≤ 12 ∥Q1/2 ¯ξf + Q−1/2wf∥22,
+
+and applying the norm bound to the regularization terms, all remaining terms are bounded above by the constant β2 in (4.8). Combining (4.12) with the bound on the remaining terms, it holds that 
+
+g(λ) ≤ L ( ˆξ, λ) ≤ β2 − β1∥λ∥2,
+
+with β1 > 0 and β2 > 0. Hence, g(λ) → −∞ as ∥λ∥2 → ∞ , which is precisely the definition of coercivity for a concave function. Now, we prove that the dual iterates generated by Algorithm 3.1 remain within a bounded set. This property is crucial for ensuring that error bounds are well-defined. The following lemma provides this guarantee by leveraging the coercivity of the dual function established in Theorem 4.3. 16 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+Lemma 4.4 (Boundedness of Dual Iterates). Let {λ(k)}∞ 
+
+> k=0
+
+be the sequence gen-erated by the accelerated gradient in Algorithm 3.1 applied to the concave function 
+
+g with L-Lipschitz gradient. Since g is coercive by Theorem 4.3 , it follows that the sequence {λ(k)} is uniformly bounded: there exists a constant B > 0 such that 
+
+(4.13) ∥λ(k)∥2 ≤ B, for all k ≥ 0.
+
+Proof. According to Theorem 4.1, it follows that as k → ∞ 
+
+lim  
+
+> k→∞
+
+g(λ(k)) = g(λ⋆),
+
+where λ⋆ is a global maximizer of g. Hence, there exists an integer ˆk such that for all 
+
+k ≥ ˆk, it holds 
+
+|g(λ(k)) − g(λ⋆)| ≤ 1.
+
+Assume, for contradiction, that {λ(k)} is unbounded. Then there exists a subse-quence {λ(kj )}∞ 
+
+> j=1
+
+such that 
+
+∥λ(kj )∥2 → ∞ as j → ∞ .
+
+Since g is coercive, it follows that g(λ(kj )) → −∞ and, for sufficiently large j,this yields 
+
+g(λ(kj )) < g (λ⋆) − 1.
+
+For all sufficiently large j, the condition kj ≥ ˆk holds (since kj → ∞ ). Thus, 
+
+g(λ(kj )) ≥ g(λ⋆) − 1, which contradicts the previous inequality. Therefore, the as-sumption of unboundedness is false and the sequence {λ(k)} must be bounded. Now, we are ready to state the main convergence result of this paper. In this context, we define suboptimality by how close the objective value of (Reg-QCP) is from the optimum value of (QCP). Mathematically, we analyze the difference between objective functions 
+
+fρ(Sξ(λ(N ))) − f (ξ⋆),
+
+where ξ⋆ is the optimal solution of the original problem of (QCP) and Sξ(λ(N )) is the primal solution returned by Algorithm 3.1 after N iterations for the regularized problem of (Reg-QCP). 
+
+Theorem 4.5 (non-asymptotic Bound for Suboptimality). Consider the original quadratic conic program of (QCP) with objective 
+
+f (ξ) = 12 ξ⊤ 
+
+> f
+
+Qξ f + w⊤ξ,
+
+and its regularized version of (Reg-QCP) with objective 
+
+fρ(ξ) = 12 ξ⊤ 
+
+> f
+
+Qξ f + w⊤ξ + ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos ∥22.
+
+Let Q ∈ Snf 
+
+> ≻0
+
+and the feasible set of (Reg-QCP) be nonempty with Slater point ¯ξ ∈
+
+int K satisfying A ¯ξ = b. Let Sξ(λ(N )) and λ(N ) denote the primal and dual iterates, respectively, returned by Algorithm 3.1 after N gradient steps with η = 1 /L , where LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 17 
+
+L is the Lipschitz constant in (3.15) . Let ξ⋆ be an optimal solution of (QCP) and 
+
+Sξ(λ⋆) an optimal solution of (Reg-QCP) .Then, for all N ≥ 0,
+
+(4.14) f (Sξ(λ(N ))) − f (ξ⋆) ≤ 2BL ∥λ(0) − λ⋆∥2
+
+(N + 1) + ρ
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22.
+
+Proof. The proof proceeds in three steps: relate the regularized objective at the recovered primal Sξ(λ(N )) to the dual function value g(λ(N )), bound the regularized suboptimality fρ(Sξ(λ(N ))) − fρ(Sξ(λ⋆)) using the convergence of the dual problem, and transfer the bound to the original objective f via the regularization error. 
+
+Step 1. From the definitions of Sξf (λ) and Sξ(j)sos 
+
+(λ) in (3.6) and (3.8), respec-tively, the returned primal Sξ(λ(N )) minimizes the partial Lagrangian L(ξ, λ(N )) over 
+
+ξ ∈ K. Hence, evaluating the Lagrangian at Sξ(λ(N )) gives (4.15) L(Sξ(λ(N )), λ(N )) = fρ(Sξ(λ(N ))) − λ(N )⊤(ASξ(λ(N )) − b) = g(λ(N )).
+
+The gradient of the dual function, derived in (3.14) and expressed in (4.1), satisfies (4.16) ∇g(λ(N )) = −(ASξ(λ(N )) − b).
+
+Combining (4.15) and (4.16) yields (4.17) fρ(Sξ(λ(N ))) = g(λ(N )) − λ(N )⊤∇g(λ(N )),
+
+which concludes the first step of the proof. 
+
+Step 2. Now, because (Reg-QCP) is a convex optimization problem satisfying Slater’s condition, strong duality holds. Let λ⋆ be a dual optimal solution, which exists and is finite due to coercivity established in Theorem 4.3. Then, (4.18) fρ(Sξ(λ⋆)) = g(λ⋆)Using (4.17) and (4.18), the suboptimality of the regularized problem is decom-posed as (4.19) fρ(Sξ(λ(N ))) − fρ(Sξ(λ⋆)) = ( g(λ(N )) − g(λ⋆)) − λ(N )⊤∇g(λ(N ))Theorem 4.1 provides the accelerated dual convergence bound 
+
+g(λ⋆) − g(λ(N )) ≤ 2L∥λ(0) − λ⋆∥22
+
+(N + 1) 2 .
+
+Since g is concave (see Lemma 3.5) and λ⋆ is a maximizer, it follows that (4.20) g(λ(N )) − g(λ⋆) ≤ 0 ≤ g(λ⋆) − g(λ(N )) ≤ 2L∥λ(0) − λ⋆∥22
+
+(N + 1) 2 .
+
+Therefore, by substituting (4.20) into (4.19), one has 
+
+fρ(Sξ(λ(N ))) − fρ(Sξ(λ⋆)) ≤ − λ(N )⊤∇g(λ(N )),18 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+and, by using the Cauchy–Schwarz inequality to bound the last term of the right-hand side, yields (4.21) fρ(Sξ(λ(N ))) − fρ(Sξ(λ⋆)) ≤ ∥ λ(N )∥2∥∇ g(λ(N ))∥2,
+
+which concludes the second step of the proof. 
+
+Step 3. For any ξ ∈ K,
+
+fρ(ξ) = f (ξ) + ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos ∥22.
+
+Applying this to Sξ(λ(N )) and to an optimal solution ξ⋆ of the original problem of (QCP) yields 
+
+f (Sξ(λ(N ))) − f (ξ⋆) = fρ(Sξ(λ(N ))) − fρ(ξ⋆) − ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos (N )∥22 + ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22.
+
+Because the penalty term is nonnegative, one has (4.22) f (Sξ(λ(N ))) − f (ξ⋆) ≤ fρ(Sξ(λ(N ))) − fρ(ξ⋆) + ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22.
+
+Now, note that ξ⋆ is feasible for (Reg-QCP), so the optimality of Sξ(λ⋆) for the regularized problem implies 
+
+fρ(Sξ(λ⋆)) ≤ fρ(ξ⋆) = f (ξ⋆) + ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22.
+
+Thus (4.23) fρ(Sξ(λ(N ))) − fρ(ξ⋆) ≤ fρ(Sξ(λ(N ))) − fρ(Sξ(λ⋆)) + ρ
+
+2
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22,
+
+and by combining (4.22) and (4.23), one has 
+
+f (Sξ(λ(N ))) − f (ξ⋆) ≤ fρ(Sξ(λ(N ))) − fρ(Sξ(λ⋆)) + ρ
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22.
+
+Applying the upper bound in (4.21), it holds 
+
+f (Sξ(λ(N ))) − f (ξ⋆) ≤ ∥ λ(N )∥2∥∇ g(λ(N ))∥2 + ρ
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22.
+
+Using Lemma 4.4 to bound the dual iterate and the bound in (4.3) from the proof of Theorem 4.2 gives (4.24) f (Sξ(λ(N ))) − f (ξ⋆) ≤ 2BL ∥λ(0) − λ⋆∥2
+
+(N + 1) + ρ
+
+> msos
+
+X
+
+> j=1
+
+∥ξ(j)sos 
+
+> ⋆
+
+∥22,
+
+concluding the last step of the proof. LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 19 The suboptimality bound in Theorem 4.5 demonstrates that the distance be-tween the regularized primal solution of (Reg-QCP) and the solution of the original (QCP) decreases as the number of iterations N grows, indicating accelerated conver-gence of the dual method. However, the bound also contains terms proportional to 
+
+ρ, implying that the regularized problem must approach the unregularized one for the approximation to be exact. Intuitively, as ρ → 0, the objective of (Reg-QCP) is equal with that of (QCP), but the Lipschitz constant of the dual gradient grows as 
+
+O(1 /ρ ), making the dual problem increasingly slow to solve: to achieve very small error, N must increase much faster relative to 1 /ρ , which guarantees that the accel-erated method compensates for the larger Lipschitz constant or, equivalently, for the smaller stepsize. Such a relationship indicates that vanishing regularization increases accuracy compared to the original problem while requiring additional dual iterations to maintain convergence guarantees. 
+
+Termination Criteria. Algorithm 3.1 terminates when both the primal fea-sibility residual and the duality gap fall below absolute and relative tolerances. At iteration k, primal feasibility is measured and termination requires 
+
+r(k)prim < ϵ abs + ϵrel max {∥ y(k)∥∞, 1},
+
+where r(k)prim = ∥∇ g(y(k))∥∞, ϵabs > 0, and ϵrel > 0 are the primal residual and user supplied tolerances, respectively. Although the primal feasibility residual already guarantees that the recovered point is nearly feasible, one may also wish to ensure near-optimality. The duality gap for the regularized problem of (Reg-QCP) is given by (4.15), 
+
+|fρ(Sξ(λ)) − g(λ)| = |λ⊤(ASξ(λ) − b)| = |λ⊤∇g(λ)|,
+
+and the algorithm stops when 
+
+r(k)gap < ϵ abs + ϵrel max {| fρ(y(k))|, |g(y(k))|} ,
+
+which reflects a relative duality gap, where r(k)gap = |y(k)⊤∇g(y(k))|. In general, it is noted that checking only the primal feasibility residual is often sufficient, since the convergence of the dual objective (Theorem 4.1) and the boundedness of the dual variables (Lemma 4.4) imply that the gap also becomes small. These criteria mirror those used in modern conic solvers such as COSMO, SCS, and Clarabel, where termination is based on feasibility of affine constraints and a certificate of near-optimality. Because primal variables are recovered in closed form from the dual iterate, feasibility and optimality can be monitored directly through the gradient of the dual function. Adaptive restart ensures stability of the accelerated scheme, and the algorithm stops either when tolerances are met or when the maximum number of iterations is reached. 
+
+Adaptive Restart. The accelerated scheme uses an adaptive restart mecha-nism to maintain stability and prevent oscillations typical of Nesterov’s method. At iteration k, restart is triggered when the gradient direction becomes misaligned with the extrapolated step, i.e., when ∇g(y(k−1) )⊤(λ(k) − λ(k−1) ) < 0. In this case, the momentum parameter is reset to t(k) = 1, and the extrapolated point is replaced by the current dual iterate, y(k) = λ(k), warm-starting the accelerated gradient. This heuristic [44] helps to mitigate oscillatory behavior and can lead to faster practical convergence, especially when the objective is not strongly convex or when the Lip-20 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES 
+
+schitz constant is over-estimated. In practice, it often reduces the number of iterations required to reach a given tolerance, as the algorithm adaptively resets when progress stalls. 
+
+5. Numerical Experiments. In this section, benchmark examples are pre-sented to show how can one employ Algorithm 3.1 to solve the problems in the form of (QSOS). At the current state, Algorithm 3.1 is implemented in MATLAB [25] due to being fast to develop and debug. All programs are parsed into an optimization prob-lem in the form of (QCP). Specifically, the quadratic objective is parsed manually, while the constraints are parsed using SOSTOOLS [46]. Then, to compare different solving approaches, the original problem of (QCP) is lifted into Opt. (2.2) (which is solved by SCS [43]), or lifted into (SOCP) and (SDP) which are solved by MOSEK [4]. Only Algorithm 3.1 solves the problem of (QCP) without lifting the decision variables or the constraints space. The comparison between Algorithm 3.1 and IPMs focuses primarily on scalabil-ity: IPMs are known to suffer from high memory and computational costs as problem dimensions grow, whereas the proposed method maintains a much smaller memory usage. In contrast, the comparison with SCS (another first-order conic solver) centers on computational efficiency: since scalability is less of a differentiator, they are com-pared in terms of solution time and achievable accuracy. In SCS and Algorithm 3.1, 
+
+ϵabs = 10 −12 and ϵrel = 10 −12 are set for full accuracy of solutions and a maximum of 10 5 iterations is defined. In MOSEK, default termination criteria parameters are used. The maximum solve time for all solvers is set to 600 seconds (10 minutes) and if a solver fail (due to numerical problems or memory exhaustion) the maximum allowable solve time is set. Next, performance metrics are defined to compare the proposed approach against other solvers. 
+
+Performance Metrics. In this section, the standard benchmark convention is followed using performance profiles to compare solve time and the ratio of problems solved [10]. The first metric uses the relative performance ratio, which is defined as the time t to solve a problem p using a solver s divided by the fastest solve time across all solvers, up,s = tp,s / min s tp,s . For the ratio of N problems solved relative to the fastest solve time, define f : R≥0 → [0 , 1] such that fs(τ ) = 1 /N P 
+
+> p
+
+I≤τ (up,s ), where 
+
+I≤τ (up,s ) = 
+
+(
+
+1 if tp,s ≤ τ , 
+
+0 otherwise .
+
+This metric measures the ratio of problems solved by solver s within the time τ .By varying τ as a multiple of the best solve time, a relative performance profile is constructed using fs(τ ). The second metric uses the shifted geometric mean of solve times defined by SGM s =
+
+> N
+
+Y
+
+> i=1
+
+(ti,s + 1) 
+
+!1/N 
+
+− 1,
+
+and consists of the normalized shifted geometric mean, NSGM s = SGM s/ min s SGM s.This metric measures the typical relative performance of a solver against the best on each problem. It provides a single-number summary of how close a solver is to the best (NSGM s = 1), but it is worth noting that performance profiles remain the standard point of reference to evaluate performance. LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 21 
+
+Constrained Regression Problems. Consider the following regression prob-lem (5.1) min 
+
+> pD
+
+X
+
+> i=1
+
+
+
+p(x(i)) − y(i)2
+
+s.t. p(x) is sum of squares ,
+
+where the solution is a sum-of-squares polynomial p⋆(x) with coefficients ξf⋆ ∈ Rnf
+
+that fits the D ∈ N data points. For any polynomial p(x) = z2d(x)⊤ξf (of the same degree of p⋆(x)), the objective becomes PDi=1 
+
+ p(x(i)) − y(i)2 = 12 ξ⊤ 
+
+> f
+
+Qξ f + w⊤ 
+
+> f
+
+ξf +constant, where Q = 2 PDi=1 z2d(x(i))z2d(x(i))⊤ and wf = −2 PDi=1 y(i)z2d(x(i)). The constant term is omitted as it does not affect minimization. Hence, this problem is computationally equivalent to the form min 
+
+> ξf,Ξ(1)
+
+12 ξ⊤ 
+
+> f
+
+Qξ f + w⊤ 
+
+> f
+
+ξf
+
+s.t. z2d(x)⊤ξf = zd(x)⊤Ξ(1) zd(x),
+
+Ξ(1) ∈ S(nx+d)! /(nx! d!) + .
+
+By following the procedure presented in Section 2, one can reformulate this prob-lem into the form of (QCP). To construct sets of benchmark problems, randomly generated sum-of-squares polynomials of different degrees 2 d in different dimension sizes nx define the problem size. The set of data points {x(i), y (i)}Di=1 is defined by randomly sampling x(i) ∈ [−1, 1] nx and generating y(i) = p⋆(x(i)) by the ground-truth solution, whose coefficients are ξf⋆ ∈ [−1, 1] nf . The scaling of x(i), ξf⋆, and the number D = 2 nf of data points are defined to ensure Q ∈ Snf 
+
+> ≻0
+
+and to avoid ill conditioning as much as possible. In this numerical comparison, benchmark problems where 1000 ≤ nf ≤ 20000 are considered, with this range defining the problems’ size. For the set of problems, 10 different solution polynomials are defined for 24 different combinations of ( nx, 2d), resulting in 240 problems in total. The numerical results are summarized in Table 1 and Figure 1. Table 1 reports the normalized shifted geometric mean (NSGM) of solve times, the failure rate, and the averages of suboptimality and primal feasibility (computed just for reference and only over successfully solved instances). Algorithm 3.1, with regularization parameter 
+
+ρ = 10 −6, solves all 240 problems, achieving a zero failure rate and the best NSGM of 1. SCS has an NSGM of 1 .4013, about 40% slower than Algorithm 3.1 on average, but fails on 8 .33% of the problems. Both MOSEK reformulations (SOCP and SDP) exhibit high failure rates (71 .67% and 75%, respectively) and infinite NSGM due to numerous timeouts and memory errors. In terms of solution quality, Algorithm 3.1 and SCS attain comparable average suboptimality (averaged 4 .25 × 10 −8) and primal feasibility (averaged 1 .33 × 10 −13 ) on the problems they both solve. MOSEK, when it succeeds, achieves lower accuracy (suboptimality as high as 0 .24 for (SOCP) and 
+
+≈ 5 × 10 −6 for (SDP)) and has longer runtimes, showing poor reliability. Figure 1 presents the performance profile. The curve for Algorithm 3.1 rises quickly, reaching about 80% of problems solved at a relative performance ratio τ > 50, meaning that 80% of the problems are solved in at most 50 times the fastest solve time, which corresponds to approximately 15 seconds. For 100 < τ < 250, about 90% of the problems are solved faster with Algorithm 3.1 than with any of the other solvers. SCS’s curve flattens at 91 .67% because it fails on the remaining 8 .33%, 22 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES                                   
+
+> Method Alg. Algorithm 3.1, (QCP) SCS, Opt. (2.2) MOSEK, (SOCP) MOSEK, (SDP) NSGM 11.4013 ∞∞
+> Failure rate (%) 08.3333 71 .6667 75 Avg. suboptimality 5.1499 ×10 −83.3482 ×10 −80.2473 4.9624 ×10 −6
+> Avg. primal feasibility 2.5635 ×10 −13 1.0619 ×10 −14 2.0277 ×10 −72.5030 ×10 −10
+
+Table 1 
+
+Performance comparison on 240 constrained regression problems. Reported are the normalized shifted geometric mean (NSGM) of solve times (lower is better, 1 indicates the fastest on average), failure rate (percentage of problems not solved within the 10 -minute time limit or due to memory exhaustion), and averages of suboptimality and primal feasibility (computed only over successfully solved instances). 
+
+whereas Algorithm 3.1 can solve all problems within the 10-minute time limit. Both MOSEK variants climb slowly and do not exceed 30% even at large τ , confirming their poor scalability. Overall, the results demonstrate that Algorithm 3.1 is a ro-bust, memory-efficient, and practically accurate solver for large-scale quadratic SOS programs, outperforming MOSEK in reliability and SCS in the fraction of problems solved, presenting competitive speed and accuracy. Relative time to solve, =
+
+50 100 150 200 250 300 350 400 450 500 550
+
+> Ratio of problems solved
+
+0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.6
+
+0.7
+
+0.8
+
+0.9
+
+1      
+
+> Algorithm1,(QCP)
+> SCS,Opt.(3)
+> MOSEK,(SOCP)
+> MOSEK,(SDP)
+
+Fig. 1 . Relative performance profiles to capture the behavior of solvers in different scale prob-lems. The fraction of problems solved is computed for each multiple τ of the best solve time. 
+
+6. Conclusion. This work introduced a lifting-free regularization method for quadratic Sum-Of-Squares (QSOS) programs. By adding a norm penalty to SOS-constrained variables, the method preserves the original conic structure and yields closed-form primal updates, reducing the problem to an unconstrained dual with Lipschitz-continuous gradient. The dual can be efficiently maximized using accel-LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 23 erated first-order methods, and the theoretical analysis establishes concavity, dif-ferentiability, smoothness, and non-asymptotic recovery of the original solution of (QCP). Theorem 4.2 guarantees that the primal feasibility residual vanishes at the rate O(1 /N ), and Theorem 4.5 gives a complete bound on the suboptimality of the recovered primal solution in terms of the number of iterations, the regularization parameter ρ, and the distance to the optimal dual point. These guarantees are un-conditional and hold for all problems without any additional assumptions. Numerical experiments on constrained regression problems demonstrate that the method solves all instances, handles larger problems than interior-point reformula-tions, and can achieve faster performance than SCS and MOSEK with memory scal-ing only in the number of equality constraints. These results show that lifting-free regularization provides a practical and scalable alternative for large-scale quadratic SOS optimization. 
+
+Future Work. Although the current implementation of Algorithm 3.1 already demonstrates competitive performance, several improvements could further enhance its efficiency and robustness. The dual problem can be solved using alternative first-order methods that may converge in significantly fewer iterations, especially for ill-conditioned problems. A direct implementation of the algorithm in a compiled lan-guage would eliminate the overhead of the MATLAB interpreter and likely improve runtime. Future work could also systematically investigate the use of adaptive regular-ization (varying ρ during the solve) and warm-starting strategies to handle even larger and more difficult problems. Finally, the robustness observed in the benchmarks sug-gests that the method is well suited for problems where other solvers fail. The present work thus provides a solid foundation for a family of simple, memory-efficient, and robust solvers. 
+
+REFERENCES [1] A. A. Ahmadi and B. E. Khadir , Learning dynamical systems with side information , SIAM Review, 65 (2023), pp. 183–223. [2] F. Alizadeh, J.-P. A. Haeberly, and M. L. Overton , Primal-dual interior-point methods for semidefinite programming:Cconvergence rates, stability and numerical results , SIAM Journal on Optimization, 8 (1998), pp. 746–768. [3] E. D. Andersen and Y. Ye , On a homogeneous algorithm for the monotone complementarity problem. , Mathematical Programming, 84 (1999), pp. 375–399. [4] M. ApS , MOSEK Optimization Toolbox for MATLAB Release 10.1.11 , 2023, https://docs. mosek.com/10.1/toolbox/index.html. [5] G. Azuma, S. Kim, and M. Yamashita , Rank-one matrix completion via high-rank matrices in sum-of-squares relaxations , Journal of Global Optimization, 92 (2025), pp. 321–343. [6] F. Bach, E. Cornacchia, L. Pesce, and G. Piccioli , Theory and applications of the sum-of-squares technique , Journal of Statistical Mechanics: Theory and Experiment, 2024 (2024), p. 104010. [7] G. Blekherman, P. A. Parrilo, and R. R. Thomas , Semidefinite optimization and convex algebraic geometry , SIAM, 2012. [8] J. J. Bramburger, S. Dahdah, and J. R. Forbes , Synthesizing control laws from data us-ing sum-of-squares optimization , in Conference on Control Technology and Applications (CCTA), IEEE, 2024, pp. 505–510. [9] G. C. Calafiore and L. El Ghaoui , Optimization models , Cambridge university press, 2014. [10] E. D. Dolan and J. J. Mor´ e, Benchmarking optimization software with performance profiles ,Mathematical programming, 91 (2002), pp. 201–213. [11] T. d’Orsi, R. Nasser, G. Novikov, and D. Steurer , Higher degree sum-of-squares relax-ations robust against oblivious outliers , in Proceedings of the 2023 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA), SIAM, 2023, pp. 3513–3550. [12] R. Fletcher , Practical methods of optimization , John Wiley & Sons, 2013. [13] D. Gabay , Chapter ix applications of the method of multipliers to variational inequalities , in 24 GABRIEL F. MACHADO, ROSS DRUMMOND, AND MORGAN JONES Studies in mathematics and its applications, vol. 15, Elsevier, 1983, pp. 299–331. [14] D. Gabay and B. Mercier , A dual algorithm for the solution of nonlinear variational problems via finite element approximation , Computers & mathematics with applications, 2 (1976), pp. 17–40. [15] M. Garstka, M. Cannon, and P. Goulart , COSMO: A conic operator splitting method for convex conic problems , Journal of Optimization Theory and Applications, 190 (2021), pp. 779–810. [16] R. Glowinski and A. Marroco , Sur l’approximation, par ´ el´ ements finis d’ordre un, et la r´ esolution, par p´ enalisation-dualit´ e d’une classe de probl` emes de dirichlet non lin´ eaires ,Revue fran¸ caise d’automatique, informatique, recherche op´ erationnelle. Analyse num´ erique, 9 (1975), pp. 41–76. [17] P. J. Goulart and Y. Chen , Clarabel: An interior-point solver for conic programs with quadratic objectives , Mathematical Programming Computation, (2026), pp. 1–83. [18] C. Helmberg, F. Rendl, R. J. Vanderbei, and H. Wolkowicz , An interior-point method for semidefinite programming , SIAM Journal on Optimization, 6 (1996), pp. 342–361. [19] D. Henrion and J. Malick , SDLS: a Matlab package for solving conic least-squares problems ,arXiv preprint arXiv:0709.2556, (2007). [20] D. Henrion and J. Malick , Projection methods for conic feasibility problems: Applications to polynomial sum-of-squares decompositions , Optimization Methods & Software, 26 (2011), pp. 23–46. [21] N. J. Higham , Computing a nearest symmetric positive semidefinite matrix , Linear algebra and its applications, 103 (1988), pp. 103–118. [22] N. J. Higham , Computing the nearest correlation matrix—a problem from finance , IMA journal of Numerical Analysis, 22 (2002), pp. 329–343. [23] J.-B. Hiriart-Urruty and C. Lemar´ echal , Convex analysis and minimization algorithms I: Fundamentals , vol. 305, Springer science & business media, 2013. [24] S. B. Hopkins, P. K. Kothari, A. Potechin, P. Raghavendra, T. Schramm, and D. Steurer , The power of sum-of-squares for detecting hidden structures , in Annual Sym-posium on Foundations of Computer Science (FOCS), IEEE, 2017, pp. 720–731. [25] T. M. Inc. , MATLAB version: 25.2.0.3177638 (r2025b) update 5, 2025, https://www. mathworks.com. [26] D. Jagt, S. Shivakumar, P. Seiler, and M. Peet , Efficient data structures for representation of polynomial optimization problems: Implementation in sostools , IEEE Control Systems Letters, 6 (2022), pp. 3493–3498. [27] F. Jarre and F. Rendl , An augmented primal-dual method for linear conic programs ,SIAM Journal on Optimization, 19 (2008), pp. 808–823, https://doi.org/10.1137/ 070687128, https://doi.org/10.1137/070687128, https://arxiv.org/abs/https://doi.org/10. 1137/070687128. [28] M. Laurent , Sums of squares, moment matrices and optimization over polynomials , in Emerg-ing applications of algebraic geometry, Springer, 2008, pp. 157–270. [29] M. S. Lobo, L. Vandenberghe, S. Boyd, and H. Lebret , Applications of second-order cone programming , Linear algebra and its applications, 284 (1998), pp. 193–228. [30] J. Lofberg , Pre-and post-processing sum-of-squares programs in practice , IEEE Transactions on Automatic Control, 54 (2009), pp. 1007–1011. [31] A. Luppi, A. Bisoffi, C. D. Persis, and P. Tesi , Data-driven design of safe control for polynomial systems , European Journal of Control, (2023), p. 100914. [32] G. F. Machado and M. Jones , Sparse identification of nonlinear dynamics with side informa-tion (sindy-si) , in 2024 American Control Conference (ACC), IEEE, 2024, pp. 2879–2884. [33] A. Majumdar, G. Hall, and A. A. Ahmadi , Recent scalability improvements for semidefinite programming with applications in machine learning, control, and robotics , Annual Review of Control, Robotics, and Autonomous Systems, 3 (2020), pp. 331–360. [34] J. Malick , A dual approach to semidefinite least-squares problems , SIAM Journal on Matrix Analysis and Applications, 26 (2004), pp. 272–284. [35] J. Malick, J. Povh, F. Rendl, and A. Wiegele , Regularization methods for semidefinite programming , SIAM Journal on Optimization, 20 (2009), pp. 336–356. [36] F. Meng, D. Wang, P. Yang, G. Xie, and F. Guo , Application of sum-of-squares method in estimation of region of attraction for nonlinear polynomial systems , IEEE Access, 8 (2020), pp. 14234–14243. [37] J. J. Moreau , D´ ecomposition orthogonale d’un espace hilbertien selon deux cˆ ones mutuelle-ment polaires , Comptes rendus hebdomadaires des s´ eances de l’Acad´ emie des sciences, 255 (1962), pp. 238–240. [38] P. Neal, C. Eric, P. Borja, and E. Jonathan , Distributed optimization and statistical LIFTING-FREE QUADRATIC SUM-OF-SQUARES PROGRAMMING 25 
+
+learning via the alternating direction method of multipliers , Foundations and Trends ® in Machine learning, 3 (2011), pp. 1–122. [39] A. S. Nemirovski and M. J. Todd , Interior-point methods for optimization , Acta Numerica, 17 (2008), pp. 191–234. [40] Y. Nesterov , A method for unconstrained convex minimization problem with the rate of con-vergence O(1/k 2), Dokl. Akad. Nauk. SSSR, 269 (1983), p. 543, https://cir.nii.ac.jp/crid/ 1370576118744597902. [41] Y. E. Nesterov and M. J. Todd , Self-scaled barriers and interior-point methods for convex programming , Mathematics of Operations research, 22 (1997), pp. 1–42. [42] Y. E. Nesterov and M. J. Todd , Primal-dual interior-point methods for self-scaled cones ,SIAM Journal on Optimization, 8 (1998), pp. 324–364. [43] B. O’Donoghue , Operator splitting for a homogeneous embedding of the linear complemen-tarity problem , SIAM Journal on Optimization, 31 (2021), pp. 1999–2023. [44] B. O’donoghue and E. Candes , Adaptive restart for accelerated gradient schemes , Founda-tions of computational mathematics, 15 (2015), pp. 715–732. [45] B. O’donoghue, E. Chu, N. Parikh, and S. Boyd , Conic optimization via operator splitting and homogeneous self-dual embedding , Journal of Optimization Theory and Applications, 169 (2016), pp. 1042–1068. [46] A. Papachristodoulou, J. Anderson, G. Valmorbida, S. Prajna, P. Seiler, P. Parrilo, M. M. Peet, and D. Jagt , SOSTOOLS version 4.00 sum of squares optimization toolbox for MATLAB , 2021, https://arxiv.org/abs/1310.4716, https://arxiv.org/abs/1310.4716. [47] N. Parikh and S. Boyd , Proximal algorithms , Foundations and Trends in optimization, 1 (2014), pp. 127–239. [48] P. A. Parrilo , Structured semidefinite programs and semialgebraic geometry methods in ro-bustness and optimization , California Institute of Technology, 2000. [49] P. A. Parrilo , Semidefinite programming relaxations for semialgebraic problems , Mathemat-ical programming, 96 (2003), pp. 293–320. [50] B. Stellato, G. Banjac, P. Goulart, A. Bemporad, and S. Boyd , OSQP: An opera-tor splitting solver for quadratic programs , Mathematical Programming Computation, 12 (2020), pp. 637–672. [51] Y. Sun, M. S. Andersen, and L. Vandenberghe , Decomposition in conic optimization with partially separable structure , SIAM Journal on Optimization, 24 (2014), pp. 873–897. [52] L. Vandenberghe and S. Boyd , Semidefinite programming , SIAM review, 38 (1996), pp. 49– 95. [53] Z. Wen, D. Goldfarb, and W. Yin , Alternating direction augmented Lagrangian methods for semidefinite programming , Mathematical Programming Computation, 2 (2010), pp. 203– 230. [54] H. Wolkowicz, R. Saigal, and L. Vandenberghe , Handbook of semidefinite programming: Theory, algorithms, and applications , Springer Science & Business Media, 2012. [55] S. J. Wright , Primal-dual interior-point methods , SIAM, 1997. [56] Y. Ye, M. J. Todd, and S. Mizuno , An O (√nL )-iteration homogeneous and self-dual linear programming algorithm , Mathematics of operations research, 19 (1994), pp. 53–67. [57] Y. Zheng, G. Fantuzzi, and A. Papachristodoulou , Exploiting sparsity in the coefficient matching conditions in sum-of-squares programming using ADMM , IEEE Control Systems Letters, 1 (2017), pp. 80–85. [58] Y. Zheng, G. Fantuzzi, A. Papachristodoulou, P. Goulart, and A. Wynn , Chordal de-composition in operator-splitting methods for sparse semidefinite programs , Mathematical Programming, 180 (2020), pp. 489–532.

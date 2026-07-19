@@ -1,0 +1,948 @@
+Title: Robust Optimal Control of Arbitrarily Switched Systems: A Path-Complete Framework
+
+URL Source: https://arxiv.org/pdf/2607.15055v1
+
+Published Time: Fri, 17 Jul 2026 01:39:34 GMT
+
+Number of Pages: 22
+
+Markdown Content:
+# Robust Optimal Control of Arbitrarily Switched Systems: A Path-Complete Framework ∗
+
+## Léa Ninite ⋆†
+
+## , Adrien Banse ⋆, Guillaume O. Berger ⋆, Raphaël M. Jungers ⋆⋆ICTEAM Institute, UCLouvain, Louvain-la-Neuve, Belgium July 17, 2026 
+
+Abstract 
+
+This paper addresses the robust control of switched systems under arbitrary switching with perfor-mance guarantees. We propose a framework that jointly synthesizes a feedback policy and a certified upper bound on its corresponding infinite-horizon closed-loop value function. The proposed upper bound not only certifies the performance of the synthesized policy, but can also be optimized during controller synthesis. More precisely, our approach associates functions with the nodes of a path-complete graph and enforces graph-based Bellman inequalities along its edges. Exploiting a newly introduced notion of reachability graph, these functions are combined into both a feedback policy and a certified upper bound on its corresponding closed-loop value function, expressed as a pointwise min–max combination of the graph-indexed functions. For linear switched systems with quadratic stage costs, the proposed framework admits tractable computational formulations based on semidefinite programming and alternating opti-mization. Numerical experiments, including a building temperature regulation benchmark, demonstrate the practical usefulness of the proposed approach both for direct feedback control using the synthesized policy and for model predictive control using the certified upper bound as a terminal cost. 
+
+# 1 Introduction 
+
+Dynamical systems operating under uncertainty are increasingly prevalent, with applications in autonomous driving, search-and-rescue robotics, smart grids, and smart buildings [2, 34]. Ensuring the safe deployment of such systems requires rigorous mathematical tools that can formally certify whether prescribed require-ments, such as safety and performance specifications, are satisfied [4, 25, 31]. In this paper, we consider arbitrarily switched systems (or switched systems for short). These are multi-modal dynamical systems of the form 
+
+xk+1 = fik (xk, u k), ik ∈ { 1, . . . , M }.
+
+Here the mode dynamics fi are known for every i, but the uncertainty comes from the fact that any mode 
+
+i can be applied at each step k. These systems arise naturally in many applications, including mechanical systems [11], power systems [40], networked systems [19], and biological or epidemiological models [22]; see also [26] for a comprehensive introduction to switched systems and their applications. More generally, they provide paradigmatic examples of uncertain systems where robust control is known to be challenging, even in systems with linear dynamics [24, 42]. 
+
+> ∗
+
+This project has received funding from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme (grant agreement No. 864017, L2C), from the Horizon Europe programme (grant agreement No. 101177842, Unimaas), and from the ARC (French Community of Belgium) project SIDDARTA. 
+
+> †
+
+Léa Ninite is a Research Fellow of the Fonds de la Recherche Scientifique – FNRS. E-mails: {lea.ninite,adrien.banse,guillaume.berger,raphael.jungers}@uclouvain.be .
+
+1arXiv:2607.15055v1 [math.OC] 16 Jul 2026 This paper is concerned with the robust optimal control of switched systems. Our goal is to design policies that achieve a low infinite-horizon value function , which denotes the worst-case infinite-horizon cost-to-go, i.e., the cost under the worst possible infinite mode sequence (see, e.g., [32], and see Definition 1 for a pre-cise definition). Throughout the paper, we will drop the horizon prefix when clear from the context. To achieve tractability and robustness, we design feedback policies that minimize a certified upper bound on the corresponding closed-loop value function, thereby providing an efficient controller while simultaneously addressing the need for guarantees described above. These bounds are relevant in safety and energy-critical applications, where one seeks guarantees on performance and stability even under adversarial operating con-ditions [26, 42, 12]. They also find applications beyond certification; for instance, they can serve as terminal costs in robust model predictive control (RMPC, also called Min–Max MPC) for switched systems, enabling finite-horizon policies with infinite-horizon performance guarantees (see, e.g., [39, Chapter 2] for an intro-duction). Finding such controllers and bounds is a well-understood problem in simpler settings. For example, in the case of linear systems with quadratic stage costs, the value function is quadratic and can be computed efficiently through the solution of the algebraic Riccati equation [30]. Similarly, in finite systems, the value function can be easily computed through the robust Bellman equation [9, 32, 41] which reduces to a set of piecewise-linear equations to solve. These properties make the value function both analytically tractable and computationally efficient to evaluate. The situation changes drastically for switched systems with continuous state and input spaces. For instance, in the case of switched linear systems with quadratic stage cost and where the mode is a controlled input, it was shown in [46] that the optimal finite-horizon value function is piecewise quadratic, with a number of pieces that may grow exponentially with the horizon, and that the optimal infinite-horizon value function is in general neither quadratic nor smooth. A similar phenomenon arises under arbitrary switching, where the number of possible switching sequences grows exponentially with time. In [8], the author shows that, in this setting, the infinite-horizon value function can be non-differentiable almost everywhere, even for switched systems with linear dynamics and quadratic stage cost. These difficulties motivate the development of tractable methods for designing robust controllers, together with guarantees. To this end, we leverage the powerful path-complete framework [1], initially introduced in the context of stability analysis of switched systems, and combine it with robust Bellman inequalities [32, 41], initially introduced in robust dynamic programming to characterize bounds on the value function. 
+
+Contributions We use the path-complete framework to define graph-based relaxations of robust Bellman inequalities, leading to a tractable and guaranteed robust control method for arbitrarily switched systems. Our main contributions are as follows: 
+
+• We associate functions with the nodes of a path-complete graph (see Definition 3) and enforce graph-based Bellman inequalities along its edges. By exploiting the newly introduced notion of reachability graph (Definition 5), we show how these functions can be combined to construct both an explicit feedback policy and a certified upper bound on its corresponding closed-loop value function, expressed as a suitable pointwise min–max combination of the graph-indexed functions. 
+
+• We derive tractable computational formulations under suitable assumptions. Complete graphs (a particular class of path-complete graphs, see Definition 4) admit an exact semidefinite programming formulation, while general path-complete graphs can be handled through an alternating optimization procedure. 
+
+• We demonstrate the practical relevance of the proposed framework on a building temperature regulation benchmark. In particular, we show that the certified upper bound can be used as a terminal cost in robust MPC. The main idea of the proposed framework is illustrated in Figure 1. 2This paper extends our preliminary conference version [33]. For autonomous switched systems, the con-ference paper established certified upper bounds on the value function only for complete and co-complete graphs (see Definition 4), while for controlled switched systems it was restricted to complete graphs and piecewise-linear feedback policies. In contrast, the framework developed here applies to general controlled switched systems of the form xk+1 = fik (xk, u k), uses arbitrary path-complete graph structures to derive certified upper bounds, and provides a unified methodology for simultaneously synthesizing a feedback policy and a certified upper bound on the corresponding closed-loop value function. This additional flexibility can lead to tighter value function bounds and improved control policies. Finally, the present paper also extends the computational and experimental scope of the conference paper by developing tractable synthesis meth-ods for general path-complete graphs and by demonstrating a practical application of the proposed certified upper bounds as terminal costs in robust MPC.                                      
+
+> Robust Bellman inequality
+> V(x)≥c(x, ϕ (x)) + max
+> iV fi(x, ϕ (x)) ∀x
+> Graph-based Bellman inequalities
+> Vα(x)≥c(x, π α(x)) + Vα
+>  f1(x, π α(x)) ∀xVα(x)≥c(x, π α(x)) + Vβ
+>  f2(x, π α(x)) ∀xVβ(x)≥c(x, π β(x)) + Vβ
+>  f2(x, π β(x)) ∀xVβ(x)≥c(x, π β(x)) + Vα
+>  f1(x, π β(x)) ∀x
+> VαVβ12
+> 2
+> 1
+> V(x) = min
+> iVi(x)
+> κ(x) = arg min
+> i
+> Vi(x)
+> ϕ(x) = πκ(x)(x)
+
+Figure 1: Overview of the proposed approach. A path-complete graph is used to generate a collection of graph-based Bellman inequalities, one for each edge of the graph (matching colors indicate the correspon-dence). Instead of enforcing a single Bellman inequality directly, we enforce these graph-based inequalities on several functions. These functions are then combined to define both a feedback control policy and a certified upper bound on the infinite-horizon value function, which satisfies the robust Bellman inequality. 
+
+Related work Several works studied the problem of optimal control of switched systems when both the control input and the switching sequence are decision variables (called optimal control and mode scheduling 
+
+problem) [38, 21, 47, 45]. In contrast, this paper considers arbitrary switching, which makes the problem fundamentally different; for instance, while optimal control and mode scheduling is a minimization problem over control input and mode sequence, optimal control under arbitrary switching amounts to solve a minimax 
+
+optimization problem (see Definition 2). Our problem is an instance of robust control. We present hereafter relevant approaches for robust con-trol and explain the differences with our work. Robust Lyapunov functions [16, 10] and robust barrier certificates [36, 37] focus on stability and safety analysis respectively, leaving the optimal control aspects aside. Symbolic control [6, 43] can provide certified controllers for robust optimal control problems [13] but this approach, which is very general, usually does not scale with system dimension, since it proceeds by par-titioning the state space into small cells. In particular, it usually does not exploit the structure of switched linear systems. Robust model predictive control (RMPC) [7] also addresses optimal control problems but faces two main limitations compared to our approach: (i) it does not provide guarantees unless a suitable terminal cost function is used (which essentially requires to solve an RDP problem; see below), and (ii) as 3we show in our experiments, this approach is computationally demanding because it requires to solve an optimization problem at each time step. Furthermore, the number of variables and constraints of the opti-mization problem grows exponentially with the prediction horizon. Finally, robust dynamic programming (RDP) [20, 41, 32] provides a powerful mathematical framework to rigorously study robust optimal control problems. Nevertheless, due to tractability issues, this framework has been mainly used for systems with finite state and input spaces [23]. To the best of our knowledge, our work is the first one to effectively apply RDP to switched systems with continuous state and input spaces, by combining it with path-complete graphs to balance tractability and accuracy. Our work leverages path-complete methods, which were introduced for stability analysis of switched sys-tems [1] and have been recently extended to controller synthesis. In particular, [17, 27] develop tractable methods for the synthesis of stabilizing controllers using path-complete graphs. However, these works focus on stabilization and restrict attention to a subset of path-complete graphs, called complete graphs. By contrast, the framework developed in this paper addresses performance certification through value function upper bounds and applies to any path-complete graphs. 
+
+Outline Section 2 introduces the problem formulation and the value function. Section 3 reviews the necessary background on robust Bellman inequalities and path-complete graphs. The main theoretical results are presented in Section 4, where path-complete graphs are used to construct control policies and certified upper bounds on the corresponding value function. Section 5 presents tractable procedures for computing such policies and bounds. Finally, Section 6 illustrates the proposed framework on a toy example and a temperature regulation problem. It also compares our methods against finite-horizon RMPC, and investigates the use of our upper bounds as terminal costs for RMPC. 
+
+Notation Given M ∈ N, we let ⟨M ⟩ := {1, . . . , M }. The set of n × n symmetric positive definite (semidef-inite) matrices is denoted by Rn × n≻0 (Rn × n⪰0). The set of nonnegative-valued functions defined on Rn
+
+(i.e., functions f : Rn → R≥0) is denoted by Fn
+
+> ≥0
+
+. The set of functions from Rn to Rm is denoted by (Rm)Rn
+
+.
+
+# 2 Problem statement 
+
+We consider a discrete-time switched system of the form 
+
+xk+1 = fσ(k)(xk, u k), k ∈ N, (1) where xk ∈ Rn is the state at time k, uk ∈ Rm is the control input at time k, σ(k) ∈ ⟨ M ⟩ is the mode at time k and for all i ∈ ⟨ M ⟩, fi : Rn × Rm → Rn. The function σ : N → ⟨ M ⟩ is called the switching signal .Given x ∈ Rn, a policy ϕ : Rn → Rm, and a switching signal σ : N → ⟨ M ⟩, we denote by ξϕ(·, x, σ ) the solution of (1) with switching signal σ and policy ϕ, i.e., ξϕ(k, x, σ ) = xk for all k ∈ N where x0 = x and 
+
+xk+1 = fσ(k)(xk, ϕ (xk)) for any k ∈ N.We also consider a cost function c : Rn × Rm → R≥0, mapping state–input pairs to nonnegative cost values. In this work, the switching signal is treated as an external and uncontrolled signal. Accordingly, system performance is evaluated in a worst-case sense over all switching signals, which motivates the following definitions. 
+
+Definition 1 (Closed-loop value function) 
+
+Consider the switched system (1) under a fixed policy ϕ : Rn → Rm, and a cost function c : Rn × Rm → R≥0.For each switching signal σ : N → ⟨ M ⟩, the cost-to-go under policy ϕ is the map Jϕσ : Rn → [0 , ∞] defined by 
+
+Jϕσ (x) := 
+
+> ∞
+
+X
+
+> k=0
+
+c ξϕ(k, x, σ ), ϕ (ξϕ(k, x, σ ))  ,
+
+4with the convention that Jϕσ (x) = ∞ if the series diverges. The closed-loop value function under policy ϕ is defined as the worst-case cost over all switching signals: 
+
+Jϕ(x) := sup  
+
+> σ:N→⟨ M⟩
+
+Jϕσ (x).
+
+Definition 2 (Optimal value function) 
+
+The optimal value function of system (1) with cost function c : Rn × Rm → R≥0 is defined as the pointwise infimum of the closed-loop value functions over all policies: 
+
+J⋆(x) := inf  
+
+> ϕ:Rn→Rm
+
+Jϕ(x).
+
+In this paper, our goal is to jointly synthesize a policy ϕ and a certified upper bound on its corresponding value function Jϕ, namely a function V : Rn → R≥0 satisfying 
+
+V (x) ≥ Jϕ(x), ∀ x ∈ Rn.
+
+Note that since J⋆(x) ≤ Jϕ(x) for any policy ϕ, such a function V also provides a certified upper bound on the optimal value function J⋆. However, it provides more than an upper bound on J⋆: it certifies the performance of a specific synthesized policy ϕ.1 To address the synthesis problem, we leverage the path-complete framework and robust Bellman inequalities introduced in the next section. 
+
+# 3 Preliminaries 
+
+## 3.1 Robust Bellman inequalities 
+
+In this section, we draw inspiration from the theory of robust Markov decision processes to develop a dynamic programming framework for switched systems under arbitrary switching. In robust Markov decision processes, the value function is characterized as the solution of a robust Bellman equation, i.e., a recursive functional equation obtained by replacing the expectation in the classical Bellman equation [9] with a worst-case operator [32, 41]. Related worst-case dynamic programming formulations also arise for nondeterministic systems [20]. We recall below the corresponding Bellman equation for switched systems, which serves as the starting point for the Bellman inequalities introduced later in Proposition 2. 
+
+Proposition 1 (Robust Bellman equation) 
+
+Consider the switched system (1) under a fixed policy ϕ : Rn → Rm, and a cost function c : Rn × Rm → R≥0.The closed-loop value function Jϕ satisfies the following robust Bellman equation :
+
+Jϕ(x) = c(x, ϕ (x)) + max   
+
+> i∈⟨ M⟩
+
+Jϕ(fi(x, ϕ (x))) , ∀ x ∈ Rn.
+
+In practice, when restricting the search to a prescribed function class (e.g., quadratic functions), it is generally impossible to satisfy the robust Bellman equation exactly. We therefore consider a relaxation of this equation, called robust Bellman inequality .2 The following proposition, adapted from [33, Proposition 2], shows that any function satisfying this functional inequality yields an upper bound on the closed-loop value function.         
+
+> 1In fact, our framework allows to minimize different metrics associated with the upper bound V(like the value at some given point x0) in order to find policies ϕfor which Jϕis close to J⋆.
+> 2Bellman inequalities have also been extensively used in stochastic optimal control to derive tractable bounds on the value function; see, e.g., [29, 38, 28].
+
+5Proposition 2 (Robust Bellman inequality) Consider the switched system (1) under a fixed policy ϕ :
+
+Rn → Rm, and a cost function c : Rn × Rm → R≥0. Let Jϕ denote the corresponding closed-loop value function. Let V : Rn → R≥0 satisfy the following robust Bellman inequality :
+
+V (x) ≥ c(x, ϕ (x)) + max   
+
+> i∈⟨ M⟩
+
+V (fi(x, ϕ (x))) , ∀ x ∈ Rn. (2) 
+
+Then, 
+
+V (x) ≥ Jϕ(x), ∀ x ∈ Rn.
+
+Proof. Let x ∈ Rn and σ : N → ⟨ M ⟩. For each k ∈ N, denote xk = ξϕ(k, x, σ ). Note that by (2), it holds that for all k ∈ N, V (xk) ≥ c(xk, ϕ (xk)) + V (xk+1 ). Hence, for all H ∈ N>0,
+
+V (x) ≥ V (x) − V (xH ) = 
+
+> H−1
+
+X
+
+> k=0
+
+V (xk) − V (xk+1 ) ≥
+
+> H−1
+
+X
+
+> k=0
+
+c(xk, ϕ (xk)) .
+
+Taking the limit when H → ∞ , we get that V (x) ≥ Jϕσ (x). Then, taking the supremum over σ, we obtain that V (x) ≥ Jϕ(x), concluding the proof. □
+
+Proposition 2 will be central to our approach for constructing guaranteed upper bounds on the value function using path-complete graphs (introduced below). In particular, we replace the robust Bellman inequality (2) by a graph-based set of simpler ‘Bellman-type’ inequalities, yielding approximations of the value function expressed as pointwise min–max combinations of functions. 
+
+## 3.2 Path-complete graphs 
+
+The path-complete Lyapunov framework, introduced in [1], extends classical Lyapunov methods for the stability analysis of discrete-time switched systems by replacing a single Lyapunov function with multiple functions coupled through graph-based inequalities. The underlying graph, called a path-complete graph , is constructed so that every admissible mode sequence corresponds to a path in the graph. We next recall the definitions required in the remainder of the paper. We consider a directed labeled graph G = ( S, E), where S is a finite set of nodes and E ⊆ S × S × ⟨ M ⟩
+
+is the set of edges labeled by elements of ⟨M ⟩. Each edge (α, β, i ) ∈ E represents a possible transition from node α to node β under mode i of the switched system. 
+
+Definition 3 (Path-complete graph) 
+
+Let G = ( S, E) be a directed labeled graph. We say that G is path-complete (for ⟨M ⟩) if for any ℓ ∈ N>0 and any sequence σ = ( i1, . . . , i ℓ) ∈ ⟨ M ⟩ℓ, there exists a path {(αk, α k+1 , i k)}ℓk=1 ⊆ E .
+
+An example of path-complete graph is shown in Figure 2a. The graph in Figure 2b is not path-complete (for example, it cannot generate the sequence ‘ 22 ’). Below, we define two special classes of path-complete graphs: 
+
+Definition 4 (Complete and co-complete graphs) A directed labeled graph G = ( S, E) is complete 
+
+(for ⟨M ⟩) if for each node α ∈ S and each label i ∈ ⟨ M ⟩, there exists at least one node β ∈ S such that (α, β, i ) ∈ E . Conversely, G is co-complete if for each node β ∈ S and each label i ∈ ⟨ M ⟩, there exists at least one node α ∈ S such that (α, β, i ) ∈ E .
+
+The graph in Figure 2a is co-complete, whereas the graph in Figure 3 is path-complete but neither complete nor co-complete. We next introduce the notion of a reachability graph, which will play a central role in the construction of policies and upper bounds on the value function in Section 4. 6α β
+
+1 2
+
+1
+
+2 
+
+> (a)
+> αβ
+
+1
+
+1
+
+2
+
+> (b)
+
+Figure 2: (a) Path-complete graph with two nodes, for a system with two switching modes. (b) Graph not path-complete.     
+
+> αβγδ
+
+2
+
+1
+
+1 1
+
+1
+
+2
+
+2
+
+1
+
+Figure 3: Path-complete graph with four nodes, for a system with two switching modes. 
+
+Definition 5 (Reachability graph) Let G = ( S, E) be a path-complete graph for ⟨M ⟩. A graph H =(SH, EH), where SH ⊆ 2S and EH ⊆ S H × S H × ⟨ M ⟩,3 is a reachability graph of G if (i) H is complete, and (ii) for every (A, B, i ) ∈ E H,
+
+∀ β ∈ B, ∃ α ∈ A such that (α, β, i ) ∈ E .
+
+Remark 1 We note that any graph (with label set ⟨M ⟩) that admits a reachability graph is path-complete (the proof, which is not difficult, is omitted). Therefore, Definition 5 restricts to path-complete graphs. 
+
+Examples of reachability graphs are shown in Figure 4. 
+
+H1 
+
+> α, γ, δ β, δ
+
+2
+
+1
+
+2
+
+1
+
+H2  
+
+> α, β, γ, δ α, γ, δ β, δ
+
+1 2
+
+2
+
+1
+
+1
+
+2
+
+Figure 4: Two examples of reachability graphs for the graph in Figure 3. 
+
+Remark 2 Reachability graphs can be viewed as a generalization of the subgraph O⋆(G) introduced in [3]. Indeed, if O⋆(G) denotes the unique strongly connected, deterministic, and complete subgraph of the observer graph of a path-complete graph G [3, Lemma 1], then O⋆(G) is a reachability graph in the sense of Definition 5. For example, the graph H1 in Figure 4 corresponds to O⋆(G) with G the graph in Figure 3, and the graph H2
+
+is the observer graph.     
+
+> 3This means that for all A∈ S H,A⊆ S .
+
+74 Deriving path-complete control policies and upper bounds on the value function 
+
+In this section, we show how path-complete graphs can be used to jointly construct a feedback control policy and a certified upper bound on the value function of the corresponding closed-loop system. To this end, we introduce two families of decision variables: functions {Vα}α∈S associated with the nodes of a path-complete graph, and functions {πA}A∈S H associated with the nodes of one of its reachability graphs (see Definition 5). By enforcing graph-based Bellman inequalities on these functions, we show that they can be combined into an explicit feedback law ϕ and a certified upper bound V on Jϕ.More precisely, given a path-complete graph G = ( S, E), let H = ( SH, EH) be a reachability graph, and let T ⊆ F n 
+
+> ≥0
+
+be a template of functions. For system (1) and a cost function c : Rn × Rm → R≥0, we seek functions {Vα}α∈S ⊆ T and {πA}A∈S H ⊆ (Rm)Rn
+
+satisfying the following graph-based Bellman inequalities: 
+
+Vα(x) ≥ c(x, π A(x)) + Vβ (fi(x, π A(x))) , ∀ x ∈ Rn, ∀ A ∈ S H, ∀ (α, β, i ) ∈ E with α ∈ A. (3) Given a solution to (3), we define the feedback policy 
+
+ϕ(x) := πA⋆(x)(x), A⋆(x) ∈ arg min 
+
+> A∈S H
+
+max  
+
+> α∈A
+
+Vα(x). (4) The theorem below shows that the graph-based Bellman inequalities (3) yield an explicit certified upper bound on the closed-loop value function of the policy (4). The result builds on ideas from [3, Theorem 1] and [17, Proposition 10]. The former shows how a set of inequalities similar to (3) (but without the controllers and the cost functions) provides a common Lyapunov function for autonomous switched systems, by using the observer graph (see Remark 2) as a reachability graph. The second extends this approach to switched systems with inputs, but restricts to complete graphs and less rich controller structures than in (4). Our theorem is the first to simultaneously (i) provide certified upper bounds on the value function (rather than stability guarantees), (ii) apply to systems with inputs, and (iii) allow for general path-complete graphs and rich controller structures as in (4), enabled by the notion of reachability graph. 
+
+Theorem 1 Consider system (1) , a cost function c : Rn × Rm → R≥0, a directed labeled graph G = ( S, E)
+
+and a template T ⊆ F n
+
+> ≥0
+
+. Assume that G is path-complete for ⟨M ⟩ and let H = ( SH, EH) be a reachability graph of G. Assume furthermore that {Vα}α∈S ⊆ T , {πA}A∈S H ⊆ (Rm)Rn
+
+satisfy (3) . Let V : Rn → R≥0 be defined by 
+
+V (x) := min 
+
+> A∈S H
+
+max  
+
+> α∈A
+
+Vα(x), (5) 
+
+and let ϕ : Rn → Rm be defined as in (4) . Then, for all x ∈ Rn, V (x) ≥ Jϕ(x) ≥ J⋆(x), where J⋆ is the optimal value function of system (1) with cost c, and Jϕ is the value function of the closed-loop system with policy ϕ.Proof. Take any x ∈ Rn and let A = A⋆(x), with A⋆(x) defined in (4). Then, by (4) and (5), 
+
+ϕ(x) = πA(x), V (x) = max  
+
+> α∈A
+
+Vα(x). (6) We show that (2) is satisfied at x. To this end, let i ∈ ⟨ M ⟩. Take any B ∈ S H such that (A, B, i ) ∈ E H (such a node B always exists since the reachability graph H is complete). By Definition 5, we know that for every 
+
+β ∈ B, there exists α ∈ A such that (α, β, i ) ∈ E . In particular, for 
+
+β⋆ ∈ arg max 
+
+> β∈B
+
+Vβ (fi(x, π A(x))) ,
+
+there exists α⋆ ∈ A such that (α⋆, β ⋆, i ) ∈ E . Applying (3) to x, A, and (α⋆, β ⋆, i ), we get 
+
+Vα⋆ (x) ≥ c(x, π A(x)) + max  
+
+> β∈B
+
+Vβ (fi(x, π A(x))) .
+
+8Recalling (6), we have 
+
+V (x) ≥ c(x, ϕ (x)) + V (fi(x, ϕ (x))) .
+
+Since this holds for every i ∈ ⟨ M ⟩, taking the maximum over i yields 
+
+V (x) ≥ c(x, ϕ (x)) + max   
+
+> i∈⟨ M⟩
+
+V (fi(x, ϕ (x))) .
+
+Since x was arbitrary, we can use Proposition 2 to conclude that V (x) ≥ Jϕ(x) for all x ∈ Rn. The inequality 
+
+Jϕ(x) ≥ J⋆(x) for all x ∈ Rn follows directly from Definition 2, completing the proof. □
+
+The next two corollaries provide specializations of Theorem 1 for complete and co-complete graphs (which are particular classes of path-complete graphs; see Definition 4). In these specializations, the upper bound simplifies to a pointwise minimum or maximum of the functions Vα, without explicitly involving a reachability graph. These corollaries also generalize [33, Theorem 1] to systems with inputs. 
+
+Corollary 1 Consider system (1) , a cost function c : Rn × Rm → R≥0, a complete graph G = ( S, E), and a template T ⊆ F n
+
+> ≥0
+
+. Assume that {Vα}α∈S ⊆ T and {πα}α∈S ⊆ (Rm)Rn
+
+satisfy 
+
+Vα(x) ≥ c(x, π α(x)) + Vβ (fi(x, π α(x))) , (7) 
+
+for all x ∈ Rn and all (α, β, i ) ∈ E . Let V : Rn → R≥0 be defined by 
+
+V (x) := min  
+
+> α∈S
+
+Vα(x), (8) 
+
+and let ϕ : Rn → Rm be defined by 
+
+ϕ(x) := πκ(x)(x), κ(x) ∈ arg min 
+
+> α∈S
+
+Vα(x). (9) 
+
+Then, for all x ∈ Rn, V (x) ≥ Jϕ(x) ≥ J⋆(x).Proof. Let {Vα}α∈S and {πα}α∈S satisfy (7). Since G is complete, the graph H = ( SH, EH) with nodes SH := {{ α} : α ∈ S} and edges EH defined by 
+
+({α}, {β}, i ) ∈ E H ⇐⇒ (α, β, i ) ∈ E ,
+
+is a reachability graph of G. For each A = {α} ∈ S H, define 
+
+˜πA := πα.
+
+Then, by (7), {Vα}α∈S , {˜πA}A∈S H satisfy (3). Hence all assumptions of Theorem 1 are satisfied. Since every node of H is a singleton, the function defined in (5) reduces to (8) and the policy (4) reduces to (9). Applying Theorem 1 yields the result. □
+
+Corollary 2 Consider system (1) , a cost function c : Rn × Rm → R≥0, a co-complete graph G = ( S, E),and a template T ⊆ F n
+
+> ≥0
+
+. Assume that {Vα}α∈S ⊆ T and ϕ : Rn → Rm satisfy 
+
+Vα(x) ≥ c(x, ϕ (x)) + Vβ (fi(x, ϕ (x))) , (10) 
+
+for all x ∈ Rn and all (α, β, i ) ∈ E . Let V : Rn → R≥0 be defined by 
+
+V (x) := max  
+
+> α∈S
+
+Vα(x). (11) 
+
+Then, for all x ∈ Rn, V (x) ≥ Jϕ(x) ≥ J⋆(x).Proof. Let {Vα}α∈S and ϕ satisfy (10). Since G is co-complete, the graph H = ( SH, EH) with SH = {S} and EH = SH × S H × ⟨ M ⟩ is a reachability graph of G. Associate with its unique node the policy 
+
+πS := ϕ. 
+
+Then, by (10), {Vα}α∈S , {πA}A∈S H satisfy (3). Hence all assumptions of Theorem 1 are satisfied. Since SH = {S} , the function defined in (5) reduces to (11) and the policy (4) reduces to ϕ. Applying Theorem 1 yields the result. □
+
+95 Matrix inequalities in the LQR setting 
+
+The conditions in (3) remain difficult to solve in general because they are functional inequalities which implies that they need to be verified or enforced at every state x. Several approaches allow to do that (possibly conservatively), including sum-of-square programming [35] (for inequalities involving polynomi-als), counterexample-guided methods [14], or sensitivity analysis [5]. In this section, we focus on switched systems with linear dynamics, quadratic cost functions, and piecewise-linear policies, for which we can ex-press unconservatively the functional inequalities as matrix inequalities .More precisely, we focus on switched systems of the form: 
+
+xk+1 = Aσ(k)xk + Bσ(k)uk, k ∈ N, (12) wherein Ai ∈ Rn×n and Bi ∈ Rn×m for every i ∈ ⟨ M ⟩. Moreover, we seek local policies πA parameterized as linear state-feedback laws: 
+
+πA(x) = KAx, KA ∈ Rm×n, ∀ A ∈ S H.
+
+The resulting policy (4) is therefore piecewise linear. We further consider a quadratic cost function 
+
+c(x, u ) = x⊤Qx + u⊤Ru, 
+
+where Q ∈ Rn×n 
+
+> ≻0
+
+and R ∈ Rm×m 
+
+> ≻0
+
+. Finally, we seek local upper bounds {Vα}α∈S in the template of quadratic functions; namely, parameterized by positive semidefinite matrices {Pα}α∈S :
+
+Vα(x) = x⊤Pαx, Pα ∈ Rn×n 
+
+> ⪰0
+
+, ∀ α ∈ S .
+
+In the rest of this section, the above structure is assumed. We explain how the functional inequalities (3) can be formulated as polynomial matrix inequalities (PMIs) for general path-complete graphs and solved using alternating optimization. We also show how they can be formulated as linear matrix inequalities (LMIs) in the specific case of complete graphs. 
+
+## 5.1 PMI formulation and alternating optimization 
+
+We describe here an algorithmic procedure for computing a control policy together with a certified upper bound on the corresponding closed-loop value function using a general path-complete graph G.Under the assumptions of this section, (3) reduces to the matrix inequalities 
+
+Pα ⪰ Q + K⊤ 
+
+> A
+
+RK A + ( Ai + BiKA)⊤Pβ (Ai + BiKA), ∀ A ∈ S H, ∀ (α, β, i ) ∈ E with α ∈ A. (13) Since (13) is multilinear in the decision variables Pα and KA, we resort to an alternating optimization pro-cedure, described below. 
+
+Initialization. To initialize the algorithm, we assume that a stabilizing policy is available. More precisely, we assume that a feasible solution  {KA}A∈S H , {Pα}α∈S 
+
+ to (13) is given. Practical procedures for constructing such an initial stabilizing policy are discussed in Appendix A. 
+
+Loop. Starting from this feasible solution, we iteratively optimize over the matrices {Pα}α∈S and the feed-back gains {KA}A∈S H in alternation while keeping the other variables fixed. More precisely, we repeatedly alternate between the ‘P-step’ and ‘K-step’ described below. 
+
+P-step. Given a policy {KA}A∈S H , the matrix inequalities (13) become linear in the variables {Pα}α∈S . We compute the matrices {Pα}α∈S by solving the semidefinite program 
+
+min 
+
+> {Pα}α∈S
+
+X
+
+> α∈S
+
+trace( Pα) s.t. (13) . (14) 10 The objective function above reflects our goal of obtaining a small upper bound on the closed-loop value function. We adopt the trace-minimization criterion used in [33], although other choices, such as Frobenius norm or log-det minimization, 4 are also possible [33]. 
+
+K-step. Given the matrices {Pα}α∈S , we solve the following optimization problem: 
+
+min 
+
+> γ≥0,{KA}A∈S H
+
+γ
+
+s.t. γP α − Q − K⊤ 
+
+> A
+
+RK A ⪰ (Ai + BiKA)⊤γP β (Ai + BiKA),
+
+∀ A ∈ S H, ∀ (α, β, i ) ∈ E with α ∈ A. (15) It is solved by bisection on γ. For any fixed value of γ, a Schur complement reformulation of the constraints (provided in Appendix B) yields a semidefinite program in the variables {KA}A∈S H .The scalar γ is introduced to reflect our overall objective of decreasing the certified upper bound on the value function. By minimizing γ, we seek the smallest scaling of the matrices {Pα}α∈S for which the inequalities remain feasible. The overall procedure is summarized in Algorithm 1. 
+
+Algorithm 1 Alternating optimization  
+
+> 1:
+
+Choose a path-complete graph G = ( S, E) and a reachability graph H = ( SH, EH) of G 
+
+> 2:
+
+Initialize  {K(0)  
+
+> A
+
+}A∈S H , {P (0)  
+
+> α
+
+}α∈S 
+
+ with a feasible solution to (13) (see Appendix A)  
+
+> 3:
+
+k ← 0 
+
+> 4:
+
+repeat  
+
+> 5:
+
+P-step  
+
+> 6:
+
+Compute {P (k+1)  
+
+> α
+
+}α∈S by solving (14) with {KA}A∈S H fixed at {K(k) 
+
+> A
+
+}A∈S H 
+
+> 7:
+
+K-step  
+
+> 8:
+
+Compute {K(k+1)  
+
+> A
+
+}A∈S H by solving (15) with {Pα}α∈S fixed at {P (k+1)  
+
+> α
+
+}α∈S  
+
+> 9:
+
+k ← k + 1  
+
+> 10:
+
+until convergence  
+
+> 11:
+
+return {K(k) 
+
+> A
+
+}A∈S H and {P (k) 
+
+> α
+
+}α∈S 
+
+## 5.2 LMI formulation in the complete case 
+
+In this section, we show that for complete graphs (see Definition 4), the PMIs (13) can be reformulated as LMIs. As a consequence, the synthesis of a policy together with a certified upper bound on the corresponding closed-loop value function can be carried out through a single semidefinite program, thereby avoiding the alternating optimization procedure described above. As shown in Corollary 1, complete graphs allow assigning a distinct policy πα to each node α of the graph. In the linear-feedback setting considered here, this corresponds to assigning a matrix Kα ∈ Rm×n to each node α ∈ S . Under the assumptions of this section, the feedback policy (9) reduces to the piecewise-linear controller 
+
+ϕ(x) = Kκ(x)x, κ(x) ∈ arg min 
+
+> α∈S
+
+x⊤Pαx. (16) Moreover, inequalities (13) become 
+
+Pα ⪰ Q + K⊤ 
+
+> α
+
+RK α + ( Ai + BiKα)⊤Pβ (Ai + BiKα), ∀ (α, β, i ) ∈ E .   
+
+> 4Note that the convex reformulation for the log-det minimization requires a Schur complement step to obtain P−1
+> α.
+
+11 These matrix inequalities can be expressed as the following LMIs, as shown in our preliminary work [33, Proposition 7]: 
+
+
+
+Sα SαA⊤ 
+
+> i
+
++ Y ⊤ 
+
+> α
+
+B⊤ 
+
+> i
+
+Sα Y ⊤
+
+> α
+
+AiSα + BiYα Sβ 0 0
+
+Sα 0 Q−1 0
+
+Yα 0 0 R−1
+
+ ⪰ 0, ∀ (α, β, i ) ∈ E , (17) where Sα = P −1 
+
+> α
+
+and Yα = KαP −1 
+
+> α
+
+.Consequently, the joint computation of a control policy and an upper bound on the corresponding closed-loop value function reduces to solving the following SDP: 5
+
+max 
+
+> {Sα,Y α}α∈S
+
+X
+
+> α∈S
+
+log det( Sα) s.t. (17) . (18) Once a solution is obtained, the matrices Pα = S−1 
+
+> α
+
+and Kα = YαS−1 
+
+> α
+
+define both the policy (16) and the certified upper bound of Corollary 1. 
+
+# 6 Numerical experiments 
+
+All experiments are conducted under the assumptions of Section 5 (linear dynamics, linear state-feedback laws πA(x) = KAx, quadratic stage costs, and quadratic template for the functions Vα) and performed in Julia using JuMP and MOSEK on a laptop equipped with an Apple M5 chip and 16GB of RAM. Unless stated otherwise, we take Q = I and R = I. The code for reproducing the experiments can be found at 
+
+https://github.com/lninite/PathCompleteControl.jl .We consider both complete and non-complete path-complete graphs in order to illustrate the two tractable approaches detailed in Section 5. To instantiate these two classes of graphs, we use primal and dual De Bruijn graphs [15]. These are two classical families of path-complete graphs that have been extensively employed in the analysis of switched systems and in the construction of path-complete Lyapunov functions; see, e.g., [1, 17, 18]. Their definition is recalled in Appendix C. Primal De Bruijn graphs are complete, while their duals are co-complete. In the following, controllers and performance certificates associated with primal De Bruijn graphs are computed through the SDP (18), whereas those associated with dual De Bruijn graphs are computed using Algorithm 1. 
+
+## 6.1 Synthetic example 
+
+We consider the following system matrices: 
+
+A1 =
+
+ 0 1
+
+−1 0
+
+
+
+, A 2 =
+
+−0.1 00 −0.95 
+
+
+
+, B 1 = B2 =
+
+10
+
+
+
+.
+
+Figure 5 illustrates the certified upper bounds obtained from primal and dual De Bruijn graphs of orders 
+
+ℓ ∈ { 1, 2, 3, 4}, evaluated along the unit circle x = (cos θ, sin θ)⊤.6 For both graph families, increasing the graph order generally leads to smaller certified upper bounds, although this improvement is not uniform over the state space. The figure also highlights the diversity of certificates that can be obtained from different path-complete graph structures: depending on the state, either the primal or the dual De Bruijn graph may provide the smaller certified upper bound. This illustrates the interest of extending our previous work [33] (which was restricted to complete graphs) to general path-complete graphs.        
+
+> 5An alternative objective is to minimize P
+> α∈S trace( Pα). This can be reformulated as an SDP by introducing variables Pα
+> satisfying
+> PαIISα
+> 
+> ⪰0.
+> 6Since the certified upper bounds are pointwise min–max combinations of quadratic functions, they are homogeneous of degree two. It is therefore sufficient to evaluate them on the unit circle, in dimension 2.
+
+12 Figure 5: Certified upper bounds V ℓc and V ℓcc on the value function, obtained from primal and dual De Bruijn graphs of order ℓ ∈ { 1, 2, 3, 4}, respectively. The bounds V ℓc are computed via the SDP (18), whereas V ℓcc 
+
+are computed using Algorithm 1. The bounds are evaluated along the unit circle x = (cos θ, sin θ)⊤.
+
+## 6.2 Application to building temperature regulation 
+
+Next, we illustrate the proposed approach on a building temperature regulation benchmark inspired by [44, Section VI-C]. The system consists of three thermally coupled zones equipped with heating/cooling actuators. A schematic representation is shown in Figure 6. The opening and closing of the two internal doors modify the thermal couplings between neighboring zones. Since each door can independently be either open or closed, this results in M = 4 switching modes. The system is modeled as a discrete-time switched linear system of the form (12), where xk ∈ R3 denotes the deviation of the zone temperatures from the reference temperature Tref = 24 ◦C, uk ∈ R3 contains the control input of each zone, and σ(k) ∈ { 1, 2, 3, 4} specifies the door configuration at time k. The system matrices are derived from the RC model of [44], to which we refer for details on the physical modeling and parameter values. ZONE 1  ZONE 2  
+
+> ZONE 3
+> THERMOSTAT THERMOSTAT
+> THERMOSTAT
+> DOOR DOOR
+> OUTSIDE
+
+Figure 6: Three-zone building temperature regulation benchmark. 13 Considered controllers We use this benchmark to compare four controller design approaches: (1) robust MPC without terminal cost; (2) robust MPC with terminal cost; (3) path-complete controllers based on primal De Bruijn graphs; and (4) path-complete controllers based on dual De Bruijn graphs. The objective is to compare the resulting closed-loop performance together with the online and offline computation times of the different approaches. The two robust MPC baselines are briefly described below. For the robust MPC without terminal cost, a finite-horizon min–max optimal control problem is solved online at each time step in a receding-horizon fashion. Switching uncertainty is represented through a scenario tree containing all admissible mode sequences over the prediction horizon, and the optimization minimizes the worst-case quadratic cost across all scenarios. This leads to a total of ≈ 13 4N decision variables, where N is the prediction horizon. We also investigate the use of our framework for the design of MPC terminal costs. In MPC, the finite-horizon objective only accounts for costs over the prediction window {0, . . . , N − 1} and therefore does not, in general, guarantee recursive optimal cost decrease , i.e., that the optimal value of the MPC optimization problem decreases from one time step to the next. If a terminal cost Vf (xN ) is added to the objective and Vf satisfies the robust Bellman inequality (2), then recursive optimal cost decrease is guaranteed [39, Proposition 2.34]. Since the value function certificates computed by our framework satisfy the robust Bellman inequality, they can naturally serve as terminal penalties for robust MPC. In our experiment, we consider two choices: a terminal cost induced by the single-node graph, and a path-complete terminal cost induced by a first-order dual De Bruijn graph. For the single-node graph, the terminal cost is given by 
+
+Vf (xN ) := x⊤ 
+
+> N
+
+P x N ,
+
+where P is computed by solving the SDP (18). For the dual De Bruijn graph, the terminal cost is given by 
+
+Vf (xN ) := max  
+
+> α∈S
+
+x⊤ 
+
+> N
+
+PαxN ,
+
+where the matrices {Pα}α∈S are computed using Algorithm 1. In both cases, N denotes the prediction horizon and the resulting terminal cost provides a certified upper bound on the infinite-horizon cost-to-go. 
+
+Experimental setup The control objective is to regulate the temperature of the three zones to the constant reference temperature Tref = 24 ◦C, which corresponds to driving the state to the origin. The simulations are initialized from zone temperatures (29 , 19 , 29) ⊤ ◦ C, corresponding to the initial deviation 
+
+x0 = (5 , −5, 5) ⊤.
+
+For the MPC experiments (with and without terminal costs), we consider prediction horizons N ∈ { 2, 3, 4, 5}.Larger horizons were not considered because the number of scenarios grows exponentially with N , yielding rapidly increasing online computational costs. For the path-complete approach, we consider both primal and dual De Bruijn graphs, with orders ℓ ∈ { 1, . . . , 4}. For primal De Bruijn graphs, the controller and its certified value function upper bound are obtained through the single SDP (18). For dual De Bruijn graphs, they are computed using the alternating optimization procedure of Algorithm 1. For each controller, we simulate the closed-loop system, starting from x0, over a horizon T = 300 . Results are averaged over 50 Monte Carlo simulations. In each trial, a switching sequence σ(0) , . . . , σ (T − 1) is generated by sampling the mode at each time step, uniformly and independently from {1, 2, 3, 4}. The same set of sampled switching sequences is used for all controllers to ensure a fair comparison. 
+
+Performance evaluation Table 1 reports the average finite-horizon cumulative cost 
+
+Javg  
+
+> T
+
+= 150 
+
+> 50
+
+X
+
+> i=1
+
+Ji,T , Ji,T = 
+
+> T−1
+
+X
+
+> k=0
+
+x⊤
+
+> i,k
+
+Qx i,k + u⊤
+
+> i,k
+
+Ru i,k ,
+
+where (xi, ·, u i, ·) is the closed-loop trajectory associated with the ith Monte Carlo simulation; and this is done separately for each controller. Since Ji,T is evaluated over a finite horizon, it provides a lower bound on the corresponding infinite-horizon cost Jϕ(x0). For the path-complete controllers, we additionally report 14 the certified upper bound V (x0). We also report the offline synthesis time toff , the average online execution time tavg on , and the average total computation time tavg tot .Table 1 highlights several trends. First, our proposed framework achieves computation times that are or-ders of magnitude lower than those of robust MPC while maintaining comparable closed-loop performance. Comparing the dual De Bruijn controller of order ℓ = 1 with robust MPC equipped with the same terminal cost, both approaches achieve nearly identical average costs ( 1196 .57 versus 1196 .60 ). However, robust MPC requires 1305 .11 seconds of total computation time and 1303 .56 seconds of average online computation time, whereas the proposed controller requires only 1.51 seconds and 9 × 10 −6 seconds, respectively. Second, terminal costs derived from our framework significantly improve the performance of robust MPC. For instance, at horizon N = 5 , the average cost decreases from 1486 .71 without terminal cost to 1244 .74 
+
+when using a common quadratic terminal cost, and further to 1196 .60 when using a dual De Bruijn terminal cost. Third, the results highlight the benefit of extending the framework beyond complete graphs. While our previous work [33] was restricted to complete path-complete graphs, dual (co-complete) De Bruijn graphs achieve lower costs than primal (complete) ones on this benchmark while preserving certified guarantees. This improved performance comes at the expense of higher offline computational costs due to the use of alternating optimization instead of a single semidefinite program. Finally, increasing the graph order improves both empirical performance and certified upper bounds for pri-mal De Bruijn graphs on this benchmark. In contrast, dual De Bruijn graphs exhibit only minor variations in cost and upper bound as the order increases. Figure 7 illustrates closed-loop trajectories of the three-zone building under four controllers: robust MPC without terminal cost ( N = 5 ), robust MPC with a first-order dual De Bruijn terminal cost ( N = 5 ), and path-complete controllers synthesized using primal and dual De Bruijn graphs of order ℓ = 4 . The tra-jectories correspond to a common switching realization and the same initial condition as in the previous experiments. We observe that the controller synthesized using the primal De Bruijn graph yields a faster convergence to the reference temperature. Moreover, the trajectories obtained with the dual De Bruijn controller and with MPC equipped with a dual De Bruijn terminal cost are nearly indistinguishable, despite the substantial difference in online computational cost highlighted in Table 1. Finally, the slower convergence of MPC without terminal cost further illustrates the benefit of using guaranteed approaches such as incorporating a terminal cost satisfying the robust Bellman inequality. 
+
+# 7 Conclusion 
+
+We introduced a path-complete framework for the joint synthesis of control policies and certified upper bounds on their corresponding closed-loop value functions for switched systems subject to arbitrary switch-ing. By associating local functions with the nodes of a path-complete graph and enforcing graph-based Bellman inequalities along its edges, we showed how to construct both a feedback policy and a certified upper bound on its value function through a suitable min–max aggregation of the graph-indexed functions. Previously proposed constructions based on particular classes of path-complete graphs were recovered as special cases of this general result. For linear switched systems with quadratic costs, we further derived tractable computational formulations for controller synthesis and performance certification. Numerical ex-periments illustrate the proposed approach on several examples, including a building temperature regulation benchmark. The results show that the proposed framework can drastically reduce both total and online computation times compared with robust MPC while maintaining comparable or better closed-loop perfor-mance. They further illustrate that the proposed value function certificates are useful beyond controller synthesis, serving as terminal costs for robust MPC. Future work will investigate the conservatism of the proposed framework, in particular its ability to ap-proximate the optimal value function and optimal policy as the complexity of the underlying path-complete 15 graph increases. Another promising direction is the development of policy-improvement schemes based on path-complete value function certificates, as well as the extension of these ideas beyond switched systems to broader robust decision-making settings such as robust Markov decision processes. Table 1: Comparison of robust MPC and path-complete controllers in terms of empirical average cost Javg  
+
+> T
+
+,offline computation time toff , average online computation time tavg on , and average total computation time 
+
+tavg tot = toff + tavg on . For path-complete controllers, the certified upper bound V (x0) on the value function is also reported. MPC is evaluated for prediction horizons N ∈ { 2, 3, 4, 5}, with and without terminal costs, and path-complete controllers are synthesized using primal and dual De Bruijn graphs of orders ℓ ∈ { 1, 2, 3, 4}.Results are averaged over 50 simulations. Config. Javg  
+
+> T
+
+V (x0) tavg tot [s] toff [s] tavg on [s] 
+
+MPC without terminal cost 
+
+N = 2 1562 .43 – 0.78 – 0.78 
+
+N = 3 1534 .88 – 2.52 – 2.52 
+
+N = 4 1509 .72 – 13.45 – 13.45 
+
+N = 5 1486 .71 – 80.36 – 80.36 
+
+MPC + common quadratic terminal cost 
+
+N = 2 1254 .94 – 2.72 0.04 2.67 
+
+N = 3 1251 .29 – 9.02 0.04 8.98 
+
+N = 4 1247 .86 – 41.06 0.04 41.02 
+
+N = 5 1244 .74 – 400.40 0.04 400.36 
+
+MPC + dual De Bruijn terminal cost ( ℓ = 1 )
+
+N = 5 1196 .60 – 1305.11 1.55 1303.56 
+
+Path-complete controller (primal De Bruijn graph) 
+
+ℓ = 1 1261 .05 1657.57 0.11 0.11 0.00005 
+
+ℓ = 2 1261 .03 1657.51 0.39 0.39 0.00010 
+
+ℓ = 3 1226 .18 1527.94 1.28 1.28 0.00032 
+
+ℓ = 4 1214 .59 1476.04 5.78 5.78 0.00124 
+
+Path-complete controller (dual De Bruijn graph) 
+
+ℓ = 1 1196 .57 1279.75 1.51 1.51 0.000009 
+
+ℓ = 2 1196 .52 1279.74 4.16 4.16 0.000009 
+
+ℓ = 3 1196 .50 1279.72 12.66 12.66 0.000009 
+
+ℓ = 4 1196 .47 1279.71 55.06 55.06 0.000009 16 Figure 7: Closed-loop state trajectories under four controllers: the proposed path-complete controller based on the primal De Bruijn graph of order 4 (complete), the controller based on the dual De Bruijn graph of order 4 (co-complete), robust MPC with horizon N = 5 , and robust MPC with horizon N = 5 using a terminal cost derived from the dual De Bruijn graph of order 1. All controllers are simulated under the same switching sequence. 17 References 
+
+[1] A. A. Ahmadi, R. M. Jungers, P. A. Parrilo, and M. Roozbehani. Joint spectral radius and path-complete graph lyapunov functions. SIAM Journal on Control and Optimization , 52(1):687–717, 2014. [2] M. Alamir. Learning against uncertainty in control engineering. Annual Reviews in Control , 53:19–29, 2022. [3] D. Angeli, N. Athanasopoulos, R. M. Jungers, and M. Philippe. Path-complete graphs and common lya-punov functions. In Proceedings of the 20th International Conference on Hybrid Systems: Computation and Control , HSCC ’17, page 81–90, New York, NY, USA, 2017. Association for Computing Machinery. [4] C. Baier and J.-P. Katoen. Principles Of Model Checking . MIT Press, 2008. [5] R. Baier, P. Braun, L. Grüne, and C. M. Kellett. Numerical calculation of nonsmooth control lyapunov functions via piecewise affine approximation ∗∗ p. braun, l. grüne and c. m. kellett are supported by the australian research council (grant number: Arc-dp160102138). IFAC-PapersOnLine , 52(16):370–375, 2019. 11th IFAC Symposium on Nonlinear Control Systems NOLCOS 2019. [6] C. Belta, B. Yordanov, and E. A. Gol. Formal Methods for Discrete-Time Dynamical Systems , volume 89 of Studies in Systems, Decision and Control . Springer. [7] A. Bemporad and M. Morari. Robust model predictive control: A survey. In A. Garulli and A. Tesi, editors, Robustness in identification and control , pages 207–226, London, 1999. Springer London. [8] G. O. Berger. On the differentiability of the value function of switched linear systems under arbitrary and controlled switching. arXiv preprint arXiv:2511.20037 , 2025. [9] D. Bertsekas. Dynamic programming and optimal control: Volume I , volume 4. Athena scientific, 2012. [10] F. Blanchini. Nonquadratic lyapunov functions for robust control. Automatica , 31(3):451–461, 1995. [11] F. Blanchini, D. Casagrande, P. Gardonio, and S. Miani. Constant and switching gains in semi-active damping of vibrating structures. International Journal of Control , 85(12):1886–1897, 2012. [12] F. Blanchini, S. Miani, et al. Set-theoretic methods in control , volume 78. Springer, 2008. [13] J. Calbert, B. Legat, L. N. Egidio, and R. Jungers. Alternating simulation on hierarchical abstractions. In 2021 60th IEEE Conference on Decision and Control (CDC) , pages 593–598, 2021. [14] Y.-C. Chang, N. Roohi, and S. Gao. Neural lyapunov control. In H. Wallach, H. Larochelle, A. Beygelz-imer, F. d 'Alché-Buc, E. Fox, and R. Garnett, editors, Advances in Neural Information Processing Systems , volume 32. Curran Associates, Inc., 2019. [15] N. G. De Bruijn and P. Erdös. On a combinatorial problem. Proceedings of the Section of Sciences of the Koninklijke Nederlandse Akademie van Wetenschappen te Amsterdam , 51(10):1277–1279, 1948. [16] M. de Oliveira, J. Bernussou, and J. Geromel. A new discrete-time robust stability condition. Systems & Control Letters , 37(4):261–265, 1999. [17] M. Della Rossa, T. Alves Lima, M. Jungers, and R. M. Jungers. Graph-based conditions for feedback stabilization of switched and lpv systems. Automatica , 160:111427, 2024. [18] M. Della Rossa and R. M. Jungers. Multiple lyapunov functions and memory: A symbolic dynamics approach to systems and control. SIAM Journal on Control and Optimization , 62(5):2695–2722, 2024. [19] M. Donkers, W. M. H. Heemels, N. Van de Wouw, and L. Hetel. Stability analysis of networked control systems using a switched linear systems approach. IEEE Transactions on Automatic control ,56(9):2101–2115, 2011. 18 [20] T. Fujita, T. Ueno, and S. Iwamoto. A nondeterministic dynamic programming model. In International Conference on Knowledge-Based and Intelligent Information and Engineering Systems , pages 1208–1214. Springer, 2004. [21] D. Görges, M. Izák, and S. Liu. Optimal control and scheduling of switched systems. IEEE Transactions on Automatic Control , 56(1):135–140, 2011. [22] E. A. Hernandez-Vargas, R. H. Middleton, and P. Colaneri. Optimal and mpc switching strategies for mitigating viral mutation and escape. IFAC Proceedings Volumes , 44(1):14857–14862, 2011. [23] G. N. Iyengar. Robust dynamic programming. Mathematics of Operations Research , 30(2):257–280, 2005. [24] R. Jungers. The joint spectral radius: theory and applications , volume 385. Springer Science & Business Media, 2009. [25] E. A. Lee and S. A. Seshia. Introduction to Embedded Systems A Cyber-Physical Systems Approach .MIT Press, 2016. [26] D. Liberzon. Switching in systems and control , volume 190. Springer, 2003. [27] T. A. Lima, M. Della Rossa, and A. Girard. Feedback stabilization of switched systems under arbitrary switching: A convex characterization. arXiv preprint arXiv:2506.03759 , 2025. [28] B. Lincoln and A. Rantzer. Relaxing dynamic programming. IEEE Transactions on Automatic Control ,51(8):1249–1260, 2006. [29] F. Lu, P. G. Mehta, S. P. Meyn, and G. Neu. Convex q-learning. In 2021 American Control Conference (ACC) , pages 4749–4756. IEEE, 2021. [30] V. L. Mehrmann. The autonomous linear quadratic control problem: theory and numerical solution .Springer, 1991. [31] S. Mitra. Verifying Cyber-Physical Systems: A Path to Safe Autonomy . MIT Press, 2021. [32] A. Nilim and L. E. Ghaoui. Robust control of markov decision processes with uncertain transition matrices. Operations Research , 53(5):780–798, 2005. [33] L. Ninite, A. Banse, G. O. Berger, and R. M. Jungers. A path-complete approach for optimal control of switched systems. In Proceedings of the 29th International Conference on Hybrid Systems: Computation and Control , 2026. [34] E. Pairet, J. D. Hernandez, M. Carreras, Y. Petillot, and M. Lahijanian. Online mapping and mo-tion planning under uncertainty for safe navigation in unknown environments. IEEE Transactions on Automation Science and Engineering , 19(4):3356–3378, Oct. 2022. [35] P. A. Parrilo. Semidefinite programming relaxations for semialgebraic problems. Mathematical Pro-gramming, Series B , 96, 2003. [36] S. Prajna and A. Jadbabaie. Safety verification of hybrid systems using barrier certificates. In R. Alur and G. J. Pappas, editors, Hybrid Systems: Computation and Control , pages 477–492, Berlin, Heidel-berg, 2004. Springer Berlin Heidelberg. [37] S. Prajna, A. Jadbabaie, and G. J. Pappas. A framework for worst-case and stochastic safety verification using barrier certificates. IEEE Transactions on Automatic Control , 52(8):1415–1428, 2007. [38] A. Rantzer. On approximate dynamic programming in switching systems. In Proceedings of the 44th IEEE Conference on Decision and Control , pages 1391–1396. IEEE, 2005. 19 [39] J. B. Rawlings, D. Q. Mayne, and M. M. Diehl. Model Predictive Control Theory, Computation, and Design, 2nd Edition . Nob Hill Publishing, LLC. [40] C. A. Sanchez, G. Garcia, S. Hadjeras, W. M. H. Heemels, and L. Zaccarian. Practical stabiliza-tion of switched affine systems with dwell-time guarantees. IEEE Transactions on Automatic Control ,64(11):4811–4817, 2019. [41] M. Suilen, T. Badings, E. M. Bovy, D. Parker, and N. Jansen. Robust markov decision processes: A place where ai and formal methods meet. In Principles of Verification: Cycling the Probabilistic Landscape: Essays Dedicated to Joost-Pieter Katoen on the Occasion of His 60th Birthday, Part III ,pages 126–154. Springer, 2024. [42] Z. Sun and S. S. Ge. Stability theory of switched dynamical systems. 2011. [43] P. Tabuada. Verification and Control of Hybrid Systems: A Symbolic Approach . Springer US, 2009. [44] Z. Wang, G. O. Berger, and R. M. Jungers. Data-driven control of unknown switched linear systems using scenario optimization. IEEE Transactions on Automatic Control , 69(11):7310–7325, 2024. [45] Z. Wu and Q. He. Optimal switching sequence for switched linear systems. SIAM Journal on Control and Optimization , 58(2):1183–1206, 2020. [46] W. Zhang, J. Hu, and A. Abate. On the value functions of the discrete-time switched lqr problem. 
+
+IEEE Transactions on Automatic Control , 54(11):2669–2674, 2009. [47] W. Zhang, J. Hu, and A. Abate. Infinite-horizon switched lqr problems in discrete time: A suboptimal algorithm with performance analysis. IEEE Transactions on Automatic Control , 57(7):1815–1821, 2012. 
+
+# A Initialization of Algorithm 1 
+
+The alternating optimization procedure described in Algorithm 1 requires an initial feasible point (line 2). To obtain one, we first solve a stabilization problem. To this end, we introduce a scaling factor γ ≥ 0 and seek a collection of matrices {Pα}α∈S and controller gains {KA}A∈S H such that 
+
+γP α − (Ai + BiKA)⊤Pβ (Ai + BiKA) ⪰ 0, (19) for every transition (α, β, i ) ∈ E with α ∈ A. Any feasible solution satisfying γ < 1 guarantees the existence of a stabilizing controller. Starting from an initial collection of positive definite matrices {Pα}α∈S , we alternately optimize the controller gains {KA}A∈S H and the matrices {Pα}α∈S while minimizing γ. For fixed {Pα}α∈S , condition (19) can be reformulated as a set of LMIs using the Schur complement. The controller synthesis problem is then convex, and controller gains minimizing γ can be computed. For fixed {KA}A∈S H , feasibility with respect to {Pα}α∈S 
+
+is checked via a semidefinite program, and the smallest admissible value of γ is determined by bisection. These two steps are repeated until a solution with γ < 1 is obtained. The resulting pair ({KA}A∈S H , {Pα}α∈S ) is then used to initialize the alternating optimization procedure described in Algorithm 1 (cf. line 2). 
+
+# B SDP formulation of (15) 
+
+For a fixed value of γ > 0, the constraints of (15) can be rewritten as 
+
+γP α − Q − K⊤ 
+
+> A
+
+RK A − (Ai + BiKA)⊤γP β (Ai + BiKA) ⪰ 0.
+
+20 An application of the Schur complement shows that the above inequality is equivalent to 
+
+
+
+γP α − Q K⊤ 
+
+> A
+
+(Ai + BiKA)⊤
+
+KA R−1 0
+
+Ai + BiKA 0 1 
+
+> γ
+
+P −1
+
+> β
+
+ ⪰ 0.
+
+For fixed γ, Pα, and Pβ , this is a linear matrix inequality in the variable KA.
+
+# C De Bruijn graphs 
+
+In this appendix, we recall the definition of primal and dual De Bruijn graphs used in the numerical experi-ments. 
+
+Definition 6 (Primal De Bruijn graph) Let ℓ ∈ N>0 and let ⟨M ⟩ be a finite set. The primal De Bruijn graph of order ℓ is the graph 
+
+Hℓ(⟨M ⟩) = ( Sℓ, Eℓ),
+
+with node set 
+
+Sℓ = ⟨M ⟩ℓ.
+
+There is an edge (α, β, i ) ∈ E ℓ if and only if 
+
+α = ( j1, . . . , j ℓ), β = ( i, j 1, . . . , j ℓ−1),
+
+for some (j1, . . . , j ℓ) ∈ ⟨ M ⟩ℓ.
+
+Definition 7 (Dual De Bruijn graph) Let ℓ ∈ N>0 and let ⟨M ⟩ be a finite set. The dual De Bruijn graph of order ℓ is the graph 
+
+Hℓ(⟨M ⟩) = ( Sℓ, Eℓ),
+
+with node set 
+
+Sℓ = ⟨M ⟩ℓ.
+
+There is an edge (α, β, i ) ∈ E ℓ if and only if 
+
+α = ( i, j 1, . . . , j ℓ−1), β = ( j1, . . . , j ℓ),
+
+for some (j1, . . . , j ℓ) ∈ ⟨ M ⟩ℓ.
+
+Notice that the dual De Bruijn graph of order ℓ is obtained by reversing each edge of its primal counterpart. Primal De Bruijn graphs of orders 1 to 3 are shown in Figure 8 for the mode set ⟨M ⟩ = {1, 2}.21 ℓ = 1 
+
+1 2 
+
+> ℓ= 2
+
+11 
+
+21 
+
+22 
+
+12  
+
+> ℓ= 3
+
+111 
+
+211 
+
+121 
+
+221 
+
+112 
+
+212 
+
+122 
+
+222 
+
+Figure 8: Primal De Bruijn graphs of orders ℓ = 1 , ℓ = 2 , and ℓ = 3 for the mode set ⟨M ⟩ = {1, 2}. Blue and orange edges correspond to labels 1 and 2, respectively. 22

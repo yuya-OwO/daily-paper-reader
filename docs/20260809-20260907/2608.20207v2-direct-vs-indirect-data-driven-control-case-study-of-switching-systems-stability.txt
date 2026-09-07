@@ -1,0 +1,1139 @@
+Title: Direct vs. Indirect Data-Driven Control: Case-study of Switching Systems Stability
+
+URL Source: https://arxiv.org/pdf/2608.20207v2
+
+Published Time: Mon, 24 Aug 2026 00:54:55 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Direct vs. Indirect Data-Driven Control: Case-study of Switched Systems Stability 
+
+# Alexis Vuille a Guillaume O. Berger a Rapha¨ el M. Jungers a
+
+> a
+
+UCLouvain, Louvain-la-Neuve, Belgium (e-mail: firstname.lastname@uclouvain.be). 
+
+Abstract 
+
+A central methodological question in data-driven control is whether to adopt a direct or indirect approach. Direct methods infer a controller or certificate directly from data, while indirect methods first identify a model and then apply model-based control techniques. Recent developments of the direct method have led to finite-sample guarantees for the data-driven stability analysis of switched linear systems under various settings. However, for the indirect method, such guarantees remain largely elusive. In this paper, we provide a novel framework for the stability analysis of switched linear systems from noisy state measurements, using the indirect approach. Our framework comes with finite-sample guarantees on the convergence rate of the system. For that, we combine generalization bounds from machine learning and system identification with quadratic Lyapunov analysis. To enable comparison, we also extend existing direct methods to handle measurement noise beyond the bounded-noise case available in the literature. Finally, we compare the two approaches through numerical experiments, revealing that the indirect approach can give tighter probabilistic guarantees as well as greater robustness to noise and outliers than the direct approach. 
+
+Key words: data-driven methods, statistical learning, stability analysis, system identification, switched linear systems 
+
+1 Introduction 
+
+In recent years, data-driven methods have emerged as a central paradigm for the analysis and control of cyber-physical systems [27, 10, 11, 16]. This development is driven by several converging trends. Indeed, many mod-ern systems are proprietary, highly complex, or governed by poorly understood physical principles, making mod-eling from first principles impractical. At the same time, advances in sensing technologies and the widespread de-ployment of inexpensive and accurate sensors have in-creased the availability of data, complemented by user feedback and public databases. In parallel, statistical learning theory has undergone major theoretical and al-gorithmic developments, providing rigorous tools for ex-tracting guarantees from finite datasets [34]. An important question in data-driven control is the dis-tinction between indirect and direct approaches, which has attracted significant attention; see, e.g., [13]. In the 
+
+⋆ Preprint version. Submitted to Automatica. 
+
+GB is an FNRS Postdoctoral Researcher. RJ is an FNRS honorary Research Associate. This project has received fund-ing from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation pro-gramme under grant agreement No 864017 – L2C. 
+
+indirect approach, one first identifies a model from data and then performs analysis or controller synthesis on the identified model. In contrast, the direct approach by-passes system identification and constructs certificates, such as Lyapunov or barrier functions, directly from data. While both paradigms are well established, their relative advantages remain insufficiently understood. Recent works have started to investigate this question in the context of linear control problems; see, e.g., [15, 21, 14]. Although these studies provide valuable insights into the relative merits of direct and indirect methods, it remains unclear to what extent their conclusions ex-tend beyond the linear setting. This motivates the search for more complex classes of systems that can serve as testbeds for investigating the direct-vs-indirect question. In this paper, we consider this question in the context of switched linear systems. Switched linear systems con-stitute a paradigmatic class of hybrid systems that are more complex than linear systems and arise naturally in a wide range of applications or as approximation of nonlinear dynamics; see, e.g., [25, 19, 35]. Their stability is characterized by the joint spectral radius (JSR, [32]), which captures the maximal exponential growth rate of trajectories of the system. It is well known that com-puting the JSR exactly is a hard problem [6, 19]. Never-
+
+Preprint submitted to Automatica 24 August 2026 arXiv:2608.20207v2 [math.OC] 21 Aug 2026 theless, several powerful approximation techniques have been developed in the model-based setting, including combinatorial and sum-of-squares relaxations [1, 19]. When a model of the system is not available, [11, 5] show how stability can be analyzed and stabilizing controllers can be designed for linear systems directly from trajec-tory data. Several recent works also study the case of switched linear systems [20, 4, 33, 39, 3, 37, 38]. These approaches belong to the family of direct methods: they construct Lyapunov functions (e.g., quadratic or polyno-mial) directly from data (which can include full or partial state and noisy measurements) and rely on tools from scenario optimization and statistical learning theory to derive probabilistic guarantees on the stability of the system. Despite these advances, existing direct methods still face limitations in terms of robustness to noise and outliers [3]. Furthermore, the literature has almost ex-clusively focused on the direct paradigm; comparatively, little attention has been devoted to the development of indirect approaches with finite-sample guarantees. 
+
+Contributions. Our contribution is threefold. First, we study the indirect approach for data-driven stabil-ity analysis of switched linear systems. Our proposed method first identifies a switched linear model from data (notably, any hybrid system identification method can be used, e.g., [28, 23]); then, it upper bounds the JSR of the system by synthesizing a robust quadratic Lyapunov function for the identified model. Crucially, we derive finite-sample probabilistic guarantees on this JSR upper bound by i) bounding the identification error with high probability and ii) propagating this bound to the JSR upper bound via sensitivity analysis of the quadratic Lyapunov function. For the first part, we leverage split-set methods from statistical learning theory (see Related work for more information). Our framework applies to systems with noisy full-state measurements. Second, we revisit existing direct methods that account for noisy data, namely [3], by i) refining the finite-sample guarantees in the presence of noisy measurements and ii) extending them to unbounded noise. Besides advancing the state of the art in direct data-driven control, this also enables fairer comparison with the indirect approach, which in our framework natively accounts for unbounded noise. Finally, we compare the direct and indirect approaches on a numerical benchmark. Our goal is to identify which approach is favorable in different settings, both in com-putation time and sample complexity. Our results show that in the low-noise regime both approaches are able to provide stability guarantees for the benchmark sys-tem, even though the indirect approach requires less data than the direct approach. In the higher-noise regimes, only the indirect approach was able to provide meaning-ful stability guarantees, demonstrating greater robust-ness to noise and outliers. The indirect approach also exhibits better computational complexity. These find-ings are valuable (i) for practitioners who have to select one method for their application, and (ii) to contribute to the overall debate on direct vs indirect methods by highlighting the strengths and weaknesses of both ap-proaches on a representative benchmark. 
+
+Related work 
+
+In the context of switched linear systems, several works have investigated stability certification from trajectory data. These works follow the direct paradigm, learning a stability certificate directly from data and deriving prob-abilistic guarantees on its validity. The original result in [20] shows how statistical guarantees derived from sce-nario optimization theory [9, 8] can be translated into stability guarantees under a given confidence level. An-other inspiration for the present work is [3], which de-rives probabilistic upper bounds on the joint spectral ra-dius under bounded measurement noise. We extend the latter to unbounded measurement noise and improve it by exploiting symmetries of the problem. In parallel, the identification of switched and hybrid sys-tems from data has been extensively studied, leading to a broad literature [2, 28, 36, 23]. However, finite-sample guarantees remain scarce. A notable exception is [26], which provides statistical guarantees for hybrid system identification. Our framework differs from [26] in that our objective is not identification itself, but rather the use of identification guarantees for stability certification. This requires controlling the tail of the identification er-ror, rather than its expectation as in [26], in order to obtain sharp probabilistic stability guarantees. To this end, we leverage split-set methods from statistical learn-ing theory (see, e.g., [30]), which provide simple and ef-fective finite-sample confidence bounds that are partic-ularly well suited to our setting. Split-set methods have already been used in control settings (for instance, con-formal prediction in safety analysis [29] and the holdout method in reachability analysis [12]); however, their use in switched system identification has not been investi-gated yet to the best of our knowledge. An important contribution of our work is an extensive comparison of the direct and indirect approaches for switched linear systems stability analysis. Similar com-parisons have been conducted for LTI system control in [21, 14, 15], while a broader perspective on this method-ological question is provided in [13]. These works show that, for LTI systems, direct and indirect approaches can be related through regularization or relaxation tech-niques, which in some cases lead to equivalent formula-tions, and that they exhibit trade-offs in data efficiency, asymptotic performance, and robustness. Our work dif-fers from these studies in that we focus on switched linear systems, which introduces additional challenges both for system identification and for stability certification. We 2show through numerical experiments that the current state of the art provides direct and indirect techniques that are not equivalent in general, each with respective strengths and weaknesses. 
+
+Notation 
+
+Rn×n 
+
+> ≻0
+
+denotes the set of n×n symmetric positive definite matrices. For N ∈ N, [ N ] denotes the set {1, . . . , N }.Given x ∈ Rn, ∥x∥2 := √x⊤x denotes its 2-norm. We denote the unit 2-norm sphere in Rn by Sn−1.
+
+2 Problem Statement 
+
+We consider a discrete-time switched linear system (SLS) whose dynamics is described by 
+
+ξ(t + 1) ∈ { Aξ (t) : A ∈ A} , (1) wherein A = {A1, . . . , A m} ⊆ Rn×n is a set of m matri-ces in Rn×n. Each matrix of A is called a mode of the sys-tem. A trajectory of this system is a function ξ : N → Rn
+
+such that for all t ∈ N, the condition in (1) holds. Since 
+
+A fully characterizes system (1), in the following, we will refer to it simply by A.We say that A is asymptotically stable if all trajectories converge to the origin. The rate of growth of the trajec-tories is called the joint spectral radius (JSR) of A:
+
+Definition 1 The joint spectral radius of A, denoted by 
+
+ρ(A), is the infimum of all r ≥ 0 for which there exists 
+
+C ≥ 1 such that every trajectory ξ of A satisfies that for all t ∈ N, ∥ξ(t)∥ ≤ Cr t∥ξ(0) ∥.
+
+The JSR is notoriously difficult to approximate, even when the matrices in A are known [19]. One way to upper bound it is to compute the contraction rate of the system with respect to a given norm: 
+
+Definition 2 Given a SLS A and a norm ∥·∥ : Rn →
+
+R≥0. The contraction rate of A with respect to ∥·∥ is defined by 
+
+γ(∥·∥ , A) = max 
+
+> x∈Rn\{ 0}, A ∈A
+
+∥Ax ∥∥x∥ .
+
+The following result is standard in the literature (see, e.g., [19, Proposition 1.4]): 1
+
+Proposition 3 Given a SLS A and a norm ∥·∥ : Rn →
+
+R≥0, it holds that ρ(A) ≤ γ(∥·∥ , A).      
+
+> 1In fact, it holds that ρ(A) = inf ∥·∥ γ(∥·∥ ,A), where the infimum is over all norms on Rn[19, Proposition 1.4].
+
+Remark 4 When γ(∥·∥ , A) < 1, the function x 7 → ∥ x∥
+
+is a Lyapunov function for the system. 
+
+In this paper, following previous work on data-driven control of SLS (e.g., [20, 4, 39, 3]), we focus on norms in-duced by a quadratic function, called hereafter quadratic norms . Namely, given a positive definite matrix P , we define the associated norm by ∥x∥P := ( x⊤P x )1/2. For simplicity of notation, we write γ(P, A) = γ(∥·∥ P , A). We define the best quadratic approximation of the JSR: 
+
+ρquad (A) = inf  
+
+> P∈Rn×n
+> ≻0
+
+γ(P, A).
+
+To ensure existence of a minimizer and guarantee that it is well conditioned, we restrict the set to δ-conditioned 
+
+positive definite matrices: 
+
+ρquad (A, δ ) = inf   
+
+> P∈Rn×n
+> ≻0
+> I⪯P⪯δI
+
+γ(P, A), (2) where δ ≥ 1 is the conditioning parameter. We denote by P0(A, δ ) the matrix realizing the minimum in (2). 2
+
+By Proposition 3, it holds that ρ(A) ≤ ρquad (A, δ ); see also [20, Theorem 5]. 
+
+Remark 5 Note that ρquad can be computed efficiently using semi-definite programming (see, e.g., [19]). 2.1 Data-driven analysis and random data collection 
+
+In the data-driven setting, the system matrices are un-known so that the JSR cannot be computed directly as in (2). Instead, we rely on data consisting of noisy one-step trajectories. More precisely, we consider an unknown SLS A =
+
+{A1, . . . , A m}. An experiment consists of initializing the system at a state x ∈ Sn−1 and observing the state after one time step. Due to the switching and measurement noise, the observation satisfies 
+
+y = Aj x + w, 
+
+where j ∈ [m] denotes the mode and w ∈ Rn the noise. To formalize the data-generation process, we assume that each experiment produces a triplet ( x, j, w ) drawn independently from an underlying probability distribu-tion π = μstate × μmode × μnoise on the set ∆ := Sn−1 ×
+
+[m] × W . The components of this product distribution have the following interpretation:   
+
+> 2By compactness of the domain of δ-conditioned matrices, the minimizer always exists. If it is not unique, we can use a tie-breaking rule; see, e.g., [4].
+
+3• μstate is the distribution of the initial condition x. We assume that x is sampled uniformly on Sn−1.
+
+• μmode is the unknown distribution governing the switching mechanism. It models the probability with which each mode is activated. 
+
+• μnoise is the unknown noise distribution. 
+
+Remark 6 The assumption on μstate can be interpreted in two ways: (i) as a design choice, in an experimen-tal setting where the experimenter actively initializes the system with uniformly distributed states (see for instance the adaptive-sampling framework in [37]); or (ii) as a modeling assumption in a passive data-collection setting (such as in [20, 4, 39, 3]). 
+
+With the assumptions above, repeating the experiment 
+
+N times yields an i.i.d. sample set 
+
+ωN = {(xi, j i, w i)}Ni=1 . (3) For each experiment i ∈ [N ], only the “input–output” pair ( xi, y i), where yi = Aji xi + wi, is observable; the mode ji and the noise realization wi remain latent. This gives the observation set 
+
+D := {(xi, y i)}Ni=1 , yi = Aji xi + wi ∀ i ∈ [m]. (4) The following assumptions will be used to establish the probabilistic stability guarantees: 
+
+Assumption 7 (Mode excitation) There exists α > 
+
+0 such that each mode has probability at least α of being sampled, i.e., for all j ∈ [m], μmode (j) ≥ α.
+
+Assumption 8 (Noise tail bound) For all W ≥ 0,there exists a known bound p(W ) such that 
+
+μnoise ({w ∈ Rn : ∥w∥2 > W }) ≤ p(W ).
+
+Note that Assumption 8 does not require full knowledge of μnoise but only an upper bound on the tail probability of the noise. Two examples are given in Appendix A. 
+
+2.2 A useful result 
+
+We recall the following result from [20, Theorem 15], stated here under a generalized form that will be useful to obtain probabilistic upper bounds. This result allows to translate any upper bound on the measure of the set of points where the quadratic norm fails to be contractive (Eq. 5 below) into an upper bound on the JSR: 
+
+Proposition 9 Consider a SLS A. Let γ ≥ 0, P ∈
+
+Rn×n 
+
+> ≻0
+
+and ν ∈ (0 , 1) . For each j ∈ [m], define 
+
+Vj := x ∈ Sn−1 : ∥Aj x∥P > γ ∥x∥P . (5) 
+
+Assume that for all j ∈ [m], μstate  Vj
+
+ ≤ ν. Then, 
+
+ρ(A) ≤ γζ  ν 
+
+> 2
+
+κ(P ) ,
+
+where 
+
+• κ(P ) := pdet( P )/λ min (P )n,
+
+• ζ(x) := p1 − I−1(2 x; ( n − 1) /2; 1 /2) for x ∈ (0 , 1) .
+
+• I(·; a; b) is the regularized incomplete beta function, defined by I(x; a; b) := 
+
+R x 
+
+> 0ta−1(1 −t)b−1dt
+
+R 10 ta−1(1 −t)b−1dt .
+
+The proof is adapted from [20, Theorem 15]. For com-pleteness, it is given in Appendix B. Key steps in the proofs of both the indirect and the direct approaches guarantees will be to bound the probability of Vj in (5) in order to apply Proposition 9. 
+
+3 Indirect Approach 
+
+In this section, we present our first main contribution: an indirect-approach framework to bound the JSR with finite-sample probabilistic guarantees. First, we explain how an identified SLS model along with a bound on the identification error can lead to a bound on the JSR of the true system (Theorem 12); then, we explain how the identification error can be bounded by using tools from statistical learning (Proposition 14). 
+
+3.1 From system identification to stability guarantees 
+
+In the indirect approach, given an observation set D as in (4), we use system identification to learn a SLS model. Then, we compute a quadratic norm and the associated contraction rate for this model. The main question is: since the contraction analysis is performed on the model, what guarantees can we obtain on the true system? As we show in this section, we can transfer the guarantees from the model to the true system by bounding the dis-crepancy between the two dynamics. In the following of this section, we let ˆA := { ˆA1, . . . , ˆAm}
+
+denote the identified SLS model. 3
+
+Definition 10 Given a SLS A, a SLS model ˆA and a sample point (x, j, w ) ∈ ∆, we define the prediction error 
+
+as 
+
+eA, ˆA(x, j, w ) := min  
+
+> k∈[m]
+
+∥ ˆAkx − Aj x + w∥2. 
+
+> 3For simplicity, we assume that the number of modes of the true and the identified systems are the same, but our frame-work can be easily extended to the more general setting.
+
+4The prediction error above is defined for a specific sam-ple ( x, j, w ). We define the associated cumulative distri-bution of the prediction error as follows: 
+
+Definition 11 Given a SLS A, a SLS model ˆA and 
+
+ϵ > 0, the complementary cumulative distribution of the prediction error is 
+
+Qerror   
+
+> A,ˆA
+
+(ϵ) := π
+
+n 
+
+(x, j, w ) ∈ ∆ : eA, ˆA(x, j, w ) > ϵ 
+
+o 
+
+.
+
+The theorem below assumes an upper bound ˆq on 
+
+Qerror   
+
+> A,ˆA
+
+(ϵ) (we explain in Section 3.2 how to compute such an upper bound with finite-sample guarantees). The theorem shows how this bound can be propagated into the quadratic norm computed for the model in order to obtain an upper bound on the JSR of the true system: 
+
+Theorem 12 Given a SLS A, a model SLS ˆA and δ ≥ 1,let P := P0( ˆA, δ ) and ρquad ( ˆA, δ ) be solutions of (2) . Let 
+
+ϵ > 0 and W ≥ 0. Let Assumptions 7 and 8 hold. 4 Let 
+
+ˆq ≥ Qerror   
+
+> A,ˆA
+
+(ϵ). The following holds: 
+
+ρ(A) ≤ ρquad ( ˆA, δ ) + ( ϵ + W )pκ(P )
+
+ζ
+
+ ˆq  
+
+> 2(1 −p(W)) α
+
+κ(P )
+
+| {z } 
+
+> =: ρ(ˆ q; ˆA,δ )
+
+,
+
+where 
+
+• κ(P ) := λmax (P )/λ min (P ),
+
+• ζ(x) and κ(P ) are defined in Proposition 9. 
+
+To prove Theorem 12, we will need the following lemma. Intuitively, the lemma propagates the error coming from the noise and the system identification error into an up-per bound on the measure of the set of points for which the contraction of the quadratic norm computed with the model does not hold in the true system. This upper bound will be used to apply Proposition 9 to obtain the upper bound on the JSR in Theorem 12. 
+
+Lemma 13 Let A, ˆA, δ, P , ρquad ( ˆA, δ ), ϵ, W and ˆq be as in Theorem 12. Let Assumptions 7 and 8 hold. Let j ∈ [m]
+
+and Vj be as in (5) with γ := ρquad ( ˆA, δ )+( ϵ+W )pκ(P ).Then, 
+
+μstate (Vj ) ≤ ˆq
+
+(1 − p(W )) α .
+
+PROOF. Let Ωj := 
+
+
+
+x ∈ Sn−1 : min  
+
+> k∈[m]
+
+∥ ˆAkx − Aj x∥2 > ϵ + W
+
+
+
+. 
+
+> 4
+
+We remind that Assumptions 7 and 8 define the quantities 
+
+α and p(W ) used in the definition of ρ(ˆ q; ˆA, δ ). 
+
+We first prove the following bound: 
+
+μstate (Ω j ) ≤ ˆq
+
+(1 − p(W )) α . (6) To prove this, define Ω := 
+
+n
+
+(x, j, w ) ∈ ∆ : min  
+
+> k∈[m]
+
+∥ ˆAkx − Aj x∥2 > ϵ + W
+
+o
+
+,
+
+˜V := 
+
+n
+
+(x, j, w ) ∈ ∆ : min  
+
+> k∈[m]
+
+∥ ˆAkx − Aj x + w∥2 > ϵ 
+
+o
+
+,V := 
+
+n
+
+(x, j, w ) ∈ ∆ : ( x, j, w ) ∈ Ω ∧ ∥ w∥2 ≤ W
+
+o
+
+.
+
+Note that π( ˜V ) = Qerror   
+
+> A,ˆA
+
+(ϵ). We prove that V ⊆ ˜V ,which implies π(V ) ≤ π( ˜V ). Therefore, let ( x, j, w ) ∈ V .By the triangle inequality, 
+
+ϵ + W < min  
+
+> k∈[m]
+
+∥ ˆAkx − Aj x∥2
+
+≤ min  
+
+> k∈[m]
+
+∥ ˆAkx − Aj x + w∥2 + ∥w∥2
+
+≤ min  
+
+> k∈[m]
+
+∥ ˆAkx − Aj x + w∥2 + W. 
+
+Hence, ϵ < min k∈[m] ∥ ˆAkx − Aj x + w∥2, so that (x, j, w ) ∈ ˜V . This proves V ⊆ ˜V .Then, notice that 
+
+π(V ) = π(Ω) · μnoise ({w ∈ Rn : ∥w∥2 ≤ W })
+
+≥ π(Ω) · (1 − p(W )) ,
+
+where the latter comes from Assumption 8. This implies 
+
+π(Ω) ≤ π(V )1 − p(W ) ≤ π( ˜V )1 − p(W ) = Qerror   
+
+> A,ˆA
+
+(ϵ)1 − p(W ) ≤ ˆq
+
+1 − p(W ) .
+
+Since π(Ω) = Pmj=1 μstate (Ω j )μmode (j), it follows that 
+
+μstate (Ω j )μmode (j) ≤ ˆq
+
+1 − p(W ) .
+
+Thus, by Assumption 7, 
+
+μstate (Ω j ) ≤ ˆq
+
+(1 − p(W )) μmode (j) ≤ ˆq
+
+(1 − p(W )) α .
+
+This proves (6). To prove the rest of the lemma, we prove that Vj ⊆ Ωj , or equivalently that 
+
+x ∈ (Sn−1 \ Ωj ) = ⇒ x ∈ (Sn−1 \ V j ).
+
+It will follow that μstate (Vj ) ≤ μstate (Ω j ) ≤ ˆq  
+
+> (1 −p(W)) α
+
+.Given x ∈ (Sn−1 \ Ωj ), let k ∈ [m] be such that ∥Aj x −
+
+5ˆAkx∥2 ≤ ϵ + W . By the triangle inequality, 
+
+∥Aj x∥P ≤ ∥ ˆAkx∥P + ∥Aj x − ˆAkx∥P
+
+By the definition of P , it holds that 
+
+∥ ˆAkx∥P ≤ ρquad ( ˆA, δ )∥x∥P .
+
+Furthermore, it holds that 
+
+∥Aj x − ˆAkx∥P ≤ pλmax (P )∥Aj x − ˆAkx∥2
+
+≤ pλmax (P )( ϵ + W )
+
+≤
+
+s
+
+λmax (P )
+
+λmin (P ) (ϵ + W )∥x∥P .
+
+By combining the two inequalities above, we obtain 
+
+∥Aj x∥P ≤
+
+
+
+ρquad ( ˆA, δ ) + pκ(P )( ϵ + W )
+
+
+
+∥x∥P .
+
+Thus, x / ∈ V j . Hence, Vj ⊆ Ωj , concluding the proof. 2
+
+Proof of Theorem 12. The proof follows by apply-ing Proposition 9 with ν := ˆq  
+
+> (1 −p(W)) α
+
+, which holds by Lemma 13. 2
+
+3.2 Bounding the identification error 
+
+Theorem 12 allows us to obtain probabilistic bounds on the JSR through a bound on the complementary cumu-lative distribution of the prediction error, ˆ q ≥ Qerror   
+
+> A,ˆA
+
+(ϵ). However, how do we compute such a bound on the distri-bution of the prediction error? In this section, we propose a standard approach from statistical learning called the 
+
+binomial-tail inversion to do this with finite-sample guarantees. This method, which belongs to the family of split-set (aka. holdout or validation-set) methods, splits the dataset into two parts: one for training and one for testing. It then uses the binomial distribution that de-scribes the number of samples in the testset for which the prediction error is larger than ϵ. By inverting it, and comparing with the observed number of samples with prediction error larger than ϵ, one can retrieve a proba-bilistic upper bound on Qerror   
+
+> A,ˆA
+
+(ϵ). Concretely, binomial-tail inversion is a general frame-work to bound with prescribed confidence the probabil-ity of an event S ⊆ Ω, where (Ω , π ) is a probability space [22]. It proceeds by taking N i.i.d. samples in Ω and computing how many of them belong to S. In our case, given a SLS A, a SLS model ˆA and ϵ > 0, the associated event is defined by 
+
+S := 
+
+n
+
+(x, j, w ) ∈ ∆ : eA, ˆA(x, j, w ) > ϵ 
+
+o
+
+, (7) i.e., it is the set of samples for which the prediction error is larger than ϵ. Note that π(S) = Qerror   
+
+> A,ˆA
+
+(ϵ). For any sample set ωN = {(xi, j i, w i)}Ni=1 , the number of samples in S is denoted by 
+
+F (ωN ) := PNi=1 1(xi,j i,w i)∈S
+
+= # {i ∈ [N ] : eA, ˆA(xi, j i, w i) > ϵ }. (8) Binomial-tail inversion gives an upper bound on π(S)from F (ωN ), that is correct with high probability: 
+
+Proposition 14 Consider a SLS A and a SLS model 
+
+ˆA. Let β ∈ (0 , 1) , ϵ > 0 and F (·) be as in (8) . For any 
+
+k ∈ N, k ≤ N , let qbin  
+
+> β
+
+(k) be the unique q ∈ [0 , 1] such that 
+
+Φ( q; k; N ) = β, where Φ is the cumulative distribution function of the binomial distribution defined as 
+
+Φ( q; k; N ) = 
+
+> k
+
+X
+
+> j=0
+
+Nj
+
+
+
+qj (1 − q)N −j .
+
+The following inequality holds: 
+
+πN n 
+
+ωN ∈ ∆N : Qerror   
+
+> A,ˆA
+
+(ϵ) ≤ qbin 
+
+> β
+
+ F (ωN )o 
+
+≥ 1 − β. 
+
+For a proof, see, e.g., [22, Theorem 3.3]. 
+
+3.3 Overall indirect framework 
+
+The overall framework is presented in Algorithm 1. The soundness of the algorithm is established below: 
+
+Theorem 15 Consider a SLS A. Let β ∈ (0 , 1) and 
+
+ϵ > 0. Let ωN be an i.i.d. sample set as in (3) and D
+
+be the observation set as in (4) . Let Assumptions 7 and 8 hold. Consider an execution of Algorithm 1 with D, ϵ
+
+and β as inputs and ρ as output. With confidence 1 − β
+
+on the sampling of ωN , it holds that ρ(A) ≤ ρ.
+
+PROOF. Corollary of Theorem 12 and Proposi-tion 14. 2
+
+4 Direct Approach 
+
+In this section, we recall the direct approach, developed in [20, 4, 39, 3], with which we will compare our method in Section 5. We also extend and improve this framework to account for unbounded observation noise, to enable fair comparison with our approach. The direct approach works as follows: from a sample set of (possibly noisy) trajectories, we compute a quadratic 6Algorithm 1 Indirect data-driven stability certification 
+
+Require: Dataset D := {(xi, y i)}Ni=1 of noisy trajecto-ries from unknown SLS A; system identification er-ror level ϵ > 0; confidence level β ∈ (0 , 1). 
+
+Ensure: Probabilistic upper bound ρ on ρ(A).  
+
+> 1:
+
+System identification: Learn a SLS model ˆA =
+
+{ ˆA1, . . . , ˆAm} from D. Any approach can be used for that (see also Section 5).  
+
+> 2:
+
+Bounding identification error: Compute a prob-abilistic bound ˆ q such that 
+
+Qerror   
+
+> A,ˆA
+
+(ϵ) ≤ ˆq
+
+holds with confidence 1 − β. See Proposition 14 . 
+
+> 3:
+
+Model-based quadratic JSR analysis: Compute a matrix P0( ˆA, δ ) and the associated contraction rate ρquad ( ˆA, δ ) for the model ˆA, as solutions of (2).  
+
+> 4:
+
+Bound on the JSR of the system: Compute ρ =
+
+ρ(ˆ q; ˆA, δ ) as in Theorem 12. norm and its associated scenario contraction rate by solving a quasi-convex scenario optimization program (see Eq. 9 below). Using tools from scenario optimization [9, 7], this rate is then transformed into a probabilistic upper bound on the JSR of the system. Concretely, given δ ≥ 1 and a sample set ωN = {(xi, j i,wi)}Ni=1 , we solve the following scenario program: min  
+
+> γ≥0, P ∈Rn×n
+> ≻0
+
+γ, 
+
+s.t I ⪯ P ⪯ δI, 
+
+∥Aji xi + wi∥P ≤ γ∥xi∥P ∀i ∈ [N ],
+
+(9) The optimal cost and solution of (9) are denoted respec-tively by γ⋆(ωN , δ ), and P⋆(ωN , δ ). 5 They correspond to the scenario contraction rate and the quadratic norm. 
+
+Remark 16 Note that while (9) is defined with respect to the sample set ωN , it can be computed from the obser-vation set D, defined in (4) . Accordingly, one could write 
+
+γ⋆(D, δ ) and P⋆(D, δ ) instead to highlight that it depends only on observable quantities. 
+
+We make the following assumption on the noise distri-bution, which is also present in previous works on the direct approach with noisy measurements [3]: 
+
+Assumption 17 (Absolute continuity) The noise distribution μnoise is absolutely continuous with respect to the Lebesgue measure on Rn. 
+
+> 5For the same reason as mentioned earlier (footnote 2), we can assume existence and uniqueness of the optimal solution.
+
+We prove the following theorem, which is an im-provement (tighter bound) and a generalization (from bounded to unbounded noise) of [3, Theorem 1]. 
+
+Theorem 18 Consider a SLS A. Let β ∈ (0 , 1) and 
+
+δ ≥ 1. Let d = n(n + 1) /2 and N ∈ N, N ≥ d. For each sample set ωN as in (3) , let γ⋆(ωN , δ ) and P⋆(ωN , δ ) be the solution of (9) . Let W ≥ 0. Let Assumptions 7, 8 and 17 hold. 6 The following holds: 
+
+πN  {ωN ∈ ∆N : ρ(A) ≤ ρ(ωN )} ≥ 1 − β, 
+
+where 
+
+• the bound ρ(ωN ) is defined by 
+
+ρ(ωN ) := γ(ωN , δ )
+
+ζ
+
+ ϵ(β,N )κ(P⋆(ωN ,δ )) 2α(1− 12 p(W ))
+
+ .
+
+• γ(ωN , δ ) and ϵ(β, N ) are defined in Lemma 21 below. 
+
+• κ(P ) and ζ(x) are defined in Proposition 9. 
+
+Remark 19 We note that Theorem 18 improves the bound in [3, Theorem 1] even when the noise is bounded, say by Wmax . Indeed, if Wmax is large, choosing a smaller value W < W max can yield a tighter upper bound ρ(ωN )
+
+(in some cases, even W = 0 ; see Subsection 5.3). 
+
+Remark 20 Similarly to Remark 16, ρ(ωN ) can be writ-ten ρ(D) as it depends only on D, defined in (4) .
+
+To prove Theorem 18, we need the following lemma: 
+
+Lemma 21 Let A, β, δ, d, N , γ⋆(ωN , δ ), P⋆(ωN , δ ) and 
+
+W be as in Theorem 18. Let Assumptions 7, 8 and 17 hold. Define ϵ(β, N ) as the unique q ∈ [0 , 1] such that 
+
+Φ( q; d − 1; N ) = β, where Φ( ·; ·; ·) is as in Proposition 14. The following inequality holds: 
+
+πN   ωN ∈ ∆N : π(V (ωN )) ≤ ξ(β, N )  ≥ 1 − β, 
+
+where ξ(β, N ) := ϵ(β,N )1− 12 p(W ) and 
+
+V (ωN ) := {(x, j, w ) ∈ ∆ : 
+
+∥Aj x∥P⋆(ωN ,δ ) > γ (ωN , δ )∥x∥P⋆(ωN ,δ )},
+
+with 
+
+γ(ωN , δ ) := γ⋆(ωN , δ ) + W pκ(P⋆(ωN , δ )) ,
+
+and κ(P ) is defined in Theorem 12.      
+
+> 6We remind that Assumptions 7 and 8 define the quantities
+> αand p(W) used in the definition of ρ(ˆ q; ˆA, δ ).
+
+7PROOF. In this proof, with a slight abuse of nota-tion, we denote γ = γ⋆(ωN , δ ), P = P⋆(ωN , δ ) and 
+
+γ = γ(ωN , δ ). Also, for each sample set ωN , we define ˜V (ωN ) := {(x, j, w ) : ∥Aj x + w∥P > γ ∥x∥P }.
+
+Following [3, Eqs. 18–19], it holds that 
+
+πN n 
+
+ωN ∈ ∆N : π( ˜V (ωN )) ≤ ϵ(β, N )
+
+o 
+
+≥ 1 − β. 
+
+It remains to relate π( ˜V (ωN )) and π(V (ωN )) for each 
+
+ωN . For that, fix ωN ∈ ∆N and let ( x, j, ˜w) ∈ V (ωN ). We will prove that for all w ∈ W ,( ∥w∥2 ≤ W
+
+| {z }
+
+> (a)
+
+∨ (Aj x)⊤P w ≥ 0
+
+| {z }
+
+> (b)
+
+) ⇒ (x, j, w ) ∈ ˜V (ωN ).
+
+(10) Indeed, let w ∈ W . In case (a), by the triangle inequality, we have 
+
+γ∥x∥P < ∥Aj x∥P ≤ ∥ Aj x + w∥P + ∥w∥P
+
+≤ ∥ Aj x + w∥P + W pλmax (P )and 
+
+γ∥x∥P = γ∥x∥P + W pκ(P )∥x∥P
+
+≥ γ∥x∥P + W pλmax (P ).
+
+Therefore, we have 
+
+γ∥x∥P ≤ γ∥x∥P − W pλmax (P ) < ∥Aj x + w∥P ,
+
+which implies ( x, j, w ) ∈ ˜V (ωN ). Now, in case (b), we have (Aj x + w)⊤P (Aj x + w)= ( Aj x)⊤P (Aj x) + 2 ( Aj x)⊤P w 
+
+| {z }
+
+> ≥0
+
++ wT P w | {z } 
+
+> ≥0
+
+≥ (Aj x)⊤P (Aj x).
+
+Hence, 
+
+∥Aj x + w∥P ≥ ∥ Aj x∥P > γ ∥x∥P ≥ γ∥x∥P ,
+
+which implies ( x, j, w ) ∈ ˜V (ωN ). This proves (10). Then, by (10), Assumptions 8 and 17, and the definitions of ˜V (ωN ) and V (ωN ), it follows that (letting ∥·∥ = ∥·∥ P )
+
+π( ˜V (ωN )) = Ex,j,w 
+
+1∥Aj x+w∥>γ ∥x∥
+
+
+
+= 12 Ex,j,w 
+
+1∥Aj x+w∥>γ ∥x∥ + 1∥Aj x−w∥>γ ∥x∥
+
+
+
+(since π is symmetric with respect to x)
+
+≥ 12 Ex,j,w 
+
+1∥Aj x∥>γ ∥x∥1(Aj x)⊤P w ≥0
+
++ 1∥Aj x∥>γ ∥x∥1(Aj x)⊤P w< 01∥w∥2≤W
+
++ 1∥Aj x∥>γ ∥x∥1(Aj x)⊤P w ≤0
+
++ 1∥Aj x∥>γ ∥x∥1(Aj x)⊤P w> 01∥w∥2≤W
+
+
+
+(by the previous results) = 12 Ex,j 
+
+1∥Aj x∥>γ ∥x∥
+
+· Ew
+
+  1(Aj x)⊤P w ≥0 + 1(Aj x)⊤P w ≤0
+
++ 1(Aj x)⊤P w< 0 + 1(Aj x)⊤P w> 0 1∥w∥2≤W
+
+ 
+
+(by the independence of the distributions) 
+
+≥ 12 Ex,j 
+
+1∥Aj x∥>γ ∥x∥(1 + 1 − p(W )) 
+
+(using Assumptions 8 and 17) =
+
+
+
+1 − 12 p(W )
+
+
+
+π(V (ωN )) .
+
+Hence, 
+
+π(V (ωN )) ≤ π( ˜V (ωN )) 1 − 12 p(W ) ,
+
+which concludes the proof. 2
+
+Proof of Theorem 18. In this proof, with a slight abuse of notation, we denote P = P⋆(ωN , δ ) and γ =
+
+γ(ωN , δ ). For each sample set ωN and j ∈ [m], we let 
+
+Vj (ωN ) := x ∈ Sn−1 : ∥Aj x∥P > γ ∥x∥P .
+
+Let V (ωN ) be as in Lemma 21. By Assumption 7 and with the same reasoning as in the proof of Theorem 12, it holds that for all j ∈ [m], 
+
+μstate (Vj (ωN )) ≤ 1
+
+α π(V (ωN )) .
+
+Lemma 21 implies that 
+
+πN
+
+ 
+
+ωN ∈ ∆N : μstate (Vj (ωN )) ≤ 1
+
+α ξ(β, N )
+
+ 
+
+≥ 1−β. 
+
+Hence, the proof is completed by applying Proposition 9 with γ = γ and ν = 1 
+
+> α
+
+ξ(β, N ). 2
+
+8Algorithm 2 Direct data-driven stability certification 
+
+Require: Dataset D := {(xi, y i)}Ni=1 of noisy trajec-tories from unknown SLS A; confidence level β ∈
+
+(0 , 1). 
+
+Ensure: Probabilistic upper bound ρ on ρ(A).  
+
+> 1:
+
+Quadratic Synthesis: Compute a matrix P⋆(D, δ )and associated scenario contraction rate γ⋆(D, δ ) as solutions of (9).  
+
+> 2:
+
+Bound on the JSR of the system: Compute ρ =
+
+ρ(D) as in Theorem 18. 
+
+> Fig. 1. Interaction networks used in the consensus experi-ment. The system switches between three unknown network topologies, giving an underlying switched linear dynamics.
+
+4.1 Overall direct framework 
+
+The overall framework is given in Algorithm 2. The soundness of the algorithm is established below: 
+
+Theorem 22 Consider a SLS A. Let β ∈ (0 , 1) . Let ωN
+
+be an i.i.d. sample set as in (3) and D be the observation set as in (4) . Let Assumptions 7 and 8 hold. Consider an execution of Algorithm 2 with D and β as inputs and ρ
+
+as output. With confidence 1 − β on the sampling of ωN ,it holds that ρ(A) ≤ ρ.
+
+PROOF. Corollary of Theorem 18. 2
+
+5 Experimental Results 
+
+We consider a consensus problem over a hidden switched interaction network, illustrated in Figure 1. Determin-ing whether consensus is achieved can be formulated as a stability analysis problem for a 5D SLS [18]. Since the underlying networks are assumed unknown, stability is assessed by using data-driven methods on trajectory data. We apply both the direct and indirect approaches to this problem and compare their performance under different noise settings. The mode selection is considered uniform, i.e., each of the three modes can be selected with probability 13 = α. We consider three noise settings: 
+
+• Gaussian noise: additive white Gaussian noise with zero mean and covariance σ2I, where σ = 10 −3.
+
+• Gaussian mixture noise: 
+
+wt ∼ (1 − ϵ)N (0 , σ 21 I) + ϵN (0 , σ 22 I),
+
+where σ1 = 10 −3, σ2 = 1, and ϵ = 1250 . This model captures rare but large outliers. 
+
+• Bounded noise: noise uniformly distributed in the Euclidean ball B(0 , 0.1). This setting enables compar-ison with guarantees derived under bounded noise as-sumptions, such as in [3]. The quality of the indirect approach depends on the sys-tem identification procedure. Identifying SLS is known to be NP-hard in general, but heuristics often yield sat-isfactory practical results; see [23] for an overview. In this work, we employ the k-LinReg algorithm [23, Al-gorithm 6], a variant of k-means for switched linear re-gression that alternates between assigning data points to modes and least-squares regression to estimate the matrices. To improve robustness to outliers, we adopt a trimmed variant inspired by trimmed k-means [17], dis-carding a fraction of samples with the largest residuals at each iteration. The resulting procedure is summarized in Algorithm 3 in Appendix C. This highlights a key ad-vantage of the indirect approach: the framework is ag-nostic to the identification method and can incorporate robust or domain-specific algorithms. 
+
+5.1 Gaussian noise 
+
+We set δ = 5. For the probabilistic bounds, we use β =5%, W = 3 σ = 4 · 10 −3 (yielding p(W ) ≈ 0.006), and 
+
+ϵ = 5 · 10 −3. 7 in Appendix D. For the indirect approach based on binomial-tail inversion bounds, the dataset is split equally into identification and certification sets. Figure 2 reports the bounds obtained by both ap-proaches as a function of the total number of samples. Stability is certified with 95% confidence when the up-per bound drops below 1. The indirect method certifies stability with considerably fewer samples (around 800) compared to the direct approach (around 2200). Figure 3 compares the computational cost of the direct and indirect approaches with the number of samples. The direct method requires solving an LMI, whereas the indirect method primarily incurs the cost of the 
+
+k-LinReg identification procedure. Since solving LMIs is significantly more expensive than alternating least squares, the indirect approach is substantially faster. Overall, the indirect approach performs better than the direct one in both sample and computational complexity, consistent qualitatively with [21, Subsection II.C], which reports similar advantages for indirect methods in data-driven predictive control of LTI systems. 
+
+5.2 Gaussian mixture noise 
+
+We now consider the Gaussian mixture noise setting with outliers. We use δ = 5, β = 5%, ϵ = 5 · 10 −3 and W =4 · 10 −3, leading to p(W ) ≈ 0.006 + 1250 .     
+
+> 7We chose the parameters Wand ϵto minimize the upper bound; see Figures D.1 and D.2
+
+9Fig. 2. Comparison of the direct and indirect proba-bilistic upper bounds on the consensus problem with Gaussian noise. Stability is certified (with confidence 95%) when the bound drops below 1. The indirect approach cer-tifies stability with fewer samples than the direct method.   
+
+> Fig. 3. Computation time of the direct method (Algo-rithm 2) and the indirect method (Algorithm 1). The direct method becomes increasingly more expensive due to the growth in the number of LMI constraints, whereas the indirect approach remains computationally efficient.
+
+Figure 4 reports the bounds. The indirect method pro-vides meaningful stability guarantees, while the direct method fails to produce useful bounds in this setting. These results highlight the robustness advantage of the indirect paradigm when outliers are present. Since the direct approach enforces a decrease of the Lyapunov function along all sampled trajectories, it is inherently sensitive to even a small fraction of corrupted data. By contrast, in the indirect approach, the identification step implemented by Algorithm 3 acts as a kind of filter for the data that removes the outliers [24], thereby mitigat-ing these effects when sufficient data are available. This limitation reflects the sensitivity of the current scenario-based formulation to outliers. Incorporating robust sce-nario optimization techniques, such as those proposed in [31], constitutes a promising future direction. 
+
+5.3 Bounded noise 
+
+We consider the bounded noise setting to compare the direct approach of [3], which assumes bounded noise, with the bound obtained in Theorem 18. The bound from [3] corresponds to the special case of Theorem 18 with W = 0 .1 and p(W ) = 0. We compare with the case      
+
+> Fig. 4. Comparison under Gaussian mixture noise. The indirect approach provides meaningful stability guarantees (below 1), whereas the direct approach fails to yield infor-mative bounds due to its sensitivity to outliers.
+> Fig. 5. Comparison under bounded noise between [3, Theorem 1] ( W= 0 .1) and Theorem 18 ( W= 0 ). Our bound converges to a smaller value and certifies stability, while the bound in [3] does not.
+
+W = 0 and p(W ) = 1. We use δ = 5 and β = 5%. Figure 5 reports the results. Our bound quickly falls be-low that of [3]. In particular, the bound from [3] fails to certify stability, whereas our bound successfully drops below one around 7500 samples. This gap is due to the worst-case noise analysis in [3, Proposition 3, Theorem 1], which introduces the additive term W pκcond (P ). This term does not vanish with the number of sam-ples, leading to inherent asymptotic conservatism in the bounded-noise setting. In contrast, Theorem 18 is more flexible and can avoid this situation by setting the addi-tional term to 0. More generally, one can optimize over 
+
+W in Theorem 18 to obtain the tightest bound, as is il-lustrated in Appendix D. 
+
+6 Conclusion 
+
+In this paper, we developed a new framework for indirect data-driven stability analysis of switched linear systems by combining statistical guarantees for system identifi-cation with Lyapunov-based stability certification. We also improved the finite-sample bounds for direct data-driven stability analysis from [3]. The resulting direct and indirect methods were com-10 pared experimentally. Our results show that the indi-rect approach can significantly outperform the direct ap-proach, especially when the dataset is small or contains outliers. In particular, it can provide nontrivial stability certificates in situations where the direct approach fails to do so, even asymptotically. Beyond the specific methods developed in this paper, these results contribute to the broader discussion on the relative merits of direct and indirect approaches. In line with the observations of [21], the indirect approach often exhibits superior performance in limited-data regimes. At the same time, our findings indicate significant prac-tical differences between direct and indirect methods for switched system stability certification, in sharp contrast to recent linear-control studies highlighting close con-nections between the two paradigms [14, 15]. Understanding the origin of these differences and devel-oping direct methods that are more robust to outliers constitute promising directions for future research. We also plan to extend the comparison to adaptive sampling strategies developed for the direct method, which appear promising for improving sample efficiency [37, 38]. 
+
+References 
+
+[1] Amir Ali Ahmadi, Rapha¨ el M Jungers, Pablo A Parrilo, and Mardavij Roozbehani. Joint spectral radius and path-complete graph Lyapunov func-tions. SIAM Journal on Control and Optimization ,52(1):687–717, 2014. [2] Laurent Bako. Identification of switched lin-ear systems via sparse optimization. Automatica ,47(4):668–677, 2011. [3] Adrien Banse, Zheming Wang, and Rapha¨ el M Jungers. Learning stability guarantees for con-strained switching linear systems from noisy ob-servations. Nonlinear Analysis: Hybrid Systems ,51:101425, 2024. [4] Guillaume O Berger, Rapha¨ el M Jungers, and Zheming Wang. Chance-constrained quasi-convex optimization with application to data-driven switched systems control. In Learning for Dynam-ics and Control 2021 , volume 144 of Proceedings of Machine Learning Research , pages 571–583, 2021. [5] Andrea Bisoffi, Claudio De Persis, and Pietro Tesi. Data-driven control via petersen’s lemma. Auto-matica , 145:110537, 2022. [6] Vincent D Blondel and John N Tsitsiklis. The boundedness of all products of a pair of matrices is undecidable. Systems & Control Letters , 41(2):135– 140, 2000. [7] Giuseppe C Calafiore and Marco C Campi. The scenario approach to robust control design. IEEE Transactions on Automatic Control , 51(5):742–753, 2006. [8] Giuseppe Carlo Calafiore. Random convex pro-grams. SIAM Journal on Optimization , 20(6):3427– 3464, 2010. [9] Marco C Campi and Simone Garatti. The ex-act feasibility of randomized solutions of uncertain convex programs. SIAM Journal on Optimization ,19(3):1211–1230, 2008. [10] Jeremy Coulson, John Lygeros, and Florian D¨ orfler. Data-enabled predictive control: In the shallows of the deepc. In 2019 18th European control conference (ECC) , pages 307–312. IEEE, 2019. [11] Claudio De Persis and Pietro Tesi. Formulas for data-driven control: Stabilization, optimality, and robustness. IEEE Transactions on Automatic Con-trol , 65(3):909–924, 2019. [12] Elizabeth Dietrich, Rosalyn Devonport, Stephen Tu, and Murat Arcak. Data-driven reachabil-ity with scenario optimization and the holdout method. In 2025 IEEE 64th Conference on Decision and Control (CDC) , pages 3925–3931. IEEE, 2025. [13] Florian D¨ orfler. Data-driven control: Part two of two: Hot take: Why not go with models? IEEE Control Systems Magazine , 43(6):27–31, 2023. [14] Florian D¨ orfler, Jeremy Coulson, and Ivan Markovsky. Bridging direct and indirect data-driven control formulations via regularizations and relaxations. IEEE Transactions on Automatic Con-trol , 68(2):883–897, 2023. [15] Florian D¨ orfler, Pietro Tesi, and Claudio De Per-sis. On the certainty-equivalence approach to di-rect data-driven lqr design. IEEE Transactions on Automatic Control , 68(12):7989–7996, 2023. [16] Chuchu Fan, Bolun Qi, Sayan Mitra, and Mahesh Viswanathan. Dryvr: Data-driven verification and compositional reasoning for automotive systems. In 
+
+International Conference on Computer Aided Veri-fication , pages 441–461. Springer, 2017. [17] Luis Angel Garcia-Escudero and Alfonso Gordal-iza. Robustness properties of k means and trimmed k means. Journal of the American Statistical Asso-ciation , 94(447):956–969, 1999. [18] Ali Jadbabaie, Jie Lin, and A Stephen Morse. Co-ordination of groups of mobile autonomous agents using nearest neighbor rules. IEEE Transactions on automatic control , 48(6):988–1001, 2003. [19] Rapha¨ el M Jungers. The joint spectral radius: the-ory and applications . Springer, Berlin, 2009. [20] Joris Kenanian, Ayca Balkan, Rapha¨ el M Jungers, and Paulo Tabuada. Data driven stability analysis of black-box switched linear systems. Automatica ,109:108533, 2019. [21] Vishaal Krishnan and Fabio Pasqualetti. On di-rect vs indirect data-driven predictive control. In 
+
+2021 60th IEEE Conference on Decision and Con-trol (CDC) , pages 736–741. IEEE, 2021. [22] John Langford and Robert Schapire. Tutorial on practical prediction theory for classification. Jour-nal of machine learning research , 6(3), 2005. [23] Fabien Lauer and G´ erard Bloch. Hybrid system 
+
+11 identification: theory and algorithms for learning switching models . Springer, Cham, 2019. [24] Dajiang Lei, Qingsheng Zhu, Jun Chen, Hai Lin, and Peng Yang. Automatic k-means clustering al-gorithm for outlier detection. In Information Engi-neering and Applications: International Conference on Information Engineering and Applications (IEA 2011) , pages 363–372. Springer, 2012. [25] Daniel Liberzon. Switching in systems and control .Birkh¨ auser, Boston, MA, 2003. [26] Louis Massucci, Fabien Lauer, and Marion Gilson. A statistical learning perspective on switched lin-ear system identification. Automatica , 145:110532, 2022. [27] Ameneh Nejati, Abolfazl Lavaei, Pushpak Jagtap, Sadegh Soudjani, and Majid Zamani. Formal ver-ification of unknown discrete- and continuous-time systems: a data-driven approach. IEEE Transac-tions on Automatic Control , 68(5):3011–3024, 2023. [28] Simone Paoletti, Aleksandar Lj Juloski, Giancarlo Ferrari-Trecate, and Ren´ e Vidal. Identification of hybrid systems a tutorial. European journal of con-trol , 13(2-3):242–260, 2007. [29] Xin Qin, Yuan Xia, Aditya Zutshi, Chuchu Fan, and Jyotirmoy V. Deshmukh. Statistical verifi-cation using surrogate models and conformal in-ference and a comparison with risk-aware verifica-tion. ACM Transactions on Cyber-Physical Sys-tems , 8(2), 2024. [30] Sebastian Raschka. Model evaluation, model selec-tion, and algorithm selection in machine learning. 
+
+arXiv preprint arXiv:1811.12808 , 2018. [31] Licio Romao, Kostas Margellos, and Antonis Pa-pachristodoulou. Tight sampling and discarding bounds for scenario programs with an arbitrary number of removed samples. In Learning for Dy-namics and Control , pages 312–323. PMLR, 2021. [32] Gian-Carlo Rota and Gilbert Strang. A note on the joint spectral radius. Indag. Math , 22(4):379–381, 1960. [33] Anne Rubbens, Zheming Wang, and Raphael M Jungers. Data-driven stability analysis of switched linear systems with sum of squares guarantees. 
+
+IFAC-PapersOnLine , 54(5):67–72, 2021. [34] Shai Shalev-Shwartz and Shai Ben-David. Un-derstanding machine learning: from theory to algo-rithms . Cambridge University Press, Cambridge, UK, 2014. [35] Zhendong Sun and Shuzhi Sam Ge. Stability theory of switched dynamical systems . Springer, London, 2011. [36] Ren´ e Vidal. Recursive identification of switched arx systems. Automatica , 44(9):2274–2287, 2008. [37] Alexis Vuille, Guillaume O Berger, and Rapha¨ el M Jungers. Data-driven stability analysis of switched linear systems using adaptive sampling. IFAC-PapersOnLine , 58(11):31–36, 2024. [38] Alexis Vuille, Guillaume O Berger, and Rapha¨ el M Jungers. A stochastic-optimization-based adaptive-sampling scheme for data-driven stability analysis of switched linear systems. In 2025 IEEE 64th Conference on Decision and Control (CDC) , pages 1974–1979. IEEE, 2025. [39] Zheming Wang, Guillaume O Berger, and Rapha¨ el M Jungers. Data-driven feedback sta-bilization of switched linear systems with proba-bilistic stability guarantees. In 2021 60th IEEE Conference on Decision and Control (CDC) , pages 4400–4405. IEEE, 2021. 
+
+A Examples for Assumption 8 Example 23 Assume the noise w has zero mean and covariance matrix R. Then by a direct application of Markov’s inequality to w⊤w = ∥w∥22,
+
+μnoise ({w ∈ Rn : ∥w∥2 > W ) ≤ tr( R)
+
+W 2 .
+
+Example 24 Assume that the noise is a scaled standard Gaussian noise in dimension n, i.e., w ∼ N (0 , σ 2I), with 
+
+σ > 0. Then ∥w∥22 
+
+> σ2
+
+∼ χ2
+
+> n
+
+, where χ2 
+
+> n
+
+is the standard Chi-square distribution with n degrees of freedom, and the tail probability can be computed explicitly as 
+
+μnoise (∥w∥2 > W ) = 1 −
+
+γ
+
+ n 
+
+> 2
+
+, W 2
+
+> 2σ2
+
+
+
+Γ  n
+
+> 2
+
+ ,
+
+where Γ( ·) is the Gamma function and γ(·, ·) is the lower incomplete Gamma function. 
+
+B Proof of Proposition 9 
+
+Let P = L⊤L be the Cholesky factorization of P and define Bj := LA j L−1. Given j ∈ [m], 
+
+x⊤A⊤ 
+
+> j
+
+P A j x ≤ γ2x⊤P x, ∀x ∈ (Sn−1 \ Vj )
+
+⇔ x⊤B⊤ 
+
+> j
+
+Bj x ≤ γ2x⊤x, ∀x ∈ L(Sn−1 \ Vj )
+
+⇔ ∥ Bj x∥2 ≤ γ∥x∥2, ∀x ∈ ΠSn−1 (L(Sn−1 \ Vj )) 
+
+⇔ ∥ Bj x∥2 ≤ γ, ∀x ∈ (Sn−1 \ ΠSn−1 L(Vj )) ,
+
+where Π Sn−1 is the scaling on Sn−1 and the third in-equality holds by homogeneity of the system. Denote 
+
+V ′ 
+
+> j
+
+:= ΠSn−1 (L(Vj )). By [20, Theorem 15], we have: 
+
+μstate (V ′ 
+
+> j
+
+) ≤ κ(P )μstate (Vj ). Now, let ξj > 0 be the ra-dius of the largest sphere included in conv( Sn−1 \ V ′ 
+
+> j
+
+). Then, given z ∈ Sn−1 \ V ′ 
+
+> j
+
+, there exists x1, x 2 ∈ (Sn−1 \
+
+V ′ 
+
+> j
+
+) and λ ∈ [0 , 1] such that ξj z = λx 1 + (1 − λ)x2 and by the triangle inequality: 
+
+∥Bj (ξj z)∥2 ≤ λ∥Bj x1∥2 + (1 − λ)∥Bj x2∥2 ≤ γ
+
+⇔ ∥ Bj z∥2 ≤ γξj
+
+.
+
+12 Therefore, we have the following inequality: 
+
+∥Bj x∥2 ≤ γξj
+
+, ∀x ∈ Sn−1
+
+⇔ ∥ Bj x∥2 ≤ γξj
+
+∥x∥2, ∀x ∈ Rn
+
+⇔ ∥ Aj x∥P ≤ γξj
+
+∥x∥P , ∀x ∈ Rn
+
+Finally, following [20, Proposition 3], we have: 
+
+ξj ≥ ζ
+
+ μstate (V ′ 
+
+> j
+
+)2
+
+
+
+≥ ζ
+
+ κ(P )μstate (Vj )2
+
+
+
+≥ ζ
+
+ ηκ (P )2
+
+
+
+.
+
+Therefore, we have max 
+
+> x∈Sn−1
+
+∥Aj x∥P
+
+∥x∥P
+
+≤ γξj
+
+≤ γζ   12 κ(P )η
+
+and 
+
+ρ(A) ≤ ρquad (A, δ ) = max 
+
+> x∈Sn−1
+> j∈[m]
+
+∥Aj x∥P
+
+∥x∥P
+
+≤ γζ   12 κ(P )η . 2
+
+C System Identification Algorithm Algorithm 3 Trimmed k-LinReg for SLS identification 
+
+Require: Dataset D := {(xi, y i)}Ni=1 of noisy trajecto-ries from unknown SLS A; number of modes m; trim-ming level θ ∈ (0 , 1); tolerance ϵtol > 0; maximum number of iterations T .
+
+1: Randomly initialize { ˆAj }mj=1 and set t ← 0. 
+
+2: repeat 
+
+3: t ← t + 1. 
+
+4: for i = 1 to N do 
+
+5: Let ˆ ri := arg min 
+
+> j∈{ 1,...,m }
+
+∥yi − ˆAj xi∥22.
+
+6: end for 
+
+7: for j = 1 to m do 
+
+8: Let Ij := {i ∈ [N ] : ˆ ri = j}.
+
+9: if Ij̸ = ∅ then 
+
+10: Compute ei := ∥yi − ˆAj xi∥22, i ∈ Ij .
+
+11: Let Iθj be the indices of the ⌊(1 − θ)|Ij |⌋ 
+
+smallest residuals ei in Ij .
+
+12: Let ˆAj := arg min 
+
+> A∈Rn×n
+
+P
+
+> i∈Iθj
+
+∥yi − Ax i∥22
+
+13: end if 
+
+14: end for 
+
+15: until max  
+
+> j∈{ 1,...,m }
+
+∥ ˆA(t) 
+
+> j
+
+− ˆA(t−1)  
+
+> j
+
+∥F ≤ ϵtol or t ≥ T
+
+16: return { ˆAj }mj=1 
+
+In all experiments, we set ϵtol = 10 −6, T = 100, θ = 0 .01 and θ = 0 .05 for Sections 5.1 and 5.2 respectively. 
+
+Fig. D.1. Comparison of the probabilistic upper bounds with the indirect approach and different ϵ.The value ϵ = 5 · 10 −3 gives the tightest upper bound. 
+
+Fig. D.2. Comparison of the probabilistic upper bounds obtained with the direct approach .
+
+W = 4 · 10 −3 gives the tightest upper bound. 
+
+D Additional Figures and Comparisons 
+
+Figures D.2 and D.1 present the guarantees obtained by the direct and indirect methods by varying several pa-rameters. Figure D.1 compares the upper bound with the indirect method for different values of the parame-ter ϵ. Theorem 12 using ϵ = 5 · 10 −3 gives the tightest upper bound (the curve corresponding to ϵ = 3 · 10 −3 is not visible because the upper bound exceeds the plotted range.). Figure D.2 compares the upper bound with the direct method for different values of the parameter W .Theorem 12 with W = 4 · 10 −3 gives the tightest upper bound. 13

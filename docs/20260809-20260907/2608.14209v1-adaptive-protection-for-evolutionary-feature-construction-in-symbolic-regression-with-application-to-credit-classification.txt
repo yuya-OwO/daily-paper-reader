@@ -1,0 +1,707 @@
+Title: Adaptive Protection for Evolutionary Feature Construction in Symbolic Regression with Application to Credit Classification
+
+URL Source: https://arxiv.org/pdf/2608.14209v1
+
+Published Time: Mon, 17 Aug 2026 00:43:58 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# Adaptive Protection for Evolutionary Feature Construction in Symbolic Regression with Application to Credit Classification 
+
+Hengzhe Zhang 1, Qi Chen 1, Bing Xue 1, Lean Yu 3, Wolfgang Banzhaf 2, and Mengjie Zhang 1 
+
+> 1
+
+Centre for Data Science and Artificial Intelligence & School of Engineering and Computer Science, Victoria University of Wellington, PO Box 600, Wellington 6140, New Zealand 
+
+{hengzhe.zhang,qi.chen,bing.xue,mengjie.zhang}@ecs.vuw.ac.nz  
+
+> 2
+
+Department of Computer Science and Engineering, Michigan State University, East Lansing, MI 48824, USA 
+
+banzhafw@msu.edu  
+
+> 3
+
+Business School, Sichuan University, Chengdu, 610065, China 
+
+yulean@amss.ac.cn 
+
+Abstract. Evolutionary feature construction has shown strong promise in symbolic regression by automatically discovering informative transfor-mations of input features that enhance a simple base learner. However, existing approaches often lack explicit mechanisms to preserve important constructed features discovered during evolution, and valuable genetic material can be lost when genetic operators disrupt effective features. This paper introduces an adaptive protection mechanism that leverages feature importance metrics to selectively preserve constructed features during evolution. The mechanism provides stronger protection for more important constructed features while still allowing less important features to be modified and to incorporate useful building blocks from more impor-tant features. We evaluate the approach using multiple feature importance calculation methods and demonstrate its robustness across different base learners. Experimental results on 98 regression benchmark datasets show that the proposed mechanism consistently improves solution quality over baseline approaches, and experiments on two credit classification datasets demonstrate that the method also extends effectively to improve search effectiveness beyond symbolic regression. 
+
+Keywords: symbolic regression · credit classification · evolutionary computation · feature construction · feature importance · genetic programming 
+
+1 Introduction 
+
+Symbolic regression aims to discover mathematical expressions that best describe relationships in data, without assuming a predefined functional form [7]. Formally, given a dataset D = {(xi, y i)}ni=1 where xi ∈ Rd are input features and yi ∈ RarXiv:2608.14209v1 [cs.LG] 14 Aug 2026 2 H. Zhang et al. +          
+
+> X₂X3
+> +
+> X₂X3
+> ×
+> X₂X3
+> ×
+> X₂X3
+> Feature
+> Construction
+> Linear Model
+> Feature
+> Importance
+> Large
+> (φ1)
+> Small
+> (φ2)
+> φ1Protection
+> ✓
+> φ2Exploration
+> ✓
+> ×
+> X₂X1
+> ×
+> X₂X1
+> Decision Tree
+> +
+> X₂X3
+> +X₂X3
+
+Fig. 1: Universal protection framework that wraps around arbitrary genetic operators, analogously to depth-limit protection that is not bound to any specific genetic operator. are target values, symbolic regression seeks to find a function f : Rd → R that minimizes a loss function: f ∗ = arg min f ∈F 
+
+Pni=1 L(yi, f (xi)) where F is the space of all possible mathematical expressions and L is a loss function such as mean squared error. Among symbolic regression methods, feature-construction-based symbolic regression is a popular approach that generates informative feature transforma-tions ϕj : Rd → R, which are then used to build predictive models f (ϕ1(x),. . . , ϕ k(x)) [26]. Evolutionary feature construction-based symbolic regression represents a particularly promising variant where genetic programming (GP) automatically evolves these transformations [16,36], creating a rich space of potential transformations that can be combined by a linear model or a decision tree, as illustrated in Figure 1. As with many other evolutionary approaches, a fundamental challenge in evo-lutionary feature construction lies in balancing the preservation of useful building blocks with the generation of new feature combinations. Genetic operators such as mutation and crossover can generate promising new constructed features, but they may also inadvertently disrupt valuable existing ones [4]. This is problematic because modifying or removing an important feature can replace a highly useful building block with a less effective alternative, potentially degrading solution quality even when the offspring introduces other useful features. To address this challenge, feature importance metrics provide a natural mechanism to identify which constructed features contribute most to model per-formance [18,12]. Traditional approaches use model coefficients [38] and marginal contribution [5], while recent advances have introduced more sophisticated meth-ods such as Shapley values [18]. These metrics offer different perspectives on feature contribution and can guide the preservation of valuable genetic material during evolution. Although feature-importance-aware genetic operators have been developed [34,37], there is no simple mechanism that is universally applicable to arbitrary genetic operators. This paper introduces an adaptive protection mechanism that uses feature importance to guide the preservation of good building blocks 1. As illustrated in  
+
+> 1
+
+https://github.com/hengzhe-zhang/EvolutionaryForest/blob/master/ evolutionary_forest/component/crossover/adaptive_feature_importance.py Evolutionary Feature Construction with Adaptive Protection 3
+
+Figure 1, this mechanism can be embedded in a universal protection framework that is compatible with any genetic operator. The key insight is that constructed features should receive protection proportional to their importance, so that highly useful features are preserved more reliably, whereas less important features remain free to be modified or replaced by genetic operators. In this way, feature protection preserves strong building blocks, while crossover and mutation continue to generate new feature combinations and replace less valuable ones. The specific objectives of this work are threefold: 
+
+– We introduce an adaptive protection mechanism that protects constructed features using an importance-weighted score to guide restoration, provid-ing stronger protection for more important constructed features while still allowing less important features to be modified or replaced. 
+
+– We compare multiple feature importance calculation methods across different model types to demonstrate the generality of our approach. 
+
+– We provide an empirical evaluation on symbolic regression benchmarks, together with an application to credit classification, demonstrating the ef-fectiveness of the approach across different importance metrics and base learners. 
+
+2 Related Work 
+
+2.1 Evolutionary Feature Construction 
+
+Feature construction in evolutionary computation falls into three paradigms: wrap-per, filter, and embedded. Wrapper methods [15] train a model on constructed features and use its performance as fitness. They include Multi-dimensional Mul-ticlass Genetic Programming (M3GP) [22], Interaction-Transformation Evolution-ary Algorithm (ITEA) [9], Multiple Regression Genetic Programming (MRGP) [2], and Genetic Programming Gene-pool Optimal Mixing Evolutionary Algorithm (GP-GOMEA) [28]. Filter methods [23,27] use statistical or information-theoretic criteria, independent of the learner. Embedded methods [30] integrate construc-tion into the learning process. This work focuses on wrapper-based approaches, which have shown strong performance in symbolic regression and classification. 
+
+2.2 Building Block Analysis 
+
+The notion of building blocks—reusable, high-quality substructures—has long been studied in GP. Classical work focuses on structural building blocks and their role in bloat control [13], whereas semantic building blocks characterize useful program fragments through their input–output behaviors [20]. Related work has also explored gene-pool optimal mixing with learned building blocks [29], as well as building-block reuse in analog circuit synthesis [19], large-scale Boolean problems [11], and image classification [6]. More directly relevant, importance analysis has guided genetic operators at the tree level [35], subtree level [34,24], and variable level [31]. These methods rely on measures such as frequency 4 H. Zhang et al. Population Initialization Population Initialization 
+
+> Termination?
+> End End
+> Yes
+> No
+> Parent Selection Parent Selection
+> Importance Calculation Importance Calculation
+> Elitism Elitism
+> Fitness Evaluation Fitness Evaluation
+> Offspring Generation Offspring Generation
+> Adaptive Protection
+
+(a) Workflow. Linear Regression    
+
+> Decision Tree
+> Logistic Regression
+> Base Models (choose one)
+> φ1φ2φ3
+> Constructed Features
+
+(b) Evaluation. 
+
+Fig. 2: (a) overall workflow from population initialization through elitism. (b) evaluation of the evolutionary feature construction process. analysis [29], correlation analysis [34], and Shapley values [31], but crossover and mutation typically must be redesigned to exploit the identified components. It is therefore desirable to protect useful parts with an operator-agnostic mechanism that remains compatible with traditional operators, semantic operators [8], and LLM-based crossover [1]. 
+
+3 Algorithm 
+
+3.1 Overall Workflow 
+
+The evolutionary feature construction process follows a generational evolutionary algorithm framework [4]. Let Φ = {Φ1, Φ 2, . . . , Φ N } denote the population of N
+
+individuals, where each individual Φi is a set of feature transformation trees 
+
+{ϕ(i)1 , ϕ (i)2 , . . . , ϕ (i) 
+
+> k
+
+}. Each tree ϕ(i) 
+
+> j
+
+is constructed using the primitives of GP, which include mathematical operators and terminal nodes representing input variables or constants. Figure 2a illustrates the overall workflow of the evolutionary feature construction process. The workflow consists of seven main stages: 
+
+– Population Initialization: An initial population Φ(0) of N individuals is created, where each individual Φ(0)  
+
+> i
+
+contains multiple trees {ϕ(i)1 , . . . , ϕ (i) 
+
+> k
+
+},and each tree ϕ(i) 
+
+> j
+
+is randomly generated using the ramped half-and-half initialization method [4] with GP primitives. 
+
+– Solution Evaluation: For each individual Φi in the current population, a machine learning model is trained on the features constructed from its trees {ϕ(i)1 , ϕ (i)2 , . . . , ϕ (i) 
+
+> k
+
+}. The fitness f (Φi) is a scalar measuring prediction performance: coefficient of determination ( R2) in regression and area under the ROC curve (AUC) in classification. The loss vector has one component per training example and is used by epsilon lexicase selection for parent selection: per-example squared error in regression and per-example cross-entropy in classification. For regression tasks, we consider ridge regression and random decision trees. For classification tasks, we use logistic regression: 
+
+• Ridge Regression [16]: The method uses ridge regression with efficient leave-one-out evaluation for model training and fitness computation. Evolutionary Feature Construction with Adaptive Protection 5
+
+• Random Decision Tree [39]: This method uses a decision tree with a random splitter, randomly selecting splits from candidates rather than choosing optimal splits. Random decision trees are chosen because they have been shown to perform better than standard decision trees in evolutionary feature construction [39]. Five-fold cross-validation error is used as fitness. 
+
+• Logistic Regression: The base learner is regularized logistic regression, mapping the constructed feature vector to class probabilities: 
+
+P(y = 1 | x; β) = σ β0 + β⊤ϕ(x) = σ
+
+
+
+β0 +
+
+> k
+
+X
+
+> j=1
+
+βj ϕ(i) 
+
+> j
+
+(x)
+
+
+
+, (1) where σ(z) = 1 /(1 + e−z ) is the logistic function and β = ( β1, . . . , β k)⊤
+
+are the coefficients for the constructed features. Similarly, five-fold cross-validation score is used as fitness. 
+
+– Importance Calculation: After evaluation, feature importance I(i) 
+
+> j
+
+is calculated for each tree ϕ(i) 
+
+> j
+
+using the importance method for the chosen base learner, as detailed in Section 3.2. For ridge regression, we use one of three options: built-in coefficients, SHAP values, or marginal contribution. For random decision trees, we use impurity-decrease importance averaged over the five cross-validation folds. For logistic regression in credit classification, we use the absolute coefficient |βj |. These importance values are stored with each individual and form the basis of the protection mechanism. 
+
+– Parent Selection: Parent individuals Φp and Φq are selected from the current population Φ using epsilon lexicase selection [10], where p, q ∈ { 1, 2, . . . , N }.The ϵ threshold is set to the median absolute deviation (MAD) of per-example loss values [14], with the selection threshold given by min + ϵ, where min is the minimum per-example loss value over the population. 
+
+– Offspring Generation: New individuals Φoffspring are created through ge-netic operations applied to selected parent individuals. Random subtree crossover combines trees from two parents Φp and Φq to create offspring by exchanging randomly selected subtrees [4], while random subtree mutation introduces random modifications to individual trees ϕj by replacing randomly selected subtrees. In multi-tree GP, where k is the number of trees in each individual, these crossover and mutation operators can be invoked k times with their corresponding probabilities, allowing multiple trees within an individual to be modified during offspring generation. 
+
+– Adaptive Protection: The adaptive protection mechanism, detailed in Section 3.3, operates in two phases. Before genetic operations, the original trees ϕoriginal  
+
+> j
+
+are saved. After crossover and mutation, selected trees are restored to this saved state using an importance-weighted protection score. 
+
+– Elitism: Two mechanisms are employed to preserve valuable genetic material: 
+
+• Traditional Elitism: The best-performing individual from the current generation is carried forward to the next generation to preserve valuable genetic material. 6 H. Zhang et al. 
+
+• Ensemble Archive: To improve prediction stability, we maintain a separate archive of the top 100 evaluated individuals and use it for final prediction. When the base learner is a random decision tree, predictions from the archived individuals are averaged to reduce variance caused by the stochastic tree-construction process. In credit classification, where the base learner is logistic regression, the same strategy averages predicted class probabilities from the archived individuals, which helps reduce sensitivity to noise in the datasets. The archive is used for prediction, not for generating new solutions. We do not use this archive with ridge regression because ridge is deterministic and already stable. 
+
+3.2 Feature Importance Calculation 
+
+Feature importance serves as the foundation for the protection mechanism. The framework is general and can be applied with different types of importance metrics. To demonstrate this generality, we evaluate three calculation methods for ridge regression—namely built-in coefficients, SHAP values, and marginal contribution—each measuring feature importance from a different perspective. For random decision trees, we use the built-in method based on impurity decrease. For logistic regression in credit classification, we use the absolute coefficient as the built-in importance measure. The selected method is applied consistently throughout evolution for all individuals in the population at every generation, and in the adaptive protection mechanism the importance I(i) 
+
+> j
+
+of each constructed feature ϕ(i) 
+
+> j
+
+is computed accordingly. A primary objective of this work is to systematically compare the effectiveness of the three feature importance metrics when used within the protection mechanism. 
+
+Built-In Coefficients The built-in method uses model-specific importance met-rics directly, providing computational efficiency. Two variants are used depending on the base learner: 
+
+– Ridge Regression and Logistic Regression: For linear models such as ridge regression and logistic regression, the importance of constructed feature 
+
+j is computed as the absolute value of its coefficient: Ibuilt-in  
+
+> j
+
+= |βj |, where 
+
+βj is the coefficient for the constructed feature j in the model. The con-structed features are standardized before fitting, ensuring |βj | reflects feature contribution rather than scale. This method offers minimal computational overhead and provides a direct measure of feature contribution as encoded by the model. 
+
+– Random Decision Tree: For decision tree base learners, the importance of feature j is computed by summing the weighted impurity decrease across all splits that use feature j: Ibuilt-in  
+
+> j
+
+= P 
+
+> s∈Sj
+
+ws · ∆I s, where Sj is the set of all splits that use feature j, ws is the fraction of samples reaching split 
+
+s, and ∆I s is the impurity decrease at split s, defined as ∆I s = Iparent −  nleft  
+
+> ns
+
+Ileft + nright  
+
+> ns
+
+Iright 
+
+. Here, Iparent , Ileft , and Iright are the impurities of the Evolutionary Feature Construction with Adaptive Protection 7
+
+parent node and left/right child nodes, respectively, measured as variance for regression, and ns, nleft , and nright are the numbers of samples at the parent and child nodes. The final importance values are normalized to sum to 1. 
+
+SHAP Values Shapley values offer a game-theoretic approach to feature im-portance [18], computing the average marginal contribution of each feature across all possible feature subsets. The SHAP value for feature j is defined as: 
+
+ψj = P    
+
+> S⊆F\{ j}|S|!( |F|−| S|− 1)!
+> |F|!
+
+[v(S ∪{ j})−v(S)] , where F is the set of all features, 
+
+S is a subset of features excluding j, and v(S) is the value function representing the model’s prediction when only features in S are used. For linear models, LinearSHAP [18] gives a closed-form per-instance SHAP value βj (xij − E[Xj ]) .Per-instance SHAP values can be positive or negative. We define SHAP impor-tance ISHAP  
+
+> j
+
+for feature j as the mean absolute SHAP value over the n evaluation instances: 
+
+ISHAP  
+
+> j
+
+= 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+βj (xij − E[Xj ]) . (2) Here βj is the coefficient for feature j, xij is the value of feature j for instance i, and 
+
+E[Xj ] is the expected value of feature j. Because ISHAP  
+
+> j
+
+averages |βj (xij − E[Xj ]) |
+
+over instances, this scalar importance reflects both coefficient magnitude and the distribution of feature j, not coefficient magnitude alone. 
+
+Marginal Contribution In this paper, we define marginal contribution as how much a constructed feature contributes to predictive performance, measured by comparing the R2 of two ridge-regression models [5]. The full model is the ridge-regression model fitted using the complete set of constructed features in the individual, whereas the reduced model for feature j is obtained by removing feature j from that set and refitting the ridge-regression model on the remaining constructed features. Let R2 
+
+> full
+
+denote the score of the full model and R2 
+
+> −j
+
+the score of the reduced model for feature j. The marginal contribution of feature j
+
+is IMC  
+
+> j
+
+= R2 
+
+> full
+
+− R2 
+
+> −j
+
+. The definition is intuitive and model-agnostic, and unlike fixed-model measures it explicitly accounts for refitting. The trade-off is one additional model fit per constructed feature, so it is more expensive than built-in coefficient importance. When constructed features are correlated, removing one may be offset by others, so marginal contribution can underestimate importance for multiple correlated features and leave them more exposed to genetic operators, with possible performance loss. We include this method to quantify these effects and to examine how the choice of importance metric affects the protection mechanism. 
+
+3.3 Adaptive Protection Mechanism 
+
+As shown in Algorithm 1, the mechanism saves the original trees, applies genetic operations, then computes a protection score sj = mprotect · ˜I(i) 
+
+> j
+
+for each tree, 8 H. Zhang et al. 
+
+Algorithm 1 Adaptive Protection Mechanism (APM) 
+
+Require: Individual Φi with trees {ϕ(i)1 , ϕ (i)2 , . . . , ϕ (i) 
+
+> k
+
+} and importance values 
+
+{I(i)1 , I (i)2 , . . . , I (i) 
+
+> k
+
+}, protection coefficient mprotect 
+
+Ensure: Modified individual Φ′ 
+
+> i
+
+after genetic operations with selective protection 1: Save original trees: ϕoriginal  
+
+> j
+
+← ϕ(i) 
+
+> j
+
+for all j ∈ { 1, 2, . . . , k }
+
+2: ϕ(i) 
+
+> j
+
+← ϕmodified  
+
+> j
+
+← Crossover/Mutation (ϕ(i) 
+
+> j
+
+) for all j ∈ { 1, . . . , k }
+
+3: Normalize importance values: ˜I(i) 
+
+> j
+
+← | I(i) 
+
+> j
+
+|/ Pkj=1 |I(i) 
+
+> j
+
+| for all j ∈ { 1, 2, . . . , k }
+
+4: for j = 1 to k do 
+
+5: Sample u ∼ Uniform (0 , 1) 
+
+6: sj ← mprotect · ˜I(i) 
+
+> j
+
+▷ Protection score 7: if u < s j then 
+
+8: ϕ(i) 
+
+> j
+
+← ϕoriginal  
+
+> j
+
+▷ Restore to protect important features 9: end if 
+
+10: end for 
+
+11: return Φ′ 
+
+> i
+
+with updated trees 
+
+where ˜I(i) 
+
+> j
+
+is the normalized importance. Each tree is restored to its original state when a uniform random draw falls below this score. Thus, higher-importance trees are restored more often, reducing the chance that useful building blocks are lost, while lower-importance trees are still frequently modified or replaced, allowing the search to continue generating and testing new feature combinations. The protection coefficient mprotect controls protection strength. A value of zero disables protection. Larger values provide stronger protection but may reduce diversity. The saved trees are the same as those already stored for depth-limit checking, avoiding additional overhead. Conceptually, this can be viewed as a more adaptive form of elitism: rather than keeping entire individuals, it preserves the most valuable building blocks within each individual. 
+
+4 Experimental Setup 
+
+4.1 Datasets 
+
+The main experiments are conducted on 98 benchmark regression datasets from the Penn Machine Learning Benchmarks (PMLB) repository [25], focusing on datasets with up to 2000 samples due to computational cost constraints. To assess whether the proposed mechanism also applies beyond symbolic regression, we additionally evaluate it on two credit classification datasets: Australian Credit and German Credit [33]. 
+
+4.2 Parameter Settings 
+
+The experimental design compares different protection levels and feature impor-tance calculation methods. Table 1 summarizes the key parameter settings used in our experiments. The impact of the protection coefficient is further analyzed in Evolutionary Feature Construction with Adaptive Protection 9
+
+Table 1: Parameter Settings                          
+
+> Parameter Value
+> Population Size 200 Number of Generations 100 Crossover Probability 0.9 Mutation Probability 0.1 Protection Coefficient 5Max Initial Tree Depth 2Maximum Tree Depth 10 Number of Trees per Individual 10 Elitism, Number of Individuals 1Functions +,−,×,AQ ,p| · | ,log(1 + | · | ),| · | ,(·)2,
+> sin π(·),cos π(·),Max ,Min ,Neg
+
+Section B.2. 2 Categorical features are encoded using target encoding [21] fitted on the training data. The function set includes arithmetic operations, mathematical functions, and the analytical quotient AQ( x, y ) = x/ p1 + y2. For the credit classification experiments, the number of generations is reduced to 30 to avoid overfitting, while all other settings remain the same. 
+
+4.3 Evaluation Protocol 
+
+Performance is measured using R² score on test sets for regression experiments, which is scale-insensitive, and using area under the ROC curve (AUC) for the credit classification experiments, which is appropriate for imbalanced datasets. Each experiment is conducted with 30 independent runs, using an 80:20 train-test split. Results are averaged across multiple runs, and statistical significance is tested using the Wilcoxon signed-rank test with p < 0.05 . Research questions RQ1–RQ3 are addressed using ridge regression as the base learner, RQ4 uses a random decision tree as the base learner to evaluate robustness across different base learners, and RQ5 evaluates the application to credit classification using a class-balanced, regularized logistic regression base learner and coefficient-based feature importance. 
+
+5 Results and Analysis 
+
+We investigate the following research questions: 
+
+– RQ1: Does protection improve predictive performance compared with no protection? 
+
+– RQ2: Is adaptive protection more effective than reducing genetic operations? 
+
+– RQ3: What feature importance method provides the best balance between effectiveness and efficiency?  
+
+> 2
+
+Supplementary material is available at https://github.com/hengzhe-zhang/ ppsn2026-adaptive-protection/blob/main/supplementary_material.pdf .10 H. Zhang et al. 
+
+Table 2: Statistical comparison of adaptive protection strategies and baselines on 
+
+training R² score . Each cell reports the number of datasets with wins/ties/losses, denoted by +, ∼, and − respectively, for the row method against the column method. 
+
+No Protect Low Cross/Mut (1) Low Cross/Mut (5) APM (SHAP) APM (Marg. Contrib.) APM (Built-In) 93(+)/5( ∼)/0(-) 78(+)/20( ∼)/0(-) 89(+)/9( ∼)/0(-) 4(+)/93( ∼)/1(-) 9(+)/77( ∼)/12(-) 
+
+No Protect — 4(+)/12( ∼)/82(-) 0(+)/11( ∼)/87(-) 0(+)/5( ∼)/93(-) 0(+)/3( ∼)/95(-) 
+
+Low Cross/Mut (1) — — 29(+)/60( ∼)/9(-) 1(+)/19( ∼)/78(-) 0(+)/19( ∼)/79(-) 
+
+Low Cross/Mut (5) — — — 1(+)/9( ∼)/88(-) 0(+)/9( ∼)/89(-) 
+
+APM (SHAP) — — — — 7(+)/76( ∼)/15(-) 
+
+Table 3: Statistical comparison of adaptive protection strategies and baselines on 
+
+test R² score . Each cell reports the number of datasets with wins/ties/losses, denoted by +, ∼, and − respectively, for the row method against the column method. 
+
+No Protect Low Cross/Mut (1) Low Cross/Mut (5) APM (SHAP) APM (Marg. Contrib.) APM (Built-In) 56(+)/39( ∼)/3(-) 34(+)/61( ∼)/3(-) 47(+)/49( ∼)/2(-) 1(+)/93( ∼)/4(-) 5(+)/88( ∼)/5(-) 
+
+No Protect — 0(+)/44( ∼)/54(-) 0(+)/48( ∼)/50(-) 1(+)/37( ∼)/60(-) 6(+)/34( ∼)/58(-) 
+
+Low Cross/Mut (1) — — 14(+)/82( ∼)/2(-) 1(+)/68( ∼)/29(-) 5(+)/52( ∼)/41(-) 
+
+Low Cross/Mut (5) — — — 5(+)/46( ∼)/47(-) 6(+)/46( ∼)/46(-) 
+
+APM (SHAP) — — — — 5(+)/92( ∼)/1(-) 
+
+Table 4: Comparison of constructed features before and after variation with and without adaptive protection on OpenML 586.                                          
+
+> Coef (Orig) Expr (Orig) Coef (No Prot) Expr (No Prot) Coef (Prot) Expr (Prot) 2.423 AQ( X0,X1)0.02242 AQ(Add( X1,X9), X1)2.621 AQ( X0,X1)1.802 Add( X0, AbsLog(Max( X3,X4))) 1.096 Add( X0, AbsLog(Max( X0,X4))) 1.818 Add( X0, AbsLog(Max( X3,X4))) 1.196 X00.4186 X01.415 X0
+> 0.8335 X10.363 X10.8738 X1
+> 0.4052 CosPi(Max( X1,X0)) 0.2998 CosPi(Max( X1,X13 )) 0.3173 CosPi(Max( X1,X0)) 0.187 Abs( X3)0.1201 Abs( X0)0.2778 Abs( X3)0.03374 X21 0.01486 X21 0.1226 CosPi( X1)0.01167 Square( X13 )0.4186 X00.08625 Square( X3)0.008119 Abs( X0)0.003573 Sqrt(Abs( X21 )) 0.0003979 Abs( X0)0.001442 AbsLog(Neg( X23 )) 0.01326 AbsLog(Neg( X23 )) 0.0247 AbsLog(Neg(SinPi( X1)))
+
+– RQ4: Is the proposed method robust when applied with different base learners? 
+
+– RQ5: Does the adaptive protection mechanism transfer effectively to credit classification? 
+
+5.1 RQ1: Protection vs. No Protection 
+
+To evaluate whether adaptive protection improves solution quality, we compare configurations with protection, where the protection level is greater than zero, against the baseline multi-tree genetic programming (MTGP) configuration without protection. Table 3 presents the test-set statistical comparison across different configurations, and Table 2 presents the corresponding training-set comparison. The results demonstrate that protection mechanisms consistently outperform the no-protection baseline across different importance calculation methods. As shown in Table 3, Built-In wins on 56 of 98 datasets with only 3 losses, SHAP wins Evolutionary Feature Construction with Adaptive Protection 11 0 1 2 3 4 5 6 7 8 9 
+
+> Featur eIndex
+
+012
+
+> |Coefficient|  Value
+
+Featur e Importance Comparison     
+
+> Parent Offspring (No Protection) Offspring (With Protection)
+
+(a) Impact of Adaptive Protection on Fea-ture Importance Featur e 1(Str ong) Featur e 2(Str ong) Featur e 3(Medium) 0.0 0.2 0.4 0.6 0.8 1.0       
+
+> Nor malized  Value
+> Feature Importance (Normalized to 1)
+> Built-In SHAP Marg. Contrib.
+
+(b) Marginal Contribution Pitfall 
+
+Fig. 3: The left panel shows the impact of adaptive protection on feature impor-tance on OpenML 586. The right panel shows that marginal contribution can fail to identify truly useful features when highly correlated features coexist and can compensate for one another, illustrated on a synthetic dataset. on 60 datasets with only one loss, and Marginal Contribution wins on 58 datasets with only 6 losses. This pattern holds consistently regardless of the importance calculation method used, indicating robustness to the choice of importance metric. Figure 3a illustrates this effect on the OpenML 586 dataset: without protection, the feature-importance values after variation differ substantially from the original values, whereas with adaptive protection they remain much closer. This suggests that, without protection, genetic variation changes the solution too aggressively and leads to worse search locality, meaning that offspring are less likely to preserve the behavior of their parents. Table 4 further illustrates this effect by showing the coefficients and symbolic expressions of constructed features before and after genetic variation, with and without adaptive protection. For example, the most important feature AQ( X0, X 1) is disrupted without protection: its expression changes to AQ(Add( X1, X 9), X 1), whereas with protection the original expression is preserved. For the individual in Table 4, the parent test R² is 0.800, which drops to 0.101 without protection, indicating severe degradation in solution quality. However, with adaptive protection, the test R² improves to 0.814, demonstrating that the protection mechanism successfully maintains solution quality during genetic operations. 
+
+5.2 RQ2: Adaptive Protection vs. Reduced Genetic Operations 
+
+A key question is whether the observed improvements stem from applying fewer genetic operations or from the adaptive protection mechanism itself. To address this, we compare standard operation rates against reduced rates, where “Low Cross/Mut (1)” and “Low Cross/Mut (5)” in Table 3 represent restricted-variation baselines in which genetic operators are applied to only 1 or 5 trees per offspring with corresponding crossover and mutation probabilities, rather than all 10 trees. The results reveal that simply reducing the number of genetic operations is less effective than adaptive protection. As shown in Table 3, all protection-based methods consistently outperform low operation rate configurations. This indicates that selective protection provides a more principled approach than 12 H. Zhang et al.               
+
+> #&(!$#
+>  
+> R
+> 2  $& %#
+> 
+> #&(!$#
+>  
+> R
+> 2  $& %# 
+> 
+> #&(!$#
+>  
+> R
+> 2  $& %# 
+> 
+> #&(!$#
+>  
+> R
+> 2  $& %#
+>  )!"(# $ &$(( $* &$'')(  $* &$'')(     &  $#(&!
+
+(a) Training R² Convergence Curves                
+
+> #&(!$#
+>  
+> R
+> 2  $& %#
+> 
+> #&(!$#
+>  
+> R
+> 2  $& %# 
+> 
+> #&(!$#
+>  
+> R
+> 2  $& %# 
+> 
+> #&(!$#
+>  
+> R
+> 2  $& %#
+>  )!"(# $ &$(( $* &$'')(  $* &$'')(     &  $#(&!
+
+(b) Test R² Convergence Curves 
+
+Fig. 4: Convergence curves of different feature importance methods on four representative datasets. globally reducing genetic operations, allowing broader modification of offspring while maintaining solution quality through selective preservation of valuable genetic material. 
+
+5.3 RQ3: Feature Importance Method Comparison 
+
+To understand which feature importance method offers the best balance between effectiveness and efficiency, we compare the training and test performance of three methods: SHAP values, marginal contribution, and Built-In coefficients, using Table 3 for test results and Table 2 for the corresponding training results. Figure 4 shows convergence curves of different feature importance methods on four representative datasets. The general conclusion is that most feature importance methods show re-markably similar performance, with the vast majority of comparisons between Built-In and SHAP resulting in ties. This pattern suggests that the choice of importance calculation method has a relatively modest impact on the overall effectiveness of the protection mechanism, as long as a reasonable importance metric is used. The comparison between Built-In and marginal contribution has mixed results. Built-In performs better when multicollinearity is present because marginal contribution can assign low scores to correlated features: removing one such feature may have little effect on R2 after refitting because the remaining correlated feature can compensate for it. Figure 3b illustrates this with an example in which features are defined as f1 = s + ϵ1, f2 = s + ϵ2, and f3 is independent. In this setting, s is a shared signal and ϵ1, ϵ 2 are small independent noise terms. The target is y = 5 .0·f1 +5 .0·f2 +2 .5·f3 +ϵ. The key point is that marginal contribution fails to identify the truly useful features: although f1 and f2 carry the stronger signal and have larger coefficients, they receive lower marginal contribution scores than the less important but uncorrelated feature f3. This becomes problematic Evolutionary Feature Construction with Adaptive Protection 13         !       !                   
+
+>  "
+>       
+
+(a) Tree Size    !        "   !    "   !                     
+
+>    
+>           
+
+(b) Training Time 
+
+Fig. 5: Comparison of feature importance methods in terms of complexity and training time. when the protection mechanism relies on these scores, because the features that should receive stronger protection may instead be treated as unimportant. In other cases, however, marginal contribution can perform better because it more directly reflects a feature’s contribution to predictive performance. From a computational efficiency perspective, Built-In is the most efficient because it reuses fitted model coefficients with almost no extra overhead. Marginal contribution is computationally expensive because it requires one additional refit per feature for each evaluated individual. LinearSHAP is also more expensive than Built-In but typically cheaper than exhaustive refit-based importance. Figure 5 shows the runtime impact of these choices. Given the broadly similar predictive effectiveness of these methods, Built-In remains attractive in practice because of its low cost. 
+
+5.4 RQ4: Robustness with Different Base Learners 
+
+To verify the robustness of the proposed method when used with other base learners in feature construction, we evaluate the adaptive protection mechanism using a random decision tree as the base learner. The main motivation is to verify that the mechanism remains effective when feature importance is computed from tree-based impurity decrease rather than linear model coefficients. Random decision trees use the impurity-decrease importance described in Section 3.2, which differs fundamentally from the coefficient-based importance used in ridge regression. Table 5 presents the statistical comparison when using a random decision tree as the base learner. Comparisons are made within the same base learner setting to isolate the protection mechanism’s effect. The results demonstrate that adaptive protection maintains effectiveness when feature importance is calculated from impurity decrease. Protection-based configurations consistently outperform the no-protection baseline and reduced genetic operation rates, mirroring the findings for RQ2. This confirms robustness across different base learners and importance calculation paradigms. 14 H. Zhang et al. 
+
+Table 5: Statistical comparison of different configurations with random decision tree base learners on test R² score .          
+
+> No Protect Low Cross/Mut (1) Low Cross/Mut (5) APM (Built-In) 52(+)/34( ∼)/12(-) 39(+)/54( ∼)/5(-) 36(+)/54( ∼)/8(-)
+> No Protect —5(+)/50( ∼)/43(-) 2(+)/45( ∼)/51(-)
+> Low Cross/Mut (1) ——5(+)/82( ∼)/11(-)
+
+Table 6: Detailed training AUC 
+
+for classification. +/−/=: bet-ter/worse/equal compared to Built-In.       
+
+> Built-In No Protect Low Cross/Mut (1) Australian 0.961 0.956 (-) 0.957 (-)
+> German 0.844 0.832 (-) 0.834 (-)
+
+Table 7: Detailed test AUC for clas-sification. +/−/=: better/worse/equal compared to Built-In.       
+
+> Built-In No Protect Low Cross/Mut (1) Australian 0.942 0.941 (=) 0.934 (-)
+> German 0.787 0.787 (=) 0.787 (=)
+
+5.5 RQ5: Application to Credit Classification 
+
+To verify that the adaptive protection mechanism transfers beyond symbolic regression, we evaluate it on the Australian and German credit datasets. Table 6 and Table 7 report training and test AUC. On training data, the proposed method achieves higher AUC than both no protection and reduced genetic operations on both datasets, showing that adaptive protection improves search effectiveness. On test data, it matches no protection on both datasets and outperforms reduced genetic operations on Australian while matching them on German. The equal test results suggest that protection offers limited benefit on unseen data here, possibly because the current function set is not designed for credit tasks, and a more tailored function set may be needed to reveal clearer gains. 
+
+6 Conclusions 
+
+This paper introduced an adaptive protection mechanism for evolutionary feature construction that uses feature importance to guide the preservation of valuable genetic material. The mechanism restores selected constructed features to their original state after genetic operations, using an importance-weighted protection score, preserving important features while still allowing less important features to be modified or replaced. Experimental evaluation on 98 regression benchmark datasets demonstrates that protection-based methods substantially outperform no-protection baselines, and adaptive protection proves more effective than simply reducing genetic opera-tions. Experiments on two credit classification datasets show that the mechanism also extends effectively to improve search effectiveness beyond symbolic regression. Across these settings, the mechanism shows robustness to different feature impor-tance calculation methods and base learners, confirming its broad applicability to evolutionary feature construction. One potential limitation is that the protection mechanism operates at the feature level. A promising direction is to dynamically identify and protect useful substructures using building-block analysis techniques throughout the evolution-ary process. Evolutionary Feature Construction with Adaptive Protection 15 
+
+Acknowledgements 
+
+This work was supported in part by the Marsden Fund of New Zealand Gov-ernment under Contract VUW1913, and Contract VUW2016; in part by the MBIE Data Science SSIF Fund under Contract RTVU1914; in part by the MBIE Endeavor Research Programme under Contract UOCX2104; and in part by the Catalyst: Leaders International Leader Fellowship grant under Contract 23-VUW-006-ILF. 
+
+References 
+
+1. Anthes, P., Sobania, D., Rothlauf, F.: Transformer semantic genetic programming for symbolic regression. arXiv preprint arXiv:2501.18479 (2025) 2. Arnaldo, I., Krawiec, K., O’Reilly, U.M.: Multiple regression genetic programming. In: Proceedings of the 2014 Annual Conference on Genetic and Evolutionary Computation. pp. 879–886 (2014) 3. Bahnsen, A.C., Aouada, D., Stojanovic, A., Ottersten, B.: Feature engineering strategies for credit card fraud detection. Expert Systems with Applications 51 ,134–142 (2016) 4. Banzhaf, W., Nordin, P., Keller, R.E., Francone, F.D.: Genetic programming: an introduction: on the automatic evolution of computer programs and its applications. Morgan Kaufmann Publishers Inc. (1998) 5. Behzadifar, P., Shojaee, P., Kabra, S., Meidani, K., Reddy, C.K.: Decompose, adapt, and evolve: Towards efficient scientific equation discovery with large language models. In: NeurIPS 2025 AI for Science Workshop (2025), https://openreview. net/forum?id=iU4ddu2fgi 
+
+6. Bi, Y., Liang, J., Xue, B., Zhang, M.: A genetic programming approach with building block evolving and reusing to image classification. IEEE Transactions on Evolutionary Computation 28 (5), 1366–1380 (2023) 7. Cava, W.L., Orzechowski, P., Burlacu, B., de Franca, F.O., Virgolin, M., Jin, Y., Kommenda, M., Moore, J.H.: Contemporary symbolic regression methods and their relative performance. In: Thirty-fifth Conference on Neural Information Processing Systems Datasets and Benchmarks Track (Round 1) (2021) 8. Farinati, D., Pietropolli, G., Vanneschi, L.: A study on the dynamics and effective-ness of the deflate geometric semantic mutation. IEEE Transactions on Evolutionary Computation (2025) 9. de França, F.O., Aldeia, G.S.I.: Interaction-transformation evolutionary algorithm for symbolic regression. Evolutionary computation 29 (3), 367–390 (2021) 10. Helmuth, T., Spector, L., Matheson, J.: Solving uncompromising problems with lexicase selection. IEEE Transactions on Evolutionary Computation 19 (5), 630–643 (2014) 11. Iqbal, M., Browne, W.N., Zhang, M.: Reusing building blocks of extracted knowledge to solve complex, large-scale boolean problems. IEEE Transactions on Evolutionary Computation 18 (4), 465–480 (2013) 12. Kazemitabar, J., Amini, A., Bloniarz, A., Talwalkar, A.S.: Variable importance using decision trees. Advances in Neural Information Processing Systems 30 (2017) 13. Kinzett, D., Johnston, M., Zhang, M.: Numerical simplification for bloat control and analysis of building blocks in genetic programming. Evolutionary Intelligence 
+
+2(4), 151–168 (2009) 16 H. Zhang et al. 14. La Cava, W., Helmuth, T., Spector, L., Moore, J.H.: A probabilistic and multi-objective analysis of lexicase selection and ε-lexicase selection. Evolutionary Com-putation 27 (3), 377–402 (2019) 15. La Cava, W., Moore, J.H.: Ensemble representation learning: an analysis of fitness and survival for wrapper-based genetic programming methods. In: Proceedings of the Genetic and Evolutionary Computation Conference. pp. 961–968 (2017) 16. La Cava, W., Moore, J.H.: Learning feature spaces for regression with genetic programming. Genetic Programming and Evolvable Machines 21 , 433–467 (2020) 17. Liu, J., Zhang, S., Fan, H.: A two-stage hybrid credit risk prediction model based on xgboost and graph-based deep neural network. Expert Systems with Applications 
+
+195 , 116624 (2022) 18. Lundberg, S.M., Lee, S.I.: A unified approach to interpreting model predictions. Advances in Neural Information Processing Systems 30 (2017) 19. McConaghy, T., Palmers, P., Steyaert, M., Gielen, G.G.: Trustworthy genetic programming-based synthesis of analog circuit topologies using hierarchical domain-specific building blocks. IEEE Transactions on Evolutionary Computation 15 (4), 557–570 (2011) 20. McPhee, N.F., Ohs, B., Hutchison, T.: Semantic building blocks in genetic program-ming. In: European Conference on Genetic Programming. pp. 134–145. Springer (2008) 21. Micci-Barreca, D.: A preprocessing scheme for high-cardinality categorical attributes in classification and prediction problems. ACM SIGKDD explorations newsletter 
+
+3(1), 27–32 (2001) 22. Muñoz, L., Trujillo, L., Silva, S., Castelli, M., Vanneschi, L.: Evolving multidimen-sional transformations for symbolic regression with M3GP. Memetic Computing 
+
+11 , 111–126 (2019) 23. Neshatian, K., Zhang, M., Andreae, P.: A filter approach to multiple feature construction for symbolic learning classifiers using genetic programming. IEEE Transactions on Evolutionary Computation 16 (5), 645–661 (2012) 24. Nguyen, S., Thiruvady, D., Zhang, M., Alahakoon, D.: Automated design of multi-pass heuristics for resource-constrained job scheduling with self-competitive genetic programming. IEEE Transactions on Cybernetics 52 (9), 8603–8616 (2021) 25. Olson, R.S., La Cava, W., Orzechowski, P., Urbanowicz, R.J., Moore, J.H.: PMLB: a large benchmark suite for machine learning evaluation and comparison. BioData Mining 10 (1), 1–13 (2017) 26. Rovito, L., Virgolin, M.: Interpretable non-linear survival analysis with evolutionary symbolic regression. In: Proceedings of the Genetic and Evolutionary Computation Conference. pp. 453–462 (2025) 27. Tran, B., Xue, B., Zhang, M.: Genetic programming for multiple-feature construction on high-dimensional classification. Pattern Recognition 93 , 404–417 (2019) 28. Virgolin, M., Alderliesten, T., Bosman, P.A.: On explaining machine learning models by evolving crucial and compact features. Swarm and Evolutionary Computation 
+
+53 , 100640 (2020) 29. Virgolin, M., Alderliesten, T., Witteveen, C., Bosman, P.A.: Scalable genetic programming by gene-pool optimal mixing and input-space entropy-based building-block learning. In: Proceedings of the Genetic and Evolutionary Computation Conference. pp. 1041–1048 (2017) 30. Wang, C., Chen, Q., Xue, B., Zhang, M.: Improving generalization of genetic programming for high-dimensional symbolic regression with shapley value based feature selection. Data Science and Engineering pp. 1–16 (2024) Evolutionary Feature Construction with Adaptive Protection 17 31. Wang, C., Chen, Q., Xue, B., Zhang, M.: Improving generalization of genetic programming for high-dimensional symbolic regression with shapley value based feature selection. Data Science & Engineering 10 (2) (2025) 32. Wu, Y., Xu, Y., Li, J.: Feature construction for fraudulent credit card cash-out detection. Decision Support Systems 127 , 113155 (2019) 33. Yu, L., Zhang, X., Yin, H.: An extreme learning machine based virtual sample generation method with feature engineering for credit risk assessment with data scarcity. Expert Systems with Applications 202 , 117363 (2022) 34. Zhang, F., Mei, Y., Nguyen, S., Zhang, M.: Correlation coefficient-based recombi-native guidance for genetic programming hyperheuristics in dynamic flexible job shop scheduling. IEEE Transactions on Evolutionary Computation 25 (3), 552–566 (2021) 35. Zhang, H., Chen, Q., Xue, B., Banzhaf, W., Zhang, M.: A geometric semantic macro-crossover operator for evolutionary feature construction in regression. Genetic Programming and Evolvable Machines 25 (1, article 2), 1–23 (2024) 36. Zhang, H., Chen, Q., Xue, B., Banzhaf, W., Zhang, M.: Modular multi-tree genetic programming for evolutionary feature construction for regression. IEEE Transactions on Evolutionary Computation 28 (5), 1455–1469 (2024) 37. Zhang, H., Chen, Q., Xue, B., Banzhaf, W., Zhang, M.: A general feature-informed crossover for two-stage feature selection in symbolic regression. In: 2025 IEEE Congress on Evolutionary Computation (CEC). pp. 1–8. IEEE (2025) 38. Zhang, H., Zhou, A., Chen, Q., Xue, B., Zhang, M.: SR-Forest: A genetic pro-gramming based heterogeneous ensemble learning method. IEEE Transactions on Evolutionary Computation 28 (5), 1484–1498 (2024) 39. Zhang, H., Zhou, A., Zhang, H.: An evolutionary forest for regression. IEEE Transactions on Evolutionary Computation 26 (4), 735–749 (2021) 18 H. Zhang et al. 
+
+This appendix provides supplementary material supporting the empirical analysis in Section 5. 
+
+– Section A provides additional background on why credit classification is a suitable application domain for evolutionary feature construction and supports the transferability discussion in Section 5.5. 
+
+– Section B presents supplementary analysis of importance-value power trans-formations and effective protection levels, and supports the methodological comparison in Section 5.3. 
+
+– Section C compares the deterministic top-K and probabilistic APM variants across different base learners. 
+
+A Feature Construction in Credit Classification 
+
+Credit classification is a suitable application for evolutionary feature construction because credit risk often depends on nonlinear interactions among attributes, and useful predictors may arise from complex combinations of raw features that are labor-intensive to design manually. Prior work shows that engineered transaction and behavioral features improve cost-sensitive fraud detection [3] and cash-out fraud ranking [32], while feature engineering with virtual sample generation improves robustness in data-scarce credit scoring [33]. A two-stage pipeline combining XGBoost-based feature construction with graph-based deep models also outperforms models trained on the original features [17]. However, these studies largely lack iterative refinement during search, motivating an evolutionary framework with adaptive protection to preserve high-value features while continuing the search for better feature combinations. 
+
+B Further Analysis of Power Transformation and Protection Level 
+
+B.1 Power Transformation 
+
+As a complementary investigation within RQ3, we examine whether nonlinear transformations of importance values improve the protection mechanism by ap-plying a power transformation |βj |p for p ∈ { 0.5, 1, 2, 5}. Figure 6 and Table 8 show that power 1, corresponding to linear scaling, provides the best overall performance. Higher powers overemphasize differences, creating extreme rank-ings that underweight features of medium importance, leading to inadequate protection and performance degradation. Power 0.5 also underperforms relative to power 1, as it compresses importance values toward uniformity, reducing the contrast between high- and low-importance features and weakening the protection signal. Linear scaling therefore provides the most balanced approach, confirming that raw coefficient magnitudes are appropriate without requiring nonlinear transformations. Evolutionary Feature Construction with Adaptive Protection 19   
+
+>      
+>        
+
+(a) R² Ranks      
+
+>     
+>     
+
+(b) Tree Size 
+
+Fig. 6: Comparison of feature importance power values. Table 8: Statistical comparison of feature importance power values. 
+
+1 2 50.5 3(+)/92( ∼)/3(-) 4(+)/91( ∼)/3(-) 15(+)/81( ∼)/2(-) 
+
+1 — 1(+)/97( ∼)/0(-) 27(+)/70( ∼)/1(-) 
+
+2 — — 20(+)/75( ∼)/3(-) 
+
+B.2 Effective Protection Level 
+
+To determine an effective restoration intensity, we examine the trade-off between preserving existing valuable trees and allowing further tree modifications by comparing different protection coefficients. We consider protection coefficients of 0, 1, 3, and 5, where 0 represents no protection. Figure 7 and Table 9 summarize the outcomes. Statistical comparisons show that protection consistently outperforms no protection: with 10 trees per individual, larger protection coefficients perform better. Coefficients of 1 or 3 provide insufficient protection, whereas a coefficient of 5 provides adequate protection while still allowing sufficient modification of other trees.  
+
+>       
+>        
+
+(a) R² Ranks         
+
+>     
+>      
+
+(b) Tree Size 
+
+Fig. 7: Comparison of different protection coefficients. Table 9: Statistical comparison of different protection coefficients. 
+
+1 3 50 0(+)/67( ∼)/31(-) 2(+)/44( ∼)/52(-) 3(+)/39( ∼)/56(-) 
+
+1 — 5(+)/51( ∼)/42(-) 3(+)/42( ∼)/53(-) 
+
+3 — — 1(+)/75( ∼)/22(-) 20 H. Zhang et al. 
+
+C Deterministic vs. Probabilistic Adaptive Protection 
+
+We compare two APM variants: a deterministic top-K variant and a probabilistic variant. Both follow a partial elitism idea that keeps exactly K = 5 features per individual unchanged through the genetic operations: the deterministic variant always preserves the 5 highest-importance features, whereas the probabilistic variant samples 5 features without replacement, with each feature drawn with probability proportional to its importance. In both variants, features with zero importance are never preserved. As shown in Figure 8, the two variants are broadly equivalent, with the large majority of datasets showing no significant difference under either base learner. The minor differences that do arise vary by base learner, suggesting these differences stem from how feature importance is estimated under each base learner rather than a systematic advantage of either formulation. Overall, both variants perform similarly, confirming that feature-importance-guided protection is the key mechanism regardless of whether the protected features are selected deterministically or sampled probabilistically. 3 82 13 
+
+APM (Exact-K) better No significant differ ence APM (Deterministic) better   
+
+> (a) Ridge regression base learner. 12 85 1
+
+APM (Exact-K) better No significant differ ence APM (Deterministic) better 
+
+> (b) Random decision tree base learner.
+
+Fig. 8: Comparison of deterministic and probabilistic APM variants across base learners.

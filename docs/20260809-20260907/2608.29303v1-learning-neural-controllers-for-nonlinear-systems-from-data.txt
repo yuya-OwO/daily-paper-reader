@@ -1,0 +1,1776 @@
+Title: Learning neural controllers for nonlinear systems from data
+
+URL Source: https://arxiv.org/pdf/2608.29303v1
+
+Published Time: Tue, 01 Sep 2026 00:47:16 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+> 1
+
+# Learning neural controllers for nonlinear systems from data 
+
+Zhongjie Hu, Zhi-Wei Liu, Chen Wang 
+
+Abstract —This article addresses the problem of designing neural feedback controllers for unknown nonlinear systems. We propose an indirect data-driven framework that uses offline data to identify the system dynamics, upon which a neural feedback controller and a neural Lyapunov function are jointly synthesized. Input constraints are enforced by integrating ahard-saturation structure into the controller architecture. Robust synthesis conditions are derived to account for data perturbations during identification. Formal stability is certified by combining SMT verification with local Lyapunov analysis near the equi-librium. Numerical examples validate the effectiveness of the proposed framework. 
+
+Index Terms —Data-driven control, neural networks, formal verification, nonlinear control systems, robust control. 
+
+I. I NTRODUCTION 
+
+# THE rapid advances in deep learning and machine learning have revolutionized many branches of science and engi-neering, including robotics [1], magnetic plasma control [2], and power systems [3], which has established learning for control as a prevalent paradigm for tackling complex tasks. Methodologically, learning-based control can be categorized into indirect methods [4], [5], which first identify the system model to enable model-based control synthesis, and direct 
+
+methods [6], [7], which learn controllers directly from data without explicitly attempting to identify the system. Within these frameworks, a major body of research for-mulates controller synthesis as convex optimization, such as Semidefinite Programming (SDP) [8], [9], or Sum-of-Squares (SOS) formulations [10], [11]. While offering appealing com-putational tractability, these formulations typically restrict can-didate controllers to linear feedback or fixed-structure nonlin-ear laws [12], [13]. Such structural constraints limit the expres-sive capacity of the controller, thus imposing a fundamental bottleneck on achievable closed-loop performance. Further-more, candidate Lyapunov functions within these paradigms are predominantly confined to standard quadratic forms or fixed-degree polynomial functions [14], [15], which restricts the search space for valid stability certificates. In this paper, we are interested in leveraging neural networks to parameterize both the controller and the Lyapunov function. By the universal approximation theorem [16], neural networks are capable of approximating any continuous function with arbitrary accuracy. Employing neural architectures thus sig-nificantly enhances the expressivity of both search spaces. 
+
+> Zhongjie Hu, Zhi-Wei Liu and Chen Wang are with the Key Laboratory of Image Processing and Intelligent Control and School of Artificial Intelligence and Automation, Huazhong University of Science and Technology, Wuhan 430074, China.
+
+Despite their expressive capacity, deploying neural networks in safety-critical applications raises concerns regarding reliability and formal correctness [17], [18]. In fact, neural networks are trained on finite, discrete data samples, while stability must hold continuously over the entire domain, which makes rigorous stability guarantees non-trivial [19], [20]. In addition, stability conditions involving neural networks are inherently non-convex, rendering classical SDP or SOS optimization tools inapplicable. In recent years, Satisfiability Modulo Theories (SMT) has been increasingly utilized for formal stability certification [21], [22]. In general, SMT solvers operate by formulat-ing the negation of desired property conditions into a first-order logical formula, and then searching for counterexamples within the domain of interest [23], [24]. A determination of unsatisfiability (UNSAT) guarantees the absence of coun-terexamples, thereby certifying that the target conditions hold across the entire domain. Representative SMT solvers include dReal [25], [26], Z3 [27], and Reluplex [28]. Building upon these solvers, the counterexample-guided inductive synthe-sis (CEGIS) framework, which is typically structured as a learner-falsifier loop, was developed for the automated formal synthesis of neural controllers and stability certificates [29], [30], [31]. This paradigm was first introduced to co-synthesize neural controllers and Lyapunov functions for known nonlinear systems [32], and was subsequently extended to unknown systems by employing Lipschitz-based error bounds to bridge neural system identification and robust SMT verification [33]. More recently, to incorporate performance specifications be-yond mere stabilization, this framework was generalized to input-output dissipativity, where neural storage functions and supply rates are learned to guarantee stability along with optimality [34]. 
+
+Contribution: The purpose of this paper is to design neural feedback controllers for unknown nonlinear systems with provable stability guarantees. We focus on systems whose vector fields are expressible as combinations of known basis functions. To achieve this, our approach relies on an indirect 
+
+data-driven framework, wherein offline collected data are first utilized to identify the underlying system dynamics, upon which the joint synthesis and formal verification of neural controllers and neural Lyapunov functions are subsequently executed. Building upon the paradigms in [32], [33], our framework extends these results across several key dimensions. First, we establish a structured optimization scheme and network architecture that guarantee exact theoretical soundness while enhancing numerical tractability. Specifically, a linear state normalization scheme maps the bounded domain of arXiv:2608.29303v1 [eess.SY] 29 Aug 2026 2
+
+interest onto a well-conditioned unit hypercube. In addition, we introduce a hard bias-elimination network architecture that strictly enforces exact zero-equilibrium vanishing by construc-tion, complemented by a pre-training stage to establish a well-conditioned initial Lyapunov topology. Building upon this ar-chitecture, Lyapunov stability conditions are formulated into a sample-based loss function, driven by a counterexample search paradigm that accelerates training efficiency by uncovering worst-case states that maximize loss violations. Remarkably, to overcome SMT solver conservatism near the equilibrium, we partition the domain into an outer SMT domain and an inner local exclusion ball, certifying the former via interval-based SMT solvers and the latter analytically via system linearization and SDP optimization. Next, to enforce input constraints by construction, we integrate a hard-saturation architecture into the neural feedback design. By combining a tanh activation function at the controller output with linear input scaling matrices, actuator limits are strictly guaranteed. Finally, to account for additive perturbations in offline identification data, robust Lyapunov synthesis conditions are derived across the entire set of data-consistent models. Crucially, rather than treating the uncertainty trade-off parameter as a pre-selected hyperparameter, our framework parameterizes this decision variable via an exponential mapping. This strictly enforces its positivity constraint by construction and enables its co-optimization along with neural network weights during back-propagation. 
+
+Outline. The remainder of this article is organized as follows. Section II formulates the system setup and problem statement. Section III presents the identification scheme and neural controller formulation. Section IV details the synthe-sis and verification pipeline, including state normalization, network pre-training, loss function design, counterexample generation, and formal stability verification. Section V extends this framework to handle input constraints, while Section VI develops the robust synthesis formulation under data pertur-bations. Finally, Section VII concludes the paper. 
+
+Notation. Throughout this paper, Rn>0 denotes the set of n-dimensional real vectors with positive entries, and Sn denotes the set of n × n real symmetric matrices. A symmetric matrix 
+
+M is positive definite (semidefinite) if M ≻ 0 (M ⪰ 0), and negative definite (semidefinite) if M ≺ 0 (M ⪯ 0). In symmetric block matrices, the asterisk ∗ represents the symmetric transpose of the corresponding off-diagonal blocks. The notation diag( v1, . . . , v n) represents a diagonal matrix with entries v1, . . . , v n on its main diagonal. ∥v∥2 and ∥v∥∞
+
+denote the 2-norm and the infinity norm of a vector v,respectively, while ∥M ∥2 denotes the induced spectral norm of a matrix M . λmin (M ) and λmax (M ) denote the smallest and largest eigenvalues of M , respectively. ∇2h(x) denotes the Hessian matrix of a scalar function h. For a set S ⊂ Rn,
+
+∂S represents its boundary, and ΠS (v) denotes the projection of a vector v onto S. The symbol ∨ denotes the logical OR operator. For real numbers a, b ∈ R, min( a, b ) and max( a, b )
+
+denote the minimum and maximum of a and b, respectively. Finally, the scalar functions tanh( ·), ReLU( ·), and sign( ·)
+
+are defined as tanh( x) := ex−e−x 
+
+> ex+e−x
+
+, ReLU( x) := max(0 , x ),and sign( x) returns 1, −1, and 0 for x > 0, x < 0, and 
+
+x = 0 , respectively, with all functions operating element-wise on vectors. II. S ET -UP AND PROBLEM FORMULATION 
+
+Consider a continuous-time nonlinear system of the form 
+
+˙x = f (x, u ) (1) where x ∈ Rn is the state and u ∈ Rm is the control input, and f : Rn × Rm → Rn is an unknown vector field. Without loss of generality, we assume that the origin (xe, u e) = (0 , 0) 
+
+is a known equilibrium point of the system. The objective is to design a state feedback controller that stabilizes the dynamics around the origin. To facilitate the control design, we formalize the prior knowledge regarding the vector field f through the following standing assumption. 
+
+Assumption 1: We know a vector-valued function Z :
+
+Rn+m → Rs such that f (x, u ) = AZ (x, u ) for some matrix 
+
+A ∈ Rn×s. □
+
+Under Assumption 1, system (1) can be equivalently rewrit-ten as 
+
+˙x = AZ (x, u ) (2) with A unknown. Note that formulating f (x, u ) via a dic-tionary of functions as AZ (x, u ) is a standard paradigm in nonlinear system identification [35]. To account for potential inaccuracies in our prior knowledge, the function library Z
+
+is permitted to include redundant terms that may not actually appear in f (x, u ).
+
+Problem. We are interested in the design of a neural feedback controller of the form 
+
+u = ϕ(x) (3) where ϕ : Rn → Rm is a feedforward neural network, such that the closed-loop system 
+
+˙x = AZ (x, ϕ (x)) (4) is asymptotically stable around the origin. III. C ONTROL DESIGN 
+
+To address the controller synthesis problem, we consider an indirect method consisting of two primary steps. First, we identify the system model from collected offline data. Second, building upon the identified model, we synthesize the neural controller and its corresponding neural Lyapunov function. 
+
+A. System identification 
+
+To obtain an identified model of the system, we conduct an experiment on the system (1) to collect the dataset 
+
+D := {(x(ti), u (ti), ˙x(ti)) }T −1 
+
+> i=0
+
+(5) where T > 0 is the number of samples and 0 ≤ t0 <t1 < . . . < t T −1 are the sampling times. The samples satisfy 
+
+˙x(ti) = AZ (x(ti), u (ti)) for i = 0 , . . . , T − 1. Z(x(ti), u (ti)) 3
+
+can be readily evaluated at (x(ti), u (ti)) since Z is known. We organize the dataset into the following matrices: 
+
+X1 :=  ˙x(t0) ˙x(t1) · · · ˙x(tT −1) ∈ Rn×T , (6a) 
+
+Z0 := Z(x(t0), u (t0)) Z(x(t1), u (t1)) 
+
+· · · Z(x(tT −1), u (tT −1))  ∈ Rs×T , (6b) and these data matrices satisfy 
+
+X1 = AZ 0. (7) For identification purpose, we assume that matrix Z0 has full row rank. This condition necessitates T ≥ s and can be interpreted as a data richness requirement, which can typically be fulfilled by acquiring additional samples. 
+
+Assumption 2: Z0 has full row rank. □
+
+By (7), Assumption 2 implies that 
+
+A = X1Z† 
+
+> 0
+
+, (8) where Z† 
+
+> 0
+
+∈ RT ×s denotes the right inverse of Z0. Hence, the identified model can be expressed as 
+
+˙x = X1Z† 
+
+> 0
+
+Z(x, u ). (9) 
+
+B. Neural controller design 
+
+The first statement below presents the main result of this section, which establishes a sufficient condition for asymptotic stabilization through the joint design of a neural feedback controller u = ϕ(x) and a neural Lyapunov function V (x)
+
+with V : Rn → R a feedforward neural network. We first recall the definition of region of attraction. 
+
+Definition 1: Let xe be an asymptotically stable equilibrium point for the system ˙x = f (x). A set R ⊆ Rn is called a region of attraction (ROA) for the system relative to xe if, for every initial state x(0) ∈ R , the corresponding state trajectory x(t)
+
+satisfies lim t→∞ x(t) = xe.
+
+Theorem 1: Consider the nonlinear system (1). Let Assump-tions 1 and 2 hold. Let X ⊆ Rn be a set containing the origin. Suppose there exist neural networks ϕ and V satisfying 
+
+ϕ(0) = 0 and V (0) = 0 such that for each x ∈ X \ { 0}
+
+V (x) > 0, (10a) 
+
+∂V (x)
+
+∂x X1Z† 
+
+> 0
+
+Z(x, ϕ (x)) < 0. (10b) Then, the origin is asymptotically stable for the closed-loop system (4) and any sublevel set V := {x ∈ Rn : V (x) ≤ δ},with δ > 0 such that V is contained in X defines an estimate of the ROA relative to x = 0 .
+
+Proof. The conditions (10) imply that V serves as a valid Lyapunov function for the closed-loop system (4), which completes the proof. ■
+
+C. Comparison With Other Methods 
+
+To highlight the methodological differences, it is useful to compare the proposed approach with existing data-driven methods developed for the nonlinear system (1), such as [8], [36], [15]. First, consider the approximate nonlinearity cancellation method in [8] and the data-driven contraction framework in [36]. By introducing the augmented state-input coordinate 
+
+ξ := [ xu ], system (1) can be recast into ˙x = AZ(ξ). Here, 
+
+A ∈ Rn×R and Z(ξ) = 
+
+ ξ
+
+Q(ξ)
+
+
+
+constitutes a rearrangement of the original dictionary Z(x, u ), thereby achieving a decoupling between the linear terms ξ and the remaining nonlinearities captured by Q(ξ). To further yield a transformed system with a constant input matrix, an integral control action ˙u = v is implemented, where v ∈ Rm serves as the new control input. Consequently, by partitioning the matrix as A := A1 A2
+
+
+
+with A1 ∈ Rn×(n+m) and A2 ∈ Rn×(R−n−m), the over-all augmented system can be compactly expressed as ˙ξ =
+
+AZ (ξ) + Bv, where A := 
+
+ A1 A2
+
+0m×(n+m) 0m×(R−n−m)
+
+
+
+and 
+
+B := 
+
+0n×m
+
+Im
+
+
+
+. The controller to be synthesized takes the form 
+
+v = KZ (ξ), where K = [ K1 K2 ] with K1 ∈ Rm×(n+m) and 
+
+K2 ∈ Rm×(R−n−m).In [8], controller synthesis relies on a nonlinearity cance-lation framework aimed at stabilizing the linear part while minimizing the impact of the nonlinear part in closed-loop. This guarantees asymptotic stability of the origin provided that the underlying SDP is feasible and the nonlinearities satisfy lim ξ→0 ∥Q (ξ)∥∥ξ∥ = 0. On the other hand, in [36], the method focuses on enforcing exponential contractivity on the closed-loop dynamics. Compared with our framework, a fundamental limitation shared by [8] and [36] is that their feasibility necessitates the stabilizability of the structured pair 
+
+(
+
+ A1
+
+0
+
+
+
+, B), which is structurally difficult to satisfy due to the intrinsic zero-blocks within the augmented system matrices. In contrast, our neural controller is synthesized by directly taking the entire nonlinear dynamics into account, thereby bypassing the linear stabilizability requirements A further distinction lies in the capacity to achieve global 
+
+stability guarantees. Specifically, the framework in [36] can theoretically establish global stability provided that the con-tractivity condition holds over X = Rn. On the other hand, global stability is structurally unachievable within the frame-work of [8] because the specific zero-block configuration of the input matrix B renders the exact nonlinearity cancellation, namely, 
+
+ A2
+
+0
+
+
+
++ BK 2 = 0 , impossible to satisfy. From a for-mal verification perspective, although algebraic SMT solvers, such as Z3, can analyze unbounded spaces, their theoretical guarantees are confined to polynomial systems. For dynamics involving transcendental nonlinearities, such as the system’s 
+
+sin( ·) terms or the neural network’s tanh( ·) activations, global verification is mathematically undecidable. To accommodate these transcendental functions, we utilize interval-based SMT solvers. Crucially, such solvers rely on interval constraint propagation over compact domains, and hence restricting the verification space to a bounded domain X is an essential requirement for returning formal stability certificates. Another relevant line of research is the Taylor’s expansion-based data-driven framework in [15]. An appealing feature of this approach is that it does not require prior knowledge of the underlying function library. Instead, it approximates 4
+
+the unknown dynamics (1) around the equilibrium via Tay-lor’s polynomials, and treats the truncated remainder as a bounded uncertainty. Nonetheless, to maintain computational tractability within SOS and SDP formulations, the candidate controllers and Lyapunov functions in [15] are restricted to linear or fixed-degree polynomial templates. Furthermore, the truncated remainder grows unbounded as ∥x∥ → ∞ , which inherently confines the theoretical guarantees to a local region. IV. N EURAL CONTROLLER SYNTHESIS AND SMT-B ASED 
+
+LYAPUNOV VERIFICATION 
+
+This section develops the data-driven synthesis and formal verification framework for the neural controller and neural Lyapunov function introduced in Theorem 1. The overall scheme relies on minimizing a sample-based loss function to enforce stability conditions, while employing SMT solvers along with local stability analysis to formally certify that the stability guarantees hold across the entire domain of interest. 
+
+A. Neural Synthesis Framework and Optimization Scheme Dynamic Data Generation and State Normalization: Rather than relying on a static offline dataset, a dynamic data-augmentation strategy is adopted to train both the neural controller and the neural Lyapunov function. Specifically, the training set D is initially populated via uniform state sam-pling from the domain of interest. Subsequently, an adaptive, counterexample-guided mechanism is employed to iteratively expand the dataset with critical samples, as detailed later in Sections IV-B and IV-C. In multivariable nonlinear systems, the states typically operate on disparate physical scales, and directly injecting raw state data into neural networks would induce numerical ill-conditioning and sluggish gradient propagation, especially given that standard activation functions, such as tanh( ·), suffer from vanishing gradients outside the interval [−1, 1] . Hence, state normalization serves not merely as an empirical data-preprocessing step, but a fundamental requirement for stable and effective network optimization. To this end, we introduce a linear coordinate transformation for state normalization. Consider the bounded domain X := 
+
+{x ∈ Rn | − bi ≤ xi ≤ bi, i = 1 , . . . , n }, where b := [b1, . . . , b n]⊤ ∈ Rn>0 denotes the vector of coordinate-wise upper bounds. By scaling the raw state x relative to b, the normalized state vector is defined as z := [ z1, . . . , z n]⊤ with 
+
+zi = xi/b i, i = 1 , . . . , n . This transformation maps the domain 
+
+X onto a well-conditioned unit hypercube [−1, 1] n, and z are subsequently utilized for neural network training. Let S := 
+
+diag ( 1 
+
+> b1
+
+, 1 
+
+> b2
+
+, . . . , 1 
+
+> bn
+
+) and hence z = Sx . Consequently, the transformed dynamics governing z are formulated as: 
+
+˙z = M Φ( z, u ) (11) where Φ( z, u ) := TZ Z(x, u ) represents the normalized func-tion library, TZ ∈ Rs×s is a non-singular diagonal matrix, and 
+
+M ∈ Rn×s denotes the system matrix to be identified. The normalized data matrices are organized from the dataset D as: 
+
+Z1 := S ˙x(t0) S ˙x(t1) · · · S ˙x(tT −1) ∈ Rn×T , (12a) 
+
+Φ0 := Φ( Sx (t0), u (t0)) Φ( Sx (t1), u (t1)) 
+
+· · · Φ( Sx (tT −1), u (tT −1))  ∈ Rs×T . (12b) These matrices satisfy Z1 = M Φ0, and Φ0 preserves the full row rank property of Z0 since TZ is non-singular. Conse-quently, M is identified as M = Z1Φ†
+
+> 0
+
+, where Φ† 
+
+> 0
+
+∈ RT ×s
+
+denotes the right inverse of Φ0. The identified normalized model is thus expressed as 
+
+˙z = Z1Φ†
+
+> 0
+
+Φ( z, u ). (13) As formalized below, the stability of the normalized system (13) is equivalent to that of the original physical dynamics (9). 
+
+Proposition 1: Consider the system (9) and the transformed normalized system (13), subject to the state transformation 
+
+z = Sx . Let Xz := [ −1, 1] n denote the unit hypercube, and let 
+
+X ⊆ Rn be the domain containing the origin such that Xz =
+
+SX . Suppose there exist neural networks ψ and Vz satisfying 
+
+ψ(0) = 0 and Vz (0) = 0 . Then, the stability conditions 
+
+Vz (z) > 0, (14a) 
+
+∂V z (z)
+
+∂z Z1Φ†
+
+> 0
+
+Φ( z, ψ (z)) < 0, (14b) hold for all z ∈ X z \{ 0} if and only if 
+
+Vz (Sx ) > 0, (15a) 
+
+∂V z (Sx )
+
+∂x X1Z† 
+
+> 0
+
+Z(x, ψ (Sx )) < 0, (15b) hold for all x ∈ X \{ 0}.
+
+Proof. Since S is a non-singular diagonal matrix, z = Sx 
+
+defines a diffeomorphism between X and Xz , which estab-lishes a bijective mapping such that x = 0 ⇐⇒ z = 0 and 
+
+X \{ 0} ⇐⇒ Xz \{ 0}. For any state pair adhering to this transformation, Vz (Sx ) = Vz (z) holds, which implies that (14a) holds for all z ∈ X z \ { 0} if and only if (15a) holds for all x ∈ X \ { 0}.Furthermore, since ˙z = S ˙x, (9) yields ˙z = SX 1Z† 
+
+> 0
+
+Z(x, u ).By (13), we have SX 1Z† 
+
+> 0
+
+Z(x, u ) = Z1Φ†
+
+> 0
+
+Φ( z, u ). Under the controller u = ψ(z) = ψ(Sx ), it yields 
+
+SX 1Z† 
+
+> 0
+
+Z(x, ψ (Sx )) = Z1Φ†
+
+> 0
+
+Φ( z, ψ (z)) ,
+
+and it follows that 
+
+∂V z (Sx )
+
+∂x X1Z† 
+
+> 0
+
+Z(x, ψ (Sx )) = ∂V z (z)
+
+∂z SX 1Z† 
+
+> 0
+
+Z(x, ψ (Sx )) = ∂V z (z)
+
+∂z Z1Φ†
+
+> 0
+
+Φ( z, ψ (z)) .
+
+Consequently, (14b) holds for all z ∈ X z \ { 0} if and only if (15b) holds for all x ∈ X \ { 0}, which completes the proof. 
+
+> ■
+
+Based on the equivalence established in Proposition 1, the synthesis objective reduces to designing a neural controller 
+
+u = ψ(z) and a neural Lyapunov function Vz (z) that satisfy (14) over Xz \ { 0}. Consequently, the stability conditions (10) are guaranteed to hold across X \ { 0} by recovering the 5
+
+controller as ϕ(x) = ψ(Sx ) and the Lyapunov function as 
+
+V (x) = Vz (Sx ).
+
+Remark 1: For asymmetric state domains characterized by 
+
+X = {x ∈ Rn | − ai ≤ xi ≤ bi, i = 1 , . . . , n } with ai̸ = bi,state normalization is achieved via the maximum-absolute-value scaling si := max( ai, b i). Consequently, the resulting coordinate transformation zi = xi/s i, i = 1, . . . , n maps 
+
+X onto a hyper-rectangle embedded within [−1, 1] n, while remaining linear and origin-preserving. 
+
+Structural Equilibrium Constraints and Network Pre-training: The theoretical prerequisites of the Lyapunov sta-bility conditions in Theorem 1 and Proposition 1 necessitate that both the Lyapunov function and the controller vanish at the equilibrium, i.e., Vz (0) = 0 and ψ(0) = 0 . Rather than imposing these equilibrium constraints via soft regularization terms within the loss function, which cannot guarantee exact zero-convergence, we adopt a hard bias-elimination network architecture formulated as: 
+
+Vz (z) = NV (z) − N V (0) , (16a) 
+
+ψ(z) = Nu(z) − N u(0) , (16b) where NV : Rn → R and Nu : Rn → Rm represent the raw outputs of the underlying multilayer perceptrons (MLPs). By explicitly subtracting the network evaluations at the origin, Vz (0) = 0 and ψ(0) = 0 are strictly guaranteed by construction, which is independent of the network weights and biases. During the joint synthesis, optimizing both networks si-multaneously from random initializations might suffers from numerical instability or convergence failure. To overcome this challenge, we execute a pre-training stage wherein Vz (z) is first trained to approximate a canonical quadratic function: 
+
+Vtarget (z) = β∥z∥22,
+
+where β > 0 a positive scalar. This pre-training step estab-lishes a well-conditioned initial Lyapunov topology that guides the subsequent co-optimization of ψ(z) and Vz (z).
+
+Loss Function Design and Optimization: The loss function architecture is designed to explicitly penalize violations of the Lyapunov stability conditions (14). To transform (14) into penalty terms within loss function, a positive-definite metric is defined as Ω( z) := z⊤z.Given a training set D consisting of N normalized state samples and a positive margin parameter ε > 0, the penalty term enforcing the positive definiteness of Vz (z) over Xz \{ 0}
+
+is formulated as: 
+
+LPD (Vz ) = 1
+
+N
+
+> N
+
+X
+
+> k=1
+
+ReLU (ε · Ω( zk) − Vz (zk)) , (17) and the penalty term enforcing the negative definiteness of the time derivative ˙Vz (z) over Xz \ { 0} is given by: 
+
+LND (Vz , ψ ) = 1
+
+N
+
+> N
+
+X
+
+> k=1
+
+ReLU 
+
+ ∂V z (zk)
+
+∂z Z1Φ†
+
+> 0
+
+Φ( zk, ψ (zk)) +ε · Ω( zk)) .
+
+(18) Then, the overall loss function for jointly synthesizing the neural controller ψ(z) and the neural Lyapunov function Vz (z)
+
+is defined as: 
+
+Ltotal (Vz , ψ ) = γ1LPD (Vz ) + γ2LND (Vz , ψ ), (19) where γ1 > 0 and γ2 > 0 are positive penalty hyperparame-ters. 
+
+Remark 2: The parameter ε governs the closed-loop decay rate, and its selection embodies a trade-off between the tran-sient performance and optimization tractability. Specifically, a large margin ε imposes a restrictive constraint on (14b), which forces the controller ψ(z) to deliver high-gain control actions, thereby potentially inducing gradient explosion and optimization divergence. On the other hand, selecting a con-servative margin ε dampens the closed-loop convergence rate, which results in a sluggish transient response. Furthermore, from a verification perspective, an overly small ε severely compromises the numerical robustness of interval-based SMT solvers. When ε falls below the solver’s precision tolerance, it might induce computational bottlenecks. Consequently, ε
+
+should be chosen to reconcile closed-loop performance with the solver’s numerical limits. 
+
+Remark 3: The selection of γ1 and γ2 in (19) is intrinsi-cally determined by the normalization scaling bounds. For X
+
+characterized by small scaling bounds, i.e., 0 < b i ≪ 1, i =1, . . . , n , the coordinate transformation substantially amplifies 
+
+˙z = S ˙x. Consequently, LND yields disproportionately large gradients that suppress the contribution of LPD and dominate the loss function. In this case, a higher weight ratio γ1/γ 2
+
+is required to balance the respective contributions of LND 
+
+and LPD . Conversely, for X characterized by large scaling bounds, i.e., bi ≫ 1, i = 1 , . . . , n , coordinate transformation dampens the z dynamics, and thus a lower weight ratio γ1/γ 2
+
+is essential to prevent LND from being numerically neglected during optimization. 
+
+B. Counterexample Generation 
+
+Conventional deep learning paradigms predominantly rely on Empirical Risk Minimization (ERM), which optimizes average performance over randomly drawn samples [37], [38]. However, certifying Lyapunov stability demands a determinis-tic, worst-case guarantee across the entire domain Xz . Instead of blindly sampling from Xz , we shift the focus toward a targeted search for counterexamples. A counterexample zce 
+
+is defined as a state vector within Xz \ { 0} that violates the stability conditions (14). Mathematically, the violation set Xce ,which represents the union of the individual violation zones, is formalized as: 
+
+Xce =
+
+n
+
+z ∈ X z \ { 0} | (Vz (z) < ε Ω( z)) ∨ ( ˙Vz (z) > −εΩ( z)) 
+
+o
+
+.
+
+Here, we introduce three computationally efficient ap-proaches for counterexample generation: Projected Gradient Descent (PGD), Generative Adversarial Network (GAN) and Particle Swarm Optimization (PSO). First, the PGD algorithm is employed as a gradient-based 
+
+search mechanism to uncover the worst-case states that maxi-mize the violation loss [39]. Specifically, the search is initial-ized by generating a seed dataset Dpgd containing Npgd samples 6
+
+within Xz . Over an optimization horizon of p steps, each state trajectory in Dpgd is recursively driven along the worst-case gradient direction with a step size κ. The updated vector is then projected back onto Xz via the projection operator ΠXz ,yielding the following update law for t = 0 , . . . , p − 1:
+
+zt+1 = Π Xz
+
+
+
+zt + κ · sign 
+
+ ∂L total (Vz , ψ )
+
+∂z z=zt
+
+ 
+
+.
+
+If zt ∈ X ce , t = 0 , . . . , p − 1, it is classified as a counterex-ample. Second, the GAN algorithm is introduced as a mapping-based counterexample generator [40]. Unlike PGD, which re-cursively updates state trajectories step-by-step using gradient information, this generative mechanism establishes a direct map from a continuous stochastic input space to candidate counterexamples. Formally, the generator Gμ, parameterized by trainable weights μ, takes a random vector τ drawn from a standard Gaussian distribution pτ as its input, and maps it directly to a candidate counterexample: 
+
+zgan = Gμ(τ ).
+
+In conventional GANs, the discriminator is an empirical neural network, which serves as the optimization target for the gener-ator Gμ. In contrast, our framework replaces the discriminator with the deterministic loss function Ltotal . The objective is thus to maximize Ltotal to uncover counterexamples. If zgan ∈ X ce ,it is classified as a counterexample. Finally, the PSO algorithm is utilized as a derivative-free 
+
+search mechanism to uncover the worst-case states that max-imize the violation loss [41], thereby bypassing the gradient vanishing or explosion issues caused by saturating activation functions (e.g., tanh ) and non-smooth penalty terms (e.g., ReLU). Specifically, the search is initialized by deploying a swarm Dpso consisting of Npso particles within Xz , where each particle i ∈ { 1, . . . , N pso } denotes a state vector z(i),t ∈ X z
+
+associated with a search velocity vector v(i),t ∈ Rn. Over an optimization horizon of p steps, the trajectory of each particle is recursively updated in a derivative-free manner driven by individual and collective historical optima rather than gradient evaluations, yielding the following iterative update law for 
+
+t = 0 , . . . , p − 1:
+
+v(i),t +1 = ωv (i),t + c1r1
+
+
+
+q(i),t − z(i),t 
+
++ c2r2
+
+
+
+gt − z(i),t 
+
+z(i),t +1 = Π Xz
+
+
+
+z(i),t + v(i),t +1 
+
+where ω denotes the inertia weight, c1 and c2 represent individual and collective tracking gains, respectively, and 
+
+r1, r 2 ∼ U (0 , 1) are independent random variables introducing stochastic exploration. The vectors q(i),t and gt denote the individual historical best position and the global best position achieved across Dpso up to step t, respectively, which are extracted by maximizing 
+
+q(i),t = arg max 
+
+> z∈{ z(i),0,...,z (i),t }
+
+Ltotal (Vz , ψ ) z ,gt = arg max 
+
+> q∈{ q(1) ,t ,...,q (Npso) ,t }
+
+Ltotal (Vz , ψ ) q .
+
+If z(i),t ∈ X ce for i = 1 , . . . , N pso and t = 0 , . . . , p − 1, it is classified as a counterexample. Throughout the counterexample search phase, the param-eters of both Vz and ψ remain fixed. The underlying search paradigm features a highly flexible architecture, capable of de-ploying PGD, GAN, and PSO either individually, in pairwise combinations, or through a tripartite integration. Ultimately, the uncovered counterexamples are appended into D to train 
+
+Vz and ψ.
+
+C. Stability Formal Verification 
+
+Neural network training inherently operates on finite, dis-crete samples. Even when augmented with adversarial and heuristic search paradigms such as PGD, GAN and PSO, data-driven optimization can only ensure that stability conditions hold at discrete sample points. In contrast, certifying Lyapunov stability demands a continuous guarantee that holds universally across the domain Xz . To bridge this methodological gap, interval-based SMT solvers, such as dReal, are deployed in this paper to execute formal stability verification. To render the verification process computationally tractable, the solver operates under the paradigm of δ-completeness, wherein the target domain Xz is partitioned via recursive state-space bi-section governed by a precision tolerance δ > 0. In fact, the mathematical foundation of the formal verification procedure rests upon interval arithmetic and interval constraint propaga-tion. Specifically, for each generated sub-domain, the solver over-approximates the sub-domain via an interval vector [z].According to the fundamental theorem of interval arithmetic, the solver evaluates the functions on the left-hand side of (14) over [z], yielding a conservative interval enclosure that strictly contains the true image of these functions over that sub-domain. If this interval enclosure satisfies the stability conditions (14), the associated sub-domain is successfully verified and excluded from further search. Otherwise, the sub-domain is marked as unverified and subjected to further subdi-vision. For any sub-domain, the subdivision process terminates either upon verification, or when the interval width falls below 
+
+δ without satisfying (14), in which case the solver finds a violation and returns this falsifying sub-domain. Verification across Xz is successful if all partitioned sub-domains are veri-fied. Consequently, upon successful verification, the Lyapunov conditions (14) are rigorously guaranteed to hold continuously across Xz , thereby elevating empirical optimization into a deterministic stability certificate. Despite their mathematical rigor, interval-based SMT solvers encounter severe computational bottlenecks near the origin. Since both Vz (z) and ψ(z) vanish at the equilibrium 
+
+z = 0 , the conservative interval enclosures of the Lyapunov stability conditions near the origin inherently contain zero, which prevents the solver from certifying (14). To circumvent this verification limitation, we partition Xz by isolating the origin, thereby shifting the SMT verification domain from 
+
+Xz \ { 0} to XSMT := Xz \ B σ (0) , where Bσ (0) := {z ∈
+
+Rn | ∥ z∥2 < σ } with a small radius σ > 0. Depending on the verification outcome, the training loop branches into two pathways. On the one hand, if the SMT solver uncovers a 7
+
+stability violation and returns a falsifying interval vector, can-didate counterexamples zSMT are sampled around this interval. Those satisfying zSMT ∈ X ce are classified as counterexamples and aggregated into the training set D to drive the next training loop. On the other hand, if the SMT solver successfully verifies XSMT , the remaining stability analysis within Bσ (0) 
+
+is conducted via the local Lyapunov approach detailed below. Let fcl (z) := Z1Φ†
+
+> 0
+
+Φ( z, ψ (z)) . The first-order Taylor’s expansion of the closed-loop system ˙z = fcl (z) around the origin is given by 
+
+˙z = Acl z + g(z), (20) where Acl := ∂f cl (z) 
+
+> ∂z z=0
+
+and g(z) denotes the remainder satisfying g(0) = 0 and ∂g (z) 
+
+> ∂z z=0
+
+= 0 . If the matrix Acl 
+
+is not Hurwitz, the candidate controller is rejected, and the algorithm reverts to the training loop to re-synthesize ψ(z)
+
+and Vz (z). On the other hand, if the matrix Acl is Hurwitz, we proceed with the following local stability certification. Consider a candidate local Lyapunov function Vloc (z) := 
+
+z⊤P z with P ∈ Sn×n. Its time derivative along (20) is given by: 
+
+˙Vloc (z) = ˙ z⊤P z + z⊤P ˙z = z⊤(A⊤ 
+
+> cl
+
+P + P A cl )z + 2 z⊤P g (z).
+
+(21) We search for a matrix P ≻ 0 via the following SDP: 
+
+max   
+
+> P≻0,γ> 0
+
+γ s.t. P ⪯ I, A⊤ 
+
+> cl
+
+P + P A cl + γI ⪯ 0. (22) Since A is Hurwitz, the SDP (22) is feasible. Let P denote its solution and define Q := −(A⊤ 
+
+> cl
+
+P +P A cl ). Then, the quadratic term in (21) then satisfies 
+
+z⊤(A⊤ 
+
+> cl
+
+P + P A cl )z = −z⊤Qz ≤ − λmin (Q)∥z∥22. (23) Furthermore, by the Cauchy-Schwarz inequality along with Taylor’s theorem, the higher-order cross-term in (21) satisfies 
+
+2z⊤P g (z) = 2 
+
+> n
+
+X
+
+> i=1
+
+(Pi, ·z)gi(z)
+
+≤ 2
+
+> n
+
+X
+
+> i=1
+
+∥Pi, ·∥2∥z∥2 ·
+
+ 12 Hi∥z∥22
+
+
+
+,
+
+(24) where Pi, · denotes the i-th row of P , and Hi := max z∈B σ (0) ∥∇ 2fcl ,i (z)∥2 denotes an upper bound on the Hessian spectral norm for the i-th component of fcl over 
+
+Bσ (0) . Note that the evaluation of Acl and ∇2fcl ,i (z) implic-itly requires the function library Z(x, u ) and the activation functions in ψ(z) to be twice continuously differentiable over 
+
+Bσ (0) . Defining Kg := Pni=1 ∥Pi, ·∥2Hi and combining (23) with (24), we arrive at 
+
+˙Vloc (z) ≤ − (λmin (Q) − Kg ∥z∥2) ∥z∥22. (25) Consequently, if the exclusion radius σ satisfies 
+
+σ < σ threshold := λmin (Q)
+
+Kg
+
+, (26) 
+
+˙Vloc (z) < 0 is guaranteed to hold for all z ∈ B σ (0) \ { 0}.Together with the SMT verification over XSMT , this establishes a formal stability guarantee across the entire domain Xz .
+
+Algorithm 1. Synthesis and SMT-Based Verification of Neural Controllers  
+
+> 1:
+
+Input: Identified model (13), domain of interest Xz , pre-training parameter β, positive margin ε, penalty hyper-parameters γ1 and γ2, exclusion radius σ, and precision tolerance δ. 
+
+> 2:
+
+Output: Verified neural controller ψ(z), verified neural Lyapunov function Vz (z). 
+
+> 3:
+
+Initialization: Construct ψ and Vz with ψ(0) = 0 and 
+
+Vz (0) = 0 . 
+
+> 4:
+
+Pre-training: Pre-train Vz to approximate Vtarget . 
+
+> 5:
+
+Seed Sampling: Sample initial dataset D ⊂ X z \ { 0}. 
+
+> 6:
+
+while true do  
+
+> 7:
+
+for i = 1 , 2, . . . do  
+
+> 8:
+
+Perform hybrid sampling targeting XSMT and bound-ary ∂Bσ (0) . 
+
+> 9:
+
+Search counterexamples Dce via heuristic search paradigms.  
+
+> 10:
+
+if Dce = ∅ then  
+
+> 11:
+
+break  
+
+> 12:
+
+end if  
+
+> 13:
+
+Augment training dataset: D ← D ∪ Dce . 
+
+> 14:
+
+for epoch = 1 , . . . , N epoch do  
+
+> 15:
+
+Update ψ and Vz by minimizing Ltotal (Vz , ψ ) over 
+
+D. 
+
+> 16:
+
+end for  
+
+> 17:
+
+end for  
+
+> 18:
+
+Invoke SMT solver to verify (14) over XSMT . 
+
+> 19:
+
+if SMT verification fails then  
+
+> 20:
+
+Extract counterexamples DSMT from the returned falsifying interval.  
+
+> 21:
+
+Augment training dataset: D ← D ∪ DSMT . 
+
+> 22:
+
+else  
+
+> 23:
+
+Evaluate the Jacobian matrix Acl . 
+
+> 24:
+
+if Acl is Hurwitz then  
+
+> 25:
+
+Solve P , estimate Hi and compute σthreshold . 
+
+> 26:
+
+if σ < σ threshold then  
+
+> 27:
+
+return ψ, V z . 
+
+> 28:
+
+end if  
+
+> 29:
+
+end if  
+
+> 30:
+
+end if  
+
+> 31:
+
+end while 
+
+Conversely, if (26) is violated, the candidate controller is rejected, and the algorithm reverts to the training loop to re-synthesize ψ(z) and Vz (z). The complete implementation of the proposed counterexample-guided synthesis and formal verification procedure is summarized in Algorithm 1. 
+
+Remark 4: It is worth noting that the SDP (22) inherently optimizes σthreshold . Specifically, the constraint P ⪯ I enforces 
+
+∥P ∥2 ≤ 1 that suppresses Kg , while the optimization objective 
+
+max γ maximizes λmin (Q), thereby enlarging σthreshold to facilitate the satisfaction of (26). Furthermore, to compute Hi
+
+(i = 1 , . . . , n ), a set of state samples {zk} ¯Nk=1 is densely drawn within Bσ (0) . The Hessian spectral norm ∥∇ 2fcl ,i (zk)∥2 at each sample point is evaluated using PyTorch, and Hi is subsequently determined by taking the maximum value across 8
+
+all evaluated samples. 
+
+Remark 5: Unlike conventional deep learning paradigms reliant on static datasets, the proposed synthesis framework dynamically expands the training set D through three sources: (i) initial seed samples drawn across Xz \ { 0}, (ii) targeted counterexamples generated via PGD, GAN, and PSO algo-rithms, and (iii) formal counterexamples extracted by the SMT solver during the verification phase. 
+
+Remark 6: Verifying stability conditions near the boundary of Bσ (0) poses computational challenges for interval-based SMT solvers, rendering this transition zone prone to verifi-cation failures without targeted optimization. To mitigate this issue, we implement a hybrid sampling strategy specifically designed to initialize the PGD search trajectories, train the GAN mapping, and position the PSO swarm particles. Specif-ically, the total sample allocation is partitioned into a global component drawn from Xz \ { 0} to ensure extensive baseline coverage, and a local component densely clustered along the boundary ∂Bσ (0) . This targeted sampling strategy enhances the search efficacy of the PGD, GAN, and PSO algorithms in uncovering potential counterexamples along this critical interface, thereby facilitating the subsequent formal stability certification. We demonstrate the proposed framework via a numerical example. 
+
+Example 1: Consider the dynamics of a controlled Lorenz chaotic system [42]: 
+
+˙x1 = a(x2 − x1),
+
+˙x2 = rx 1 − x2 − x1x3 + u, 
+
+˙x3 = x1x2 − ηx 3,
+
+(27) where x := [ x1, x 2, x 3]⊤ ∈ R3 denotes the state vector, u ∈
+
+R represents the control input, and a, r, η > 0 are physical system parameters. The control objective is to stabilize the chaotic system at the origin. Note that the origin is an unstable equilibrium of the uncontrolled system for r > 1.Let X = {x ∈ R3 | − bi ≤ xi ≤ bi, i = 1 , 2, 3} denote the target stabilization domain, and S = diag( 1 
+
+> b1
+
+, 1 
+
+> b2
+
+, 1 
+
+> b3
+
+) be the state scaling matrix. By expressing (27) in terms of the normalized state z = Sx , the transformed dynamics governing 
+
+z is formulated as: 
+
+˙z1 = a
+
+ b2
+
+b1
+
+z2 − z1
+
+
+
+,
+
+˙z2 = rb 1
+
+b2
+
+z1 − z2 − b1b3
+
+b2
+
+z1z3 + 1
+
+b2
+
+u, 
+
+˙z3 = b1b2
+
+b3
+
+z1z2 − ηz 3.
+
+(28) Accordingly, we construct the normalized function library as 
+
+Φ( z, u ) = [ z1, z 2, z 3, u, z 1z3, z 1z2]⊤.As the first step, we collect the dataset D for identification purpose from the system (27) setting the parameters as a =10 , r = 28 , and η = 83 . The domain bounds defining X are specified as b1 = b2 = b3 = 1 . Here, we collect T = 300 
+
+samples by uniformly sampling the control input u ∈ [−20 , 20] 
+
+and the state x ∈ X . Based on the collected dataset D, the identified normalized model (13) is constructed. To prepare for the joint synthesis and formal stability verification, the neural controller ψ(z) and neural Lyapunov function Vz (z) are configured as feedforward neural networks with one hidden layer of 80 neurons and tanh activation function. To satisfy the equilibrium stability prerequisites, the bias-elimination architecture is implemented to strictly enforce 
+
+Vz (0) = 0 and ψ(0) = 0 . Prior to the training phase, a warm-up stage is executed wherein Vz (z) is pre-trained to approx-imate Vtarget (z) = 3 ∥z∥22. Regarding the loss function, we set the convergence margin ϵ = 0 .01 , and the hyperparameters 
+
+γ1 = 10 and γ2 = 10 . The network parameters are optimized via the Adam optimizer with a learning rate of 1 × 10 −3.The training phase begins with the construction of the training dataset D. Initially, D is populated with 50 batches of samples, each with a batch size of 300 , generated via uniform state sampling across the domain Xz = [ −1, 1] 3. Let the exclu-sion ball be of radius σ = 0 .1, and thus the SMT verification domain is XSMT = {z ∈ R3 | z ∈ [−1, 1] 3 \ B σ (0) }. Within each training loop, a counterexample search is conducted by deploying the PGD algorithm over p = 60 steps with a step size of κ = 0 .04 . A hybrid sampling strategy is applied to initialize the PGD candidate trajectories: 70% of the initial states are drawn uniformly across Xz , whereas the remaining 
+
+30% are densely clustered along the boundary ∂Bσ (0) . The uncovered counterexamples are aggregated and dynamically appended to D. For formal stability verification, the SMT solver dReal is deployed to validate the Lyapunov conditions over XSMT with a precision tolerance of δ = 1 × 10 −4.In the numerical evaluation, dReal successfully returns a formal verification certificate, confirming that the Lyapunov conditions (14) hold universally across XSMT . Furthermore, regarding the local domain Bσ (0) , the maximum real part of the eigenvalues of Acl is −2.6667 , confirming its Hurwitz property. Solving the SDP (22) and evaluating the Hessian bounds Hi over Bσ (0) yield a threshold σthreshold = 2 .2526 
+
+that satisfies σ < σthreshold , thereby ensuring asymptotic stability over the entire domain Xz . By Proposition 1, the synthesized neural controller u = ψ(Sx ) formally guarantees the asymptotic stability of the Lorenz system at the origin. To assess the control performance, we examine the 3D phase portraits of both the open-loop and closed-loop Lorenz systems, initialized from four distinct states in X . As depicted in Figure 1, the open-loop state trajectories exhibit typical chaotic motion, persistently orbiting within the chaotic attrac-tor without converging to the origin. In contrast, under the synthesized neural controller, all closed-loop state trajectories originating from these initial points are driven to the origin. V. I NPUT CONSTRAINTS 
+
+In practical physical systems, actuators are invariably sub-ject to saturation limits. To ensure safe controller deployment, the set of admissible control inputs U ⊂ Rm is formulated as 
+
+U := {u ∈ Rm | − ui, min ≤ ui ≤ ui, max , i = 1 , . . . , m },
+
+(29) where ui, min > 0 and ui, max > 0 denote the lower and upper bounds on ui, respectively. 920    
+
+> 10
+> 010 20 x1
+> 30
+> 15
+> 015 30
+> x2
+> 015 30 45
+> x3
+> (a) Open-loop trajectories. 1.0
+> 0.5
+> 0.0 0.5 1.0 x1
+> 1.0
+> 0.5
+> 0.0 0.5 1.0
+> x2
+> 0.8
+> 0.4
+> 0.0 0.4 0.8
+> x3
+> (b) Closed-loop trajectories.
+> Fig. 1. 3D phase portraits of the open-loop and closed-loop Lorenz systems, initialized from four distinct initial conditions in X.
+
+To enforce input constraints, one intuitive approach is to integrate the input admissibility condition, i.e., ϕ(x) ∈ U ,into the stability formulation (10), penalize its violations in the loss function during training, and formally verify it using SMT solvers. However, incorporating input constraints into SMT verification substantially increases computational burden, while penalizing input violations distracts the neural network’s optimization focus on fulfilling the Lyapunov stability condi-tions. To circumvent these limitations, we incorporate a hard saturation architecture into the neural feedback design, which guarantees input constraints by construction. Specifically, we first construct a normalized controller ¯u = ¯ψ(z) parameterized as: 
+
+¯ψ(z) := tanh  Nu(z) − N u(0) . (30) By passing the control signal through the tanh function, ¯u is confined to the unit hypercube [−1, 1] m, thereby serving as a normalized control input. The physical control input u is subsequently recovered via the linear scaling transformation: 
+
+u = Su ¯u, (31) where Su := diag (bu, 1, b u, 2, . . . , b u,m ) denotes the input scal-ing matrix with bu,i := min( ui, min , u i, max ), which guarantees 
+
+u ∈ U by construction. Analogous to (11), the z-dynamics under the control input 
+
+¯u are expressed as 
+
+˙z = ¯M ¯Φ( z, ¯u) (32) where ¯Φ( z, ¯u) := TΦΦ( z, u ) represents the input-normalized function library, and TΦ ∈ Rs×s is a non-singular diagonal matrix. The normalized data matrix ¯Φ0 ∈ Rs×T is organized from the dataset D as: 
+
+¯Φ0 :=  ¯Φ( Sx (t0), S −1 
+
+> u
+
+u(t0)) ¯Φ( Sx (t1), S −1 
+
+> u
+
+u(t1)) 
+
+· · · ¯Φ( Sx (tT −1), S −1 
+
+> u
+
+u(tT −1))  .
+
+These matrices satisfy Z1 = ¯M ¯Φ0, and ¯Φ0 preserves the full row rank property of Φ0. The matrix ¯M is identified as 
+
+¯M = Z1 ¯Φ†
+
+> 0
+
+, where ¯Φ† 
+
+> 0
+
+∈ RT ×s denotes the right inverse of 
+
+¯Φ0. Hence, the identified model under input normalization is expressed as 
+
+˙z = Z1 ¯Φ† 
+
+> 0
+
+¯Φ( z, ¯u). (33) As formalized below, the stability of (33) is equivalent to that of the system (11). 
+
+Proposition 2: Consider the system (11) and the input-normalized system (33) under the input transformation u =
+
+Su ¯u. Suppose there exist neural networks ¯ψ and Vz satisfying 
+
+¯ψ(0) = 0 , Vz (0) = 0 , and Vz (z) > 0, ∀z ∈ X z \ { 0}. Then, for each z ∈ X z \ { 0}, the condition 
+
+∂V z (z)
+
+∂z Z1 ¯Φ† 
+
+> 0
+
+¯Φ( z, ¯ψ(z)) < 0 (34) holds if and only if 
+
+∂V z (z)
+
+∂z Z1Φ†
+
+> 0
+
+Φ( z, S u ¯ψ(z)) < 0 (35) holds. 
+
+Proof. Since ¯Φ( z, ¯u) = TΦΦ( z, u ) and TΦ is a non-singular diagonal matrix, the constructed data matrices satisfy ¯Φ0 =
+
+TΦΦ0, which yields 
+
+¯Φ† 
+
+> 0
+
+= ( TΦΦ0)† = Φ †
+
+> 0
+
+T −1Φ .
+
+Furthermore, under the controller ¯u = ¯ψ(z) with the input transformation u = Su ¯u, we have ¯Φ( z, ¯ψ(z)) =
+
+TΦΦ( z, S u ¯ψ(z)) . Substituting these relations yields 
+
+Z1 ¯Φ† 
+
+> 0
+
+¯Φ( z, ¯ψ(z)) = Z1
+
+
+
+Φ†
+
+> 0
+
+T −1Φ
+
+  TΦΦ( z, S u ¯ψ(z)) 
+
+= Z1Φ†
+
+> 0
+
+ T −1Φ TΦ
+
+ Φ( z, S u ¯ψ(z)) = Z1Φ†
+
+> 0
+
+Φ( z, S u ¯ψ(z)) .
+
+Left-multiplying both sides by ∂V z (z) 
+
+> ∂z
+
+, we obtain 
+
+∂V z (z)
+
+∂z Z1 ¯Φ† 
+
+> 0
+
+¯Φ( z, ¯ψ(z)) = ∂V z (z)
+
+∂z Z1Φ†
+
+> 0
+
+Φ( z, S u ¯ψ(z)) ,
+
+which holds pointwise for all z ∈ X z \ { 0}. Consequently, condition (34) holds over Xz \ { 0} if and only if condition (35) holds over Xz \ { 0}, which completes the proof. ■
+
+By virtue of the joint equivalences established in Proposi-tions 1 and 2, the synthesis objective under input constraints reduces to designing a neural controller ¯u = ¯ψ(z) and a 10 
+
+neural Lyapunov function Vz (z) that satisfy (14a) and (34). Accordingly, the loss term LND in (18) is adapted to account for the input-normalized dynamics: 
+
+LND (Vz , ¯ψ) = 1
+
+N
+
+> N
+
+X
+
+> k=1
+
+ReLU 
+
+ ∂V z (zk)
+
+∂z Z1 ¯Φ† 
+
+> 0
+
+¯Φ( zk, ¯ψ(zk)) +ε · Ω( zk)) .
+
+(36) Consequently, the stability conditions (10) are guaranteed to hold across X \ { 0} by recovering the physical controller as ϕ(x) = Su ¯ψ(Sx ) and establishing the physical Lyapunov function as V (x) = Vz (Sx ).
+
+Remark 7: Appending a tanh function to the raw MLP output provides an intuitive yet effective strategy for both enforcing input constraints and achieving input normalization. From an optimization perspective, in the absence of input normalization, the gradient updates of the neural controller tend to dominate those of the neural Lyapunov function when 
+
+bu,i ≫ 1, whereas the converse holds when bu,i ≪ 1. Hence, input normalization plays a role in balancing the optimization of both networks. 
+
+Example 2: Consider the dynamics of a magnetic levitation system [43]: 
+
+˙λ = − Rk λh + u, 
+
+˙h = 1
+
+m w, 
+
+˙w = − 12k λ2 + mg, 
+
+(37) where λ is the coil flux, h is the absolute air gap, w is the momentum of the levitated iron ball, and u is the control voltage applied to the electromagnet coil. Let x := [ λ, h, w ]⊤
+
+be the state vector. The control objective is to stabilize the iron ball at a desired height h∗. The corresponding steady-state equilibrium point is given by x∗ = [ λ∗, h ∗, 0] ⊤ and 
+
+u∗ = Rh ∗λ∗ 
+
+> k
+
+, where λ∗ = √2kmg . To shift the equilibrium to the origin, we introduce the error state and input variables as 
+
+˜x := x − x∗ and ˜u := u − u∗, respectively. Note that ˜x = 0 
+
+is an unstable equilibrium of the uncontrolled system. Let X = {˜x ∈ R3 | − bi ≤ ˜xi ≤ bi, i = 1 , 2, 3} denote the target stabilization domain, and S = diag ( 1 
+
+> b1
+
+, 1 
+
+> b2
+
+, 1 
+
+> b3
+
+) be the state scaling matrix. Furthermore, let U = {˜u ∈ R | − umin ≤
+
+˜u ≤ umax } be the set of admissible control input, and Su = bu
+
+be the input scaling factor with bu = min( umin , u max ). By expressing (37) in terms of the shifted, normalized state z =
+
+S ˜x and control input ¯u = S−1 
+
+> u
+
+˜u, the transformed dynamics governing z are formulated as: 
+
+˙z1 = − Rk
+
+
+
+h∗z1 + λ∗b2
+
+b1
+
+z2 + b2z1z2
+
+
+
++ bu
+
+b1
+
+¯u, 
+
+˙z2 = b3
+
+b2m z3,
+
+˙z3 = − 12kb 3
+
+ 2λ∗b1z1 + b21z21
+
+ .
+
+(38) Accordingly, we construct the normalized function library as 
+
+Φ( z, ¯u) = [ z1, z 2, z 3, ¯u, z 1z2, z 21 ]⊤.As the first step, we collect the dataset D for identifica-tion purpose from the system (37) setting the parameters as 
+
+R = 2 .52 , m = 0 .0844 , g = 9 .81 , k = 6 .4042 × 10 −5,and the target equilibrium height as h∗ = 0 .007 . The domain bounds defining X are set to b1 = 0 .0015 , b2 = 0 .0015 ,and b3 = 0 .008 , and the input bounds defining U are set to 
+
+umax = umin = 2 . Given the small magnitude of the physical bounds bi ≪ 1 (i = 1 , 2, 3), state normalization is essential; otherwise, training directly on the unscaled error state ˜x might induce numerical issues. Here, we collect T = 50 samples by uniformly sampling the control input u and state x such that 
+
+˜u ∈ U and ˜x ∈ X , respectively. Based on the collected dataset 
+
+D, the identified model (33) is constructed. For network configuration, both Vz (z) and ¯ψ(z) are param-eterized using feedforward neural networks with one hidden layer of 80 neurons and tanh activation function. To satisfy the equilibrium stability prerequisites, the bias-elimination architecture (16) is implemented to guarantee Vz (0) = 0 and 
+
+¯ψ(0) = 0 , with an additional tanh function enforcing the input constraint ˜u ∈ U . Prior to the training phase, a warm-up stage is executed wherein Vz (z) is pre-trained to approximate 
+
+Vtarget (z) = 6∥z∥22. Regarding the loss function, we set the convergence margin ϵ = 0 .01 , and the hyperparameters 
+
+γ1 = 100 and γ2 = 25 to balance the penalty terms. The network parameters are updated via the Adam optimize, and 
+
+Vz (z) is trained with a learning rate of 1 × 10 −3, whereas 
+
+ψ(z) is trained with a learning rate of 5 × 10 −4 together with a weight decay of 1 × 10 −3.The training phase begins with the construction of the training dataset D. Initially, D is populated with 50 batches of samples, each with a batch size of 300 , generated via uniform state sampling across the domain Xz . Let the exclusion ball be of radius σ = 0 .05 , and thus the SMT verification domain is XSMT := {z ∈ R3 | z ∈ [−1, 1] 3 \ B σ (0) }. Within each training loop, a synergistic counterexample search is executed by deploying both PGD and PSO. Specifically, the gradient-based PGD search initializes a pool of 100 batches of candidate samples, which are recursively updated over 
+
+p = 60 steps with a step size of κ = 0 .04 . Furthermore, to bypass saturation-induced vanishing gradients, the derivative-free PSO search deploys a swarm of Npso = 1000 particles over p = 60 steps, configured with ω = 0 .5 and c1 = c2 = 1 .5.Both the PGD trajectories and the PSO swarms adopt the hybrid sampling configuration detailed in Example 1. The counterexamples uncovered by both search algorithms are aggregated and dynamically appended to D. In the formal stability verification phase, the SMT solver dReal is deployed to validate the Lyapunov conditions (14a) and (34) over XSMT 
+
+with a precision tolerance of δ = 1 × 10 −4.In the numerical evaluation, dReal successfully returns a formal verification certificate, confirming that the Lyapunov conditions (14a) and (34) hold universally across XSMT . Fur-thermore, regarding the local domain Bσ (0) , the maximum real part of the eigenvalues of Acl is −8.0824 , confirming its Hurwitz property. Solving the SDP (22) and evaluating the Hessian bounds Hi over Bσ (0) yield a threshold σthreshold =0.3327 that satisfies σ < σ threshold , thereby ensuring asymptotic stability over the entire domain Xz . By Propositions 1 and 2, the synthesized neural controller u = u∗ + Su ¯ψ S(x − x∗)
+
+formally guarantees to stabilize the iron ball at the desired 11 
+
+height h∗. The closed-loop state and input evolutions of the physical dynamics (37) initialized at x(0) = [ λ∗, 0.008 , 0] ⊤
+
+are displayed in Figure 2, where the state trajectories converge to the target equilibrium point x∗ and the control input remains within the set U.For the closed-loop dynamics, we numerically determine the set H := {z ∈ R3 | ˙Vz (z) < 0}, with ˙Vz (z) =  
+
+> ∂V z(z)
+> ∂z
+
+Z1 ¯Φ† 
+
+> 0
+
+¯Φ( z, ¯ψ(z)) , over which the Lyapunov function 
+
+Vz (z) decreases, and any sub-level set Rc := {z ∈ R3 |
+
+Vz (z) ≤ c} with c > 0 contained within H ∪ { 0} yields an estimate of the ROA for the normalized closed-loop system. Figure 3 shows the planar projections of the set H, a sublevel set of Vz (z), and the target domain Xz . Note that the green set is larger than the projection of any sub-level set of Vz (z)
+
+contained in Xz , and hence the obtained neural controller performs better than theoretically predicted. 0.0102 0.0104 0.0106 Flux  (Wb)      
+
+> 7.0 7.5 8.0 Air Gap  h (mm) 0.0015
+> 0.0010
+> 0.0005
+> 0.0000 0.0005 Momentum  w (kg·m/s) 0.0 0.2 0.4 0.6 0.8 1.0 Time (s) 12345Voltage  u (V)
+
+Fig. 2. State and control responses of the closed-loop magnetic levitation system, initialized at state x(0) = [ λ∗, 0.008 , 0] ⊤.1.5 1.0 0.5 0.0 0.5 1.0 1.5 
+
+> z1
+> 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5
+> z2
+
+Fig. 3. The gray set, the blue set, and the red dashed box represent the projections of the set H, the Lyapunov sublevel set Rc with c = 2 .3660 ,and the domain Xz onto the plane {z ∈ R3 | z3 = 0 }, respectively. 
+
+VI. R OBUSTNESS TO DISTURBANCES 
+
+In this section, we extend the previous results to sce-narios where additive perturbations corrupt the identification data. Note that offline data acquisition during the system identification phase is the sole step that interfaces with the physical plant, rendering the identification data susceptible to environmental disturbances. In turn, the subsequent con-troller synthesis and verification phase is conducted within a deterministic numerical framework, which is insulated from physical measurement noise. Hence, the exclusive source of uncertainty is the parametric mismatch of the identified system matrix. Building upon this, we develop robust control design methods that explicitly account for the uncertainties arising from the corrupted identification data by enforcing the Lyapunov stability conditions over the entire set of data-consistent models. 
+
+A. Robust Stability Conditions under Data Perturbations 
+
+Consider the scenario where additive perturbations corrupt the state derivative measurement and the collected samples satisfy: 
+
+˙x(ti) = AZ (x(ti), u (ti)) + d(ti), i = 0 , . . . , T − 1 (39) where d(ti) ∈ Rn represents the unknown perturbation at sampling time ti. Accordingly, the data matrices X1 and Z0
+
+defined in (6) satisfy the following relation: 
+
+X1 = AZ 0 + D0, (40) where D0 := [ d(t0), d (t1), . . . , d (tT −1)] ∈ Rn×T is the un-known data perturbation matrix. To perform robust synthesis, we formalize our prior knowledge regarding D0 through the following bounded uncertainty set assumption. 
+
+Assumption 3: Given a matrix ∆, D0 ∈ D := {D ∈
+
+Rn×T : DD ⊤ ⪯ ∆∆ ⊤}. □
+
+This formulation provides a versatile framework capable of accommodating various perturbation classes, including point-wise norm bounds, energy constraints, and stochastic distur-bances. Under Assumption 2, the true system matrix can be expressed as A = ( X1 −D0)Z† 
+
+> 0
+
+. Since D0 is unknown, we aim to ensure that the Lyapunov stability conditions hold robustly across the entire set of system matrices compatible with the corrupted data, leading to the following robust stability guarantee. 
+
+Theorem 2: Consider the nonlinear system (1). Let Assump-tions 1, 2 and 3 hold. Let X ⊆ Rn be a set containing the origin. Suppose there exist a scalar α > 0, neural networks ϕ
+
+and V satisfying ϕ(0) = 0 and V (0) = 0 such that for each 
+
+x ∈ X \ { 0}
+
+V (x) > 0, (41a) 
+
+2 ∂V (x)
+
+∂x X1Z† 
+
+> 0
+
+Z(x, ϕ (x)) + α ∂V (x)
+
+∂x ∆∆ ⊤
+
+ ∂V (x)
+
+∂x 
+
+⊤
+
++ 1
+
+α Z(x, ϕ (x)) ⊤Z†
+
+> 0
+> ⊤
+
+Z† 
+
+> 0
+
+Z(x, ϕ (x)) < 0. (41b) Then, the origin is asymptotically stable for the closed-loop system (4). 12 
+
+Proof. The proof relies on demonstrating that V (x) serves as a valid Lyapunov function for all consistent systems of the form ˙x = ( X1 − D)Z† 
+
+> 0
+
+Z(x, ϕ (x)) , ∀D ∈ D . This requires verifying two properties: (i) V is positive definite, and (ii ) its time derivative along the system trajectories satisfies 
+
+∂V (x)
+
+∂x (X1 −D)Z† 
+
+> 0
+
+Z(x, ϕ (x)) < 0 ∀x ∈ X \{ 0}, ∀D ∈ D .
+
+(42) The positive definiteness of V is a direct consequence of 
+
+V (0) = 0 together with (41a). We then demonstrate that (42) holds by virtue of (41b). By Assumption 3, ∀x ∈ X \ { 0},(41b) gives 
+
+2 ∂V (x)
+
+∂x X1Z† 
+
+> 0
+
+Z(x, ϕ (x)) + α ∂V (x)
+
+∂x DD ⊤ ∂V (x)
+
+∂x 
+
+> ⊤
+
++ 1
+
+α Z(x, ϕ (x)) ⊤Z†
+
+> 0
+> ⊤
+
+Z† 
+
+> 0
+
+Z(x, ϕ (x)) < 0 ∀D ∈ D 
+
+and by Young’s inequality, we have 
+
+2 ∂V (x)
+
+∂x X1Z† 
+
+> 0
+
+Z(x, ϕ (x)) − ∂V (x)
+
+∂x DZ † 
+
+> 0
+
+Z(x, ϕ (x)) 
+
+− Z(x, ϕ (x)) ⊤Z†
+
+> 0
+> ⊤
+
+D⊤ ∂V (x)
+
+∂x 
+
+> ⊤
+
+< 0 ∀D ∈ D 
+
+that is, (42) holds. The validation of the properties for V is complete, which concludes the proof. ■
+
+Remark 8: Note that the feasibility of (41) hinges on the existence of V (x) and ϕ(x) that render the nom-inal closed-loop term 2 ∂V (x) 
+
+> ∂x
+
+X1Z† 
+
+> 0
+
+Z(x, ϕ (x)) sufficiently negative to dominate both the data perturbation penalty 
+
+α ∂V (x) 
+
+> ∂x
+
+∆∆ ⊤
+
+ ∂V (x)
+
+> ∂x
+
+⊤
+
+and the regressor-dependent term  
+
+> 1
+> α
+
+Z(x, ϕ (x)) ⊤Z†
+
+> 0
+> ⊤
+
+Z† 
+
+> 0
+
+Z(x, ϕ (x)) . Hence, the controllability of the nominal system plays a fundamental role in achieving this goal. 
+
+B. Robust Loss Design and Joint Synthesis 
+
+To translate the robust stability conditions (41) into the penalty terms within loss function (19), the term LND (18) is modified to explicitly enforce the condition (41b), which yields the robust penalty term LRND formulated as: 
+
+LR,d ND (Vz , ψ, α )= 1
+
+N
+
+> N
+
+X
+
+> k=1
+
+ReLU 
+
+
+
+2 ∂V z (zk)
+
+∂z Z1Φ†
+
+> 0
+
+Φ( zk, ψ (zk)) + α ∂V z (zk)
+
+∂z ∆z ∆⊤
+
+> z
+
+ ∂V z (zk)
+
+∂z 
+
+⊤
+
++ 1
+
+α Φ( zk, ψ (zk)) ⊤(Φ †
+
+> 0
+
+)⊤Φ†
+
+> 0
+
+Φ( zk, ψ (zk)) + εΩ( zk)
+
+
+
+.
+
+(43) Under the state normalization z = Sx , the normalized per-turbation matrix is defined as Dz, 0 := SD 0, which satisfies 
+
+Dz, 0D⊤ 
+
+> z, 0
+
+⪯ ∆z ∆⊤ 
+
+> z
+
+with ∆z := S∆ denoting the scaled perturbation bound matrix. Rather than treating α as an offline hyperparameter selected prior to the controller synthesis stage, our framework considers it as a decision variable optimized jointly with ψ(z) and Vz (z).To achieve this, we re-parameterize α as: 
+
+α = eθα , (44) where θα ∈ R is an unconstrained trainable parameter up-dated via backpropagation. This exponential mapping strictly guarantees α > 0 by construction, thereby fulfilling the positivity prerequisite of Theorem 2. During joint training, the optimizer automatically adjusts θα to dynamically balance the terms within the loss function. Upon convergence, the learned parameter evaluates to a deterministic constant α∗ = eθ∗ 
+
+> α
+
+.
+
+Remark 9 (Joint Optimization of ϵ): Analogous to the treatment of α, rather than pre-selecting the margin parameter 
+
+ϵ a priori , it can be re-parameterized as: 
+
+ϵ = eθϵ , (45) where θϵ ∈ R is a trainable parameter updated jointly during training. Note that unconstrained minimization of the loss function tends to yield a trivial solution ϵ → 0+, which dampens the closed-loop convergence rate. To circumvent this, a regularization term LCR (θϵ) := −λϵθϵ with λϵ > 0 is incorporated into the overall loss Ltotal (Vz , ψ, α, ϵ ). The term 
+
+LCR (θϵ) serves to maximize ϵ while maintaining the Lyapunov stability constraints Vz (z) ≥ ϵ∥z∥2 and ˙Vz (z) ≤ − ϵ∥z∥2.
+
+C. Robust Local Stability Certification 
+
+In the presence of state derivative measurement noise, the uncertain normalized closed-loop dynamics are given by 
+
+˙z = fcl ,D (z) := ( Z1 − Dz, 0)Φ †
+
+> 0
+
+Φ( z, ψ (z)) . (46) Let JΦ(0) := ∂Φ( z,ψ (z))  
+
+> ∂z z=0
+
+∈ Rs×n denote the Jacobian of Φ( z, ψ (z)) evaluated at the origin. The first-order Taylor’s expansion of (46) around z = 0 is expressed as 
+
+˙z = Acl ,D z + g(z, D z, 0), (47) where Acl ,D := A0 − Dz, 0Φ†
+
+> 0
+
+JΦ(0) with A0 := Z1Φ†
+
+> 0
+
+JΦ(0) 
+
+representing the nominal closed-loop Jacobian, and g(z, D z, 0)
+
+denotes the higher-order remainder satisfying g(0 , D z, 0) = 0 
+
+and ∂g (z,D z, 0) 
+
+> ∂z z=0
+
+= 0 .To establish local asymptotic stability robustly against all perturbation matrices Dz, 0 ∈ D z , we consider a candidate local Lyapunov function Vloc (z) = z⊤P z with P ∈ Sn×n.The time derivative of Vloc (z) along the trajectories of (47) is given by 
+
+˙Vloc (z) = z⊤  A⊤ 
+
+> cl ,D
+
+P + P A cl ,D 
+
+ z + 2 z⊤P g (z, D z, 0). (48) By Young’s inequality, the quadratic term in (48) can be upper-bounded for any scalar φ > 0 as 
+
+z⊤
+
+A⊤ 
+
+> cl ,D
+
+P + P A cl ,D 
+
+
+
+z
+
+= z⊤
+
+A⊤ 
+
+> 0
+
+P + P A 0 − JΦ(0) ⊤(Φ †
+
+> 0
+
+)⊤D⊤
+
+> z, 0
+
+P
+
+− P D z, 0Φ†
+
+> 0
+
+JΦ(0) 
+
+
+
+z
+
+≤ z⊤
+
+A⊤ 
+
+> 0
+
+P + P A 0 + 1
+
+φ P ∆z ∆⊤ 
+
+> z
+
+P
+
++ φJ Φ(0) ⊤(Φ †
+
+> 0
+
+)⊤Φ†
+
+> 0
+
+JΦ(0) 
+
+
+
+z. 
+
+(49) 13 
+
+We then search for P ≻ 0, φ > 0, and γ > 0 by solving the following SDP: 
+
+max   
+
+> P≻0,φ> 0,γ> 0
+
+γ
+
+s.t. P ⪯ I, 
+
+M11 P ∆z
+
+∗ −φI n
+
+
+
+⪯ 0,
+
+(50) where M11 := A⊤ 
+
+> 0
+
+P + P A 0 + φJ Φ(0) ⊤(Φ †
+
+> 0
+
+)⊤Φ†
+
+> 0
+
+JΦ(0) + γI .By Schur complement, the feasibility of (50) guarantees that 
+
+z⊤
+
+
+
+A⊤ 
+
+> cl ,D
+
+P + P A cl ,D 
+
+
+
+z ≤ − γ∥z∥22 holds robustly for all 
+
+Dz, 0 ∈ Dz . If the SDP (50) is infeasible, the candidate controller is rejected, and the algorithm reverts to the training loop to re-synthesize ψ(z) and Vz (z).On the other hand, if the SDP (50) is feasible, by Cauchy-Schwarz inequality together with Taylor’s theorem, the higher-order cross-term in (48) satisfies 
+
+2z⊤P g (z, D z, 0) ≤
+
+> n
+
+X
+
+> i=1
+
+∥Pi, ·∥2Hi,D ∥z∥32, (51) where Hi,D := max Dz, 0∈D z max z∈B σ (0) ∥∇ 2fcl ,D,i (z)∥2 de-notes a uniform upper bound on the Hessian spectral norm for the i-th scalar component of fcl ,D over Bσ (0) . Recalling that the nominal closed-loop dynamics are given by fcl (z) := 
+
+Z1Φ†
+
+> 0
+
+Φ( z, ψ (z)) , Hi,D can be conservatively upper-bounded by ¯Hi,D , which is defined as: 
+
+¯Hi,D := max   
+
+> z∈B σ(0)
+
+∥∇ 2fcl ,i (z)∥2
+
++ ∥∆z ∥2∥Φ†
+
+> 0
+
+∥2
+
+> s
+
+X
+
+> j=1
+
+max   
+
+> z∈B σ(0)
+
+∥∇ 2Φj (z, ψ (z)) ∥2.
+
+(52) Let Kg,D := Pni=1 ∥Pi, ·∥2 ¯Hi,D . Combining (49) and (51) yields 
+
+˙Vloc (z) ≤ − (γ − Kg,D ∥z∥2) ∥z∥22, ∀Dz, 0 ∈ D z . (53) Consequently, if the exclusion radius σ satisfies 
+
+σ < σ threshold := γKg,D 
+
+, (54) 
+
+˙Vloc (z) < 0 is guaranteed to hold for all z ∈ B σ (0) \{ 0} across the entire set of data-consistent dynamics. Together with the SMT verification over XSMT , this establishes a formal robust stability guarantee across the entire domain Xz . Conversely, if (54) is violated, the candidate controller is rejected, and the algorithm reverts to the training loop to re-synthesize ψ(z)
+
+and Vz (z).
+
+Remark 10: Analogous to (22), the SDP (50) inherently optimizes σthreshold . Furthermore, to compute ¯Hi,D (i =1, . . . , n ) via (52), a set of state samples {zk} ¯Nk=1 is densely drawn within Bσ (0) . At each sample point, ∥∇ 2fcl ,i (zk)∥2
+
+and ∥∇ 2Φj (zk, ψ (zk)) ∥2 (j = 1 , . . . , s ) are evaluated using PyTorch. By taking the maximums over all evaluated samples and incorporating ∥∆z ∥2 along with ∥Φ†
+
+> 0
+
+∥2, the bounds ¯Hi,D 
+
+are determined. 
+
+Example 3: Consider the dynamics of an inverted pendulum 
+
+˙x1 = x2,
+
+˙x2 = − ζmℓ 2 x2 + gℓ sin x1 + 1
+
+mℓ 2 u, (55) where x1 and x2 denote the angular position and velocity, respectively, and u is the applied torque. Note that the origin, representing the pendulum upright position, is an unstable equilibrium, and the control objective is to stabilize the closed-loop system at the origin. Let X = {x ∈ R2 | − bi ≤ xi ≤ bi, i = 1 , 2} denote the target stabilization domain, and S = diag ( 1 
+
+> b1
+
+, 1 
+
+> b2
+
+) be the state scaling matrix. By expressing (55) in terms of the normalized state z = Sx , the transformed dynamics governing z are formulated as: 
+
+˙z1 = b2
+
+b1
+
+z2,
+
+˙z2 = − ζmℓ 2 z2 + gℓb 2
+
+sin( b1z1) + 1
+
+mℓ 2b2
+
+u. 
+
+(56) Accordingly, we construct the normalized function library as 
+
+Φ( z, u ) = [ z1, z 2, sin( b1z1), u ]⊤.In this example, we evaluate the proposed robust neural control framework subject to identification data perturbations. As the first step, we collect the dataset D from (55) with physical parameters m = 0.1, ℓ = 2.0, g = 9.81 , and 
+
+ζ = 0.01 . The bounds defining the domain X are set to 
+
+b1 = 3 .14 and b2 = 2 .0. Specifically, we collect T = 50 
+
+samples by uniformly sampling the control input u ∈ [−2, 2] 
+
+and the state x ∈ X . The collected samples are corrupted by additive perturbations d(ti) satisfying ∥d(ti)∥∞ ≤ ρd with 
+
+ρd = 0 .01 . Accordingly, the scaled perturbation bound matrix is computed as ∆z = S√T ρ dI2. The scalar parameter θα is initialized to −2.3 (corresponding to α ≈ 0.1) and optimized jointly with the network parameters. For network configuration, both Vz (z) and ψ(z) are param-eterized using feedforward neural networks with one hidden layer of 50 neurons and tanh activation functions. The bias-elimination architecture is implemented to strictly enforce the equilibrium constraints Vz (0) = 0 and ψ(0) = 0. Prior to the joint synthesis phase, a warm-up stage is executed wherein Vz (z) is pre-trained to approximate Vtarget (z) = ∥z∥22.Regarding the loss function, we set the convergence margin 
+
+ϵ = 0 .1 and the penalty hyperparameters to γ1 = γ2 = 10 .During joint synthesis, the network parameters are optimized via the Adam optimizer with a learning rate of 5 × 10 −4.The training phase begins with the construction of the training dataset D. Initially, D is populated with 50 batches of samples, each with a batch size of 300 , generated via uniform state sampling across the domain Xz . Let the exclusion ball be of radius σ = 0 .05 , and thus the SMT verification domain is XSMT = {z ∈ R2 | z ∈ [−1, 1] 2 \ B σ (0) }. Within each training loop, the counterexample search is executed via the PGD algorithm. Both the hybrid sampling strategy and the PGD algorithm share the same configuration as detailed in Example 1. For formal stability verification, we employ the SMT solver dReal to validate the normalized counterpart of the robust Lyapunov conditions (41) over XSMT with a precision tolerance of δ = 2 × 10 −5.14 
+
+In the numerical evaluation, dReal successfully certifies that the robust Lyapunov conditions hold universally across 
+
+XSMT . Upon convergence, the optimized parameter yields 
+
+α∗ = eθ∗ 
+
+> α
+
+= 0.0152 . Furthermore, regarding the local domain Bσ (0) , evaluating the Hessian bounds ¯Hi,D over 
+
+Bσ (0) determines a threshold σthreshold = 2 .5523 that satisfies 
+
+σ < σ threshold , thereby ensuring asymptotic stability over the entire domain Xz under data perturbations. By Proposition 1, the synthesized neural controller u = ψ(Sx ) is formally guaranteed to stabilize the inverted pendulum at the upright equilibrium position. Let 
+
+W(x) := 2 ∂V z (Sx )
+
+∂x X1Z† 
+
+> 0
+
+Z(x, ψ (Sx )) + α∗ ∂V z (Sx )
+
+∂x ∆∆ ⊤
+
+ ∂V z (Sx )
+
+∂x 
+
+⊤
+
++ 1
+
+α∗ Z(x, ψ (Sx )) ⊤(Z† 
+
+> 0
+
+)⊤Z† 
+
+> 0
+
+Z(x, ψ (Sx )) .
+
+(57) For the closed-loop dynamics, we numerically determine the set HW := {x ∈ R2 | W (x) < 0}, over which the Lyapunov function Vz (Sx ) decreases, and any sub-level set Rc := {x ∈
+
+R2 | Vz (Sx ) ≤ c} with c > 0 contained within HW ∪ { 0}
+
+yields an estimate of the ROA for the closed-loop system. The set HW , a sublevel set of Vz (Sx ), and the domain X are shown in Figure 4. Notably, the green set is larger than any sub-level set of Vz (Sx ) contained in X .Note that since ∆ = √T ρ dI2, the uncertainty bound increases with the number of identification samples T . As a result, a larger T introduces greater conservatism, making it more challenging to synthesize ϕ(x) and V (x) that satisfy (41). In our experiments, robust stability can be certified up to 
+
+T = 1000 , which validates the effectiveness of the proposed approach. Furthermore, we observe that σthreshold decreases as T increases, which is consistent with the fact that Kg,D 
+
+increases with T .8 6 4 2 0 2 4 6 8 
+
+> Angle (rad)
+> 8
+> 6
+> 4
+> 2
+> 02468
+> Angular Velocity  (rad/s)
+
+Fig. 4. The grey set represents the set HW , the green set is a sub-level set Rc contained in HW ∪ { 0} with c = 3 .4224 , and the red dashed box delineates the verified domain X .
+
+VII. C ONCLUSION 
+
+We have introduced a data-driven framework for the joint synthesis and formal verification of neural feedback controllers and neural Lyapunov functions for unknown nonlinear sys-tems. We adopt an indirect control paradigm, wherein the system model is first identified from offline data, and the neural feedback law and Lyapunov function are subsequently synthesized based on the identified dynamics. To accommo-date physical actuator limits, a hard saturation architecture is incorporated to enforce input constraints by construction. Furthermore, a robust extension is developed to ensure sta-bility across all data-consistent models under identification data perturbations. Future research should focus on mitigating computational complexity for high-dimensional systems, as well as extending the proposed framework to output-feedback control. REFERENCES [1] J. Lee, J. Hwangbo, L. Wellhausen, V. Koltun, and M. Hutter, “Learning quadrupedal locomotion over challenging terrain,” Science robotics ,vol. 5, no. 47, p. eabc5986, 2020. [2] J. Degrave, F. Felici, J. Buchli, M. Neunert, B. Tracey, F. Carpanese, T. Ewalds, R. Hafner, A. Abdolmaleki, D. de Las Casas et al. , “Magnetic control of tokamak plasmas through deep reinforcement learning,” 
+
+Nature , vol. 602, no. 7897, pp. 414–419, 2022. [3] Y. Wang, H. Wang, K. Zhuang, K. Moffat, and F. D¨ orfler, “Model-free power system stability enhancement with dissipativity-based neural control,” Electric Power Systems Research , vol. 262, p. 113518, 2027. [4] G. Pillonetto, F. Dinuzzo, T. Chen, G. De Nicolao, and L. Ljung, “Kernel methods in system identification, machine learning and function estimation: A survey,” Automatica , vol. 50, no. 3, pp. 657–682, 2014. [5] L. Ljung, “Perspectives on system identification,” Annual Reviews in Control , vol. 34, no. 1, pp. 1–12, 2010. [6] C. De Persis and P. Tesi, “Formulas for data-driven control: Stabilization, optimality, and robustness,” IEEE Transactions on Automatic Control ,vol. 65, no. 3, pp. 909–924, 2020. [7] M. C. Campi, A. Lecchini, and S. M. Savaresi, “Virtual reference feedback tuning: a direct method for the design of feedback controllers,” 
+
+Automatica , vol. 38, no. 8, pp. 1337–1346, 2002. [8] C. De Persis, M. Rotulo, and P. Tesi, “Learning controllers from data via approximate nonlinearity cancellation,” IEEE Transactions on Automatic Control , vol. 68, no. 10, pp. 6082–6097, 2023. [9] H. J. van Waarde, M. K. Camlibel, and M. Mesbahi, “From noisy data to feedback controllers: Nonconservative design via a matrix S-lemma,” 
+
+IEEE Transactions on Automatic Control , vol. 67, no. 1, pp. 162–175, 2021. [10] M. Guo, C. De Persis, and P. Tesi, “Data-driven stabilization of nonlinear polynomial systems with noisy data,” IEEE Transactions on Automatic Control , vol. 67, no. 8, pp. 4210–4217, 2021. [11] H. Huang, M. K. Camlibel, R. Carloni, and H. J. van Waarde, “Feedback stabilization of polynomial systems: From model-based to data-driven methods,” IEEE Transactions on Automatic Control , 2026. [12] C. De Persis and P. Tesi, “Learning controllers for nonlinear systems from data,” Annual Reviews in Control , p. 100915, 2023. [13] T. Martin, T. B. Sch¨ on, and F. Allg¨ ower, “Guarantees for data-driven control of nonlinear systems using semidefinite programming: A survey,” 
+
+Annual Reviews in Control , vol. 56, p. 100911, 2023. [14] A. Bisoffi, C. De Persis, and P. Tesi, “Data-driven control via Petersen’s lemma,” Automatica , vol. 145, p. 110537, 2022. [15] M. Guo, C. De Persis, and P. Tesi, “Data-driven stabilization of nonlinear systems via taylor’s expansion,” in Hybrid and Networked Dynamical Systems: Modeling, Analysis and Control . Springer, 2024, pp. 273–299. [16] K. Hornik, M. Stinchcombe, and H. White, “Multilayer feedforward networks are universal approximators,” Neural networks , vol. 2, no. 5, pp. 359–366, 1989. [17] I. R. Manchester, R. Wang, and N. H. Barbara, “Neural networks in the loop: Learning with stability and robustness guarantees,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 9, 2026. [18] P. Mestres, J. Cort´ es, and E. D. Sontag, “Neural network-based universal formulas for control,” arXiv preprint arXiv:2505.24744 , 2025. 15 
+
+[19] H. Dai, B. Landry, L. Yang, M. Pavone, and R. Tedrake, “Lyapunov-stable neural-network control,” arXiv preprint arXiv:2109.14152 , 2021. [20] A. Abate, D. Ahmed, M. Giacobbe, and A. Peruffo, “Formal synthesis of lyapunov neural networks,” IEEE Control Systems Letters , vol. 5, no. 3, pp. 773–778, 2020. [21] A. Edwards, A. Peruffo, and A. Abate, “A general framework for verification and control of dynamical models via certificate synthesis,” 
+
+Annual Reviews in Control , vol. 60, p. 101028, 2025. [22] D. Ahmed, A. Peruffo, and A. Abate, “Automated and sound synthesis of lyapunov functions with smt solvers,” in International conference on tools and algorithms for the construction and analysis of systems .Springer, 2020, pp. 97–114. [23] R. Nieuwenhuis, A. Oliveras, and C. Tinelli, “Solving sat and sat modulo theories: From an abstract Davis–Putnam–Logemann–Loveland procedure to DPLL( T ),” Journal of the ACM (JACM) , vol. 53, no. 6, pp. 937–977, 2006. [24] C. Barrett and C. Tinelli, “Satisfiability modulo theories,” in Handbook of model checking . Springer, 2018, pp. 305–343. [25] S. Gao, S. Kong, and E. M. Clarke, “dreal: An smt solver for nonlinear theories over the reals,” in International conference on automated deduction . Springer, 2013, pp. 208–214. [26] S. Gao, J. Avigad, and E. M. Clarke, “ δ-complete decision procedures for satisfiability over the reals,” in International Joint Conference on Automated Reasoning . Springer, 2012, pp. 286–300. [27] L. De Moura and N. Bjørner, “Z3: An efficient smt solver,” in Inter-national conference on Tools and Algorithms for the Construction and Analysis of Systems . Springer, 2008, pp. 337–340. [28] G. Katz, C. Barrett, D. L. Dill, K. Julian, and M. J. Kochenderfer, “Reluplex: An efficient smt solver for verifying deep neural networks,” in International conference on computer aided verification . Springer, 2017, pp. 97–117. [29] A. Abate, C. David, P. Kesseli, D. Kroening, and E. Polgreen, “Coun-terexample guided inductive synthesis modulo theories,” in International Conference on Computer Aided Verification . Springer, 2018, pp. 270– 288. [30] A. Abate, D. Ahmed, A. Edwards, M. Giacobbe, and A. Peruffo, “Fossil: a software tool for the formal synthesis of lyapunov functions and barrier certificates using neural networks,” in Proceedings of the 24th international conference on hybrid systems: computation and control ,2021, pp. 1–11. [31] A. Edwards, A. Peruffo, and A. Abate, “Fossil 2.0: Formal certificate synthesis for the verification and control of dynamical models,” in Pro-ceedings of the 27th ACM international conference on hybrid systems: computation and control , 2024, pp. 1–10. [32] Y.-C. Chang, N. Roohi, and S. Gao, “Neural lyapunov control,” Ad-vances in neural information processing systems , vol. 32, 2019. [33] R. Zhou, T. Quartz, H. De Sterck, and J. Liu, “Neural lyapunov control of unknown nonlinear systems with stability guarantees,” Advances in Neural Information Processing Systems , vol. 35, pp. 29 113–29 125, 2022. [34] H. Wang, K. Miao, D. d. S. Madeira, and A. Papachristodoulou, “Designing neural controllers with optimality and stability guarantees by learning input-output dissipativity,” Automatica , vol. 191, p. 113120, 2026. [35] S. L. Brunton, J. L. Proctor, and J. N. Kutz, “Discovering governing equations from data by sparse identification of nonlinear dynamical systems,” Proceedings of the national academy of sciences , vol. 113, no. 15, pp. 3932–3937, 2016. [36] Z. Hu, C. De Persis, and P. Tesi, “Enforcing contraction via data,” IEEE Transactions on Automatic Control , vol. 70, no. 12, pp. 8076–8091, 2025. [37] V. N. Vapnik, “An overview of statistical learning theory,” IEEE trans-actions on neural networks , vol. 10, no. 5, pp. 988–999, 1999. [38] I. Goodfellow, Y. Bengio, A. Courville, and Y. Bengio, Deep learning .MIT press Cambridge, 2016, vol. 1, no. 2. [39] J. Wu, A. Clark, Y. Kantaros, and Y. Vorobeychik, “Neural lyapunov control for discrete-time systems,” Advances in neural information processing systems , vol. 36, pp. 2939–2955, 2023. [40] I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio, “Generative adversarial networks,” 
+
+Communications of the ACM , vol. 63, no. 11, pp. 139–144, 2020. [41] J. Kennedy and R. Eberhart, “Particle swarm optimization,” in Proceed-ings of ICNN’95-international conference on neural networks , vol. 4. ieee, 1995, pp. 1942–1948. [42] T. L. Vincent and J. Yu, “Control of a chaotic system,” Dynamics and Control , vol. 1, no. 1, pp. 35–52, 1991. [43] R. Ortega, A. J. Van Der Schaft, I. Mareels, and B. Maschke, “Putting energy back in control,” IEEE Control Systems Magazine , vol. 21, no. 2, pp. 18–33, 2001.

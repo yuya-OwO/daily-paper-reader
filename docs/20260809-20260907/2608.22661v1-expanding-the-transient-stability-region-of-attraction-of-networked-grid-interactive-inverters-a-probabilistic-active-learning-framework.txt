@@ -1,0 +1,534 @@
+Title: Expanding the Transient Stability Region of Attraction of Networked Grid-Interactive Inverters: A Probabilistic Active Learning Framework
+
+URL Source: https://arxiv.org/pdf/2608.22661v1
+
+Published Time: Tue, 25 Aug 2026 01:48:27 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+> IEEE TRANS SMART GRID 1
+
+# Expanding the Transient Stability Region of Attraction of Networked Grid-Interactive Inverters: A Probabilistic Active Learning Framework 
+
+Zhong Liu, Student Member, IEEE , Jialin Zheng, Member, IEEE ,Junjie Qin, Member, IEEE , Xiaonan Lu, Member, IEEE 
+
+Abstract —The continuous integration of inverter-based re-sources makes transient stability analysis increasingly important for power system modernization, in light of the intricate dynamics arising from large-scale inverter deployment. However, analytical transient stability analysis methods consistently yield overly conservative stability boundary estimates, which constrain grid dispatch and operational flexibility. Although recent neural Lya-punov methods attempt to enlarge these stability boundaries to obtain less conservative estimates, they remain trapped within re-stricted domains due to the out-of-distribution problem. To break this bottleneck, this paper proposes a probabilistic active learning framework. Starting from a deterministic inner stability region certified by neural Lyapunov functions, the framework constructs a Gaussian process surrogate and deploys an uncertainty-guided frontier search. By intelligently coupling electromagnetic tran-sient simulations with active boundary exploration, the algorithm systematically drives the estimated stability boundary outward. Comprehensive evaluations across multi-machine grid-forming benchmarks demonstrate that the proposed framework sub-stantially reduces estimation conservatism. Across test systems ranging up to four interconnected grid-forming inverters, the methodology achieves up to a 20 -fold volumetric enlargement of the certified stability region over classical baselines, while requiring at most 220 time-domain simulation queries per system, far fewer than the 1,600 queries that exhaustive EMT evaluation demands even for the simplest single-inverter benchmark. 
+
+Index Terms —Active learning, Gaussian process, grid-forming inverter, Lyapunov methods, transient stability analysis. 
+
+NOMENCLATURE 
+
+Power System Model Symbols 
+
+δi, ω i Virtual rotor angle and frequency deviation of unit i.
+
+Mi, H i Virtual inertia constant and inertia time con-stant, Mi = 2 Hi.
+
+Di Damping coefficient of unit i.
+
+P ∗ 
+
+> i
+
+Active-power setpoint of unit i.
+
+P e 
+
+> i
+
+Electrical active power injected by unit i.
+
+Ei Terminal-voltage magnitude of unit i.
+
+θCOI , ω COI COI reference angle and frequency. 
+
+MT Total system inertia. 
+
+∆δi, ν i COI-referenced angle and frequency devia-tions. 
+
+Gaussian Process and Active Learning Symbols 
+
+σ2 
+
+> f
+
+, ℓ Signal variance and characteristic length scale. 
+
+μ(x), σ 2(x) GP predictive mean and variance. 
+
+K, k∗ Covariance matrix and cross-covariance vector. 
+
+α GP regularization parameter. 
+
+β, γ Confidence multiplier and membership threshold. 
+
+J(x) UGFS information metric. 
+
+Na, N m Archive size and number of stochastic probes. 
+
+pl, w l, q Rank-weighted selection probability, weight, and shape parameter. 
+
+b(g), ζ, ξ Adaptive bandwidth, Gaussian noise, and contraction coefficient. 
+
+εσ , d div Uncertainty threshold and minimum query separation. I. I NTRODUCTION 
+
+# THE continuous proliferation of inverter-based resources (IBRs) is driving a profound paradigm shift in the dy-namic behavior of modern power grids [1]. Traditional power systems are dominated by synchronous generators (SGs), whose massive physical rotating inertia acts as a buffer to inherently absorb and suppress energy fluctuations during large-signal disturbances [2]. As the grid transitions toward a power electronics-dominated paradigm, devices such as Grid-Forming (GFM) inverters are increasingly displacing SGs [3]. Due to their low-inertia or zero-inertia characteristics, these power electronic interfaces respond extremely fast to external grid conditions [4], [5]. This implies that when the system encounters severe grid disturbances, the fast control loops of inverters cannot rely on inertia to ride through the transients. Instead, their rapid nonlinear actions may further amplify the initial disturbances, triggering severe transient instability. Consequently, developing reliable transient stability analysis (TSA) methods for such highly nonlinear, low-inertia networks has become an urgent yet unprecedented challenge. To systematically address the stability challenge, TSA aims to delineate the boundary within which the system can safely recover from severe faults. Mathematically, this transient sta-bility margin is typically quantified by the Region of At-traction (ROA) [6]. In engineering practice, obtaining a non-conservative ROA estimation is of tremendous value [7]. In contrast, a highly conservative ROA substantially underesti-mates the true stability boundary. Given that grid operators generally rely on the estimated boundary as the operational arXiv:2608.22661v1 [eess.SY] 23 Aug 2026 IEEE TRANS SMART GRID 2
+
+limit for dispatch, an overly conservative ROA artificially shrinks the admissible operating region [8]. Consequently, operators are often forced to adopt suboptimal operational strategies, such as curtailing renewable energy output, execut-ing unnecessary load shedding, or incurring high costs to over-design system hardware capacity [9]. Conversely, estimating a less conservative ROA can not only unlock greater trans-mission potential of existing equipment and higher renewable energy hosting capacity, but also provide broader dispatch headroom for secure grid operation. However, traditional TSA methods often suffer from in-trinsic theoretical bottlenecks when attempting to expand the ROA boundary, resulting in extremely conservative evalua-tion results. Although high-fidelity Electromagnetic Transient (EMT) simulations can provide reliable time-domain testing [10], they can only yield binary stability judgments for limited initial points and cannot explicitly delineate the global ROA boundary in the complete state space. To overcome this limitation, conventional analytical methods attempt to assess transient stability by constructing Lyapunov functions [11]. For instance, the Linear Matrix Inequality (LMI) method has to rely on broad Jacobian envelopes to transform the complex inverter dynamics into a convex optimization problem [12]; this excessive approximation directly leads to a severely shrunken estimated ROA. The Sum-of-Squares (SOS) method requires the system dynamics to be in polynomial form, forc-ing truncation approximations to fit the sinusoidal nonlinear inverter characteristics, which further compresses the provable stability region [13]. Due to unavoidable model reduction and structural limitations, these TSA methods consistently yield overly conservative ROA estimates. Driven by the imperative to accurately uncover these true stability boundaries, recent studies have leveraged neural net-works (NNs) to construct neural Lyapunov functions [14]– [17]. While these methods mitigate conservativeness to some extent, they ultimately struggle to push the ROA any further toward its physical limits. Early neural Lyapunov frameworks are typically restricted to training within conservative state space regions [14], [15]. Furthermore, as noted in [18], when the system dimension exceeds a certain scale, these methods often fail to converge to a valid Lyapunov function. Subse-quent efforts introduced tailored neural Lyapunov candidates to facilitate training [16], but at the cost of limiting the NN’s approximation capability, thus introducing additional conservativeness. While recent advancements have success-fully achieved rapid algebraic verification using Lipschitz continuity, their estimated ROAs still leave substantial room for improvement regarding the reduction of conservativeness [17]. Looking across current NN-based TSA methods, their inability to continuously expand the ROA stems from acommon fatal flaw: the Out-of-Distribution (OOD) problem [19]. Within the limited training region (i.e., the inner core region around the system equilibrium point), the neural net-work can satisfy the Lyapunov condition ˙V (x) < 0, where 
+
+V (x) denotes the NN-parameterized Lyapunov function and 
+
+˙V (x) is its time derivative. However, once the algorithm attempts to expand the ROA outward into the unknown OOD region, the NNs could suffer from severe generalization errors, causing the gradient ˙V (x) to violently distort. This distortion triggers massive ”pseudo-counterexamples”: state points that are mathematically misjudged as unstable ( ˙V (x) ≥ 0), but can actually converge to the equilibrium point. These ”pseudo-counterexamples” block the possibility of further outward expansion of the ROA, leaving existing NN methods still trapped in the dilemma of conservativeness. In response to the analytical barriers formed by these ”pseudo-counterexamples”, this paper proposes a paradigm shift towards a probabilistic active learning framework for TSA. We completely abandon evaluating Lyapunov gradi-ents outside the training region. Instead, inspired by recent advancements in probabilistic modeling [20], this work in-troduces a surrogate modeling philosophy. By leveraging a Gaussian Process (GP) to quantify stability uncertainties and actively querying a high-fidelity EMT Oracle, this data-driven exploration empowers the proposed framework to uncover the less conservative ROAs that remain hidden from traditional analytical tools. The main contributions of this paper are summarized as follows: 1) A three-stage TSA framework is proposed, establishing a structural synergy between rigorous mathematical ver-ification and probabilistic active learning. Specifically, a baseline ROA is first established by a Lipschitz-enforced neural Lyapunov function. Beyond this deterministic inner core, a GP coupled with an active exploration algorithm is deployed to bypass the trap of ”pseudo-counterexamples” in the OOD region, thus dynamically extending the stability boundary into the unknown outer space. 2) The long-standing conservativeness bottlenecks inher-ent in existing TSA methodologies are substantially mitigated. By bypassing the spurious mathematical vi-olations that hinder NN extrapolation, the proposed methodology captures significantly larger ROAs com-pared to state-of-the-art baselines. Validated across com-plex networked GFM inverter test cases, the framework expands the certified ROA size by 5 to 20 times com-pared to traditional analytical methods. 3) High computational and data efficiency is achieved, effectively bridging the gap between pure NNs and pure EMT simulations. Unlike pure NN-based methods that suffer from severe OOD extrapolation errors, or pure EMT approaches that are computationally prohibitive for delineating continuous stability boundaries, the proposed framework synthesizes a reliable, less conservative ROA while demanding only a marginal fraction of EMT runs. The remainder of this paper is structured as follows. Section II establishes the GFM inverter system modeling. Section III details the GP-based active exploration methodology. Section IV provides the case studies. Section V draws the conclusions. II. P RELIMINARY : M ODELING OF NETWORKED 
+
+GRID -I NTERACTIVE INVERTERS 
+
+To endow the inverter-dominated grid with the inertial and damping response, this work adopts GFM units as a represen-tative class of IBRs. Each GFM unit is operated under virtual IEEE TRANS SMART GRID 3
+
+synchronous machine (VSM) control, which reproduces the electromechanical behavior of a SG within the inverter control loop [21]. For the i-th unit in a network of N interconnected units, the active power loop yields the swing dynamics 
+
+˙δi = ωi, (1) 
+
+Mi ˙ωi = P ∗ 
+
+> i
+
+− P e 
+
+> i
+
+− Di ωi, (2) where δi and ωi are the virtual rotor angle and the angular-frequency deviation of unit i, Mi is the virtual inertia constant, 
+
+Di is the damping coefficient, and P ∗ 
+
+> i
+
+is the active-power setpoint. These GFM inverters are electrically coupled through the impedance network; consequently, the active power injected by unit i is governed by the relative virtual angles of its interconnected neighbors, formulated as: 
+
+P e 
+
+> i
+
+=
+
+> N
+
+X
+
+> j=1
+
+EiEj
+
+ Gij cos δij + Bij sin δij 
+
+, δij = δi − δj ,
+
+(3) where Ei is the terminal-voltage magnitude of unit i, and Gij 
+
+and Bij are the real and imaginary parts of the (i, j ) entry of the network admittance matrix. Because the reactive-power loop holds each voltage magnitude close to its reference, Ei is treated as constant, so the transient stability of the networked system is governed by the coupled angle–frequency dynamics in (1)–(3). The post-fault steady state δ∗ is the equilibrium point of (1)– (3), obtained by setting the time derivatives to zero. However, a significant challenge arises when directly analyzing the system in the absolute reference frame. Since the electrical power injection P e 
+
+> i
+
+is exclusively dictated by the relative angle differences δij , shifting all absolute virtual angles by an identical arbitrary constant yields zero effect on the system dynamics. This physical characteristic implies that the post-fault equilibrium is not a single isolated point, but rather a continuous infinite manifold. Since rigorous Lyapunov-based asymptotic stability certification strictly demands an isolated equilibrium point [22], this absolute reference frame completely hinders direct Lyapunov-based TSA. To overcome this issue, the system dynamics are mapped into the center-of-inertia (COI) reference frame [23]. In this reference frame, each unit’s angle and frequency are measured relative to the inertia-weighted dynamic average of the entire network. Consequently, the state variables of one unit can be algebraically eliminated using the COI constraints, as detailed in Appendix A. By shifting the newly anchored post-fault equilibrium point to the origin, the reduced dynamics successfully form an autonomous system. The state vector of this reduced system is defined as: 
+
+x = ∆δ1, . . . , ∆δN −1, ν 1, . . . , ν N −1
+
+⊤ ∈ Rn, (4) where n = 2( N − 1) . This vector stacks the COI-referenced angle deviations ∆δi and frequency deviations νi of the N −1
+
+independent units. The post-fault equilibrium point is now an isolated, asymptotically stable equilibrium, which serves as the prerequisite for the proposed method in Section III.  
+
+> Fig. 1. Overall architecture of the proposed framework.
+
+Building upon the formulated autonomous system, the tran-sient stability of the networked GFM inverters can be analyti-cally evaluated via Lyapunov’s direct method. The essence of this classical theorem lies in constructing a continuously dif-ferentiable, positive-definite scalar function V (x). The system equilibrium point is guaranteed to be asymptotically stable if the time derivative of V (x) is strictly negative: 
+
+Lf V (x) = ∇V (x) · f (x) < 0. (5) III. M ETHODOLOGY : P ROBABILISTIC ACTIVE LEARNING 
+
+FRAMEWORK 
+
+A. Framework Overview 
+
+As illustrated in Fig. 1, the proposed methodology adopts a synergistic architecture comprising a deterministic mathemat-ical anchor and a probabilistic active learning loop. Rooted in the analytical system dynamics, the framework first executes a Lipschitz-enforced neural Lyapunov training. This founda-tional process establishes a rigorously verified inner ROA, yielding a deterministic baseline for transient stability (detailed in Section III-B). To push the stability boundary beyond the conservative lim-its of this Lyapunov certificate, the framework transitions into the Active Learning and ROA Expansion Loop. Within this closed-loop architecture, a GP regression is first constructed as a non-parametric surrogate of the system’s stability indicator (Section III-C). By mapping the state space to a probabilistic stability assessment, the GP outputs both the predictive mean and its associated uncertainty. Driven by this uncertainty quan-tification, an active explorer known as Uncertainty-Guided Frontier Search (UGFS) is deployed to target informative areas along the stability frontier (Section III-D). Specifically, the explorer samples state-space locations where the current predictive uncertainty is highest. By invoking the EMT Or-acle at these targeted points, the framework maximizes the subsequent reduction of uncertainty once the new data is acquired. The Oracle evaluates the actual transient responses to generate discrete ground-truth labels, which are subsequently fed back to refine the GP regression. This iterative closed-loop interaction rapidly collapses the predictive uncertainty, effectively driving the continuous expansion of the ROA into previously unexplored regions. Throughout this section, the post-fault dynamics of the networked GFM inverter system established in Section II are written compactly as 
+
+˙x = f (x), x ∈ Rn, (6) IEEE TRANS SMART GRID 4 
+
+> Fig. 2. One-dimensional cross-section illustrating GP regression of the stability boundary.
+
+where the state vector has been shifted such that the post-fault stable equilibrium point (SEP) coincides with the origin, i.e., 
+
+f (0) = 0. The true (yet unknown) ROA is denoted by 
+
+R⋆ := x0 ∈ Rn : lim  
+
+> t→∞
+
+x(t; x0) = 0 , (7) where x(t; x0) is the solution of (6) initialized at x0.
+
+B. Lipschitz-Certified Construction of the Base ROA 
+
+The first stage anchors the entire active learning framework with a foundational ROA rigorously validated by mathemat-ical deduction. Following the methodology in [17], a neural Lyapunov candidate Vθ (x) is parameterized by a feedforward neural network. The network architecture is explicitly struc-tured with a squared-norm output layer, ensuring the positive-definite condition Vθ (x) ≥ 0 by construction. Consequently, the training phase focuses solely on enforcing the negativity of the Lie derivative Lf Vθ (x) < 0 over a verification ball 
+
+BR := {x : ∥x∥2 ≤ R}.However, empirical training over discrete collocation points inherently lacks continuous-domain guarantees. Instead of relying on computationally intensive Satisfiability Modulo Theories (SMT) solvers, an algebraic verification approach rooted in Lipschitz continuity is adopted to certify the em-pirical candidate. Specifically, the continuous domain BR is discretized into a dense verification lattice Xτ with a covering radius τ . Let Lf and LV denote the Lipschitz constants of the system vector field f and the gradient of the Lyapunov candidate ∇Vθ , respectively. By enforcing a stricter margin on the discrete lattice points, the pointwise condition: 
+
+Lf Vθ (xk) < −LV
+
+ 1 + Lf
+
+ τ, ∀ xk ∈ X τ , (8) algebraically guarantees that Lf Vθ (x) < 0 holds continuously for all x ∈ B R.Once the NN is successfully verified across the entire lattice, the certified base ROA is extracted as the largest positively invariant sublevel set fully contained within the verified ball: 
+
+c∗ = min  
+
+> ∥x∥2=R
+
+Vθ (x), Ωbase = x ∈ B R : Vθ (x) ≤ c∗ .
+
+(9) By classical Lyapunov arguments, any post-fault state strictly originating within Ωbase is deterministically guaranteed to converge to the stable equilibrium. 
+
+C. GP-Based Probabilistic Expansion of the Stability Bound-ary 
+
+Beyond the mathematically certified limits of Ωbase , the proposed framework abandons analytical Lyapunov gradients to circumvent the aforementioned OOD distortion. Instead, the TSA is reformulated to rely directly on the definitive physical outcomes provided by EMT simulations. Specifically, for any post-fault state x, a binary physical indicator representing whether the system successfully synchronizes or completely diverges is provided: 
+
+y(x) = 1{x ∈ R ⋆} ∈ { 0, 1}, (10) Since acquiring this ground-truth label y(x) demands a computationally expensive time-domain simulation, exhaustive evaluation across the continuous state space is prohibitive. Consequently, a robust surrogate model is deployed to in-terpolate stability predictions from sparse EMT observations while rigorously quantifying the associated uncertainty. To this end, a GP prior is placed on a latent stability field g(x) ∼GP  0, k (x, x′), utilizing a standard squared-exponential ker-nel to capture the smooth physical transitions within the state space: 
+
+k(x, x′) = σ2 
+
+> f
+
+exp 
+
+
+
+− ∥x − x′∥22
+
+2ℓ2
+
+
+
+, (11) where σ2 
+
+> f
+
+is the signal variance and ℓ denotes the characteristic length scale. Given a training dataset D = {(xi, y i)}Mi=1 with labels yi ∈ {0, 1}, the GP yields a Gaussian posterior at any arbitrary test state x. This posterior provides two critical metrics, a predictive mean μ(x) and a predictive variance 
+
+σ2(x):
+
+μ(x) = k⊤∗
+
+ K + αI−1y, (12) 
+
+σ2(x) = k(x, x) − k⊤∗
+
+ K + αI−1k∗. (13) Here, [K]ij = k(xi, xj ) and [k∗]i = k(xi, x). The regular-ization parameter α > 0 plays a pivotal dual role: it ensures the numerical well-conditioning of the covariance matrix and acts as a soft-margin, acknowledging that early prior labels can be gracefully overruled by subsequent EMT evidence. The hyperparameters (σf , ℓ ) are continuously re-optimized via the log marginal likelihood, allowing the GP’s spatial resolution to automatically adapt to the underlying geometry of the expanding stability boundary: 
+
+log p(y | D ) = − 12 y⊤ eK−1y − 12 log eK − M 
+
+> 2
+
+log 2 π, (14) with eK = K + αI.To establish a geometric intuition for these concepts, Fig. 2 illustrates a one-dimensional cross-section of the state space extending outward from the equilibrium. The solid blue curve represents the predictive mean μ(x), translating directly to the 
+
+Bayesian probability of transient stability (decaying from 1
+
+near the origin to 0 in the unstable far field). The shaded blue region denotes the uncertainty ±σ(x), dynamically bulging in the unexplored gaps where labeled data is absent. Subtracting this uncertainty from the mean yields the Lower Confidence Bound (LCB, dashed red line), representing a high-probability lower bound on stability. Crucially, a state is admitted into the IEEE TRANS SMART GRID 5
+
+certified probabilistic ROA (the green shaded region) only if its LCB strictly clears the predefined membership threshold γ. By enforcing this geometric condition, the predictive uncertainty natively acts as a built-in safety margin, ensuring the certified boundary remains confined within the true physical limits until targeted EMT queries locally collapse the uncertainty band. 
+
+1) GP Surrogate Initialization: A significant computational advantage of the proposed framework is the capability to establish an initial probabilistic surrogate of the system with-out executing EMT simulations. This initialization leverages established physical priors inherent to power system dynamics. Specifically, the interior base ROA is already certified; any state xi encapsulated within the baseline ROA, Ωbase , intrin-sically guarantees transient stability. Consequently, positive stability labels {(xi, 1) } can be extracted from the baseline ROA without additional computational overhead. As illustrated in Fig. 2, these initial positive samples are depicted as the stable points ( y = 1 , denoted by green circles). Conversely, extreme state deviations inevitably cause an irreversible loss of synchronism. This physical characteristic is encoded by allocating negative pseudo-labels {(xj , 0) } within the far-field regions of the state space, represented by the un-stable markers ( y = 0 , denoted by orange crosses). Facilitated by the soft-label parameter α, these negative priors remain adaptable rather than permanently fixed. If active exploration later proves a far-field state is actually stable, the GP regression updates the local predictive mean. The resulting initial dataset, 
+
+D0, perfectly incorporates the definitively stable labels and the inherently unstable labels, leaving a wide, highly uncertain ”frontier” in the middle (annotated in Fig. 2) that the algorithm must actively explore. 
+
+2) EMT Oracle and Trajectory Inheritance: To explore the high-uncertainty frontier, the ground-truth EMT Oracle O is actively queried. For any specific initial state x0, the Oracle executes a time-domain simulation. If the system regains stability within a defined time horizon Tmax without exceeding the divergence threshold ρmax , a stable verdict is returned: 
+
+y = 1
+
+n
+
+sup 
+
+> t≤Tmax
+
+∥x(t)∥2 < ρ max ∧ ∥ x(Tmax )∥2 < ε s
+
+o
+
+. (15) Given that EMT simulations are computationally heavy, rely-ing on them to label single initial states is highly inefficient. From a dynamical systems perspective, if the system success-fully converges to the equilibrium from an initial state x0, the entire traversed transient trajectory inherently resides within the true ROA [22]. Consequently, whenever a stable verdict (y = 1 ) is obtained, Ntraj points are subsampled along this convergent path and incorporated into the GP training dataset as guaranteed positive labels: 
+
+D ← D ∪ { (x0, y )} ∪ (x(tj ), 1) Ntraj  
+
+> j=1
+
+, if y = 1 . (16) 
+
+3) Probabilistic ROA Readout: Applying the LCB criterion of Fig. 2 across the search domain Ωsr yields the certified probabilistic ROA: 
+
+bR = C0
+
+x ∈ Ωsr : μ(x) − β σ (x) ≥ γ
+
+
+
+∪ Ωbase , (17)  
+
+> Fig. 3. Two-dimensional COI state-space projection illustrating the UGFS boundary exploration mechanism.
+
+where β is the confidence multiplier, γ is the membership threshold, and C0(·) retains only the connected component anchored at Ωbase .
+
+D. Uncertainty-Guided Frontier Search for ROA expansion 
+
+To systematically estimate a less conservative and enlarged ROA, the Uncertainty-Guided Frontier Search (UGFS) is in-troduced. Rather than employing uniform or passive sampling, UGFS operates as a dynamic boundary-tracking mechanism designed to concentrate computational resources on actively expanding the established stability boundary. As illustrated in the two-dimensional state-space projection in Fig. 3, the predictive uncertainty σ(x) forms a narrow, high-variance shell surrounding the certified ROA (the central disk). UGFS is specifically formulated to strategically target and sample this unexplored boundary. To evaluate candidate states, UGFS utilizes an information metric: 
+
+J(x) = σ(x) · 1μ(x) > 12 , (18) This formulation is designed to maximize information gain while mitigating the misallocation of computational resources. The predictive uncertainty σ(x) naturally peaks in the transi-tional regions where labeled EMT data are sparse. However, blindly exploring all high-uncertainty areas would waste time-intensive simulations on extreme far-field states where a loss of physical synchronism is already practically guaranteed. To circumvent this, the indicator function 1{μ(x) > 1/2}
+
+operates as a probabilistic heuristic filter. It explicitly nullifies the exploration value of any state that the surrogate model predicts as likely unstable. Consequently, the algorithm is constrained to advance the stability boundary from the inside out. It exclusively queries highly uncertain states that still maintain a realistic probability of surviving the transient. As visualized in Fig. 3, this logical condition restricts the high-value candidates to the inner, more secure perimeter of the high-uncertainty ring. The maximization of (18) is executed through an iter-ative stochastic search guided by a discrete set of highly informative boundary states. Specifically, an elite archive IEEE TRANS SMART GRID 6 
+
+> Fig. 4. Schematics of the three test systems: (a) single-GFM infinite-bus system. (b) 3-GFM system. (c) 4-GFM system.
+
+A = {x(1) , . . . , x(Na)} is dynamically updated to retain the 
+
+Na highest-scoring candidate states evaluated throughout the search progression, sorted in descending order of J(x). These archived states function as spatial guide markers distributed along the high-uncertainty stability frontier, as depicted in Fig. 3. During each internal algorithmic iteration, Nm stochas-tic state probes are generated. To instantiate a new probe, a discrete guide x(l) is first selected from the archive utilizing a rank-weighted probability distribution: 
+
+pl = wl
+
+PNa 
+
+> j=1
+
+wj
+
+, wl = 1
+
+qN a
+
+√2π exp 
+
+
+
+− (l − 1) 2
+
+2q2N 2
+
+> a
+
+
+
+, (19) where the parameter q explicitly dictates the shape of this Gaussian probability curve over the rankings. A smaller q nar-rows the curve, heavily concentrating the selection probability on the few highest-ranked guides. In contrast, a larger q flattens the curve, yielding a more uniform selection probability across the entire archive. Once a specific guide is selected, a new candidate state is generated: 
+
+x′ = x(g) + b(g) ⊙ ζ, ζ ∼ N (0, In), (20) To automatically adjust the search resolution, the spatial variance of this Gaussian kernel is dynamically scaled based on the local clustering of the archive points around the selected guide: 
+
+b(g) 
+
+> d
+
+= ξ
+
+> Na
+
+X
+
+> l=1
+
+x(l),d − x(g),d 
+
+Na − 1 , d = 1 , . . . , n, (21) where ξ ∈ (0 , 1) is a contraction coefficient. Probes instan-tiated outside the predefined physical search limits Ωsr are radially projected back into the valid operational domain. After evaluation via (18), the combined set of archived states and new probes is truncated to retain only the Na optimal members. Any probe exhibiting a mathematically significant uncertainty, J(x′) ≥ εσ , is recorded into an aggregate candi-date set H, which serves as the designated candidate pool for subsequent EMT simulations. Visually, each guide marker in Fig. 3 is thus enveloped by a localized cloud of stochastic probes, with the adaptive kernel width represented by the dotted ellipse. Following the search phase, the final EMT simulation queries are extracted from the merged candidate set H. To select the Nb allocated queries, candidates are evaluated in descending order of their information metric J(x) and admit-ted only if they maintain a minimum Euclidean distance ddiv 
+
+from all previously selected points. This minimum distance constraint ensures that time-intensive EMT simulations are well-distributed along the expanding stability boundary rather than clustering in one localized area. The selected states are then evaluated by the time-domain oracle (15), the training dataset is augmented via trajectory inheritance (16), and the GP posterior is refitted. Consequently, the predictive uncer-tainty landscape updates, and the certified boundary migrates outward wherever stable verdicts are confirmed. As illustrated in Fig. 3, a stable verdict (green star) pushes the certified ROA outward along that specific direction, whereas an unstable verdict (orange star) identifies the true power system stability limit. This cyclic alternation between boundary identification and GP refitting proceeds until the uncertainty collapse criterion is satisfied: 
+
+max  
+
+> x∈H
+
+J(x) < ε σ for Qs consecutive rounds . (22) This condition indicates that wherever the system is predicted to survive ( μ > 1/2), the surrogate model is now highly confident ( σ < ε σ ). At this juncture, the surrogate model has robustly approximated the physical stability limits, and the final extended ROA bR is extracted. IV. C ASE STUDIES 
+
+The proposed framework is evaluated on three bench-mark systems of increasing dimensionality: a single-machine infinite-bus (SMIB) system ( n = 2 ), the three-GFM system in the COI frame ( n = 4 ), and a four-GFM system formulated in the COI frame ( n = 6 ). In all cases, the EMT oracle (15) is implemented as a full nonlinear time-domain integration of the post-fault dynamics with an adaptive Runge–Kutta solver, a divergence threshold ρmax = 5 p.u., and a settling tolerance 
+
+εs = 0 .05 . The probabilistic readout uses β = 3 and γ = 0 .9
+
+throughout, and the UGFS is configured identically across all cases: Na = 50 , Nm = 40 , q = 0 .1, ξ = 0 .85 , εσ = 0 .05 ,and ddiv = 0 .15 . The estimates are benchmarked against the Lipschitz-certified ROA and a quadratic Lyapunov certificate obtained from the LQR method. 
+
+A. Case I: Single GFM System 
+
+The first benchmark is the single GFM configuration (Fig. 4 (a)) whose post-fault dynamics in SEP-shifted coordinates IEEE TRANS SMART GRID 7   
+
+> Fig. 5. Training results: (a) neural Lyapunov functions of single-GFM infinite bus system. (b) ROA estimated by Lipschitz-enforced method in [17].
+> Fig. 6. Probabilistic ROA expansion for Case I in the (x1, x 2)state space.
+
+x = [ x1, x 2]⊤ read 
+
+˙x1 = x2, ˙x2 = 1
+
+M
+
+ Pm−Pmax sin( x1+δs)−Dx 2
+
+, (23) with M = 1 .0, D = 0 .1, Pm = 2 .0, Pmax = 2 .5 (all in p.u.), and δs = arcsin( Pm/P max ).In the first stage (III-B), the baseline analytical certificate is constructed by training a Lipschitz-enforced neural Lyapunov network configured with 16 neurons per hidden layer over a training domain BR with R = 0.5. As illustrated in Fig. 5, the trained neural network successfully establishes a rigorous mathematical foundation. Fig. 5 (a) shows the learned Lyapunov function V (x), forming a smooth, positive-definite energy landscape around the equilibrium. Fig. 5 (b) delineates the ROA of V (x). While mathematically rigorous, this analytical boundary exhibits notable conservatism relative to the physical stability limit of the inverter. Following the initialization in III-C and the execution of the UGFS in III-D, the final probabilistic stability map is gener-ated. Fig. 6 displays the expanded stability boundary, whose background contour visualizes the GP predictive standard deviation σ(x). The proposed method substantially enlarges the conservative Lipschitz-certified core. This outward expan-sion is systematically driven by informative EMT simulation queries (green stars) deposited along the advancing high-uncertainty ridge.          
+
+> Fig. 7. ROA comparison and time-domain verification for Case I. TABLE I QUANTITATIVE ROA C OVERAGE COMPARISON FOR CASE IMethod ROA Size (%) LQR 2.23 Lipschitz 13.80 Proposed Method 44.63
+
+To verify the physical validity of the estimated ROA under large grid disturbances, EMT simulations are performed. In physical power systems, a large-signal disturbance, such as a temporary grid fault, injects kinetic energy into the dynamics and perturbs the system from its equilibrium to a post-fault initial state x0. Fig. 7 compares the ROAs estimated by different methods and contrasts the time-domain dynamical responses of states perturbed near the estimated boundary. When a severe disturbance perturbs the post-fault state to a location inside the proposed boundary (green star marker), the time-domain simulation confirms successful fault ride-through. The phase trajectory (bottom right) exhibits damped non-linear oscillations that robustly spiral inward to the stable equilibrium point. Conversely, when a slightly more critical fault displaces the initial state just outside the proposed boundary (red dot), physical synchronism is lost. The corresponding phase angle trajectory (top right) undergoes monotonic divergence. This sharp dynamical contrast verifies that the estimated boundary accurately captures the physical transient stability limit. For quantitative assessment, the area of each estimated ROA is computed via Monte-Carlo integration utilizing 2 × 10 5
+
+samples drawn uniformly from the bounded state-space region 
+
+[−1, 1] 2. As reported in Table I, the classical LQR certificate captures merely 2.23% of this evaluated state space, while the analytical Lipschitz-certified base ROA covers 13.80%. In contrast, the proposed method successfully certifies an area accounting for 44.63% of the domain. This achieves a more than 3.2× enlargement over the Lipschitz analytical certificate at a minimal computational overhead, requiring fewer than 50 time-domain EMT evaluations. In contrast, resolving the same boundary by exhaustive EMT evaluation on a uniform grid at resolution h = 0 .05 would require 40 2 = 1600 simulations over [−1, 1] 2.IEEE TRANS SMART GRID 8                                            
+
+> TABLE II SYSTEM PARAMETERS FOR CASE II GFM Parameters Network Parameters GFM HiDiEiP∗
+> iLine Rij Xij
+> Index (s) (p.u.) (p.u.) (p.u.) i–j(p.u.) (p.u.) 181.6 1.0566 0.7163 1–2 0.1210 0.6380 261.2 1.0502 1.6300 1–3 0.1357 0.7924 351.0 1.0170 0.8500 2–3 0.1733 0.8852
+> Mi= 2 Hi,Di= 0 .1Mi;
+> Fig. 8. ROA comparison and time-domain verification for Case II.
+
+B. Case II: Three-GFM System in the COI Frame 
+
+To evaluate scalability in multi-machine power electronics-dominated grids, the proposed framework is applied to the 3-GFM system depicted in Fig. 4 (b). The dynamics are mapped to the COI reference frame. This transformation yields a four-dimensional reduced state vector x ∈ R4 comprising relative angles and speed deviations. Complete system parameters are detailed in Table II. Applying the proposed framework yields the expanded four-dimensional ROA, visualized across six two-dimensional coordinate slices in Fig. 8. Unlike classical LQR and Lipschitz certificates that conservatively restrict the stability boundary to a rigid ellipse around the equilibrium point, the proposed framework flexibly captures the true nonlinear operational margins. Physical time-domain EMT validations corroborate these boundaries: perturbed initial states inside the proposed ROA successfully damp out multi-machine oscillations (bot-tom right of Fig. 8), whereas states perturbed outside undergo multi-machine separation and unstable divergence (bottom left of Fig. 8). Quantitative evaluation across each two-dimensional slice is detailed in Table III, computed via Monte-Carlo integration over the [−0.8, 0.8] 2 spatial domain. Across all evaluated                                                                           
+
+> TABLE III PER -S LICE ROA C OVERAGE FOR CASE II Slice LQR (%) Lipschitz (%) Proposed (%)
+> (x1, x 2)7.45 8.83 36.63
+> (x1, x 3)4.21 5.95 15.63
+> (x1, x 4)4.41 2.39 30.39
+> (x2, x 3)4.26 2.64 23.77
+> (x2, x 4)4.47 6.00 23.96
+> (x3, x 4)2.41 9.36 13.81
+> Mean 4.54 5.86 24.03
+> TABLE IV SYSTEM PARAMETERS FOR CASE III GFM Parameters Network Parameters GFM HiDiEiP∗
+> iLine Rij Xij
+> Index (s) (p.u.) (p.u.) (p.u.) i–j(p.u.) (p.u.) 181.6 1.05 0.00 1–2 1.2030 1.1034 261.2 1.04 0.20 1–3 1.0300 0.7400 351.0 1.03 0.15 3–4 1.5042 1.3554 440.8 1.02 0.18
+> Mi= 2 Hi,Di= 0 .1Mi;
+
+coordinate slices, the proposed method achieves an average area coverage of 24.03%. As visually summarized in Fig. 10, this achieves a substantial 4.1× enlargement over the ana-lytical Lipschitz baseline and a 5.3× enlargement over the LQR certificate, accomplished efficiently utilizing a budget of only 220 time-domain EMT evaluations. By comparison, exhaustive EMT evaluation of the same four-dimensional domain at identical resolution would demand 32 4 ≈ 1.0 × 10 6
+
+simulations. 
+
+C. Case III: Four-GFM System in the COI Frame 
+
+The final and most challenging case is a radial network of four GFM units with heterogeneous inertia constants, in-terconnected through three lossy distribution lines, as shown in Fig. 4 (c). Following the COI transformation, the system dynamics are represented by a six-dimensional state vector 
+
+x = [∆ δ1, ∆δ2, ∆δ3, ν 1, ν 2, ν 3]⊤ ∈ R6, capturing relative rotor angles and frequency deviations. Complete system pa-rameters are detailed in Table IV. Applying the proposed framework maps the six-dimensional stability boundary across fifteen two-dimensional coordinate slices, as depicted in Fig. 9. To substantiate these estimated boundaries, EMT simulations are subjected to severe grid faults. Following severe large-signal disturbances, post-fault initial states displaced into the estimated ROA successfully absorb the transient energy and converge back to the stable equilibrium origin via damped multi-machine oscillations (bot-tom right of Fig. 9). Conversely, when fault events displace post-fault states outside the estimated boundary, internal rotor angles monotonically diverge from the origin (bottom left of Fig. 9). Quantitative evaluation across all fifteen slices is reported in Table V, computed via Monte-Carlo integration utilizing 1 ×IEEE TRANS SMART GRID 9
+
+Fig. 9. ROA comparison and time-domain verification for Case III. TABLE V PER -S LICE ROA C OVERAGE FOR CASE III Slice LQR (%) Lipschitz (%) Proposed (%) 
+
+(x1, x 2) 2.56 0.91 23.88 
+
+(x1, x 3) 3.19 0.62 21.22 
+
+(x1, x 4) 1.84 2.94 9.88 
+
+(x1, x 5) 1.67 6.59 13.76 
+
+(x1, x 6) 2.15 9.40 12.09 
+
+(x2, x 3) 2.83 0.77 41.18 
+
+(x2, x 4) 0.86 0.71 8.01 
+
+(x2, x 5) 0.89 1.56 12.75 
+
+(x2, x 6) 1.15 2.83 11.59 
+
+(x3, x 4) 0.84 0.33 6.87 
+
+(x3, x 5) 0.90 0.79 11.15 
+
+(x3, x 6) 1.41 1.66 11.31 
+
+(x4, x 5) 2.22 13.96 23.28 
+
+(x4, x 6) 3.33 6.32 21.18 
+
+(x5, x 6) 3.16 11.21 38.77 
+
+Mean 1.93 4.04 17.80 
+
+10 5 uniform samples per slice window. The proposed method achieves a mean area coverage of 17.80%, representing a 4.4×
+
+enlargement over the analytical Lipschitz base region and a substantial 9.2× expansion over the classical LQR certificate. As summarized in Fig. 10, the relative expansion capacity of the proposed algorithm remains highly consistent as the state-
+
+Fig. 10. Quantitative comparison of ROA sizes across three case studies. 
+
+space dimension increases from two to six. By actively an-choring EMT queries directly on the uncertainty frontier rather than searching the entire state space, the proposed framework successfully certifies this high-dimensional boundary using a compact budget of only 220 time-domain EMT evaluations. Exhaustive EMT evaluation of this six-dimensional domain at the same resolution would instead require 32 6 ≈ 1.1 × 10 9
+
+simulations. IEEE TRANS SMART GRID 10 
+
+V. C ONCLUSION 
+
+This paper has presented a three-stage probabilistic active learning framework that substantially reduces the conservative-ness of ROA estimation for grid-interactive inverter systems. The framework is anchored on a deterministically guaranteed base ROA, synthesized as a neural Lyapunov function and certified through Lipschitz-based algebraic verification. Be-cause any further enlargement of a neural Lyapunov-based estimate is obstructed by gradient distortion and pseudo-counterexamples in the OOD region, the proposed method abandons the decrease condition outside the certified core and directly evaluates the physical stability boundary via a GP regression model. Case studies spanning two- to six-dimensional benchmarks validate the scalability and accuracy of the framework. On the single-GFM system, the estimated region certifies 44 .63% of the evaluated domain, achieving a 3.2-fold enlargement over the 13 .80% Lipschitz baseline and significantly outperforming the 2.23% LQR certificate. On the three-GFM system and the four-GFM system, the methodology achieves mean volumetric expansions of 4.1 and 4.4 times over analytical Lipschitz cer-tificates, and 5.3 and 9.2 times over classical LQR baselines. By actively anchoring exploration directly on boundary ridges, the proposed method captures the less conservative ROA at the cost of up to 220 time-domain simulation queries per sys-tem, demonstrating high computational efficiency. Future work will extend this proposed framework toward black-box GFM inverters with inaccessible internal dynamic models, as well as complex hybrid power systems comprising heterogeneous generation units. APPENDIX ACOI R EFERENCE FRAME TRANSFORMATION 
+
+The center-of-inertia (COI) of the N -unit system is defined by the inertia-weighted angle and frequency 
+
+θCOI = 1
+
+MTNX
+
+> i=1
+
+Mi δi, ωCOI = 1
+
+MTNX
+
+> i=1
+
+Mi ωi, (24) with total inertia MT = PNi=1 Mi. Each unit is referred to the COI through ˜δi = δi − θCOI and νi = ωi − ωCOI , and its angle deviation from the post-fault SEP is ∆δi = ˜δi − ˜δ∗ 
+
+> i
+
+. By construction, the COI coordinates satisfy the two constraints 
+
+> N
+
+X
+
+> i=1
+
+Mi ∆δi = 0 ,
+
+> N
+
+X
+
+> i=1
+
+Mi νi = 0 , (25) so the state of any one unit, say unit N , is recovered from the remaining N − 1 units: 
+
+∆δN = − 1
+
+MNN −1X
+
+> i=1
+
+Mi ∆δi, νN = − 1
+
+MNN −1X
+
+> i=1
+
+Mi νi.
+
+(26) Subtracting the COI acceleration from each swing equation (2) gives the reduced COI dynamics 
+
+˙∆δi = νi, (27) 
+
+Mi ˙νi =  P ∗ 
+
+> i
+
+− P e 
+
+> i
+
+− Diνi
+
+ − Mi
+
+MTNX
+
+> j=1
+
+ P ∗ 
+
+> j
+
+− P e 
+
+> i
+
+− Dj νj
+
+,
+
+(28) for i = 1, . . . , N − 1. The subtracted term is the COI acceleration, which guarantees PNi=1 Mi ˙νi = 0 and thereby removes the redundant common mode. Together with (26), this yields the autonomous reduced-order model in (4) on which the proposed framework operates. REFERENCES [1] Y. Gu et al. , “Power system stability with a high penetration of inverter-based resources,” Proceedings of the IEEE , vol. 111, no. 7, pp. 832–853, 2023. [2] Q. Hu et al. , “Grid-forming inverter enabled virtual power plants with inertia support capability,” IEEE Transactions on Smart Grid , vol. 13, no. 5, pp. 4134–4143, 2022. [3] X. Wang et al. , “Harmonic stability in power electronic-based power systems: Concept, modeling, and analysis,” IEEE Transactions on Smart Grid , vol. 10, no. 3, pp. 2858–2870, 2019. [4] J. Zheng et al. , “Latent-feature-informed neural ode modeling for lightweight stability evaluation of black-box grid-tied inverters,” IEEE Transactions on Power Electronics , vol. 41, no. 4, pp. 4523–4529, 2026. [5] F. Blaabjerg et al. , “Distributed power-generation systems and protec-tion,” Proceedings of the IEEE , vol. 105, no. 7, pp. 1311–1331, 2017. [6] Z. Shuai et al. , “Transient angle stability of virtual synchronous gen-erators using lyapunov’s direct method,” IEEE Transactions on Smart Grid , vol. 10, no. 4, pp. 4648–4661, 2019. [7] W. Ding et al. , “A novel lyapunov function for transient synchronization stability analysis of grid-following converters,” IEEE Transactions on Power Systems , vol. 40, no. 4, pp. 3588–3591, 2025. [8] M. W. Fisher et al. , “Determining disturbance recovery conditions by inverse sensitivity minimization,” IEEE Transactions on Power Systems ,vol. 41, no. 2, pp. 1406–1415, 2026. [9] A. Banaie et al. , “A review of the generic grid-forming model used by the system operator in chile,” National Renewable Energy Laboratory (NREL), Golden, CO, USA, Technical Report NREL/TP-5D00-91790, 2024. [10] K. Sano et al. , “Comparison and selection of grid-tied inverter models for accurate and efficient emt simulations,” IEEE Transactions on Power Electronics , vol. 37, no. 3, pp. 3462–3472, 2022. [11] A. M. Lyapunov, The General Problem of the Stability of Motion . Boca Raton, FL, USA: CRC Press, 1992. [12] Y. Du et al. , “Large-signal stability analysis for inverter-based dynamic microgrids reconfiguration,” IEEE Transactions on Smart Grid , vol. 14, no. 2, pp. 836–852, 2023. [13] Q. Song et al. , “Large-signal stability analysis of two-stage cascaded dc/dc converter systems using sum-of-squares programming,” IEEE Transactions on Power Electronics , vol. 39, no. 2, pp. 2076–2085, 2024. [14] T. Huang et al. , “A neural lyapunov approach to transient stability assessment of power electronics-interfaced networked microgrids,” IEEE Transactions on Smart Grid , vol. 13, no. 1, pp. 106–118, 2022. [15] Z. Liu et al. , “Dissipation-based dynamics-aware learning scheme for transient stability analysis of networked black-box grid-forming invert-ers,” IEEE Transactions on Power Electronics , vol. 41, no. 3, pp. 3165– 3170, 2026. [16] Y. Liu et al. , “An improved neural lyapunov method for transient stability assessment of networked microgrids,” IEEE Transactions on Smart Grid ,vol. 15, no. 2, pp. 1410–1422, 2024. [17] Z. Liu et al. , “Lipschitz-enforced machine learning framework for accelerating transient stability analysis of networked grid-interactive inverters,” arXiv preprint arXiv:2606.00883, 2026. [18] S. Zhang et al. , “Learning to stabilize high-dimensional unknown systems using Lyapunov-guided exploration,” in Proceedings of the 6th Annual Learning for Dynamics & Control Conference , vol. 242. PMLR, 15–17 Jul 2024, pp. 52–67. [19] M. Arjovsky, “Out of distribution generalization in machine learning,” arXiv preprint arXiv:2103.02667, 2021. [20] J. Zhang et al. , “Discovery learning predicts battery cycle life from minimal experiments,” Nature , vol. 650, no. 8100, pp. 110–115, 2026. [21] T. Wang et al. , “Neural networks based lyapunov functions for transient stability analysis and assessment of power systems,” IEEE Transactions on Industry Applications , vol. 59, no. 2, pp. 2626–2638, 2023. [22] H. K. Khalil, Nonlinear Systems , 3rd ed. Upper Saddle River, N.J.: Pearson Education, 2000. [23] P. Sauer et al. , Power System Dynamics and Stability . Prentice Hall, 1998.

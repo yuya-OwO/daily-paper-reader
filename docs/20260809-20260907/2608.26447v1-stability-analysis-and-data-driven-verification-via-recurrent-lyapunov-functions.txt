@@ -1,0 +1,1532 @@
+Title: Stability Analysis and Data-driven Verification via Recurrent Lyapunov Functions
+
+URL Source: https://arxiv.org/pdf/2608.26447v1
+
+Published Time: Fri, 28 Aug 2026 00:18:27 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+> 1
+
+# Stability Analysis and Data-driven Verification via Recurrent Lyapunov Functions 
+
+Roy Siegelmann, Fernando Paganini, and Enrique Mallada 
+
+Abstract —Lyapunov’s direct method is a cornerstone of sta-bility and control, but it hinges on finding a Lyapunov function, a task demanding ingenuity or computation. A key difficulty is that every sub-level set of the function must be forward invariant, coupling its geometry to the system’s trajectories. We relax this by replacing invariance with recurrence: a set is recurrent if every trajectory starting in it returns within a finite time. This yields the notion of a Recurrent Lyapunov Function (RLF), whose sub-level sets need only be recurrent. We show that, under mild conditions, RLFs guarantee stability, and we introduce stronger notions yielding asymptotic and exponential stability. We also give norm-based converse theorems: under the corresponding stability conditions, any norm is an RLF for their practical versions. We then develop GPU-based algorithms that certify (practical) stability from trajectory data alone, without a Lyapunov function. Certifying stability up to an ε-neighborhood needs only O(log(1 /ε )) trajectory evaluations, with constants growing as the certified decay rate nears the true one, exposing an intrinsic performance-cost trade-off. 
+
+I. I NTRODUCTION 
+
+Lyapunov stability theory plays a central role in the study of dynamical systems. It provides a rigorous mathematical framework for qualitatively analyzing system solutions and has heavily influenced systems theory and engineering over the past century. Its fundamental tool, Lyapunov’s direct (second) method [1], states mild conditions on a function V (x) (non-increasing along trajectories and proper) that can certify sta-bility of an equilibrium point. Since its inception in 1892, the method has found ubiquitous applications across engineering, e.g., aerospace, electrical, mechanical, and chemical [2]–[5]. A critical step in applying Lyapunov’s direct method is finding a function V that satisfies the required conditions. Unfortunately, while such a function is known to exist via converse theorems, e.g., [6], manually finding one is often tricky, relying on ingenuity and domain knowledge. To circum-vent this step, a variety of computational methods have been proposed for finding Lyapunov functions [7], e.g., via the use of partial differential equation (PDE) solvers to solve Zubov’s Equation [8], [9], linear programs (LPs) to find piece-wise 
+
+Manuscript received XXX; revised XXX; accepted XXX. This work was supported by NSF through Grants CAREER 1752362, CPS 2136324, and Global Centers 2330450, by the DOE Office of Science (ASCR) under Award No. 826565, and by AFOSR under Grant FA9550-23-1-0350. (Corresponding author: Enrique Mallada.) R. Siegelmann is with the Massachusetts Institute of Technology (MIT), Cambridge, MA, USA (e-mail: resiege@mit.edu). F. Paganini is with Universidad ORT Uruguay, Montevideo, Uruguay (e-mail: paganini@ort.edu.uy). E. Mallada is with Johns Hopkins University, Baltimore, MD, USA (e-mail: mallada@jhu.edu). 
+
+linear Lyapunov functions [10], and semidefinite programs (SDPs) to solve linear matrix inequalities (LMIs) [11] or sum-of-squares (SOS) problems [12]. However, the computational complexity increases exponentially with both the state dimen-sion and the Lyapunov function parameterization [7], [13]. This has led to multiple investigations into relaxing the conditions required for V , and in particular, its time derivative 
+
+˙V . Such relaxations can be broadly divided into three groups. The first group seeks LaSalle-Krasovskii type of conditions by relaxing the negative definiteness of ˙V , i.e., only requiring 
+
+˙V ≤ 0; see [5], [14] and its generalization [15], [16]. The second group further relaxes negative definiteness by allowing 
+
+˙V > 0 on some regions of the state space. This is implicitly done by using generalizations of the comparison lemma [17] to impose conditions on higher order time derivatives of 
+
+V that still ensure convergence of V → 0 while allowing 
+
+˙V > 0. The third group uses the so called discretization method, which considers a fixed parameter T > 0 and leverages the net decrement of V across any trajectory x(t),i.e., V (x(t+T )) −V (x(t)) , to reason about stability [18], [19]. Unfortunately, despite such efforts, the basic principle can still be traced back to the (indirect) construction of a Lyapunov function whose sub-level sets are invariant [20], [21], which still must be verified analytically or via a convex program, rendering similar challenges. The crux is that Lyapunov’s direct method implicitly con-strains their geometry by requiring every sub-level set to be positively invariant. This tightly couples level-set geometry to the vector field, making such functions difficult to construct. This paper relaxes this condition by replacing invariance of sub-level sets with the weaker notion of recurrence. We say that a set is ( τ -) recurrent if every trajectory that starts in the set returns to it (within τ seconds). This decouples level-set geometry from instantaneous vector-field alignment while still enabling stability guarantees. Recurrence has recently proved a versatile mechanism for estimating regions of attraction of stable equilibria [22] and for verifying safety properties of dynamical systems [23]. Moreover, (control) recurrence can be achieved at lower data rates than invariance [24] and often enforced from finitely many trajectory samples [25]. In this paper, we seek to explore the role of recurrence in certifying different notions of stability of an equilibrium point. The contributions of our work are several:  
+
+> •
+
+Recurrent Lyapunov Functions: We introduce Recurrent Lyapunov Functions (RLFs, Definition 12), which gener-alize classical Lyapunov functions by replacing invariance of sub-level sets with recurrence. This relaxation decouples the geometry of the level sets from the vector field. arXiv:2608.26447v1 [math.OC] 26 Aug 2026 2 
+
+> •
+
+Stability Guarantees: We establish stability theorems demonstrating that existence of an RLF over a compact set guarantees stability, asymptotic stability, and exponential stability (Theorems 1, 2, 3). These results enable stability proofs without strict invariance conditions.  
+
+> •
+
+Norm-agnostic Converse Theorems: We show that any norm is guaranteed to satisfy a practical (ε-relaxed) version of our RLF conditions (Theorems 4 and 5), provided the sys-tem is asymptotically or exponentially stable; these relaxed conditions in turn certify practical stability. This highlights the fundamental role of recurrence in stability analysis and opens the door to verification methods that do not require computing a Lyapunov function.  
+
+> •
+
+Data-Driven Verification with Guarantees: We develop two GPU-parallelized algorithms for trajectory-based verifica-tion of the RLF conditions: one for the best decay rate over a fixed region (Algorithm 1), the other for the largest region of attraction at a target rate α (Algorithm 2). We further show that O(log( R/ε )) trajectory evaluations suffice (Theorem 9) to certify practical exponential stability on BR \ Bε, with constants exposing an intrinsic trade-off between sample complexity and certified performance. A preliminary version appeared in [26]; this paper extends it in several ways. First, we extend our stability analysis to Recurrent Lyapunov Function conditions over arbitrary sets containing the equilibrium, rather than sub-level sets. Second, we introduce novel converse theorems showing that any norm can satisfy suitable weak versions of these conditions; these in turn are shown to impose practical asymptotic and exponential stability. Third, we provide estimates on the sample complex-ity of verifying practical exponential stability over bounded regions of the state space. Finally, we develop a verification algorithm and provide numerical validations illustrating the merits of our framework. 
+
+Closely related work: The derived conditions are sim-ilar in spirit to the ones considered by Karafyllis in [21], which studies robust stability analogs (cf. Propositions 2.3 and 2.5). Particularly, our asymptotic stability condition is closely related to [21, Prop. 2.5]. Our stability, asymptotic stability, exponential stability conditions, and their practical counterparts are, however, new and not present in prior work. More importantly, the focus of our paper is on exploring the connection of such conditions with the recurrence of level sets of V and developing parallelizable algorithms that can be implemented on GPUs, whereas [21] focuses on robust stability and provides Matrosov-type conditions. At the data-driven verification level, the learning-based method of Boffi et al. [27] has a sample complexity of Ω( ε−2d) in the resolution 
+
+ε, under an incremental-stability assumption on the underlying system. Our O(M d log( R/ε )) bound (Theorem 9) leverages recurrence in lieu of incremental stability: the ε dependence drops from polynomial to logarithmic, while the constant M
+
+encodes the gap (λ − α) between the system’s exponential rate λ and the certified rate α, making the trade-off between certified performance and sample complexity explicit. The paper is organized as follows. Section II establishes preliminaries on dynamical systems and stability; Section III introduces recurrent sets and their use in bounding trajectories. Sections IV–VI develop Recurrent Lyapunov Functions and the corresponding stability, asymptotic stability, and exponen-tial stability theorems. Section VII shows that norms satisfy the RLF conditions, yielding practical stability guarantees and norm-agnostic converse theorems. Section VIII develops trajectory-based verification algorithms, Section IX presents numerical experiments, and Section X concludes. 
+
+Notation: Throughout the text, we let ∥·∥ denote an arbitrary norm on Rd, and define Br (x) as the closed ball of radius r
+
+centered at x ∈ Rd. Given a set S ⊂ Rd, the distance from a point y ∈ Rd to S is defined as d( y, S ) := inf x∈S ∥y −x∥. We also use R≥0 := {x ∈ R | x ≥ 0}, R>0 := {x ∈ R | x > 0},and [n] := {1, . . . , n }.II. P RELIMINARIES 
+
+We consider a continuous-time dynamical system 
+
+˙x = f (x) , (1) where x ∈ D ⊆ Rd is the state, and the map f : D → Rd is a continuous function defined over an open domain D. Given an initial state x, we use ϕ(t, x ) to denote the solution of (1). Throughout the paper, we make the following assumption about the vector field and its solutions. 
+
+Assumption 1. The vector field f (x) in (1) is locally Lipschitz. That is, for any compact set S ⊂ D, there exists a constant 
+
+LS ∈ R≥0 such that 
+
+∥f (y) − f (x)∥ ≤ LS ∥y − x∥, ∀x, y ∈ S. 
+
+The local Lipschitz nature of the vector field implies that solutions must exist for some amount of time, which we will denote by the following: 
+
+Definition 1 (Interval of Existence) . For x ∈ D, the maximal interval of existence I(x) ⊂ R is the largest open interval around t = 0 such that ϕ(t, x ) exists for all t ∈ I(x). The trajectory is said to be forward complete if I(x) ⊃ [0 , ∞).
+
+Whenever the initial condition is understood from the con-text, we will use x(t) := ϕ(t, x ).It will be useful to introduce one-sided Lipschitz bounds. This concept, traditionally stated in inner-product spaces, has recently been extended [28] to a larger family of norms in Rd.The construction is based on concept of weak-pairing [·; ·] : 
+
+Rd × Rd → R, a generalized inner product satisfying : (i) [x1 + x2; y] ≤ [x1; y] + [ x2; y] (subadditivity in first component); (ii) [αx ; y] = [ x; αy ] = α[x; y] for α > 0; [−x; −y] = [ x; y]
+
+(weak homogeneity); (iii) [x; x] > 0 for x̸ = 0 (positive definiteness); (iv) |[x; y]| ≤ [x; x] 12 [y; y] 12 (Cauchy-Schwarz inequality). For every norm there exists a weak pairing satisfying 
+
+∥x∥ = [ x; x] 12 ; for the (weighted) Euclidean norm the natural pairing is the standard (weighted) inner product. In [28], weak pairings are provided as well for (weighted) l1, l∞ norms in 
+
+Rd. These are also shown to satisfy some additional properties, in particular we will use the curve norm derivative formula 
+
+∥x(t)∥ · D+∥x(t)∥ = [ ˙ x(t); x(t)] , (2) 3
+
+where D+φ(t) := lim sup h→0+  
+
+> φ(t+h)−φ(t)
+> h
+
+denotes the upper-right Dini derivative. The following definition is also based on [28]: 
+
+Definition 2 (One-sided Lipschitz) . For system (1) under As-sumption 1, the one-sided Lipschitz constant over the compact set S ⊂ D corresponding to a norm ∥ · ∥ is defined as the smallest LS ∈ R such that 
+
+[f (y) − f (x); y − x] ≤ LS ∥y − x∥2, ∀x, y ∈ S, 
+
+where [·; ·] is a weak pairing associated with ∥ · ∥ .It follows from condition (iv) above that LS ≤ LS .
+
+For a continuously differentiable field f (x) and a convex 
+
+domain S, it is shown in [28] that the one-sided Lipschitz constant can be computed from the Jacobian matrix: 
+
+LS = sup 
+
+> x∈S
+
+μ
+
+ ∂f ∂x (x)
+
+
+
+. (3) Here μ(A) = lim h→0+ (∥I + hA ∥ − 1) /h , the logarithmic matrix norm associated with the vector norm under consideration. In particular, for ∥ · ∥∞
+
+and ∥ · ∥ 2, μ∞(A) = max i
+
+ aii + P  
+
+> j̸=i
+
+|aij | and 
+
+μ2(A) = λmax 
+
+  A+A⊤
+
+> 2
+
+, respectively. We next review the core building blocks of Lyapunov Stability Theory. 
+
+Definition 3 (Stability) . An equilibrium x∗ is stable if for any 
+
+ε > 0, ∃δ > 0, such that if ∥x−x∗∥ ≤ δ then ∥ϕ(t, x )−x∗∥ ≤ 
+
+ε ∀t ≥ 0.
+
+Definition 4 (Attractivity) . An equilibrium x∗ is attractive on the set S if for every x ∈ S, ∥ϕ(t, x ) − x∗∥ → 0 as t → ∞ .
+
+Definition 5 (Asymptotic Stability) . An equilibrium x∗ is 
+
+asymptotically stable on the set S, where x∗ ∈ int( S), if it is stable, and attractive on S.
+
+Definition 6 (Exponential Stability) . An equilibrium x∗ is 
+
+exponentially stable on the set S, where x∗ ∈ int( S), if there exist constants C ≥ 1, λ > 0 such that if x ∈ S, then 
+
+∥ϕ(t, x ) − x∗∥ ≤ Ce −λt ∥x − x∗∥, ∀t ≥ 0.
+
+It will also be useful to define sets that are of general use to characterize transient, as well as asymptotic behavior. 
+
+Definition 7 (Reachable Tube) . For the dynamical system (1) ,a time τ > 0, and a set S ⊂ D, we denote the τ -reachable tube from S within τ units of time by 
+
+Rτ (S) = [ 
+
+> x∈S,t ∈[0 ,τ ]∩I(x)
+
+{ϕ(t, x )}.
+
+Definition 8 (Positively Invariant Sets) . A set S ⊆ Rd is positively invariant w.r.t. (1) if and only if: 
+
+x ∈ S =⇒ ϕ(t, x ) ∈ S, ∀ t ∈ R≥0.
+
+Since we only consider here positively invariant sets, as opposed to negatively invariant sets, we will often refer to them as plainly invariant sets. As mentioned before, the notion of positive invariance is a fundamental building block of Lyapunov Theory. By trapping trajectories on compact sub-level sets of a function one can guarantee boundedness of trajectories, stability, and asymptotic stability via a gradual reduction of the Lyapunov function value. III. R ECURRENCE 
+
+To relax the notion of invariance, one must allow trajectories to temporarily leave a set. However, in order to still be able to make statements about asymptotic behavior, our first condition requires trajectories to always come back. 
+
+Definition 9 (Recurrent Set) . A set S ⊆ Rd is recurrent w.r.t. 
+
+(1) , if for any x ∈ S , and t ≥ 0,
+
+∃ t′ > t, s.t. ϕ(t′, x ) ∈ S. 
+
+Since trajectories are allowed to leave S, in our develop-ment, it will be useful to keep track of the time intervals where a trajectory ϕ(t, x ) lies within a given set S for a given initial point x ∈ D.
+
+Definition 10 (Containment Times) . Given a set S ⊂ D, a point x ∈ D, and a horizon τ > 0, we define 
+
+TS (x; τ ) := {t ∈ (0 , τ ] | ϕ(t, x ) ∈ S},
+
+the set of containment times of x in S over the interval (0 , τ ].
+
+The notion of recurrent sets introduced here is related to classical Poincaré recurrence [29], and in particular, Poincaré recurrent sets [30, Def. 2.4.1], which constitutes the union of Poincare recurrent points; a point x is Poincare recurrent if its backward and forward flows, i.e., {ϕ(−t, x )}t≥0 and 
+
+{ϕ(t, x )}t≥0, get arbitrarily close to x, infinitely often . In fact, one can show that any open subset S of a Poincaré recurrent set is a Recurrent Set according to Definition 9. Definition 9 implicitly requires that trajectories starting in S
+
+are forward complete (see Remark 1) and ensures they visit 
+
+S infinitely often. These properties enable statements about asymptotic behavior, but do not bound how far trajectories travel between visits—motivating the stronger notion of τ -recurrent sets. 
+
+Definition 11 (τ -Recurrent Set) . A set S ⊆ D is τ -recurrent w.r.t. (1) , if for any x ∈ S and t ≥ 0,
+
+∃ t′ > t, with t′ − t ∈ (0 , τ ] and ϕ(t′, x ) ∈ S. 
+
+We further say that S is strictly τ -recurrent, if for any x ∈ S ,and t ≥ 0,
+
+∃ t′ > t, with t′ − t ∈ (0 , τ ] s.t. ϕ(t′, x ) ∈ S\∂S. 
+
+While Definition 11 is sufficient for the development that follows, its conditions for far-off times are hard to verify. The next lemma shows that such verification is simpler when the set S is compact. 
+
+Lemma 1 (Characterization of Compact τ -Recurrent Sets) .
+
+Let S ⊂ D be a compact set, and consider the system (1) 
+
+under Assumption 1, and τ > 0. The following conditions are equivalent: 
+
+(i) S is τ -recurrent. 4
+
+(ii ) For any x ∈ S, ∃ t ∈ (0 , τ ] ∩ I(x) with ϕ(t, x ) ∈ S.
+
+(iii ) For any x ∈ S there is a sequence {tn}n∈N satisfying, 
+
+lim  
+
+> n→∞
+
+tn = ∞ , with tn+1 − tn ∈ (0 , τ ] , (4) 
+
+and ϕ(tn, x ) ∈ S ∀n.Proof. 
+
+(i)= ⇒(ii ): Follows from Definition 11 and choosing t = 0 .
+
+(ii ) = ⇒ (iii ): Given x ∈ S, we build the sequence {tn}n∈N
+
+satisfying (4) and ϕ(tn, x ) ∈ S by induction. For the base case, let t0 := 0 , x0 = ϕ(t0, x ) = x, and define: 
+
+t1 = max {t ∈ (0 , τ ] | ϕ(t, x 0) ∈ S};
+
+the above set of times is non-empty by hypothesis. Its supre-mum is actually a maximum due to the compactness of S and the continuity of ϕ(t, x ). By construction, t1 ∈ I(x).The inductive construction proceeds in a similar manner: given t1 < t 2 < · · · tn, with xn := ϕ(tn, x ) ∈ S, define: 
+
+tn+1 = tn + max {t ∈ (0 , τ ] | ϕ(t, x n) ∈ S}. (5) Note that tn+1 exists analogously to the above, and satisfies 
+
+tn+1 −tn ∈ (0 , τ ] as required. Further, tn+1 −tn ∈ I(ϕ(tn, x )) ,which implies that tn+1 ∈ I(x).It remains to show that tn → ∞, which we argue by contradiction. If, instead, the strictly increasing sequence of times was bounded, we would have tn ↑ t∗. If t∗ was the supremum of the maximal interval I(x), then a standard result in differential equations [31] implies that ϕ(t, x ) should exit any compact set as t ↑ t∗; this would contradict the fact that xn := ϕ(tn, x ) ∈ S ∀n , and S compact. Therefore 
+
+[0 , t ∗] ⊂ I(x), x∗ = ϕ(t∗, x ) exists, and by continuity of 
+
+ϕ(·, x ), it follows that lim n→∞ xn = x∗ ∈ S.We now choose n large enough, say n∗, such that 
+
+t∗ < t n∗ + τ . Since ϕ(t∗, x ) ∈ S, then t∗ is a candidate value for the induction step (5) and satisfies t∗ > t n∗+1 ; this contradicts the fact tn∗+1 is the maximum such value. Thus, 
+
+tn → ∞ , as desired. In particular, I(x) ⊃ [0 , ∞).
+
+(iii )= ⇒(i): Given x ∈ S and t ≥ 0, let n∗ be the largest n s.t. 
+
+tn ≤ t, then, it follows that tn∗+1 − t ∈ (0 , τ ], ϕ(tn∗+1 , x ) ∈
+
+S. Definition 11 is satisfied with t′ = tn∗+1 .
+
+Remark 1 (Forward Completeness) . As a consequence of Lemma 1, condition (ii ) guarantees forward completeness of trajectories initiating in the compact set S. Hence, the implicit forward completeness requirement in Definition 9 is not restrictive when S is compact. 
+
+Another advantage of compact τ -recurrent sets is the ability to bound how far trajectories can travel away from them—a critical step for stability. We will write FS := max x∈S ∥f (x)∥ for the maximum norm of the vector field on a compact set S, with shorthand 
+
+Fε := FBε(x∗) when S = Bε(x∗); note Fε → 0 as ε → 0.
+
+Lemma 2 (Containment Lemma) . Consider system (1) under Assumption 1. Let S ⊂ D be a compact set such that solutions starting in S are forward complete. Then, Rτ (S) has compact closure, and defining L := Lcl Rτ (S) < ∞, we have 
+
+max   
+
+> t∈[0 ,τ ]
+
+d( ϕ(t, x ), S ) ≤ FS h(τ ; L), (6) 
+
+where h(τ ; L) := 
+
+( eLτ −1 
+
+> L
+
+, L̸ = 0 ,τ, L = 0 .
+
+Proof. Compactness of cl( Rτ (S)) is proved in Proposition 
+
+5.1 of [32]. Consider x0 ∈ S and let x(t) = ϕ(t, x 0), u(t) := 
+
+∥x(t) − x0∥, with t ∈ [0 , τ ]. Observe that since x0 ∈ S,
+
+d( x(t), S ) ≤ u(t). Thus, bounding u(t) will be sufficient. We now apply formula (2) with x(t) − x0 in lieu of x(t):
+
+u(t)D+u(t) = [ ˙ x(t); x(t) − x0] = [ f (x); x − x0]
+
+≤ [f (x) − f (x0); x − x0] + [ f (x0); x − x0]
+
+≤ L∥x − x0∥2 + ∥f (x0)∥∥ x − x0∥≤ Lu (t)2 + FS u(t),
+
+where the first inequality comes from the subadditivity (i) of weak pairing, the second from Definition 2 and the Cauchy-Schwarz property (iv), and the last from x0 ∈ S.If x0 is an equilibrium of (1), then u(t) = || ϕ(t, x )−x|| ≡ 0
+
+and the bound (6) is trivial; otherwise, since u(0) = 0 , we must have a time interval (0 , δ ) where u(t) > 0. Extend this interval maximally (but no further than τ ), defining: 
+
+t1 = max {δ ∈ (0 , τ ] | u(t) > 0 in (0 , δ )}.
+
+We have τ ≥ t1 > 0, and 
+
+D+u(t) ≤ Lu (t) + FS , ∀t ∈ (0 , t 1).
+
+We are now in a position to apply a generalization of the Grönwall inequality from [28] Lemma 11 to yield: 
+
+u(t) ≤ FS
+
+L (eLt − 1) or u(t) ≤ FS t, ∀t ∈ (0 , t 1) ,
+
+respectively if L̸ = 0 or L = 0 , so 
+
+u(t) ≤ FS h(t; L) ≤ FS h(τ ; L) for 0 < t < t 1, (7) where we used the fact that h(·, L ) is increasing and t1 ≤
+
+τ . If t1 = τ , then FS h(τ ; L) is a bound on the u(t) across the entire interval (0 , τ ]. If, instead, t1 < τ , then necessarily 
+
+u(t1) = 0 and the system has a periodic orbit of period t1; (7) still gives the bound FS h(τ ; L) over the entire period; since 
+
+ϕ(t, x ) = ϕ(t mod t1, x ), the bound holds for all time. Thus, (6) follows. The Containment Lemma (Lemma 2), which provides con-tainment guarantees for a finite time, can be combined with the recurrence property of Definition 11 and Lemma 1 to provide trajectory bounds for all positive times. 
+
+Corollary 1 (Boundedness of Trajectories) . Let S be a com-pact τ -recurrent set. Then it follows that for any x ∈ S,
+
+d( ϕ(t, x ), S ) ≤ FS h(τ ; L), ∀t ≥ 0,
+
+where L := Lcl Rτ (S). Moreover, the τ -reachable tube Rτ (S)
+
+is invariant. 5
+
+Proof. Applying Lemma 1, given x ∈ S, we can build a sequence of times tn → ∞ such that xn = ϕ(tn, x ) ∈ S,and tn+1 − tn ≤ τ . Also trajectories starting in S are forward complete. Applying Lemma 2 starting from xn ∈ S we conclude that: 
+
+d( ϕ(t, x ), S ) ≤ FS h(τ ; L) for t ∈ [tn, t n+1 ].
+
+Further, since tn is arbitrary and tn → ∞ , we conclude that the bound holds for all time t ≥ 0.For the second claim, observe first that if x ∈ S, then 
+
+ϕ(t, x ) ∈ R τ (S) for all t ≥ 0. This follows by placing t in an interval t ∈ [tn, t n+1 ), and noting that ϕ(t, x ) = ϕ(t − tn, x n)
+
+with xn ∈ S and t − tn ≤ τ . Now, if y ∈ R τ (S), then 
+
+y = ϕ(t′, x ) for t′ ∈ [0 , τ ] and x ∈ S, and therefore 
+
+ϕ(t, y ) = ϕ(t + t′, x ) ∈ R τ (S) ∀t ≥ 0, as required for (forward) invariance. We finalize this section, noting that Corollary 1 imbues compact τ -recurrent sets with the same functional property of compact invariant sets, i.e., bounding trajectories. This provides the cornerstone to the development of a recurrence-based stability theory. IV. R ECURRENT LYAPUNOV FUNCTIONS 
+
+We now introduce conditions on a function V : D → R≥0
+
+that relax the classical Lyapunov requirement of monotonic non-increase along trajectories: we allow τ > 0 units of time to elapse before requiring any condition on V , leading to the notion of Recurrent Lyapunov Functions. 
+
+Definition 12 (Recurrent Lyapunov Function (RLF)) . Given an equilibrium point x∗ ∈ D of (1) , a set S ⊆ D satisfying 
+
+x∗ ∈ int( S), and τ > 0, a continuous function V : D → R≥0
+
+is a Recurrent Lyapunov Function over S if: 
+
+(i) V is positive definite around x∗, that is, 
+
+V (x) > 0, ∀x ∈ D\{ x∗}, and V (x∗) = 0 . (8) 
+
+(ii ) V is τ -recurrent over S, that is, 
+
+min     
+
+> s∈TS(x;τ)
+
+V (ϕ(s, x )) ≤ V (x), ∀x ∈ S. (9) 
+
+We further say V is a Strict RLF (SRLF) over S if, in addition, the inequality in (ii) is strict for x ∈ S \ { x∗}:
+
+min     
+
+> s∈TS(x;τ)
+
+V (ϕ(s, x )) < V (x), ∀x ∈ S\{ x∗}. (10) The minimum in (9) is taken over the (possibly non-closed) set TS (x; τ ), so finiteness requires the existence of t ∈ (0 , τ ]
+
+with ϕ(t, x ) ∈ S. We require V only to be continuous, avoiding the complications of non-differentiable Lyapunov theory. The τ -recurrent property thus substitutes the standard differential inequality ˙V = ∇V (x)T f (x) ≤ 0, replacing strict invariance with the more relaxed notion of recurrence. 
+
+Lemma 3. Given any c ≥ 0 and a compact set S ⊆ D. If 
+
+V : D → R≥0 is continuous and τ -recurrent over S (cf. (ii )
+
+in Definition 12), then, the following holds: (i) The set S is τ -recurrent. (ii) The set V≤c ∩ S = {x ∈ S | V (x) ≤ c} is τ -recurrent. Proof. We start by noting that since V is continuous, it has a finite maximum over compact S; hence, there exists c large enough such that S∩V≤c = S. As a result, property (i) follows directly from (ii ).To prove (ii ) we use the characterization (ii ) of Lemma 1. By hypothesis, for any x ∈ S ∩ V≤c, one can find t′ ∈ (0 , τ ]
+
+such that ϕ(t′, x ) ∈ S ∩ V≤c. Since S ∩ V≤c is compact, by Lemma 1 it is τ -recurrent. We are now ready to present the main result of this section, which states that the existence of an RLF is sufficient to guarantee the stability of the associated equilibrium point. 
+
+Theorem 1 (Stability) . Consider system (1) under Assumption 1, with an equilibrium point x∗ ∈ D, and a compact set S ⊆
+
+D satisfying x∗ ∈ int( S). Then, if V : D → R≥0 is an RLF over S, the equilibrium x∗ is stable. Proof. It suffices to show that for any ε > 0, there exists a set I ⊂ Bε(x∗), I invariant under (1) and with x∗ ∈ int( I).Without loss of generality, assume Bε(x∗) ⊂ S.Note first that from Lemma 3, S is τ -recurrent, so tra-jectories starting in S are forward complete; furthermore, by Lemma 2, L = Lcl( Rτ (S)) is finite. Find ε′ > 0 small enough such that 
+
+ε′ + Fε′ h(τ ; L) ≤ ε. 
+
+Now let α = min ε′≤∥ x−x∗∥≤ ε V (x); by construction, α > 0.Select β such that 0 < β < α and introduce the compact set 
+
+Ωβ := {x ∈ Bε′ (x∗) : V (x) ≤ β}.
+
+Claim 1: Let I := Rτ (Ω β ). Then x∗ ∈ int( I), I ⊂ Bε(x∗).Given (8), x∗ ∈ int(Ω β ); also Ωβ ⊂ I, so x∗ ∈ int( I).To establish I ⊂ Bε(x∗), apply the Containment Lemma 2 to 
+
+Ωβ : if x ∈ Ωβ , then for every t ∈ (0 , τ ] we have: 
+
+d(ϕ(t, x ), Ωβ ) ≤ Fε′ h(τ ; L).
+
+Since Ωβ ⊂ Bε′ (x∗), the triangle inequality gives the norm bound ∥ϕ(t, x ) − x∗∥ ≤ ε′ + Fε′ h(τ ; L) ≤ ε, as claimed. Claim 2: Ωβ is τ -recurrent. Given x ∈ Ωβ , by hypothesis there exists t′ ∈ (0 , τ ] such that x′ = ϕ(t′, x ) ∈ S and V (x′) ≤ β. Since x′ ∈ R τ (Ω β )
+
+we have ∥x′ − x∗∥ ≤ ε by Claim 1. However, V (x′) < α so 
+
+∥x′ − x∗∥ cannot be in the interval [ε′, ε ]; so x′ ∈ Bε′ (x∗) ∩
+
+V≤β = Ω β , and thus this set is τ -recurrent. Now apply Corollary 1 to conclude that I = Rτ (Ω β ) is an invariant set. So I satisfies the requirements set up at the beginning of the proof. V. A SYMPTOTIC STABILITY 
+
+We now extend the theory to asymptotic stability via the Strict RLF condition of Definition 12. Since a Strict RLF is also an RLF, all properties established in the previous section continue to hold. In particular, if S
+
+is compact, then S is τ -recurrent, trajectories initiating in 
+
+S are forward complete, and remain bounded for all time by Corollary 1. Moreover, Theorem 1 guarantees stability of the equilibrium. The strict inequality in (10) plays the role of the classical Lyapunov condition ˙V (x) < 0 for all 6
+
+x ∈ S \ { x∗}. While classical Lyapunov theory enforces monotonic decrease of V (ϕ(t, x )) for all t ≥ 0, our condition only requires a strict decrease at some return time within (0 , τ ].In particular, it implies that trajectories starting from compact sub-level sets of V return to their interior within τ units of time, thereby providing the mechanism needed to establish asymptotic stability. 
+
+Theorem 2 (Asymptotic Stability) . Consider system (1) under Assumption 1, with an equilibrium point x∗ ∈ D and a com-pact set S ⊆ D satisfying x∗ ∈ int( S). Then, if V : D → R≥0
+
+is an SRLF over S, the equilibrium x∗ is asymptotically stable on the set S.Proof. The stability requirement is already established by Theorem 1 and the fact that an SRLF is also an RLF. Thus, we are only left to show the attractivity of x∗ on the set S.Consider x0 ∈ S\{ x∗}, and the trajectory ϕ(t, x 0), t ≥
+
+0 initiating in this point. It is bounded by Corollary 1, so consider its ω-limit set Ω, which is a compact set in Rd.Claim: x∗ ∈ Ω.Assume x∗̸ ∈ Ω. Consider the compact set Ω ∩ S,
+
+¯v := min  
+
+> Ω∩S
+
+V (x), and an arbitrary minimizer ¯x ∈ Ω ∩ S, 
+
+such that V (¯ x) = ¯ v. Since V (x) is only zero at x∗̸ ∈ Ω ∩ S,we must have ¯v = V (¯ x) > 0. Now by the SRLF hypothesis at ¯x, there exists s ∈ (0 , τ ] such that ϕ(s, ¯x) ∈ S and 
+
+V (ϕ(s, ¯x)) < ¯v. 
+
+But ϕ(s, ¯x) ∈ Ω since the ω-limit is an invariant set, therefore 
+
+ϕ(s, ¯x) ∈ Ω ∩ S, which contradicts the definition of ¯v. This establishes the claim. Now, since x∗ is a stable equilibrium point and x∗ ∈ Ω, we must have ϕ(t, x 0) → x∗ as t → ∞ .Explicitly: given ε > 0, by stability choose δ > 0 such that ϕ(t, B δ (x∗)) ⊂ Bε(x∗); now from the ω-limit take 
+
+t1 : ϕ(t1, x 0) ∈ Bδ (x∗). Then for any t ≥ t1, ϕ(t, x 0) = 
+
+ϕ(t − t1, ϕ (t1, x 0)) ∈ Bε(x∗).We point out that the requirement of S to be compact in Theorem 2 can be extended to a global setting, as follows. 
+
+Corollary 2 (Global Asymptotic Stability) . Let Assumption 1 hold. Consider an equilibrium point x∗ ∈ D of (1) . Then, if 
+
+V : D → R≥0 is an SRLF over D, and has compact sub-level sets V≤c ⊂ D, ∀c ≥ 0, then the equilibrium x∗ is globally asymptotically stable. Proof. Pick any x ∈ D\{ x∗} and let c := V (x) > 0. Since 
+
+V is an SRLF over D, property (10) implies there exists t′ ∈
+
+(0 , τ ] satisfying 
+
+V (ϕ(t′, x )) < V (x) = c. 
+
+Note then that ϕ(t′, x ) ∈ V≤c; therefore V satisfies the conditions of an SRLF over the set S := V≤c. Since V≤c
+
+is compact we can apply Theorem 2 to claim stability of 
+
+x∗ ∈ int V≤c and attractivity of ϕ(t, x ). Finally, since x was chosen arbitrarily within D, the result follows. VI. E XPONENTIAL STABILITY 
+
+We now seek conditions on V that enforce exponential 
+
+stability. Classical Lyapunov analysis requires an exponential decrease along trajectories, 
+
+V (ϕ(t, x )) ≤ e−αt V (x), ∀t ≥ 0, (11) which tightly couples the geometry of V to trajectories and complicates the search. Consistently with the general approach of our paper, we will give conditions on V that ensure exponential convergence at recurrent times; from there we will prove exponential convergence for all times. For this purpose, we introduce a definition that relaxes the requirement in (11). 
+
+Definition 13 (Exponential Recurrent Lyapunov Function (ERLF)) . Given an equilibrium point x∗ ∈ D of (1) and a set S ⊆ D satisfying x∗ ∈ int( S). We say that a continuous 
+
+function V : D → R≥0 is an Exponential Recurrent Lyapunov Function over the set S if the following properties hold: 
+
+(i) V is positive definite on D and linearly contained 
+
+around x∗, that is, there exist constants a1, a 2 > 0 such that 
+
+a1∥x − x∗∥ ≤ V (x) ≤ a2∥x − x∗∥, ∀x ∈ D. (12) 
+
+(ii ) V is α-exponentially τ -recurrent over S, that is, there exist constants α > 0 and τ > 0 such that: 
+
+min     
+
+> s∈TS(x;τ)
+
+eαs V (ϕ(s, x )) ≤ V (x), ∀x ∈ S\{ x∗}. (13) Note that an α-exponentially τ -recurrent function is always strictly τ -recurrent, but not the other way around. Further, in the above definition, we favor a linear containment condition in (12), instead of the standard condition based on class K
+
+functions for two reasons. Firstly, it leads to slightly simpler derivations. Secondly, as we will show in Section VII, under mild conditions standard norms ∥ · ∥ are ERLFs, thus trivially satisfying (12). We now show how to use Definition 13 to provide expo-nentially decreasing bounds for ∥ϕ(t, x ) − x∗∥.
+
+Theorem 3 (Exponential Stability) . Consider an equilibrium point x∗ ∈ D of (1) , and a compact set S ⊆ D satisfying x∗ ∈
+
+int( S). Suppose Assumption 1 holds, and let V : D → R≥0
+
+be an Exponential Recurrent Lyapunov Function over the set S. Then, the equilibrium x∗ is exponentially stable with rate α on the set S. That is, for every x ∈ S we have 
+
+∥ϕ(t, x ) − x∗∥ ≤ C e −αt ∥x − x∗∥, t ≥ 0, (14) 
+
+with C := a2 
+
+> a1
+
+eατ (1 + ¯Lh (τ ; L)) , L := Lcl Rτ (S), and ¯L := ¯Lcl Rτ (S).Proof. Pick any x ∈ S, it suffices to focus on x ∈ S\{ x∗}.Since ERLF ⇒SRLF ⇒RLF, it follows as before that ϕ(t, x ) is bounded and forward complete. Next, we find a recurrent se-quence in this trajectory with exponentially decreasing values of V , by a similar construction to that in Lemma 1. 7
+
+Claim I: there exists a sequence {tn}n∈N, with t0 = 0,
+
+lim n→∞ tn = ∞ and tn+1 − tn ∈ (0 , τ ] ∀n, such that 
+
+xn := ϕ(tn, x ) ∈ S\{ x∗} and: 
+
+eαt n+1 V (xn+1 ) ≤ eαt n V (xn) ≤ V (x), ∀ n ≥ 1. (15) The sequence is defined by induction. For the base case with t0 = 0 , x0 = x, define: 
+
+t1 = max {arg min s∈TS (x0;τ )eαs V (ϕ(s, x 0)) }; (16) by the hypothesis (13) the minimum above exists and is no larger than V (x), and t1 ∈ (0 , τ ]; if there are multiple minimizing times we have selected the largest. Note also that by construction x1 := ϕ(t1, x 0) ∈ S, and also ϕ(t1, x 0)̸ = x∗
+
+since the latter is an equilibrium and x0̸ = x∗. This allows us to repeat the construction inductively: 
+
+tn+1 − tn = max {arg min s∈TS (xn;τ )eαs V (ϕ(s, x n)) }. (17) Invoking again (13), tn+1 − tn is well defined in (0 , τ ] with 
+
+eα(tn+1 −tn)V (ϕ(tn+1 − tn, x n)) ≤ V (xn); (18) also note xn+1 = ϕ(tn+1 , x ) = ϕ(tn+1 − tn, x n) ∈ S\{ x∗},and inequalities in (15) follow from (18). It only remains to show that tn → ∞ .Assume instead that tn ↑ ¯t < ∞. By continuity of ϕ(·, x )
+
+and compactness of S, xn = ϕ(tn, x ) → ϕ(¯ t, x ) =: ¯ x ∈
+
+S\{ x∗}. By the monotonicity in (15) we have 
+
+eα¯tV (¯ x) ≤ eαt n+1 V (xn+1 ) ∀n ≥ 0.
+
+We deduce from here that: 
+
+eα(¯ t−tn)V (¯ x) ≤ eα(tn+1 −tn)V (xn+1 ). (19) Now pick n large enough so that ¯s := ¯ t − tn ≤ τ . Note 
+
+¯s > t n+1 − tn because ¯t > t n+1 .Since ϕ(¯ s, x n) = ϕ(¯ t, x ) = ¯ x ∈ S, the point ¯s is in the domain of the minimization in (17), and gives a result that is no greater than the minimum due to (19). This contradicts the fact that ¯s > t n+1 −tn, as the latter was the largest minimizing time index in (17). This establishes Claim I. We will now use (12) and (15) to bound the distance from the sequence xn to equilibrium: 
+
+∥xn − x∗∥ ≤ V (xn)
+
+a1
+
+≤ e−αt n
+
+a1
+
+V (x) =: rn.
+
+Let Bn := Brn (x∗) ∩ S. Applying Lemma 2 on the compact set Bn ⊂ S, with the global constant L in place of LRτ (Bn)
+
+(allowed since LRτ (Bn) ≤ L and h is increasing in L), it follows that 
+
+∥ϕ(t, x ) − x∗∥ ≤ rn + Frn h(τ ; L), ∀t ∈ (tn, t n+1 ]. (20) Furthermore, since by Assumption 1, f is ¯L-Lipschitz on 
+
+Bn ⊂ S, and f (x∗) = 0 we have Frn ≤ ¯Lr n, leading to 
+
+∥ϕ(t, x ) − x∗∥ ≤ rn(1 + ¯Lh (τ ; L)) = e−αt n
+
+a1
+
+(1 + ¯Lh (τ ; L)) V (x)
+
+for all t ∈ (tn, t n+1 ]. For such t we have t ≤ tn + τ , therefore 
+
+−tn ≤ τ − t so e−αt n ≤ eατ e−αt , leading to 
+
+∥ϕ(t, x ) − x∗∥ ≤ eατ e−αt 
+
+a1
+
+(1 + ¯Lh (τ ; L)) V (x).
+
+Moreover, since the last bound is independent of n, and n was chosen arbitrarily, it must hold for all t ≥ 0. Finally, applying the upper bound V (x) ≤ a2∥x−x∗∥ we establish (14) with C
+
+as in the theorem statement (note C ≥ 1, since a2 ≥ a1). The above theorem demonstrates the exponential stability of an equilibrium point x∗, for initial conditions on a compact set 
+
+S, and involving constants L and ¯L which depend on the set 
+
+S. We now turn to global exponential stability results over the entire domain, which require somewhat stronger assumptions. 
+
+Corollary 3 (Global Exponential Stability) . Consider the system (1) , and assume the vector field f is globally Lipschitz over D with Lipschitz constant ¯L. Let x∗ ∈ D be an equilibrium point. Let V : D → R≥0 be an Exponential Recurrent Lyapunov Function over D, with constants α, τ .Assume that V has compact sublevel sets .Then the equilibrium point x∗ is globally exponentially stable. In particular, for all x ∈ D and t ≥ 0,
+
+∥ϕ(t, x ) − x∗∥ ≤ C e −αt ∥x − x∗∥,
+
+with C := a2 
+
+> a1
+
+e( ¯L+α)τ .Proof. Let x ∈ D be arbitrary, and define the compact sublevel set S := V≤V (x) ⊂ D. Since V is an Exponential Recurrent Lyapunov Function over D, it satisfies the ERLF conditions over S as well. Applying Theorem 3 over S we have: 
+
+∥ϕ(t, x ) − x∗∥ ≤ CS e−αt ∥x − x∗∥ ∀t ≥ 0,
+
+where CS := a2 
+
+> a1
+
+eατ (1 + ¯LS h(τ ; LS )) .By assumption, since f is globally Lipschitz on D with con-stant ¯L, both the standard and one-sided Lipschitz constants over Rτ (S) ⊆ D satisfy LS ≤ ¯L and ¯LS ≤ ¯L.Moreover, the function h(τ ; L) := eLτ −1 
+
+> L
+
+is increasing in 
+
+L, so we conclude that 
+
+CS ≤ a2
+
+a1
+
+eατ (1 + ¯Lh (τ ; ¯L)) = a2
+
+a1
+
+e(α+ ¯L)τ = C. 
+
+Since this bound is independent of the particular choice of 
+
+x ∈ D, we obtain: 
+
+∥ϕ(t, x ) − x∗∥ ≤ Ce −αt ∥x − x∗∥, ∀x ∈ D, ∀t ≥ 0.
+
+VII. S TABILITY ANALYSIS WITH NORMS AS RLF S
+
+The previous sections establish the sufficiency of conditions based on recurrent Lyapunov functions for stability analysis. It is natural to inquire about converse results, i.e. the necessity 
+
+of such conditions. A first remark is that since our Lyapunov conditions are weaker than the standard ones, necessity follows trivially from the classical converse Lyapunov theory (see, e.g., [6], [32]): under asymptotic or exponential stability, a standard V (x) exists (in particular, decreasing along trajecto-ries) that will also satisfy our weaker recurrence conditions. 8
+
+Hence we pose a different question, aligned with our objective of decoupling the Lyapunov choice from the system geometry: can we verify recurrence with a generic Lyapunov function? In particular, in Section VII-A we will use an arbi-trary norm of the deviation from equilibrium as Lyapunov can-didate, and show that (slightly weaker) recurrence conditions follow from the appropriate stability notions. In Section VII-B we will interpret these conditions as guaranteeing practical notions of stability, which will form the basis of the data-driven verification methods to be proposed in Section VIII, and the algorithms developed in Section IX. 
+
+A. Norm-Based Weak Converse Theorems 
+
+We begin by showing that any norm satisfies the SRLF condition on compact subsets of the domain of attraction of an 
+
+asymptotically stable equilibrium , provided a neighborhood of the equilibrium itself is excluded. To that end we provide the following relaxation of SRLFs. 
+
+Definition 14 (ε-Strict Recurrent Lyapunov Func. ( ε-SRLF)) .
+
+Given an equilibrium x∗ ∈ D of (1) , a set S ⊆ D satisfying 
+
+x∗ ∈ int( S), and τ > 0. We say that a continuous function 
+
+V : D → R≥0 is an ε-Strict Recurrent Lyapunov Function 
+
+over S if: 
+
+(i) V is positive definite around x∗, that is, 
+
+V (x) > 0, ∀x ∈ D\{ x∗}, and V (x∗) = 0 . (21) 
+
+(ii ) V is ε-strictly τ -recurrent over S, i.e., there exists ε > 0,with Bε(x∗) ⊂ int( S), such that 
+
+min    
+
+> s∈TS(x;τ)
+
+V (ϕ(s, x )) < V (x), ∀x ∈ Kε, (22) 
+
+where Kε := cl ( S \ Bε(x∗)) .
+
+We now show that norms can indeed be considered as natural ε-SRLFs. 
+
+Theorem 4 (Asymptotic Stability Implies Norm is ε-SRLF) .
+
+Given system (1) . Let x∗ ∈ D be an asymptotically stable equilibrium on a compact set S ⊆ D (Definition 5) satisfying 
+
+x∗ ∈ int( S). Let ∥ · ∥ be any norm on Rd. Then, for any ε > 0
+
+such that Bε(x∗) ⊂ int( S), there exists a finite τ > 0 such that the function V (x) := ∥x − x∗∥ is a ε-Strict Recurrent Lyapunov Function ( ε-SRLF) over S.Proof. Let V (x) = ∥x − x∗∥ and consider a fixed ε > 0 such that Bε(x∗) ⊂ int( S). By definition V satisfies (21). Also introduce δ > 0 (exists due to equilibrium stability) such that for any x0 with V (x0) < δ , V (ϕ(t, x 0)) < ε for all t ≥ 0.Claim I: there exists a finite τ > 0 such that for all x ∈ S,and t ≥ τ , V (ϕ(t, x )) < ε . We prove this claim: For each x ∈ S, due to asymptotic stability we can find a time t(x) such that V (ϕ(t(x), x )) = ∥ϕ(t(x), x ) − x∗∥ < δ .By continuity of the flow with respect to initial conditions we can further find r(x) > 0 such that for any x′ ∈ int Br(x)(x),
+
+V (ϕ(t(x), x ′)) < δ . Given the choice of δ, we have: 
+
+V (ϕ(s, x ′)) < ε ∀s ≥ t(x), x′ ∈ int Br(x)(x). (23) Now, the family {int Br(x)(x)}x∈S constitutes an open cover of the compact set S: select a finite subcover 
+
+{int Brk (xk)}Kk=1 . Define τ = max k t(xk). We conclude from (23) that V (ϕ(s, x ′)) < ε for all x′ ∈ S, s ≥ τ , as claimed. To verify condition (22) of our ε-SRLF definition, consider now an initial condition x ∈ Kε := cl ( S \ Bε(x∗)) . We have 
+
+V (x) = ∥x − x∗∥ ≥ ε > V (ϕ(τ, x )) ≥ min    
+
+> s∈TS(x;τ)
+
+V (ϕ(s, x )); 
+
+note for the last step that ϕ(τ, x ) ∈ S since Bε(x∗) ⊂ S.Thus, V (x) = ∥x − x∗∥ is ε-strictly τ -recurrent. Having established that asymptotic stability implies ε-strict 
+
+τ -recurrence of standard norms, we now turn to exponential stability. In contrast to the asymptotic case—where strict recurrence can only be guaranteed away from a neighborhood of the equilibrium—exponential stability allows us to retain the full domain S while relaxing the certified rate of convergence. Nevertheless, for consistency with the verification frame-work to be developed in Section VIII, we also formulate a converse result that accommodates the possibility of ε-ERLFs. 
+
+Definition 15 (ε-Exponential Recurrent Lyapunov Function (ε-ERLF)) . Given an equilibrium x∗ ∈ D of (1) , a set S ⊆ D
+
+satisfying x∗ ∈ int( S), and constants α > 0 and τ > 0,a continuous function V : D → R≥0 is said to be an ε-Exponential Recurrent Lyapunov Function over S if: (i) V is linearly contained around x∗ on S, i.e., 
+
+a1∥x − x∗∥ ≤ V (x) ≤ a2∥x − x∗∥, ∀x ∈ S, 
+
+for some constants a1, a 2 > 0;(ii) V is ε-strictly α-exponentially τ -recurrent over S, i.e., there exists ε > 0 with Bε(x∗) ⊂ int( S) such that 
+
+min    
+
+> s∈TS(x;τ)
+
+eαs V (ϕ(s, x )) ≤ V (x), ∀x ∈ Kε, (24) 
+
+where Kε := cl ( S \ Bε(x∗)) .
+
+Theorem 5 (Exponential Stability Implies Norm is ε-ERLF) .
+
+Consider system (1) , and let x∗ ∈ D be a λ-exponentially stable equilibrium on a compact set S satisfying x∗ ∈ int( S)
+
+(Definition 6). Then for any 0 < α < λ and any ε ≥ 0 such that Bε(x∗) ⊂ int( S), the function V (x) := ∥x − x∗∥ is an 
+
+ε-Exponential Recurrent Lyapunov Function over S for any τ
+
+satisfying 
+
+τ ≥ 1
+
+λ − α ln 
+
+
+
+C Rr
+
+
+
+, (25) 
+
+where C, λ are given in Definition 6, and r, R are positive constants satisfying Br (x∗) ⊆ S ⊆ BR(x∗).
+
+Remark 2. As mentioned before, in Theorem 5, the parameter 
+
+ε may be taken equal to zero: exponential stability implies that 
+
+V (x) = ∥x − x∗∥ satisfies the full ERLF condition over S.We formulate the result for ε-ERLFs to maintain consistency with the asymptotic case and, more importantly, with the verification framework to be developed in Section VIII, where practical considerations may require the use of ε > 0.Proof. W.l.o.g. we prove the theorem statement for ε = 0 .Let V (x) := ∥x − x∗∥, where ∥ · ∥ is the norm satisfying the exponential stability Definition 6. By hypothesis, for all x ∈ S
+
+and all t ≥ 0, we have ∥ϕ(t, x ) − x∗∥ ≤ Ce −λt ∥x − x∗∥.9
+
+Applying the above condition at t = τ and noting that 
+
+Ce −λτ ≤ rR e−ατ from (25), we have: 
+
+∥ϕ(τ, x ) − x∗∥ ≤ rR e−ατ ∥x − x∗∥. (26) Recalling x ∈ BR(x∗) we conclude in particular that ϕ(τ, x ) ∈
+
+Br (x∗) ⊆ S. Moreover, from (26) we have 
+
+eατ ∥ϕ(τ, x ) − x∗∥ ≤ rR ∥x − x∗∥ ≤ ∥ x − x∗∥.
+
+Hence, for V (x) = ∥x − x∗∥ we have: 
+
+min    
+
+> t∈TS(x;τ)
+
+eαt V (ϕ(t, x )) ≤ eατ V (ϕ(τ, x )) ≤ V (x),
+
+satisfying the ERLF property over S, and thus, the ε-ERLF property for all ε ≥ 0 s.t. Bε(x∗) ⊂ int( S).
+
+B. Stability Implications of Weak Converse Conditions 
+
+The ε-strict recurrence conditions of the previous subsection are weaker versions of the respective RLF conditions. A natu-ral question is to identify the implications of these weakened conditions in regard to stability. We will now show that they imply adequate notions of practical stability. 
+
+Definition 16 (Practical Stability) . An equilibrium x∗ is prac-tically stable with precision ε′ > 0 if there exists δ > 0 s.t. 
+
+∥x − x∗∥ ≤ δ =⇒ ∥ϕ(t, x ) − x∗∥ ≤ ε′, ∀t ≥ 0.
+
+Definition 17 (Practical Asymptotic Stability on S). The equilibrium x∗ is practically asymptotically stable on S with precision ε′ > 0, if (i) x∗ is practically stable with precision ε′;(ii) lim sup 
+
+> t→∞
+
+∥ϕ(t, x ) − x∗∥ ≤ ε′ ∀x ∈ S. 
+
+Definition 18 (Practical Exponential Stability on S). Let 
+
+S ⊂ D and x∗ ∈ int( S). The equilibrium x∗ is practically exponentially stable on S with rate λ > 0 and precision ε′ if there exists C ≥ 1 such that for all x ∈ S and all t ≥ 0,
+
+∥ϕ(t, x ) − x∗∥ ≤ max {ε′, Ce −λt ∥x − x∗∥} . (27) The following lemma, a direct consequence of Lemmas 1 and 2, provides preliminary practical stability implications of 
+
+ε-SRLFs and ε-ERLFs based on norms. 
+
+Lemma 4 (Practical Stability from norm ε-RLFs) . Let x∗ be an equilibrium of (1) , satisfying Assumption 1; let S ⊂ D be compact, with Bε(x∗) ⊂ int( S) for ε > 0. If V (x) = ∥x−x∗∥
+
+is either an ε-SRLF or an ε-ERLF over S with parameter τ ,then Bε(x∗) is τ -recurrent, and x∗ is practically stable with precision 
+
+ε′ := ε + Fε h(τ ; L), (28) 
+
+where Fε := sup x∈Bε(x∗) ∥f (x)∥ and L := Lcl Rτ (Bε(x∗)) as in Lemma 2. Proof. We first show that Bε(x∗) is τ -recurrent, by applying Lemma 1, condition (ii); namely, given x ∈ Bε(x∗), there exists t ∈ (0 , τ ] such that ϕ(t, x ) ∈ Bε(x∗). Clearly, it suffices to check this condition for x ∈ ∂B ε(x∗), i.e. with 
+
+V (x) = ∥x − x∗∥ = ε. Note that such points belong to the set 
+
+Kε for both cases of ε-SRLF (22) and ε-ERLF (24). Using these conditions we conclude in both cases that there exist 
+
+t ∈ (0 , τ ] such that V (ϕ(t, x )) < ε , as required by Lemma 1; thus Bε(x∗) is τ -recurrent. We can now apply Corollary 1 over Bε(x∗); for any x
+
+satisfying ∥x − x∗∥ ≤ ε, d(ϕ(t, x ), B ε(x∗)) ≤ Fεh(τ ; L) for all t ≥ 0, with the given definitions of Fε, h and L. Therefore: 
+
+∥ϕ(t, x ) − x∗∥ ≤ ε + Fεh(τ ; L) = ε′ ∀t ≥ 0; 
+
+this establishes the claimed practical stability precision. We are now ready to characterize the time domain implica-tions of the ε-SRLF and ε-ERLF conditions. 
+
+Theorem 6 (Practical Asymptotic Stability for ε-SRLF) . Let 
+
+x∗ be an equilibrium of (1) , satisfying Assumption 1; let S ⊂
+
+D be compact, with Bε(x∗) ⊂ int( S) for ε > 0. If V (x) = 
+
+∥x−x∗∥ is an ε-SRLF with parameter τ , then x∗ is practically asymptotically stable on S with precision ε′ given by (28) .Proof. Observe first that the hypothesis implies that the com-pact set S is τ -recurrent, using Lemma 1. Indeed, for an initial condition x ∈ S: if x ∈ Kε, (22) implies there exists s ∈ (0 , τ ]
+
+such that ϕ(s, x ) ∈ S, as required in condition (ii) of Lemma 1; if, instead, x ∈ int Bε(x∗), this condition is immediate. Hence, by Corollary 1, every trajectory ϕ(t, x ) with x ∈ S
+
+is forward complete and bounded, and thus has a non-empty, compact, and invariant ω-limit set. Moreover, Lemma 4 implies that x∗ is practically stable with precision ε′ as in (28). In particular, if x ∈ Bε(x∗), then 
+
+∥ϕ(t, x ) − x∗∥ ≤ ε′ for all t ≥ 0, condition (i) in Definition 17. To establish condition (ii), it suffices to show that any trajectory initiated in x ∈ Kε := cl( S \ Bε(x∗)) reaches the ball Bε(x∗) at some finite time. Suppose by contradiction that, for x ∈ Kε, ϕ(t, x ) /∈
+
+int( Bε(x∗)) for all t ≥ 0. Let Ω be its ω-limit set. Then 
+
+Ω ∩ S is nonempty (since S is compact and visited at times 
+
+tn → ∞ ), compact, and contained in Kε. Let ¯x ∈ Ω ∩ S
+
+minimize V on Ω ∩ S. The ε-SRLF property gives s ∈ (0 , τ ]
+
+with V (ϕ(s, ¯x)) < V (¯ x) and ϕ(s, ¯x) ∈ S. By invariance of 
+
+Ω, ϕ(s, ¯x) ∈ Ω as well, contradicting minimality. We have thus shown that every trajectory from Kε en-ters Bε(x∗) in finite time, and practical stability yields 
+
+lim sup t→∞ ∥ϕ(t, x ) − x∗∥ ≤ ε′.
+
+Theorem 7 (Practical Exponential Stability for ε-ERLF) . Let 
+
+x∗ be an equilibrium of (1) , satisfying Assumption 1; let S ⊂
+
+D be compact, with Bε(x∗) ⊂ int( S) for ε > 0. If V (x) = 
+
+∥x − x∗∥ is an ε-ERLF with parameters (α, τ ), then x∗ is practically exponentially stable on S with rate α and precision 
+
+ε′ given by (28) .Proof. For initial conditions x ∈ Bε(x∗) the bound (27) holds trivially from the practical stability of Lemma 4. We thus focus on initial conditions x ∈ Kε, and carry out an iterative construction as in Theorem 3, with some adjustments. Let t0 = 0 , x0 = x, and define as in (16): 
+
+t1 = max {arg min s∈TS (x;τ )eαs V (ϕ(s, x )) } ∈ (0 , τ ]
+
+and x1 := ϕ(t1, x ) ∈ S. By hypothesis (24) we have 
+
+eαt 1 V (x1) ≤ V (x). If ∥x1 − x∗∥ < ε , then define N := 1 10 
+
+and stop the construction. If, instead, x1 ∈ Kε, we take another step defining (t2, x 2), and so on. Specifically, while the sequence xn remains in Kε, we define as in (17): 
+
+tn+1 − tn = max {arg min s∈TS (xn;τ )eαs V (ϕ(s, x n)) },
+
+and xn+1 = ϕ(tn+1 − tn, x n) = ϕ(tn+1 , x ). By hypothesis we have the recursive bound 
+
+eαt n+1 V (xn+1 ) ≤ eαt n V (xn) ≤ V (x),
+
+exactly as in (15). While xn remains in Kε, we deduce that 
+
+∥xn − x∗∥ ≤ e−αt n ∥x − x∗∥. (29) Claim I: this recursion must stop after a finite number of steps, reaching N := n + 1 such that ∥xN − x∗∥ < ε .Suppose, instead, that xn ∈ Kε for all n ≥ 1. From (29) we would have 
+
+0 < ε ≤ ∥ xn − x∗∥ ≤ e−αt n ∥x − x∗∥ ∀n, 
+
+which implies {tn} is a bounded , increasing sequence. Define 
+
+¯t = lim tn and ¯x = ϕ(¯ t, x ). Then ¯x = lim xn ∈ Kε
+
+due to compactness, and we are in an identical situation as in the proof of Theorem 3 (around equation (19)), where we showed a contradiction stemming from the finite limit ¯t.The same argument applies, reaching the same contradiction, establishing our Claim. As a consequence, we conclude from practical stability that 
+
+∥ϕ(t, x ) − x∗∥ ≤ ε′ for all t ≥ tN . (30) Claim II: for any t ∈ (0 , t N ], we have the bound 
+
+∥ϕ(t, x ) − x∗∥ ≤ Ce −αt ∥x − x∗∥, (31) where C := eατ (1 + ¯Lh (τ ; L)) , with constants defined as in Theorem 3 1, and similar proof which is now sketched. Select n ∈ { 0, 1, . . . N − 1} such that t ∈ (tn, t n+1 ], and denote rn := ∥xn − x∗∥. Apply Lemma 2 over S ∩ Brn (x∗)
+
+to obtain the bound (20): ∥ϕ(t, x ) − x∗∥ ≤ rn + Frn h(τ ; L).From the Lipschitz condition we have Frn ≤ ¯Lr n, which gives 
+
+∥ϕ(t, x ) − x∗∥ ≤ rn(1 + ¯Lh (τ ; L)) = rnCe −ατ .
+
+Now t − tn ≤ τ , so e−ατ ≤ e−α(t−tn) which implies 
+
+∥ϕ(t, x ) − x∗∥ ≤ Ce −αt eαt n rn ≤ Ce −αt ∥x − x∗∥,
+
+where the last inequality follows from (29). This establishes Claim II. We have two upper bounds, (31) for t ≤ tN and (30) for 
+
+t ≥ tN ; the max of both bounds holds for all t ≥ 0.VIII. V ERIFICATION OF ε-E XPONENTIAL RLF S
+
+We now leverage the universality of norms as RLFs to develop a practical mechanism for verifying ε-Exponential Recurrent Lyapunov Functions directly from trajectory data. The essence of the procedure is to give sufficient conditions to guarantee that the ε-ERLF condition (24) holds over a certain ball of initial conditions, and then cover the domain of interest with an adequate number of such balls.      
+
+> 1With the simplification that a1=a2= 1 in this case.
+
+Our approach is related to ideas from topological entropy, which characterize dynamical systems through coverings of trajectory segments and the growth rate of distinguishable trajectories [33], [34], as well as their extensions to control through notions such as topological feedback entropy and invariance entropy [35], [36]. 
+
+A. Trajectory-based Verification of ERLF Condition 
+
+We start by deriving conditions to verify the ERLF recur-rence condition locally around a neighborhood of a certain initial condition x. We will make use of the signed distance 
+
+function from x ∈ Rd to S ⊂ Rd, given by: 
+
+sd( x, S ) := 
+
+(
+
+d( x, ∂S ), if x / ∈ S, 
+
+−d( x, ∂S ), if x ∈ S. 
+
+It is not difficult to show that sd is non-expansive, i.e. 
+
+|sd( x, S ) − sd( y, S )| ≤ ∥ x − y∥.
+
+Theorem 8 (Trajectory-based Verification of ERLF Property) .
+
+Consider the system (1) , an equilibrium point x∗ ∈ D, a compact set S ⊆ D, and a given initial condition x ∈ S. Given constants r > 0, α > 0, and τ > 0, let L = LRτ (S∪Br (x)) ,and assume there exists t ∈ (0 , τ ] satisfying simultaneously: 
+
+eαt  ∥ϕ(t, x ) − x∗∥ + re Lt  ≤ ∥ x − x∗∥ − r, (32a) 
+
+sd( ϕ(t, x ), S ) + re Lt ≤ 0. (32b) 
+
+Then, the function V (y) = ∥y − x∗∥ satisfies condition (24) 
+
+on Br (x), i.e., 
+
+min    
+
+> s∈TS(y;τ)
+
+eαs V (ϕ(s, y )) ≤ V (y), ∀y ∈ Br (x).
+
+Proof. Let V (·) := ∥ · − x∗∥. Since system (1) is L-one-sided-Lipschitz on Rτ (S ∪ Br (x)) , for every y ∈ Br (x) and every 
+
+t ∈ [0 , τ ],
+
+∥ϕ(t, x ) − ϕ(t, y )∥ ≤ eLt ∥x − y∥ ≤ re Lt . (33) Hence, 
+
+∥ϕ(t, y ) − x∗∥ ≤ ∥ ϕ(t, x ) − x∗∥ + re Lt .
+
+Let t∗ ∈ (0 , τ ] satisfy (32a)–(32b). Then, for any y ∈ Br (x),
+
+eαt ∗
+
+∥ϕ(t∗, y ) − x∗∥ ≤ eαt ∗  ∥ϕ(t∗, x ) − x∗∥ + re Lt ∗ 
+
+≤ ∥ x − x∗∥ − r ≤ ∥ y − x∗∥,
+
+where the last inequality follows from y ∈ Br (x). Therefore, 
+
+eαt ∗
+
+V (ϕ(t∗, y )) ≤ V (y), ∀y ∈ Br (x).
+
+It remains to show that t∗ ∈ TS (y; τ ). To this end, note that: 
+
+sd( ϕ(t∗, y ), S ) ≤ sd( ϕ(t∗, x ), S ) + ∥ϕ(t∗, y ) − ϕ(t∗, x )∥≤ sd( ϕ(t∗, x ), S ) + re Lt ∗
+
+≤ 0,
+
+where the first step uses the non-expansiveness of sd, the second follows from the Lipschitz bound (33), and the last from condition (32b). Hence ϕ(t∗, y ) ∈ S, t∗ ∈ (0 , τ ], and therefore t∗ ∈ TS (y; τ ). Consequently, 
+
+min    
+
+> s∈TS(y;τ)
+
+eαs V (ϕ(s, y )) ≤ V (y), ∀y ∈ Br (x),11 
+
+which proves the claim. 
+
+Remark 3. We make a few remarks regarding Theorem 8. Checking (32) requires the simulation of one trajectory over a finite time. It is critical that (32a) and (32b) both are satisfied by the same t. However, when the set S = BR(x∗), (32a) 
+
+implies that ϕ(t∗, x ) is automatically in S, avoiding the need for (32b) , thus simplifying the verification process. B. Verifying ε-ERLFs over a Set and its Complexity 
+
+Theorem 8 provides a local mechanism for verifying the ERLF recurrence condition (24) on a neighborhood Br (x) of 
+
+x ∈ S. To verify ε-ERLF over S (Definition 15), we must cover Kε = cl( S \Bε(x∗)) by such neighborhoods. A uniform radius r > 0 is infeasible: any ball touching ∂B ε(x∗) satisfies 
+
+∥˜x−x∗∥ ≤ r +ε, so (32a) forces r < ε , which in turn requires 
+
+Ω(( R/ε )d) balls to cover S of radius R := sup x∈S ∥x−x∗∥—prohibitive. The natural alternative is to adapt r to the distance from equilibrium; restricting to S = BR(x∗), we construct a layered covering of Kε via concentric annuli 
+
+Ai := {x ∈ S : Ri ≥ ∥ x−x∗∥ > R i+1 }, i = 0 , . . . , n −1,
+
+where R0 := R, Ri := ρiR, and ρ ∈ (0 , 1) . Each layer Ai
+
+is covered by balls of radius ri := μR i, with μ ∈ (0 , 1) .The geometric progression in both radii—resolution increasing toward the equilibrium—will be key to controlling the total number of required balls. Applying Theorem 8 for the balls of each annulus, restricted to Bri (x)∩S so that all trajectories involved remain in Rτ (S)
+
+and the constant L applies, we must verify, for all x ∈ Ai, the condition 
+
+min    
+
+> t∈TS(x;τ)
+
+eαt  ∥ϕ(t, x ) − x∗∥ + rieLt  ≤ ∥ x − x∗∥ − ri. (34) Recall from Remark 3: when S = BR(x∗), (32a) alone suffices for verification. The key question is how to choose the relevant parameters (ρ, μ ) to allow for the preceding condition to hold for all i, if at all possible. Clearly, the answer depends on the underlying dynamics. 
+
+Theorem 9 (Sample Complexity for Verifying ε-ERLF) . Con-sider system (1) , an equilibrium x∗ ∈ D ⊆ Rd, and a constant 
+
+R > 0. Let S := BR(x∗) and L := LRτ (S). Suppose x∗ is λ-exponentially stable over S with constant C ≥ 1, and choose 
+
+α ∈ (0 , λ ) such that β := λ−αλ+L ∈ (0 , 1) . Define Cβ := C 1−ββ .Then, the ε-ERLF recurrence condition for V (x) = ∥x−x∗∥
+
+over Kε := cl( S \ Bε(x∗)) can be verified with at most 
+
+N (ε) := ln 
+
+ Rε
+
+
+
+3d+1 de β (2 + Cβ ) dβ = O
+
+
+
+log 
+
+ Rε
+
+ 
+
+trajectory evaluations of duration 
+
+τ = 1
+
+λ − α ln 
+
+
+
+C(2 + Cβ )eβ/d 
+
+.
+
+Proof. Since x∗ is λ-exponentially stable over BR(x∗), for all 
+
+x ∈ Ai,
+
+eαt ∥ϕ(t, x ) − x∗∥ ≤ Ce (α−λ)t∥x − x∗∥ ≤ Ce (α−λ)τ Ri.
+
+Hence the left-hand side of (34) is upper bounded by 
+
+Ri
+
+ Ce (α−λ)τ + μe (α+L)τ .
+
+Using ∥x − x∗∥ ≥ Ri+1 = ρR i and ri = μR i,
+
+∥x − x∗∥ − ri ≥ Ri(ρ − μ).
+
+Thus (34) holds if 
+
+Ce (α−λ)τ + μe (α+L)τ ≤ ρ − μ. (35) Choosing now τ (μ) = 1 
+
+> λ−α
+
+ln 
+
+ Cμβ
+
+
+
+, so that 
+
+Ce (α−λ)τ (μ) = Ce − ln  
+
+> Cμβ
+> 
+
+= μβ ,μe (α+L)τ = μe α+Lλ−α ln  
+
+> Cμβ
+> 
+
+= Cβ μβ ,
+
+turns (35) into 
+
+(1 + Cβ )μβ ≤ ρ − μ ⇐⇒ (1 + Cβ )μβ + μ ≤ ρ. (36) We will show next that the following choice satisfies (36): 
+
+μ(ρ) := 
+
+ ρ
+
+2 + Cβ
+
+1/β 
+
+. (37) Note first that since μ(ρ), β ∈ (0 , 1) we have μ(ρ) < μ (ρ)β .Thus 
+
+(1 + Cβ )μ(ρ)β + μ(ρ) < (2 + Cβ )μ(ρ)β = ρ. 
+
+Next, since Ri = ρiR, the number of layers satisfies 
+
+ρnR ≤ ε ⇒ n =
+
+
+
+ln 
+
+ Rε
+
+ 1ln( ρ−1)
+
+
+
+.
+
+To bound the number of balls per layer, we use standard relations from [37] between covering numbers N (K, r ) (min-imum number of r-balls Br covering K) and packing numbers 
+
+P(K, r ) (maximum number of disjoint balls of radius r/ 2
+
+whose centers belong to K) of a compact set K, namely: 
+
+N (K, r ) ≤ P (K, r ) ≤ vol( K + B r 
+
+> 2
+
+)vol( B r 
+
+> 2
+
+) .
+
+Applying these to Ai = BRi (x∗)\BRi+1 (x∗) ⊂ BRi (x∗) gives 2
+
+N (Ai, r i) ≤ N (BRi , r i) ≤ P (BRi , r i) ≤ vol( BRi+ ri 
+
+> 2
+
+)vol( B ri 
+
+> 2
+
+)= vol( B2Ri+ri )vol( Bri ) =
+
+ 2 + μ(ρ)
+
+μ(ρ)
+
+d
+
+≤ 3d
+
+μ(ρ)d ,
+
+where we used vol( Bcr ) = cdvol( Br ), vol( BR)vol( Br ) =   Rr
+
+d, ri =
+
+μ(ρ)Ri and μ(ρ) ∈ (0 , 1) .Hence the total number of trajectories is bounded by 
+
+n N (Ai, r i) ≤ 3d
+
+μ(ρ)d
+
+ ln( R/ε )ln( ρ−1)
+
+
+
+≤ 3d+1 
+
+μ(ρ)d
+
+ln( R/ε )ln( ρ−1) .
+
+The above bound is minimized over ρ ∈ (0 , 1) at ρ∗ =
+
+e−β/d , which substituted back and using (37) gives, for   
+
+> 2In the rest of the proof, the ball center x∗is left implicit. 12
+
+ε ≤ R e −β/ (2 d), the bound 
+
+N (ε) := ln 
+
+ Rε
+
+
+
+3d+1 de β (2 + Cβ ) dβ
+
+on the total number of trajectory evaluations required to certify the ε-ERLF condition for V (x) = ∥x − x∗∥ over Kε.
+
+Remark 4 (Performance vs Complexity Trade-off) . Theorem 9 highlights the intrinsic trade-off between the performance gap 
+
+λ−α and the sample complexity: as λ−α → 0+, β → 0+ and 
+
+Cβ → ∞ , while at the opposite extreme if λ → ∞ , β, C β → 1
+
+and the bound simplifies to N (ε) = O(d ln( R/ε ) 9 d) with arbitrarily small τ → 0+. A constant gap thus yields sample complexity exponentially better than O(( R/ε )d).
+
+IX. N UMERICAL METHODS 
+
+Building on the sample-complexity result of Section VIII-B, this section develops parallelizable algorithms that certify the 
+
+ε-ERLF property of V (x) = ∥x − x∗∥ directly from trajectory data. To simplify the exposition, we take x∗ = 0 throughout and write Br := Br (0) for r > 0; the extension to a general equilibrium is immediate. Here ∥ · ∥ is the working norm, 
+
+V (x) = ∥x∥, and L is its one-sided Lipschitz constant (3); 
+
+Br (x) is the ball in this norm. We also write Qh(x) := {y :
+
+∥y − x∥∞ ≤ h} for the cube ( ∞-ball) of half-spacing h, with 
+
+Qh := Qh(0) , and let c∞ be the norm-equivalence constant in ∥x∥ ≤ c∞∥x∥∞ (c∞ = 1 for ∥ · ∥ ∞, c∞ = √d for ∥ · ∥ 2), so that Qh(x) ⊆ Bc∞h(x).We present two complementary verification tools, address-ing dual questions about the ε-ERLF condition: (T1) Best rate over a fixed region. Given QR, find the largest 
+
+α > 0 for which V satisfies the ε-ERLF condition on 
+
+QR \ Bε (Algorithm 1, Section IX-B). (T2) Largest certified region for a fixed rate. Given QR and a target rate α > 0, find a subset S ⊆ QR such that V
+
+satisfies the ε-ERLF condition on S \ Bε (Algorithm 2, Section IX-C). Both tools rely on a common set of supporting routines, described next in Section IX-A. 
+
+A. Supporting Tools 
+
+Three constructions underlie both verification tools: a lay-ered candidate grid, a per-ball rate-feasibility check, and a refinement step. We assume here that τ and L are given; their selection is treated later, separately for each method in the respective subsections IX-B and IX-C. 
+
+Initial grid setup. Given the inner radius ε and outer radius 
+
+R, we discretize QR \ Bε by a layered grid of O(3 dm)
+
+candidate cells, where m is the number of layers. Layer 
+
+ℓ ∈ { 1, . . . , m } contributes 3d − 1 cells (excluding the origin), each a cube Qhℓ (xi) of half-spacing 
+
+hℓ := 3 ℓ−1 ε/c ∞.
+
+A cell Qh(x) is certified through the verification ball 
+
+Bc∞h(x) ⊇ Qh(x). The innermost half-spacing ε/c ∞ makes the excluded cube Qε/c ∞ ⊆ Bε, so the full ε-ERLF neigh-borhood is removed. Choosing m such that R ≤ 3mε/c ∞
+
+ensures that these cells, and hence the balls Bc∞hℓ (x), cover 
+
+QR \Bε. This construction is exponentially more efficient than a uniform ε-grid, which would require O(( R/ε )d) points and is also aligned with our sample complexity bounds of Theorem 9; an example for m = 2 , d = 2 is shown in Figure 1. 2ℎ 2ℎ/3 2𝜀/𝑐 !
+
+> 3"× 2𝜀/𝑐 !
+> 𝑟: = 𝑐 !ℎ
+
+Fig. 1: Left: initial layered grid for R = 3mε/c ∞ with 
+
+m = 2 layers; the cells are cubes Qhℓ (xi) of half-spacing 
+
+hℓ = 3 ℓ−1ε/c ∞, each certified through the containing ∥·∥ -ball 
+
+Bc∞hℓ (x) (here Euclidean, c∞ = √d); dots are grid points and the central white cell is the excluded cube Qε/c ∞ ⊆ Bε around 
+
+x∗. Right: the 3d-way subdivision performed by Split( x, h ),splitting a cube Qh(x) into 3d sub-cubes Qh/ 3, each with verification ball Bc∞h/ 3.
+
+Verifying decay of a ball at a given point. For a given center x ∈ Rd and radius r > 0, we let αmax (x, r ; S)
+
+denote the largest α for which the ball Br (x) satisfies the verification condition (32) relative to a reference set S. This is a one-dimensional maximization of α over t ∈ (0 , τ ] subject to (32a)–(32b), by Theorem 8. When S is a sub-level set of 
+
+V , which, for S = QR, holds exactly when ∥ · ∥ = ∥ · ∥ ∞,condition (32b) is implied by (32a) (see Remark 3); we then write αmax (x, r ) := αmax (x, r ; QR). If no feasible α exists, then αmax (x, r ) := −∞ .
+
+Splitting failed points. When αmax (x, r ; S) fails to certify a box of half-spacing h (i.e., αmax (x, c ∞h) < 0), the failure may reflect that the box is simply too large for the local Lipschitz bound to suffice. In that case Split( x, h ) subdivides it into 3d sub-boxes of half-spacing h/ 3 centered on a uniform grid (offsets ± 23 h per axis), illustrated for d = 2 in the right panel of Figure 1. The split is fully parallelizable and can be applied recursively. 
+
+B. Find Best Decay Rate αmin over a Given Region QR
+
+We now address Tool (T1): given an outer radius R, find the largest α > 0 for which V (x) = ∥x∥ satisfies the ε-ERLF condition on QR. The approach combines the supporting routines of Section IX-A with a procedure for selecting τ and estimating L tailored to the fixed-set nature of this setting. 
+
+Selecting τ and estimating L. Both constants are determined from a single set of trajectories initialized on the boundary of 
+
+QR. We start by constructing a uniform grid Γ ⊂ ∂Q R, with points separated 2h > 0 in the ∥ · ∥ norm, and simulate each trajectory ϕ(t, x ), x ∈ Γ.
+
+Selection of τ . We seek a value of τ for which every trajectory starting in Γ either returns to QR or enters Bε within 13 
+
+Algorithm 1: Find -αmin (R, ε, θ ) — Best decay rate α over QR \ Bε via parallel ball certification 
+
+Input: Outer radius R > 0, inner radius ε ∈ (0 , R ), gap threshold θ ∈ (0 , 1) , maximum refinements m
+
+Output: Lower bound on the certified value of α
+
+Construct initial grid G ← { (xi, h i)} covering QR \ Bε; set counter ← 0;For all (xi, h i) ∈ G, compute αi ← αmax (xi, c ∞ hi) and αi ← αmax (xi, 0) ; // lower / upper bounds 
+
+Let i∗ ← arg min i∈[|G|] αi; // worst box in the grid 
+
+while counter ≤ m − 1 and (αi∗ − αi∗ )/α i∗ > θ do 
+
+Replace the k boxes in G with smallest αi by S PLIT (·); counter ← counter + 1 ;Recompute αi and αi over the updated G; update i∗;
+
+return αi∗
+
+[0 , τ ]. Starting from a small candidate value, we increase τ
+
+until this condition is met or until it exceeds a maximum horizon τmax ; in the latter case the procedure is aborted and 
+
+R can be reduced before retrying. 
+
+Estimation of L. Once τ is fixed, the worst-case excursion radius 
+
+Rmax := max   
+
+> x∈Γ, t ∈[0 ,τ ]
+
+∥ϕ(t, x )∥∞
+
+provides a data-driven approximation of the radius of the reachable set Rτ (QR). We thus pick R′ > R max (with a small slack for discretization) and bound the one-sided Lipschitz constant by 
+
+L := sup 
+
+> z∈QR′
+
+μ
+
+ ∂f ∂z (z)
+
+
+
+,
+
+where μ is the matrix measure of the working norm (cf. (3)). In the examples below, this supremum is obtained either by max-imizing μ over the corners of QR′ , which is exact since ∂f /∂z 
+
+is affine (Section IX-B), or in closed form (Section IX-C); data-driven estimators of L are also possible [38]. To certify robustness to discretization, we verify that an h-neighborhood of every x ∈ Γ remains inside QR′ over [0 , τ ]:
+
+max   
+
+> t∈[0 ,τ ]
+
+max  
+
+> x∈Γ
+
+∥ϕ(t, x )∥∞ + h e tL ≤ R′. (38) If (38) fails, the grid Γ is refined and the procedure repeated. 
+
+Region verification algorithm. With τ and L in hand, the procedure is summarized in Algorithm 1. We construct the initial layered grid of Section IX-A, producing candidate pairs 
+
+G = {(xi, h i)} covering QR \ Bε. For each pair we compute two quantities: 
+
+αi := αmax (xi, c ∞ hi), (lower : certifies the box at xi)
+
+αi := αmax (xi, 0) , (upper : certifies the center xi).
+
+The certified rate over the entire grid is αi∗ with i∗ := arg min i αi. The relative gap at the worst point, 
+
+δi∗ := αi∗ − αi∗
+
+αi∗
+
+,
+
+measures how much can still be gained by further refinement. Whenever δi∗ exceeds a threshold θ ∈ (0 , 1) , the k boxes with smallest αi are subdivided using S PLIT (·) and the loop is repeated; the procedure stops once δi∗ ≤ θ or after a maximum of m refinements. If successful, it returns a uniform lower bound on α such that V (x) = ∥x∥ satisfies the ε-ERLF condition on QR \ Bε, as guaranteed by Theorem 8. 
+
+Numerical example: bilinear systems. We apply Algorithm 1 to two bilinear families parametrized by their nonlinearity strength σ. We use the Euclidean norm ∥ · ∥ 2 (c∞ = √d), since the spiraling linearization makes μ∞ over-conservative. In two dimensions, 
+
+ ˙x1
+
+˙x2
+
+
+
+=
+
+ 0 2
+
+−1 −1
+
+  x1
+
+x2
+
+
+
++ B1
+
+
+
+x21
+
+x1x2
+
+x22
+
+ , (39) and in three dimensions, 
+
+
+
+˙x1
+
+˙x2
+
+˙x3
+
+ =
+
+
+
+−1 0 00.5 −1 00.5 0.5 −1
+
+
+
+x1
+
+x2
+
+x3
+
+ + B2
+
+
+
+x21
+
+...
+
+x23
+
+ , (40) with B1 ∈ R2×3 and B2 ∈ R3×6 whose entries are drawn i.i.d. from N (0 , σ ). Increasing σ amplifies the nonlinearity. In all experiments we set R = 0 .7 and ε = 0 .01 , and parallelize trajectory simulation with the TorchODE toolbox [39]. The one-sided Lipschitz constant over QR′ is obtained by maximiz-ing μ2(∂f /∂z ) over its corners, exact since ∂f /∂z is affine. Figure 2 overlays the phase portrait of (39) ( σ = 0 .3) with the certified region and the adaptive cube sizes produced by Algorithm 1 across QR \ Bε.−1.0 −0.5 0.0 0.5 1.0               
+
+> x1
+> −1.0
+> −0.5 0.0 0.5 1.0
+> x2
+> "¢33
+> "¢32
+> "¢31
+> "¢30
+> "¢3¡1
+> "¢3¡2
+> "¢3¡3
+
+Fig. 2: Certified region for (39) ( σ = 0 .3) over its phase portrait. Blue: region QR; red: L-validity box QR′ ; black: excluded cube Qε/c ∞ . Colors give the verification radius 
+
+r = ε · 3k (= c∞h) of the certifying ball (Algorithm 1). 
+
+L ≃ 0.58 , τ = 2 .20 .Table I compares the certified rate α and the wall-clock 14 
+
+time of Algorithm 1 against SOSTOOLS [40] on systems (39) and (40). Across both dimensions and all values of σ, our algorithm certifies a tighter rate α. In both dimensions, the runtime of Algorithm 1 grows with the nonlinearity strength 
+
+σ, as larger one-sided Lipschitz constants over QR′ force deeper refinement. While SOSTOOLS is faster in d = 2 ,where the underlying SDPs are small, the gap reverses in three dimensions: Algorithm 1 is faster for every σ (49 .5–130 .8 sversus 54 .9–632 .6 s), and its advantage widens as σ increases, with SOSTOOLS scaling steeply (from 55 s at σ = 0 .1 to 
+
+633 s at σ = 0 .5). System 2D system 3D system 
+
+σ : 0.3 0.6 1 0.1 0.3 0.5 Alg. 1 α: 0.422 0.442 0.336 0.613 0.485 0.289 
+
+SoS α: 0.360 0.247 0.223 0.309 0.341 0.213 Alg. 1 T (s): 8.3 37.9 102.6 49.5 88.4 130.8 
+
+SoS T (s): 0.97 1.06 0.94 54.89 276.10 632.55 TABLE I: Certified rate α and runtime: Algorithm 1 versus SOSTOOLS on the bilinear systems (39) and (40). 
+
+C. Estimation of α-Regions of Attraction 
+
+We now address Tool (T2): given a target decay rate α > 0
+
+and a candidate outer radius R, identify a subset S ⊆ QR over which V (x) = ∥x∥ satisfies the ε-ERLF condition with rate at least α. The structural difference with Subsection IX-B is that the set S is now the output of the procedure; consequently, the set-feasibility condition (32b) is no longer automatic. This shapes both the estimation of L and the structure of the algorithm below. For this method, τ is chosen a priori, trading off trajectory length against the conservativeness of the output set S.
+
+Estimating L given τ . For a candidate subset S ⊆ QR to be τ -recurrent, any trajectory ϕ(·, x ) starting in S must fall into one of two regimes over [0 , τ ]: either (i) it remains inside 
+
+QR throughout, or (ii) it leaves QR for some excursion of duration less than τ and returns. Regime (i) is handled by estimating L over QR exactly as in Subsection IX-B. To cover regime (ii), we start with a uniform boundary grid Γ ⊂ ∂Q R
+
+(with spacing 2h), and partition it according to whether each sample’s trajectory returns to QR within τ :
+
+Γret := {x ∈ Γ | ∃ t ∈ (0 , τ ] : ϕ(t, x ) ∈ QR}, Γnr := Γ \Γret .
+
+The returning samples play the role of Γ in Subsection IX-B: setting Rmax := max x∈Γret , t ∈[0 ,τ ] ∥ϕ(t, x )∥∞, we choose 
+
+R′ > R max and bound L over QR′ via μ(∂f /∂z ) as before. The discretization-robustness check (38) carries over verbatim, with Γret in place of Γ. The complementary samples Γnr 
+
+require a one-sided check ensuring that trajectories from an h-neighborhood of any non-returning sample also fail to return: 
+
+min   
+
+> t∈[0 ,τ ]
+
+min 
+
+> x∈Γnr
+
+∥ϕ(t, x )∥ − h e tL > R. 
+
+If either check fails, Γ is refined and the partition recomputed. 
+
+Region-growing algorithm. With τ given as input and L
+
+estimated as above, Algorithm 2 grows the certified set S
+
+from the initial layered grid of Section IX-A. Each candidate pair (xi, h i) is tested by αmax (·, ·; ·); boxes satisfying the rate threshold are added to a set Positives , while failing boxes are recursively refined using S PLIT (·) up to depth m.The choice of the reference set inside αmax (·, ·; ·) controls whether the feasibility condition (32b) is enforced as the certified region grows. Enforcing it live is computationally expensive: each box would need to be re-tested whenever 
+
+Positives expands. The Boolean flag Trim decouples the two conditions:  
+
+> •
+
+with Trim = False , only (32a) (exponential decay) is checked;  
+
+> •
+
+with Trim = True , (32b) is also checked against the candidate region S 
+
+> (x,h )∈Positives ∪G
+
+Bc∞h(x).In practice, Algorithm 2 is invoked twice: a first pass with 
+
+Trim = False grows a tentative region S(0) from local trajectory information alone, and a second pass with Trim =
+
+True and initial grid S(0) prunes every box whose certifying trajectory escapes S(0) .
+
+Numerical example: Kuramoto oscillators. We apply Al-gorithm 2 to the Kuramoto oscillator with uniform coupling. Here we retain the max norm ∥ · ∥ ∞ (c∞ = 1 ): its sublevel sets are boxes, so the covering is tight ( r = h). For an n-dimensional system with coupling constant k, the dynamics are 
+
+˙θi = kn
+
+> n
+
+X
+
+> j=1
+
+sin( θj − θi). (41) To remove the rotational symmetry, we change variables to 
+
+φi := θi −θn, reducing the state dimension to d = n−1. A di-rect calculation gives the closed-form bound L ≤ 2k(n−1) /n ,which we use throughout without further numerical estimation. We first run the three-oscillator case with k = 10 and target rate α = 1 . Figure 3 shows the phase portrait overlaid with the certified 1-RoA returned by Algorithm 2 with maximum split count m = 6 . The run uses the two-pass invocation described above: a first pass with Trim = False to grow the candidate region, followed by a second pass with Trim = True to enforce (32b) against the grown region. Finally, we examine how the certified region and the runtime scale with the ambient dimension. Holding the system and algorithmic parameters fixed, we vary the state dimension from 
+
+2 to 6 and the maximum split count from 0 to 6, applying 
+
+Trim = True only at the final pruning pass. Figure 4 reports the percentage of the basin of attraction certified by Algorithm 2 against the wall-clock runtime. Here the certified set, clipped to QR, is compared with a Monte Carlo estimate of the basin of the origin within QR, obtained by integrating 
+
+20 ,000 initial conditions sampled uniformly in [−π, π ]d up to 
+
+T = 50 and declaring convergence when ∥ϕ(T, x )∥∞ < 0.05 .X. C ONCLUSIONS 
+
+In this paper, we relaxed the notion of set invariance by introducing set recurrence, and showed that, under mild conditions, recurrent Lyapunov functions suffice to guarantee stability, asymptotic stability, and exponential stability of an 15 
+
+Algorithm 2: Find -α-RoA (R, ε, α, G 0, Trim ) — Certified α-region of attraction 
+
+Input: Target rate α > 0, range R > 0, ε ∈ (0 , R ), initial grid G0 = {(xi, h i)}, Boolean Trim , max refinements m
+
+Output: Subset of G0 certifying V (x) = ∥x∥ as an ε-ERLF with rate at least α
+
+Set G ← G0, Positives ← ∅ , counter ← 0;
+
+while counter ≤ m − 1 and G̸ = ∅ do 
+
+Define Region ← S 
+
+> (x,h )∈Positives ∪G
+
+Bc∞h(x); // used only when Trim 
+
+foreach (xi, h i) ∈ G do 
+
+αi ← Trim ? αmax (xi, c ∞ hi; Region ) : αmax (xi, c ∞ hi); // enforce (32b) if Trim 
+
+if αi ≥ α then Positives ← Positives ∪ { (xi, h i)} ;
+
+G ← SPLIT (G \ Positives ); counter ← counter + 1 ; // refine; advance 
+
+return Positives ¡¼ 0 ¼ 
+
+> μ2¡ μ 1
+> ¡¼ 0¼
+> μ3 ¡ μ 1
+> 1 split 2 splits 3 splits 4 splits 5 splits 6 splits 7 splits
+
+Fig. 3: Phase portrait of system (41) (three oscillators, k = 10 ). The shaded region is the certified 1-RoA returned by Algo-rithm 2 with maximum split count m = 6 ; colors indicate each ball’s split depth. We have τ = 1 .25 and L ≃ 13 .33 .10 0 10 1 10 2 10 3 10 4
+
+> Time (s)
+> 020 40 60 80 100
+> Percent of RoA Veri fi ed
+> d = 2 d = 3 d = 4 d = 5 d = 6
+
+Fig. 4: Percentage of the 1-RoA certified versus wall-clock runtime of Algorithm 2 on system (41). Each curve corre-sponds to a fixed state dimension ( d = 2 , . . . , 6); points along each curve to maximum split counts m = 0 , . . . , 6. Time is on a logarithmic scale. equilibrium point. We further established norm-agnostic con-verse results: under each stability notion, every norm satisfies a slightly weaker version of the corresponding recurrence condition; the weakening is shown to correspond to a notion of practical (asymptotic or exponential) stability. Building on this theory, we developed two parallelizable, trajectory-based algorithms: Algorithm 1 (best decay rate over a fixed region), which certifies tighter rates than Sum-of-Squares methods on the bilinear benchmark, and Algorithm 2 (largest α-region of attraction for a fixed rate), which certifies large regions of attraction on the Kuramoto benchmark. A complementary sample-complexity bound shows that O(log( R/ε )) trajectory evaluations suffice, revealing an intrinsic trade-off between certified performance and computational cost. ACKNOWLEDGMENTS 
+
+The authors thank Eduardo Sontag and Victor Preciado for several insightful comments on earlier versions of this work, and Yue Shen for contributions to the conference version of this manuscript [26]. REFERENCES [1] A. M. Lyapunov, “The general problem of the stability of motion,” 
+
+International journal of control , vol. 55, no. 3, pp. 531–534, 1992. [2] E. Sontag, Mathematical Control Theory: Deterministic Finite Dimen-sional Systems , ser. Texts in Applied Mathematics. Springer New York, 2013. [3] P. C. Parks, “AM Lyapunov’s stability theory—100 years on,” IMA journal of Mathematical Control and Information , vol. 9, no. 4, pp. 275–303, 1992. [4] S. Sastry, “Lyapunov stability theory,” Nonlinear Systems: Analysis, Stability, and Control , pp. 182–234, 1999. [5] H. K. Khalil, Nonlinear Systems , 3rd ed. Prentice-Hall, 2002. [6] J. L. Massera, “On Liapounoff’s conditions of stability,” Annals of Mathematics , pp. 705–721, 1949. [7] P. Giesl and S. Hafstein, “Review on computational methods for Lyapunov functions,” Discrete and Continuous Dynamical Systems - B ,vol. 20, no. 8, pp. 2291–2331, 2015. [8] M. Hassan and C.Storey, “Numerical determination of domains of attraction for electrical power systems using the method of Zubov,” 
+
+International Journal of Control , vol. 34, no. 2, pp. 371–381, 1981. [9] A. Vannelli and M. Vidyasagar, “Maximal Lyapunov functions and domains of attraction for autonomous nonlinear systems,” Automatica ,vol. 21, no. 1, pp. 69–80, 1985. [10] P. Julian, J. Guivant, and A. Desages, “A parametrization of piecewise linear Lyapunov functions via linear programming,” International Jour-nal of Control , vol. 72, no. 7-8, pp. 702–715, 1999. [11] R. Goebel, A. Teel, T. Hu, and Z. Lin, “Conjugate convex Lyapunov functions for dual linear differential inclusions,” IEEE Transactions on Automatic Control , vol. 51, no. 4, pp. 661–666, 2006. 16 
+
+[12] A. Papachristodoulou and S. Prajna, “On the construction of Lyapunov functions using the sum of squares decomposition,” in Proceedings of the 41st IEEE Conference on Decision and Control, 2002. , vol. 3, 2002, pp. 3482–3487 vol.3. [13] A. A. Ahmadi and A. Majumdar, “Dsos and sdsos optimization: more tractable alternatives to sum of squares and semidefinite optimization,” 
+
+SIAM Journal on Applied Algebra and Geometry , vol. 3, no. 2, pp. 193–230, 2019. [14] N. Rouche, P. Habets, and M. Laloy, Stability theory by Liapunov’s direct method . Springer, 1977, vol. 4. [15] F. Mazenc and D. Nesic, “Strong Lyapunov functions for systems satisfying the conditions of La Salle,” IEEE Transactions on Automatic Control , vol. 49, no. 6, pp. 1026–1030, 2004. [16] M. Malisoff and F. Mazenc, Constructions of strict Lyapunov functions .Springer Science & Business Media, 2009. [17] R. Gunderson, “A comparision lemma for higher order trajectory deriva-tives,” Proceedings of the American Mathematical Society , vol. 27, no. 3, pp. 543–548, 1971. [18] D. Aeyels and J. Peuteman, “A new asymptotic stability criterion for nonlinear time-variant differential equations,” IEEE Transactions on Automatic Control , vol. 43, no. 7, pp. 968–971, 1998. [19] J.-M. Coron and L. Rosier, “A relation between continuous time-varying and discontinuous feedback stabilization,” J. Math. Syst., Estimation, Control , vol. 4, pp. 67–84, 1994. [20] A. A. Ahmadi, “Non-monotonic Lyapunov functions for stability of nonlinear and switched systems: theory and computation,” Ph.D. dis-sertation, Massachusetts Institute of Technology, 2008. [21] I. Karafyllis, “Can we prove stability by using a positive definite function with non sign-definite derivative?” IMA Journal of Mathematical Control and Information , vol. 29, no. 2, pp. 147–170, 2011. [22] Y. Shen, M. Bichuch, and E. Mallada, “Model-free learning of regions of attraction via recurrent sets,” in 2022 IEEE 61st Conference on Decision and Control (CDC) . IEEE, 2022, pp. 4714–4719. [23] Y. Shen, H. Sibai, and E. Mallada, “Generalized barrier functions: Integral conditions & recurrent relaxations,” in 60th Allerton Conference on Communication, Control, and Computing , 09 2024, pp. 1–8. [24] H. Sibai and E. Mallada, “Recurrence of nonlinear control systems: Entropy and bit rates,” in Proceedings of the 27th ACM International Conference on Hybrid Systems: Computation and Control (HSCC) , ser. HSCC ’24, no. 23. New York, NY, USA: Association for Computing Machinery, 05 2024, pp. 1–9. [25] ——, “Recurrence of nonlinear control systems: Entropy, bit rates, and finite alphabet controllers,” Nonlinear Analysis: Hybrid Systems , vol. 59, p. 101649, 2026. [26] R. Siegelmann, Y. Shen, F. Paganini, and E. Mallada, “A recurrence-based direct method for stability analysis and GPU-based verification of non-monotonic Lyapunov functions,” in 62nd IEEE Conference on Decision and Control (CDC) . IEEE, 12 2023, pp. 6665–6672. [27] N. Boffi, S. Tu, N. Matni, J.-J. Slotine, and V. Sindhwani, “Learning stability certificates from data,” in Conference on Robot Learning .PMLR, 2021, pp. 1341–1350. [28] A. Davydov, S. Jafarpour, and F. Bullo, “Non-euclidean contraction theory for robust nonlinear stability,” IEEE Transactions on Automatic Control , vol. 67, no. 12, pp. 6667–6681, 2022. [29] H. Poincaré, Les méthodes nouvelles de la mécanique céleste . Gauthier-Villars et fils, imprimeurs-libraires, 1893, vol. 2. [30] J. M. Alongi and G. S. Nelson, Recurrence and topology . American Mathematical Soc., 2007, vol. 85. [31] E. A. Coddington, An Introduction to Ordinary Differential Equations .New York: Dover Publications, 1989. [32] Y. Lin, E. D. Sontag, and Y. Wang, “A smooth converse Lyapunov theorem for robust stability,” SIAM Journal on Control and Optimization ,vol. 34, no. 1, pp. 124–160, 1996. [33] R. L. Adler, A. G. Konheim, and M. H. McAndrew, “Topological entropy,” Transactions of the American Mathematical Society , vol. 114, pp. 309–319, 1965. [34] R. Bowen, “Entropy for group endomorphisms and homogeneous spaces,” Transactions of the American Mathematical Society , vol. 153, pp. 401–414, 1971. [35] G. N. Nair, R. J. Evans, I. M. Y. Mareels, and W. Moran, “Topological feedback entropy and nonlinear stabilization,” IEEE Transactions on Automatic Control , vol. 49, no. 9, pp. 1585–1597, 2004. [36] F. Colonius and C. Kawan, “Invariance entropy for control systems,” 
+
+SIAM Journal on Control and Optimization , vol. 48, no. 3, pp. 1701– 1721, 2009. [37] M. J. Wainwright, High-dimensional statistics: A non-asymptotic view-point . Cambridge university press, 2019, vol. 48. [38] C. Knuth, G. Chou, N. Ozay, and D. Berenson, “Planning with learned dynamics: Probabilistic guarantees on safety and reachability via Lips-chitz constants,” IEEE Robotics and Automation Letters , vol. 6, no. 3, pp. 5129–5136, 2020. [39] M. Lienen and S. Günnemann, “torchode: A parallel ODE solver for pytorch,” in The Symbiosis of Deep Learning and Differential Equations II, NeurIPS , 2022. [40] A. Papachristodoulou, J. Anderson, G. Valmorbida, S. Prajna, P. Seiler, P. A. Parrilo, M. M. Peet, and D. Jagt, SOSTOOLS: Sum of squares optimization toolbox for MATLAB , 2021, available from 
+
+https://github.com/oxfordcontrol/SOSTOOLS .
+
+Roy N. Siegelmann is a Postdoctoral Associate at the Massachusetts Institute of Technology and a Visiting Postdoctoral Scholar at Harvard University. He received his Ph.D. degree in Applied Mathemat-ics and Statistics from Johns Hopkins University in 2025, along with a master’s degree in Com-puter Science. He received his B.S. degree in Pure Mathematics with a minor in Computer Science from the University of Massachusetts Amherst. He was awarded a National Research Service Award (NIH) in 2022 and the Harriet H. Cohen Engineering Fellowship in 2020. His research interests lie at the intersection of control theory, dynamical systems, and machine learning, with applications to large language models, reinforcement learning, and synthetic biology. 
+
+Fernando Paganini (M’90–SM’05–F’14) received his degrees in both Electrical Engineering and Math-ematics from Universidad de la República, Mon-tevideo, Uruguay, in 1990, and his M.S. and PhD degrees in Electrical Engineering from the California Institute of Technology, Pasadena, in 1992 and 1996 respectively. His PhD thesis received the 1996 Wilts Prize and the 1996 Clauser Prize at Caltech. From 1996 to 1997 he was a postdoctoral associate at MIT. Between 1997 and 2005 he was on the faculty the Electrical Engineering Department at UCLA, reaching the rank of Associate Professor. Since 2005 he is Professor of Electrical and Telecommunications Engineering at Universidad ORT Uruguay, and currently Vice-Dean of Research. Dr. Paganini has received the 1995 O. Hugo Schuck Best Paper Award, the 1999 Packard Fellowship, the 2004 George S. Axelby Best Paper Award. He is a member of the Uruguayan National Academy of Sciences, the Uruguayan National Academy of Engineering, and the Latin American Academy of Sci-ences. During the pandemic he served in Uruguay as one of three coordinators of the Honorary Scientific Advisory Group on Covid-19, receiving after the Presidency of the Republic Award. He is a Fellow of the IEEE (2014) and a Fellow of IFAC (2023). His research interests are control and networks. 
+
+Enrique Mallada (S’09-M’13-SM’19) is an Asso-ciate Professor of Electrical and Computer Engineer-ing at Johns Hopkins University. Prior to joining Hopkins in 2016, he was a Postdoctoral Fellow in the Center for the Mathematics of Information at Caltech from 2014 to 2016. He received his Inge-niero en Telecomunicaciones degree from Universi-dad ORT, Uruguay, in 2005 and his Ph.D. degree in Electrical and Computer Engineering from Cornell University in 2014. Dr. Mallada was awarded the NSF CAREER award in 2018, the ECE Director’s PhD Thesis Research Award for his dissertation in 2014, the Center for the Mathematics of Information (CMI) Fellowship from Caltech in 2014, and the Cornell University Jacobs Fellowship in 2011. His research interests lie in the areas of control, dynamical systems and optimization, with applications to engineering networks such as power systems and the Internet.

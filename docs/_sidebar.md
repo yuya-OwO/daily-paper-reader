@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-09-13 <!--dpr-date:20260913-->
+    * 精读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/13/2609.11431v1-llms-as-post-hoc-auditors-of-physiological-plausibility-in-symbolic-regression-a-clinician-evaluated-case-study" data-sidebar-item="{&quot;title&quot;: &quot;LLMs as Post-hoc Auditors of Physiological Plausibility in Symbolic Regression: A Clinician-Evaluated Case Study&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.11431v1-llms-as-post-hoc-auditors-of-physiological-plausibility-in-symbolic-regression-a-clinician-evaluated-case-study&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;sr&quot;}], &quot;evidence&quot;: &quot;大语言模型辅助提升符号回归模型的可解释性&quot;}">LLMs as Post-hoc Auditors of Physiological Plausibility in Symbolic Regression: A Clinician-Evaluated Case Study</a>
   * 2026-09-11 <!--dpr-date:20260911-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/11/2609.11746v1-construction-of-control-lyapunov-barrier-functions-from-clf-cbf-pairs" data-sidebar-item="{&quot;title&quot;: &quot;Construction of Control Lyapunov-Barrier Functions from CLF-CBF Pairs&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.11746v1-construction-of-control-lyapunov-barrier-functions-from-clf-cbf-pairs&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;从给定CLF和CBF构造控制李雅普诺夫-障碍函数，属于传统李雅普诺夫构造方法&quot;}">Construction of Control Lyapunov-Barrier Functions from CLF-CBF Pairs</a>

@@ -1,0 +1,2878 @@
+Title: Controlled Islanding and Reconnection with Stability Guarantees via Submodular Optimization
+
+URL Source: https://arxiv.org/pdf/2609.12335v1
+
+Published Time: Mon, 14 Sep 2026 00:24:33 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+> 1
+
+# Controlled Islanding and Reconnection with Stability Guarantees via Submodular Optimization 
+
+Shiyu Cheng, Graduate Student Member, IEEE , and Andrew Clark, Senior Member, IEEE 
+
+Abstract —In large-scale networked dynamical systems, local faults or disturbances may propagate through the intercon-nections and compromise the stability of the entire network. Partitioning the network into disjoint subsystems, or islands, limits this propagation by isolating unstable portions of the network from those that remain stable. This paper studies a two-stage controlled islanding and reconnection problem. In the first stage, the network is partitioned into stable and unstable islands. In the second stage, selected stable islands are reconnected to re-cover connectivity lost during islanding while satisfying stability requirements. We derive Lyapunov-based sufficient conditions for both stages. To address the coupling between the islanding and reconnection decisions, we construct an augmented graph on which the bases of a graphic matroid induce exactly the admissible islanding and reconnection pairs. We further show that the resulting optimization problem admits an equivalent non-increasing supermodular formulation. Based on this structure, we develop a local-search algorithm with counterexample refinement and establish a performance guarantee for its inner loop with fixed sample sets. Numerical studies on linear networked systems illustrate the proposed procedure, examine its sensitivity to fault locations, and compare the proposed method with a mixed-integer linear programming benchmark in terms of solution quality and computational performance. 
+
+Index Terms —Submodular optimization, controlled islanding, stability, networked systems 
+
+I. I NTRODUCTION 
+
+Large-scale networked dynamical systems arise in appli-cations such as power networks, multi-agent systems, and robotic networks [1], [2]. Their operation depends critically on interactions among subsystems, through which faults, distur-bances, or other perturbations may propagate and compromise overall system stability [3]. When the original interconnection structure cannot be maintained safely, network reconfiguration provides a mechanism for mitigating the effects of such perturbations. Controlled islanding is an important form of network recon-figuration, particularly in power systems [4], [5]. It removes selected network edges to partition the system into disjoint components, or islands, thereby isolating unstable portions of the network from those that remain stable. A central challenge is to ensure the dynamical stability of the resulting islands. Our preliminary conference work [6] addressed this problem by incorporating Lyapunov-based stability conditions directly into the islanding decision. That work, however, terminated 
+
+S. Cheng and A. Clark are with the Department of Electrical and Systems Engineering, Washington University in St. Louis, St. Louis, MO, USA. Email: 
+
+{cheng.shiyu, andrewclark }@wustl.edu 
+
+once the stable and unstable islands had been formed and did not consider subsequent reconnection. Islanding alone may leave the network unnecessarily frag-mented. After islanding, the states of stable islands evolve toward their respective asymptotically stable equilibria, after which some of the removed connections may be restored with-out sacrificing stability. This motivates a two-stage network-reconfiguration problem: the first stage isolates unstable por-tions of the network while preserving stable islands, and the second reconnects selected stable islands to recover network connectivity. The two stages are coupled because the edges available for reconnection depend on the preceding islanding decision, while the restored couplings may alter the stability of the reconnected components. Building on our preliminary work, we develop a unified optimization framework for stability-aware islanding and re-connection of nonlinear networked dynamical systems. The main contributions are as follows:  
+
+> •
+
+We formulate a two-stage controlled-islanding and re-connection problem and derive Lyapunov-based sufficient conditions that enforce stability of both post-islanding islands and reconnected components.  
+
+> •
+
+We construct an augmented-graph representation that en-codes the coupled islanding and reconnection decisions as the bases of a graphic matroid. We further show that the resulting objective admits a nonincreasing supermodular reformulation, yielding a local-search algorithm with a provable performance guarantee.  
+
+> •
+
+We evaluate the proposed method on networked linear systems, illustrating the islanding and reconnection pro-cedure and comparing solution quality and computational performance with a mixed-integer linear programming baseline. The remainder of this paper is organized as follows. Sec-tion II reviews related work. Section III introduces the sys-tem model and required preliminaries. Section IV formulates the islanding and reconnection problem and derives stability conditions. Section V develops the matroid and supermodular reformulation and the proposed solution algorithm. Section VI presents the numerical results, and Section VII concludes the paper. II. R ELATED WORK 
+
+Controlled islanding has been studied extensively in power systems using approaches including slow coherency [7], [8], arXiv:2609.12335v1 [eess.SY] 11 Sep 2026 2
+
+spectral clustering [9], mixed-integer optimization [10]–[12], and submodular optimization [13]–[15]. Mixed-integer for-mulations can directly incorporate connectivity, coherency, power-flow, and load-generation constraints, but may become computationally expensive as the network size grows. Sub-modular approaches instead exploit combinatorial structure in islanding objectives to obtain scalable algorithms with prov-able performance guarantees. Beyond controlled islanding, submodular optimization has also been applied to networked control problems such as system partitioning, sensor place-ment, and epidemic intervention [16], [17]. A separate challenge is to certify the dynamical stability of the resulting islands. Many optimization-based islanding methods use quantities correlated with stability and assess the resulting partition through subsequent dynamical analysis or simulation [7], [8]. Energy-function and Lyapunov-based methods provide a more direct means of stability certification, although incorporating such conditions into the combinatorial islanding decision is challenging. Our preliminary work [6] ad-dressed this issue by constructing an islanding objective from Lyapunov-based stability conditions and showing that it admits a graphic-matroid and supermodular representation. Related submodular islanding formulations have incorporated post-disturbance operating requirements such as load-generation balance and transmission-line capacity, but remain focused on the islanding decision [15], [18]. The stability of interconnected subsystems has been studied using Lyapunov-based, small-gain, and compositional methods [19], [20]. These methods characterize how subsystem cou-plings affect stability, but in the present setting the couplings introduced by reconnection are themselves decision variables. Post-islanding reconnection and restoration have also been studied, with restoration considerations such as blackstart availability incorporated into island formation [21]. In con-trast, we explicitly optimize the reconnection decision after islanding while imposing dynamical stability requirements on the resulting reconnected components. III. P RELIMINARIES 
+
+This section introduces the notation and system model used throughout the paper, including the effects of islanding and reconnection on the system dynamics. We then review the necessary background on submodularity, matroids, and graph theory. 
+
+A. Notation 
+
+We use N+ to denote the set of positive integers, | · | to denote set cardinality, ∥ · ∥ to denote the Euclidean norm, and 0 to denote a zero vector of appropriate dimension. For vectors vi ∈ Rni , i = 1 , . . . , n , we define col( v1, . . . , v n) ≜
+
+[vT 
+
+> 1
+
+, . . . , v Tn ]T . For an index set I = {i1, . . . , i k} with i1 <
+
+· · · < i k, we use col( {vi : i ∈ I}) ≜ col( vi1 , . . . , v ik ). For 
+
+x = col( x1, . . . , x N ), where xi ∈ Rpi , and I = {i1, . . . , i k} ⊆ {1, . . . , N } with i1 < · · · < i k, let pI ≜ P 
+
+> i∈I
+
+pi and define 
+
+proj I (x) ≜ col( xi1 , . . . , x ik ) ∈ RpI . For a set Ω ⊆ QNi=1 Rpi ,define proj I (Ω) ≜ {proj I (x) : x ∈ Ω}. For z ∈ Rn and 
+
+ϵ > 0, let B(z, ϵ ) ≜ {y ∈ Rn : ∥y − z∥ ≤ ϵ}.
+
+B. System, Islanding, and Reconnection Models 
+
+We consider a network of N nodes with node set V ≜
+
+{1, . . . , N } and edge set E ⊆ V × V . The graph G ≜ (V, E) is connected and undirected. We define M ≜ |E| as the number of edges in G. We define Ni ≜ {j ∈ V : ( i, j ) ∈ E} as the neighbor set of node i. For each node i ∈ V , let xi(t) ∈ X i ⊆
+
+Rpi denote its state variable, where pi ∈ N+. The dynamics of node i are governed by 
+
+˙xi(t) = fi(xi(t)) + X
+
+> j∈N i
+
+fij (xi(t), x j (t)) , (1) where fi : Rpi → Rpi and fij : Rpi × Rpj → Rpi are locally Lipschitz. We define islanding as follows. 
+
+Definition 1 (Islanding) . A valid islanding of G is a collection 
+
+I ≜ {I1, . . . , I m} for some m ∈ { 1, . . . , N }, where, for each 
+
+r ∈ { 1, . . . , m }, Ir ≜ (Vr , Er ) and Er ≜ {(i, j ) ∈ E : i, j ∈Vr }, and the following conditions are satisfied: 
+
+(i) Vr̸ = ∅ for all r ∈ { 1, . . . , m }, and Vr ∩ V s = ∅ for all 
+
+r, s ∈ { 1, . . . , m } with r̸ = s;
+
+(ii) Smr=1 Vr = V;
+
+(iii) Ir is connected for all r ∈ { 1, . . . , m }.
+
+We assume that, when islanding occurs, the state xi(t) of node i does not change, but the dynamics ˙xi(t) in the post-islanding system instantaneously change to 
+
+˙xi(t) = fi(xi(t)) + X
+
+> j∈N i∩V r
+
+fij (xi(t), x j (t)) (2) where r is the unique index with i ∈ V r . We next present the model of how edges are reconnected after islanding has taken place. For an islanding strategy I, we use 
+
+Ecut (I) ≜ E \ (∪mr=1 Er ) (3) to denote the edges that are removed in the islanding stage. By Definition 1, every edge of Ecut (I) has its two endpoints in distinct islands. We select a subset Erec ⊆ Ecut (I) to reconnect. For each node i ∈ V , we denote 
+
+N rec  
+
+> i
+
+≜ {j ∈ N i : ( i, j ) ∈ E rec } (4) as the set of reconnected neighbors of node i. If i ∈ V r , then 
+
+N rec  
+
+> i
+
+∩ V r = ∅, hence, (Ni ∩ V r ) ∩ N rec  
+
+> i
+
+= ∅. We assume that the dynamics ˙xi(t) in the reconnected system instantaneously change to 
+
+˙xi(t) = fi(xi(t)) + X
+
+> j∈N i∩V r
+
+fij (xi(t), x j (t)) + X 
+
+> j∈N rec
+> i
+
+fij (xi(t), x j (t)) , (5) where r is the unique index with i ∈ V r .
+
+C. Submodular Functions and Matroids 
+
+For any finite set X, a function h : 2 X → R is submodular if, for any S ⊆ T ⊆ X and v ∈ X \ T ,
+
+h(S ∪ { v}) − h(S) ≥ h(T ∪ { v}) − h(T ).
+
+A function h is supermodular if −h is submodular. It is monotone nonincreasing (resp. nondecreasing) if h(S) ≥3
+
+h(T ) (resp. h(S) ≤ h(T )) whenever S ⊆ T . Nonnegative weighted sums of submodular (resp. supermodular) functions are submodular (resp. supermodular) and preserve monotonic-ity when the constituent functions have the same monotonicity. Furthermore, if h is nonincreasing and supermodular, then 
+
+max {h(S), c } is nonincreasing and supermodular for any constant c. We next recall standard matroid terminology [22]. 
+
+Definition 2 (Matroid) . A tuple M = ( X, J ), where X is a finite ground set and J ⊆ 2X , is a matroid if: 
+
+(i) ∅ ∈ J ;
+
+(ii) if A ⊆ B and B ∈ J , then A ∈ J ;
+
+(iii) if A, B ∈ J and |A| < |B|, then there exists v ∈ B \ A
+
+such that A ∪ { v} ∈ J .The sets in J are called independent sets. A maximal indepen-dent set is called a basis, and the family of bases is denoted by B(M).
+
+Definition 3 (Rank function) . For a matroid M = ( X, J ),its rank function is ρM(S) ≜ max |R| : R ⊆ S, R ∈ J 
+
+for all S ⊆ X. A set S ⊆ X is independent if and only if 
+
+ρM(S) = |S|. Moreover, ρM is monotone nondecreasing and submodular. 
+
+We will use the following standard properties of matroid rank functions and bases. 
+
+Lemma 1 ( [22]) . For any S ⊆ X and v ∈ X, adding v
+
+increases the matroid rank by at most one, i.e., ρM(S ∪{ v})−
+
+ρM(S) ∈ { 0, 1}.
+
+Lemma 2 ( [22]) . Let B, B ′ ∈ B (M). There exists a bijection 
+
+π : B \ B′ → B′ \ B such that B \ { v} ∪ { π(v)} ∈ B (M) for every v ∈ B \ B′.D. Labeled Multigraphs and Graphic Contraction 
+
+We recall the notions of labeled multigraphs, graphic ma-troids, and contraction used in Section V; see, e.g., [22], [23]. 
+
+Definition 4 (Undirected loopless labeled multigraph) . An undirected loopless labeled multigraph is a tuple G =(V, E, Θ) , where V is a finite vertex set, E is a finite set of distinct edge elements, and 
+
+Θ : E → {u, v } : u, v ∈ V , u ̸ = v
+
+assigns to each edge element its unordered pair of endpoints. We write V(G) ≜ V, E(G) ≜ E, and ΘG ≜ Θ when the underlying multigraph must be specified explicitly. Distinct edge elements e, f ∈ E are called parallel if 
+
+Θ( e) = Θ( f ). Thus, parallel edges remain distinct elements of the edge set even though they have the same endpoint pair. A simple undirected graph is the special case in which Θ is injective. Whenever no ambiguity arises, an edge element e
+
+satisfying Θ( e) = {u, v } is denoted by (u, v ).
+
+The distinction between an edge element and its endpoint pair will be important because contraction may create parallel edges while preserving the identities of the original edge elements. For a loopless labeled multigraph G = ( V, E, Θ) ,let JG denote the family of acyclic subsets of E. Then 
+
+M(G) ≜ (E, JG ) is the graphic matroid of G [22]. If G
+
+is connected, the bases of M(G) are precisely the spanning trees of G. In particular, two parallel edges form a two-element circuit of M(G) and therefore cannot both belong to an independent set. We next recall matroid contraction. Let M = ( X , J ) be a matroid and let e ∈ X be a non-loop. The contraction M/e 
+
+is the matroid on X \ { e} whose independent sets are 
+
+J (M/e ) = I ⊆ X \ { e} : I ∪ { e} ∈ J .
+
+Equivalently, B(M/e ) = B \ { e} : B ∈ B (M), e ∈ B .We also define contraction for the labeled multigraphs used in this paper. Let H = ( V, E, ΘH) be an undirected loopless labeled multigraph, and let e ∈ E have endpoints ΘH(e) = 
+
+{u, v }. Assume that no other edge of H is parallel to e. Let 
+
+r be a new vertex and define q : V →  V \ { u, v } ∪ { r} by 
+
+q(u) = q(v) = r, q(x) = x, x ∈ V \ { u, v }. The contracted multigraph H/e has vertex set V(H/e ) = ( V \ { u, v }) ∪ { r},edge set E(H/e ) = E \ { e}, and endpoint map 
+
+ΘH/e (f ) = {q(x) : x ∈ ΘH(f )}, f ∈ E \ { e}.
+
+Since no edge other than e has endpoint pair {u, v }, ΘH/e (f )
+
+contains two distinct vertices for every f ∈ E \{ e}; hence H/e 
+
+remains loopless. Contraction may nevertheless create parallel edges, and all edge elements other than e retain their identities. The following standard result relates graph contraction and matroid contraction [22]. 
+
+Lemma 3 (Graphic contraction) . Let H be a connected undirected loopless labeled multigraph, and let e ∈ E (H) be an edge that is not parallel to any other edge. Then 
+
+M(H/e ) = M(H)/e. 
+
+Consequently, the map T 7 −→ T \ { e} is a bijection from the spanning trees of H containing e to the spanning trees of H/e ,with inverse S 7 −→ S ∪ { e}.
+
+IV. P ROBLEM FORMULATION 
+
+Under the nominal dynamics, the networked system oper-ates near an asymptotically stable equilibrium. A disturbance or fault may drive the system outside its region of attraction. We therefore partition the network into stable and unstable islands, where stability is determined by the post-islanding dynamics. The islanding stage seeks to minimize the costs associated with unstable nodes and removed edges while ensuring the stability of the stable islands. After islanding, each stable island evolves toward its post-islanding equilibrium. Once the states of the stable islands enter suitable neighborhoods of these equilibria, a subset of the removed edges may be reconnected to reduce network fragmentation. The reconnection stage requires the resulting components to remain stable. This two-stage procedure is illustrated in Fig. 1. We next formalize this two-stage islanding and reconnection problem. 
+
+A. Problem Statement 
+
+We first define the islanding stage and then introduce the reconnection stage. 4  
+
+> (a) Original system (b) Post-islanding system (c) Reconnected System
+
+Fig. 1: Illustration of the islanding and reconnection procedure. (a) Original system, with the faulty node shown in red. (b) Post-islanding system obtained by removing four edges, resulting in two stable islands, indicated by blue boundaries, and one unstable island, indicated by a red boundary. The removed edges are shown as dashed lines, with the edge selected for reconnection shown in yellow. (c) Reconnected system obtained by reconnecting the selected edge, shown as a solid yellow line, thereby merging the two stable islands into a single stable reconnected component. The remaining removed edges are shown as dashed gray lines. 
+
+1) Islanding: Let x(t) ≜ col( x1(t), . . . , x N (t)) denote the state of the entire system, and let Y ⊂ QNi=1 Xi denote the set of possible states at the instant of islanding. We now define stability of an island in the post-islanding system. 
+
+Definition 5 (Post-islanding stability) . Let I = {I1, . . . , I m}
+
+be an islanding of the network, and let r ∈ { 1, . . . , m }. Island 
+
+r is said to be stable under I if, for every initial condition 
+
+x(0) ∈ Y , the trajectory generated by the post-islanding dynamics (2) satisfies 
+
+lim  
+
+> t→∞
+
+xi(t) = 0 , ∀i ∈ V r . (6) 
+
+Otherwise, island r is said to be unstable .
+
+Next, we define the cost of islanding. Let S ⊆ { 1, . . . , m }
+
+denote the indices of stable islands and U = {1, . . . , m } \ S 
+
+denote the indices of unstable islands. The set of nodes in unstable islands is denoted as Z ≜ ∪r∈U Vr , while the set of edges in unstable islands is denoted as ∪r∈U Er . For node 
+
+i ∈ Z, we let ci ≥ 0 denote the cost of instability. For example, in a power system ci may represent the cost of shedding a load or shutting down a generator to prevent damage to the system. Similarly, we use α0cij ≥ 0 to denote the cost of removing the edge (i, j ) ∈ E cut (I) with α0 > 0 and cij ≥ 0. By (3), the cost of islanding is P 
+
+> i∈Z
+
+ci + α0
+
+P 
+
+> (i,j )∈E cut (I)
+
+cij .
+
+2) Reconnection: In the reconnection stage, only removed edges whose endpoints belong to distinct stable islands of the post-islanding system are eligible for reconnection. Accord-ingly, define the set of eligible reconnection edges as 
+
+Eelg (I) ≜ {(i, j ) ∈ E cut (I) : i ∈ V r ,j ∈ V r′ ,r, r ′ ∈ S , r ̸ = r′}. (7) The set of edges selected for reconnection satisfies Erec ⊆Eelg (I). By Definition 5, for every r ∈ S the states of nodes in Vr converge to the origin under the post-islanding dynamics. Consequently, there exists a neighborhood of the origin and a finite time after which the states of all nodes in S 
+
+> r∈S
+
+Vr lie within that neighborhood. The reconnection stage is initiated at such a time, and we therefore take the initial condition of the reconnection system to lie in a neighborhood of the origin. Reconnecting edges in Erec alters the coupling among nodes in stable islands, and so the convergence guaranteed by Definition 5 need not persist in the reconnection system. We therefore introduce a separate stability notion for this stage. 
+
+Definition 6 (Reconnected component) . Let I be a valid is-landing with stable-island index set S, and let Erec ⊆ E elg (I).The reconnected system is the graph 
+
+Grec ≜
+
+
+
+V,   S mr=1 Er
+
+ ∪ E rec 
+
+
+
+. (8) 
+
+The reconnected components C1, . . . , Cmc are the connected components of Grec whose node sets intersect ∪r∈S Vr . We define Cs ≜ (Vcs , Ecs ), and we define the index set of the islands that Cs contains as 
+
+Ss ≜ {r ∈ S : Vr ⊆ V cs }, s ∈ { 1, . . . , m c}. (9) Definition 6 determines Vcs , Ecs , and Ss from Grec alone. The following lemma records the properties of these sets that are used in the following sections. 
+
+Lemma 4. For every s ∈ { 1, . . . , m c} the following hold. 
+
+(i) Ss̸ = ∅, and {S 1, . . . , Smc } is a partition of S. In particular mc ≤ |S| .
+
+(ii) Vcs = S 
+
+> r∈S s
+
+Vr .
+
+(iii) Ecs =   S  
+
+> r∈S s
+
+Er
+
+ ∪ { (i, j ) ∈ E rec : i, j ∈ V cs }.
+
+(iv) Every edge of Erec has both of its endpoints in Vcs for exactly one s.Proof. Each island Ir is connected by Definition 1(iii), and 
+
+Er ⊆ E (Grec ), so Vr is contained in the node set of exactly one connected component of Grec . Since {V 1, . . . , Vm} partitions 
+
+V by Definition 1(i)–(ii), the node set of every connected component of Grec is a union of island node sets. Let r ∈ U . Every edge of Erec lies in Eelg (I) and therefore has both endpoints in stable islands, so no edge of Grec joins 
+
+Vr to V \ V r . Hence Vr is by itself the node set of a connected component, and that component is excluded by Definition 6. Consequently, each Cs consists of a union of stable islands, and the islands forming Vcs are exactly those indexed by Ss.This proves 
+
+Vcs = [
+
+> r∈S s
+
+Vr ,
+
+establishing (ii). Moreover, each Cs contains at least one stable island by Definition 6, so Ss̸ = ∅. Since distinct connected components are node-disjoint and every stable island belongs to exactly one such component, {S 1, . . . , Smc } is a partition of S. Hence mc ≤ |S| , proving (i). 5
+
+For (iii), every edge of Ecs belongs either to Smr=1 Er or to 
+
+Erec . In the former case, both endpoints belong to the same island, which by (ii) is indexed by some r ∈ S s. Thus 
+
+Ecs ⊆ [
+
+> r∈S s
+
+Er
+
+!
+
+∪ { (i, j ) ∈ E rec : i, j ∈ V cs }.
+
+Conversely, every edge in Er with r ∈ S s has both endpoints in Vcs by (ii), and every edge of Erec whose endpoints lie in 
+
+Vcs is an edge of the same connected component. Therefore, the reverse inclusion also holds, proving (iii). Finally, for (iv), the two endpoints of any edge in Erec 
+
+are joined by that edge in Grec and therefore belong to the same connected component. Since both endpoints lie in stable islands, this component is one of C1, . . . , Cmc . Its uniqueness follows from the fact that distinct connected components are node-disjoint. Next, we define the stability of a reconnected component in the reconnection system. 
+
+Definition 7 (Reconnection stability) . Let I be an islanding with stable-island index set S, and let Erec ⊆ E elg (I) be the set of reconnected edges. A reconnected component Cs is said to be stable in the reconnection system if, there exists ϵ > 0
+
+such that under every initial condition ∥xi(0) ∥ ≤ ϵ for all 
+
+i ∈ V cs , the trajectory generated by the reconnection dynamics 
+
+(5) satisfies 
+
+lim  
+
+> t→∞
+
+xi(t) = 0 for all i ∈ V cs . (10) Note that if a stable island r ∈ S is not incident to any edge in Erec , then Ss = {r} for the component Cs containing it, its dynamics in the reconnection system coincide with its dynamics in the post-islanding system, and stability is inherited from Definition 5. We use α1
+
+P 
+
+> (i,j )∈E rec
+
+cij to denote the reward of recon-necting the edge set Erec , where 0 < α 1 < α 0. We define 
+
+F1(I, Erec ) ≜ X
+
+> i∈Z
+
+ci + α0
+
+X
+
+> (i,j )∈E cut (I)
+
+cij − α1
+
+X
+
+> (i,j )∈E rec
+
+cij .
+
+Problem 1. Given a graph G = ( V, E) and node dynamics 
+
+(2) and (5) , compute a valid islanding I = {I1, . . . , I m} and a reconnected set Erec ⊆ E elg (I) that minimize F1(I, Erec )
+
+subject to the requirements that every island r ∈ S be stable in the sense of Definition 5 and that every reconnected component 
+
+Cs be stable in the sense of Definition 7. B. Optimization Formulation 
+
+We use Lyapunov stability analysis to derive sufficient conditions that guarantee the stability requirements in the islanding and reconnection stages. To this end, we construct candidate Lyapunov functions from node-wise and pairwise terms [1], [2], [24]. Accordingly, for an island Ir , let xr ≜
+
+col( {xi : i ∈ V r }) denote its stacked state vector. For each 
+
+i ∈ V, let Wi : Rpi → R be radially unbounded and continuous positive definite, and, for each (i, j ) ∈ E, let 
+
+Wij : Rpi × Rpj → R be continuous positive semidefinite. Define 
+
+W (x) ≜ X
+
+> i∈V
+
+Wi(xi) + X
+
+> (i,j )∈E
+
+Wij (xi, x j ), (11) 
+
+W r (xr ) ≜ X
+
+> i∈V r
+
+Wi(xi) + X
+
+> (i,j )∈E r
+
+Wij (xi, x j ). (12) For β > 0, we define Ωrβ ≜ xr ∈ Rpr : W r (xr ) ≤ β ,where pr ≜ P 
+
+> i∈V r
+
+pi. Throughout, positive definiteness of 
+
+Wi includes Wi(0) = 0 , and positive semidefiniteness of Wij 
+
+includes Wij (0 , 0) = 0 . We next construct a global sublevel set Ω whose projection onto each island contains Ωrβ .
+
+Lemma 5. Under the assumptions stated above on Wi and 
+
+Wij , suppose that, for every (i, j ) ∈ E , there exist θij i , θ ij j ≥ 0
+
+such that 
+
+Wij (xi, x j ) ≤ θij i Wi(xi) + θij j Wj (xj )
+
+for all xi ∈ Rpi and xj ∈ Rpj . Define θi ≜ max {θij i : j ∈Ni} and η ≜ max {deg( i)θi : i ∈ V} , where deg( i) = |N i|.For any β > 0, let Ω ≜ {x : W (x) ≤ (1 + η)β}. Let 
+
+∅̸ = L ⊆ V and EL ⊆ { (i, j ) ∈ E : i, j ∈ L} . Define xL ≜
+
+col( {xi : i ∈ L} ) ∈ RpL , where pL ≜ P 
+
+> i∈L
+
+pi, and 
+
+WL(xL) ≜ X
+
+> i∈L
+
+Wi(xi) + X
+
+> (i,j )∈E L
+
+Wij (xi, x j ).
+
+Let ΩL 
+
+> β
+
+≜ {xL ∈ RpL : WL(xL) ≤ β}. Then ΩL 
+
+> β
+
+⊆ proj L(Ω) .Proof. Fix any xL ∈ ΩL 
+
+> β
+
+. Define ex ∈ Q 
+
+> i∈V
+
+Rpi by 
+
+proj L(ex) = xL and exi = 0 for all i ∈ V \ L . It suffices to show that ex ∈ Ω. Since Wi(0) = 0 , we have 
+
+W (ex) = WL(xL) + X
+
+> (i,j )∈E\E L
+
+Wij (exi, exj ).
+
+Using Wi(0) = 0 and the assumed bound on Wij ,
+
+X
+
+> (i,j )∈E\E L
+
+Wij (exi, exj ) ≤ X
+
+> i∈L
+
+X
+
+> j∈N i
+
+θij i Wi(xi)
+
+≤ X
+
+> i∈L
+
+deg( i)θiWi(xi) ≤ η X
+
+> i∈L
+
+Wi(xi).
+
+Therefore, since Wij ≥ 0,
+
+W (ex) ≤ WL(xL) + η X
+
+> i∈L
+
+Wi(xi)
+
+≤ (1 + η)WL(xL) ≤ (1 + η)β. 
+
+Thus ex ∈ Ω. Since proj L(ex) = xL, it follows that xL ∈
+
+proj L(Ω) . As xL was arbitrary, ΩL 
+
+> β
+
+⊆ proj L(Ω) .
+
+Remark 1. The edge set EL need not contain all edges induced by L. This flexibility is required when Lemma 5 is applied to a reconnected component. By Lemma 4(iii), an edge in Ecut (I) \ E rec may have both endpoints in Vcs without belonging to Ecs .
+
+Corollary 1. Under the hypotheses and notation of Lemma 5, 
+
+Ωrβ ⊆ proj Vr (Ω) for every island r.Proof. Take L = Vr and EL = Er in Lemma 5. Then WL =
+
+W r , and the result follows. 6
+
+Next, we construct a sufficient condition ensuring the sta-bility of the post-islanding system. 
+
+Proposition 1. Under the hypotheses and notation of Lemma 5, suppose, in addition, that Wi and Wij are con-tinuously differentiable. If there exist k1 > 0 and β > 0 such that Y ⊆ { x : W (x) ≤ β} and 
+
+X
+
+> i∈V r
+
+∂W r
+
+∂x i
+
+fi(xi) + X
+
+> j∈N i∩V r
+
+fij (xi, x j )
+
+ ≤ − k1W r (xr )
+
+(13) 
+
+for all x ∈ Ω, where Ω ≜ {x : W (x) ≤ (1 + η)β}, then island 
+
+Ir is stable. Proof. Fix an arbitrary x(0) ∈ Y . Since Y ⊆ { x : W (x) ≤
+
+β} and all terms defining W are nonnegative, we have 
+
+W r (xr (0)) ≤ W (x(0)) ≤ β. Hence xr (0) ∈ Ωrβ .We next show that the Lyapunov inequality holds through-out Ωrβ . Fix any xr ∈ Ωrβ . By Corollary 1, there exists ex ∈ Ω
+
+such that proj Vr (ex) = xr . Evaluating (13) at ex and noting that both sides of (13) depend only on the states in Vr , we obtain, along the post-islanding dynamics, ˙W r (xr ) ≤ − k1W r (xr ),
+
+∀xr ∈ Ωrβ . It follows that Ωrβ is forward invariant. Moreover, the comparison lemma gives W r (xr (t)) ≤ W r (xr (0)) e−k1t,for all t ≥ 0. Thus W r (xr (t)) → 0 as t → ∞. By construction, W r (xr ) ≥ P 
+
+> i∈V r
+
+Wi(xi); hence W r is positive definite and radially unbounded. Therefore xr (t) → 0 as 
+
+t → ∞ , and consequently xi(t) → 0 for every i ∈ V r . Since 
+
+x(0) ∈ Y was arbitrary, Ir is stable. Next, we analyze the stability of the reconnection system. For a reconnected component Cs = ( Vcs , Ecs ), define bxs ≜
+
+col( {xi : i ∈ V cs }) and 
+
+V s(bxs) ≜ X
+
+> i∈V cs
+
+Wi(xi) + X
+
+> (i,j )∈E cs
+
+Wij (xi, x j ). (14) By Lemma 4, V s admits the decomposition 
+
+V s(bxs) = X
+
+> r∈S s
+
+W r (xr ) + 12
+
+X
+
+> i∈V r
+
+X 
+
+> j∈N rec
+> i
+
+Wij (xi, x j )
+
+ .
+
+(15) Indeed, W r accounts for all node and internal-edge terms of island r, while the factor 1/2 ensures that each reconnected edge is counted exactly once. For any γ > 0, define bΩ ≜ {x : W (x) ≤ (1 + η)γ} and 
+
+bΩsγ ≜ {bxs : V s(bxs) ≤ γ}. Applying Lemma 5 with L = Vcs ,
+
+EL = Ecs , and β = γ gives bΩsγ ⊆ proj Vcs (bΩ) .
+
+Lemma 6. For any γ > 0, there exists ϵ > 0 such that, for every valid islanding I, every Erec ⊆ E elg (I), and every resulting reconnected component Cs = ( Vcs , Ecs ),
+
+∥xi∥ ≤ ϵ, ∀i ∈ V cs =⇒ bxs ∈ bΩsγ .
+
+Proof. Since every reconnected component satisfies |V cs | ≤ 
+
+N and |E cs | ≤ M , the function V s contains at most N +
+
+M nonnegative node and edge terms. It therefore suffices to choose a neighborhood of the origin in which each such term is bounded above by γ/ (N + M ).For each i ∈ V , continuity of Wi and Wi(0) = 0 imply the existence of ϵi > 0 such that 
+
+∥xi∥ ≤ ϵi =⇒ Wi(xi) ≤ γN + M .
+
+Similarly, for each (i, j ) ∈ E, continuity of Wij and 
+
+Wij (0 , 0) = 0 imply the existence of ϵij > 0 such that 
+
+max {∥ xi∥, ∥xj ∥} ≤ ϵij =⇒ Wij (xi, x j ) ≤ γN + M .
+
+Define ϵ ≜ min ( {ϵi : i ∈ V} ∪ { ϵij : ( i, j ) ∈ E} ) > 0, where positivity follows from the finiteness of V and E.Now consider any admissible I, Erec , and resulting com-ponent Cs. If ∥xi∥ ≤ ϵ for every i ∈ V cs , then every node and edge term in V s satisfies the corresponding bound above. Hence, we have V s(bxs) ≤ |V cs |+|E cs |  
+
+> N+M
+
+γ ≤ γ. It follows that 
+
+bxs ∈ bΩsγ .Suppose every island r ∈ S is stable. Then, for each post-islanding trajectory with x(0) ∈ Y , there exists T ≥ 0 such that ∥xi(t)∥ ≤ ϵ for every i ∈ S 
+
+> r∈S
+
+Vr and all t ≥ T . Since 
+
+Vcs = S 
+
+> r∈S s
+
+Vr with Ss ⊆ S , Lemma 6 implies bxs(t) ∈ bΩsγ
+
+for every reconnected component Cs and all t ≥ T .We now give an island-wise sufficient condition for recon-nection stability. The condition requires the additional terms induced by the reconnected edges to be dominated by the decay margin available from (13). 
+
+Proposition 2. Under the hypotheses and notation of Lemma 5, suppose, in addition, that Wi and Wij are contin-uously differentiable. Let I be a valid islanding with stable-island index set S, let Erec ⊆ E elg (I), and let Cs be a recon-nected component. Suppose there exist constants k1 ≥ k2 > 0
+
+and scalars β ≥ γ > 0 such that, with Ω ≜ {x : W (x) ≤
+
+(1 + η)β}, and bΩ ≜ {x : W (x) ≤ (1 + η)γ}, the following conditions hold: 
+
+(i) For every r ∈ S s, condition (13) holds for all x ∈ Ω.
+
+(ii) For every r ∈ S s and all x ∈ bΩ,
+
+X
+
+> i∈V r
+
+∂W r
+
+∂x i
+
+X 
+
+> k∈N rec
+> i
+
+fik (xi, x k)+ X
+
+> i∈V r
+
+X 
+
+> j∈N rec
+> i
+
+∂W ij 
+
+∂x i
+
+
+
+fi(xi)+ X  
+
+> k∈(Ni∩V r)∪N rec
+> i
+
+fik (xi, x k)
+
+
+
+≤ − k2
+
+2
+
+X
+
+> i∈V r
+
+X 
+
+> j∈N rec
+> i
+
+Wij (xi, x j ) + ( k1 − k2)W r (xr ).
+
+(16) 
+
+Then the reconnected component Cs is stable. Proof. Since γ ≤ β, we have bΩ ⊆ Ω. For r ∈ Ss and 
+
+i ∈ Vr , define gri (x) ≜ fi(xi) + P 
+
+> j∈N i∩V r
+
+fij (xi, x j ),and hi(x) ≜ P 
+
+> j∈N rec
+> i
+
+fij (xi, x j ), so that the reconnection dynamics satisfy ˙xi = gri (x)+ hi(x). Differentiating V s along 7
+
+the reconnection dynamics and grouping the terms by their incident islands gives 
+
+˙V s = X
+
+> r∈S s
+
+" X
+
+> i∈V r
+
+∂W r
+
+∂x i
+
+gri + X
+
+> i∈V r
+
+∂W r
+
+∂x i
+
+hi
+
++ X
+
+> i∈V r
+
+X 
+
+> j∈N rec
+> i
+
+∂W ij 
+
+∂x i
+
+ gri + hi
+
+#
+
+.
+
+Here, the last two terms are precisely the contributions induced by the reconnected edges. Since x ∈ bΩ ⊆ Ω, conditions (i)–(ii) imply 
+
+˙V s ≤ X
+
+> r∈S s
+
+"
+
+− k2W r (xr ) − k2
+
+2
+
+X
+
+> i∈V r
+
+X 
+
+> j∈N rec
+> i
+
+Wij (xi, x j )
+
+#
+
+= −k2V s(bxs),
+
+where the last equality follows from (15). Applying Lemma 5 with L = Vcs , EL = Ecs , and β = γ
+
+shows that every bxs ∈ bΩsγ is the projection of some x ∈ bΩ.Since Cs is a connected component of the reconnection system, its dynamics, and hence ˙V s, depend only on bxs. Therefore, 
+
+˙V s(bxs) ≤ − k2V s(bxs), bxs ∈ bΩsγ .
+
+By Lemma 6, there exists ϵ > 0 such that ∥xi(0) ∥ ≤ ϵ for all i ∈ V cs implies bxs(0) ∈ bΩsγ . On the boundary of this set, 
+
+˙V s ≤ − k2γ < 0; hence bΩsγ is forward invariant, and 
+
+V s(bxs(t)) ≤ V s(bxs(0)) e−k2t.
+
+Thus V s(bxs(t)) → 0. Since V s(bxs) ≥ P 
+
+> i∈V cs
+
+Wi(xi), V s
+
+is positive definite and radially unbounded. Consequently, 
+
+bxs(t) → 0, and Cs is stable. The stability requirements in Problem 1 are trajectory-based and are not directly amenable to the combinatorial optimization formulation. We therefore impose the sufficient Lyapunov conditions of Propositions 1 and 2 through violation functions. For each r ∈ S , define 
+
+Φr (x; I) ≜ X
+
+> i∈V r
+
+∂W r
+
+∂x i
+
+fi(xi) + X
+
+> j∈N i∩V r
+
+fij (xi, x j )
+
+
+
++ k1W r (xr ), (17) and 
+
+Ψr (x; I, Erec )
+
+≜ X
+
+> i∈V r
+
+∂W r
+
+∂x i
+
+X 
+
+> k∈N rec
+> i
+
+fik (xi, x k)+ X
+
+> i∈V r
+
+X 
+
+> j∈N rec
+> i
+
+∂W ij 
+
+∂x i
+
+fi(xi) + X  
+
+> k∈(Ni∩V r)∪N rec
+> i
+
+fik (xi, x k)
+
+
+
++ k2
+
+2
+
+X
+
+> i∈V r
+
+X 
+
+> j∈N rec
+> i
+
+Wij (xi, x j ) − (k1 − k2)W r (xr ). (18) Hence, Φr ≤ 0 and Ψr ≤ 0 are the pointwise inequalities required by Propositions 1 and 2, respectively. We then formulate 
+
+min  
+
+> I,Erec
+
+F1(I, Erec ) (19a) 
+
+s.t. F2(I) = 0 , (19b) 
+
+F3(I, Erec ) = 0 , (19c) 
+
+Erec ⊆ E elg (I), (19d) 
+
+I is a valid islanding , (19e) where 
+
+F2(I) ≜
+
+Z
+
+> Ω
+
+X
+
+> r∈S
+
+{Φr (x; I)}+ dx, (20) 
+
+F3(I, Erec ) ≜
+
+Z
+
+> bΩ
+
+X
+
+> r∈S
+
+{Ψr (x; I, Erec )}+ dx. (21) The following result establishes that the zero-violation con-straints in (19) enforce the corresponding pointwise Lyapunov conditions. 
+
+Lemma 7. Assume that Ω and bΩ are the closures of their interiors. Let I be a valid islanding and let Erec ⊆ E elg (I).If (19b) and (19c) hold, then every island r ∈ S is stable and every reconnected component Cs is stable. Proof. The integrands in (20) and (21) are continuous and nonnegative. By (19b) and the domain regularity assumed in the lemma, the integrand in (20) vanishes identically on Ω.Hence Φr (x; I) ≤ 0, ∀x ∈ Ω and r ∈ S . By the definition of Φr in (17), this inequality is equivalent to (13). Therefore, Proposition 1 implies that every r ∈ S is stable. Similarly, (19c) and the same domain-regularity argument imply Ψr (x; I, Erec ) ≤ 0, ∀x ∈ bΩ, and r ∈ S. By the definition of Ψr in (18), this inequality is equivalent to condition (ii) of Proposition 2. For any reconnected component 
+
+Cs, Lemma 4 gives Ss ⊆ S , and the preceding inequality for 
+
+Φr establishes condition (i) of Proposition 2 for every r ∈ S s.Hence Cs is stable by Proposition 2. Since Cs is arbitrary, every reconnected component is stable. We next penalize violations of the stability conditions and consider 
+
+min  
+
+> I,Erec
+
+F1(I, Erec ) + α2F2(I) + α3F3(I, Erec ) (22a) 
+
+s.t. Erec ⊆ E elg (I), (22b) 
+
+I is a valid islanding , (22c) where α2, α 3 > 0 are penalty weights. Problem (22) remains combinatorial for two reasons. First, the number of valid islandings grows combinatorially with the network size. Second, the islanding and reconnection decisions are coupled because Eelg (I) depends on I. These challenges motivate the solution method developed in the next section. V. M ATROID AND SUBMODULAR REFORMULATION 
+
+In this section, we address the combinatorial and coupling challenges in (22) by reformulating it as an optimization problem over the bases of a graphic matroid. We construct an augmented graph such that each spanning tree determines 8
+
+an admissible pair (I, Erec ), thereby replacing the coupled is-landing and reconnection decisions by a single basis selection. We then show that the resulting basis-constrained objective admits a nonincreasing supermodular extension, yielding an equivalent supermodular optimization problem and a local-search method with a provable performance guarantee. 
+
+A. Matroid Reformulation and Submodular Optimization 
+
+We first construct an augmented labeled multigraph G ≜
+
+(V, E, Θ) from G = ( V, E). We introduce nodes s0 and d0,together with nij i and nij j for every (i, j ) ∈ E , and define 
+
+V ≜ V ∪ { s0, d 0} ∪ nij i , n ij j : ( i, j ) ∈ E , (23) 
+
+E ≜ (i, n ij i ), (nij i , n ij j ), (nij j , j ) : ( i, j ) ∈ E 
+
+∪ { (s0, d 0)} ∪ (s0, i ), (d0, i ) : i ∈ V . (24) Each pair in E denotes a distinct edge element, with endpoint map Θ(( u, v )) ≜ {u, v }. The nodes s0 and d0 distinguish stable from unstable islands, while nij i and nij j are used to determine the reconnection decisions. Let M ≜ M(G) be the graphic matroid of G, and let e0
+
+denote the edge element (s0, d 0). Define B∗ ≜ {A ∈ B (M) : 
+
+e0 ∈ A}. Thus, B∗ is the family of spanning trees of G
+
+containing e0.We next construct a labeled multigraph whose basis family will be shown to be B∗. Using the contraction operation introduced in Section III-D, we first contract e0 in G. The resulting labeled multigraph, denoted by Gc ≜ G/e 0, identifies 
+
+s0 and d0 as a single vertex r0 while preserving the identities of the remaining edge elements. Consequently, for each i ∈ V ,the edge elements (s0, i ) and (d0, i ) become parallel edges with common endpoint pair {r0, i }.A new vertex w is then added to Gc, and the edge element e0
+
+is reintroduced with endpoint pair {r0, w }, with no other edge incident to w. Let Gb denote the resulting labeled multigraph and define Mc ≜ M(Gb). By construction, G and Gb have the same edge-element set E, with the identity of each edge element preserved. 
+
+Lemma 8 (Graphic representation of B∗). For the graph Gb
+
+constructed above, 
+
+B(Mc) = B∗.
+
+Hence, B∗ is the family of bases of a graphic matroid on E.Proof. The graph G is connected by construction, and hence so are Gc and Gb. Moreover, e0 is not parallel to any other edge in either G or Gb. Since w is incident only to e0, every spanning tree of Gb contains e0. By construction, the three labeled multigraphs satisfy Gb/e 0 = Gc = G/e 0. Applying Lemma 3 to Gb gives 
+
+B(Mc) = S ∪ { e0} : S ∈ B (M(Gc)) .
+
+Applying the same lemma to G gives B∗ = S ∪ { e0} : S ∈B(M(Gc)) . Therefore, B(Mc) = B∗.The multigraph representation is necessary because, after contracting e0, the edge elements (s0, i ) and (d0, i ) become parallel but remain distinct by Definition 4. Consequently, by Lemma 8, every A ∈ B (Mc) can be viewed as a spanning tree of G containing e0, with the edge elements (s0, i ) and 
+
+(d0, i ) remaining distinguishable. For a valid islanding I, a pair (I, Erec ) is called admissible if Erec ⊆ E elg (I). Let 
+
+R ≜ (I, Erec ) : I is a valid islanding , Erec ⊆ E elg (I) .
+
+Thus, R is the feasible set of (22). We next characterize the islanding induced by a basis A ∈B(Mc), viewed as the corresponding spanning tree of G. Let 
+
+A ≜ A ∩ (i, n ij i ), (nij i , n ij j ), (nij j , j ) : ( i, j ) ∈ E .
+
+Two nodes i, j ∈ V belong to the same subset if and only if 𝑠 ! 𝑑 !  
+
+> 𝑖 𝑗 𝑛 ""# 𝑛 #"#
+
+Fig. 2: Spanning-tree representation of the islanding and reconnection decisions in Fig. 1. A basis A ∈ B (Mc) is shown as a spanning tree of G, with edges not contained in A
+
+omitted. The green nodes are the auxiliary nodes introduced in the construction of G. The blue and red edges connect the stable and unstable islands to s0 and d0, respectively, and serve as their reference edges. The two yellow edges are associated with the original edge (i, j ) selected for reconnection. they are connected by a path consisting of edges in A. This relation partitions V into m(A) nonempty sets, denoted by 
+
+V1(A), . . . , Vm(A)(A). For each r ∈ { 1, . . . , m (A)}, let 
+
+Er (A) ≜ {(i, j ) ∈ E : i, j ∈ V r (A)},Ir (A) ≜ (Vr (A), Er (A)) ,
+
+and I(A) ≜ {I1(A), . . . , I m(A)(A)}. The collection I(A) is uniquely determined by A, independently of the ordering of the island indices. 
+
+Lemma 9. For every A ∈ B (Mc), I(A) is a valid islanding of G. Moreover, for each r ∈ { 1, . . . , m (A)}, exactly one edge in {(s0, i ), (d0, i ) : i ∈ V r (A)} belongs to A.Proof. The proof is provided in Appendix A. By Lemma 9, each island is connected to exactly one of s0
+
+and d0 by a unique edge of A. The endpoint of this edge in 
+
+Vr (A) is called the reference node of island r and is denoted by vr . Island r is labeled stable if the edge is incident to s0,and unstable otherwise. Let S(A) denote the set of indices of the islands labeled stable. The set of reconnected edges induced by A is defined as 
+
+Erec (A) ≜ {(i, j ) ∈ E : ∃ r, s ∈ S (A), r ̸ = s, i ∈ V r (A), j ∈ V s(A), (nij i , n ij j ) /∈ A}. (25) Thus, for an edge (i, j ) joining two distinct islands labeled stable, (i, j ) ∈ E rec (A) if and only if (nij i , n ij j ) /∈ A. Fig. 2 9
+
+illustrates the above construction for the example in Fig. 1. The connectivity induced by A yields the three islands in Fig. 1(b). Two islands have reference edges incident to s0 and are therefore labeled stable, while the remaining island has a reference edge incident to d0 and is labeled unstable. For the edge (i, j ) highlighted in yellow, (nij i , n ij j ) /∈ A. Since i and 
+
+j belong to distinct stable islands, (25) gives (i, j ) ∈ E rec (A),corresponding to the reconnection shown in Fig. 1(c). The resulting map is 
+
+Ξ : B(Mc) → R , Ξ( A) ≜ (I(A), Erec (A)) .
+
+Lemma 10. The map Ξ is well-defined and surjective. Specif-ically, every A ∈ B (Mc) determines a unique admissible pair 
+
+Ξ( A) ∈ R , and every (I, Erec ) ∈ R is equal to Ξ( A) for some A ∈ B (Mc).Proof. For any A ∈ B (Mc), Lemma 9 implies that I(A)
+
+is a valid islanding. The same lemma guarantees a unique reference edge for each island, and hence the stable/unstable label of every island is uniquely determined by A. Conse-quently, Erec (A) in (25) is uniquely determined. Moreover, every (i, j ) ∈ E rec (A) has endpoints in two distinct stable islands of I(A). Hence Erec (A) ⊆ E elg (I(A)) , and therefore 
+
+Ξ( A) ∈ R . Thus, Ξ is well-defined. To prove surjectivity, consider any (I, Erec ) ∈ R , where 
+
+I = {I1, . . . , I m}, and let S denote its stable-island index set. For each r ∈ { 1, . . . , m }, a node vr ∈ V r and a spanning tree 
+
+Tr ⊆ E r of Ir are selected. Let F ≜ Smr=1 Tr . Since I is a valid islanding, |F| = |V| − m. Consider the edge set 
+
+A ≜ {(s0, d 0)} ∪ { (s0, v r ) : r ∈ S} ∪ { (d0, v r ) : r / ∈ S} ∪ [
+
+> (i,j )∈F
+
+{(i, n ij i ), (nij i , n ij j ), (nij j , j )}∪ [
+
+> (i,j )∈E rec
+
+{(i, n ij i ), (nij j , j )}∪ [
+
+> (i,j )∈E\ (F∪E rec )
+
+{(nij i , n ij j ), (nij j , j )}. (26) For each r, the edges associated with Tr connect every node in 
+
+Vr to vr . The node vr is connected to s0 when r ∈ S and to d0
+
+otherwise, while (s0, d 0) ∈ A. Hence all nodes in V, together with s0 and d0, are connected in A. For each (i, j ) ∈ F ,both auxiliary nodes nij i and nij j are connected to i and j. For 
+
+(i, j ) ∈ E rec , nij i is connected to i and nij j to j. For every remaining edge (i, j ), both nij i and nij j are connected to j.Thus, A is connected. Since Erec ⊆ E cut (I) and F ⊆ Smr=1 Er , the sets F and 
+
+Erec are disjoint. Therefore, 
+
+|A| = m + 1 + 3 |F| + 2( |E| − |F| )= |V| + 2 |E| + 1 = |V| − 1.
+
+Hence A is a spanning tree of G containing e0 = ( s0, d 0). By Lemma 8, A ∈ B (Mc).It remains to verify that the constructed A satisfies Ξ( A) = (I, Erec ). For (i, j ) ∈ F , all three edges (i, n ij i ), (nij i , n ij j ),and (nij j , j ) belong to A. If (i, j ) ∈ E rec , the middle edge 
+
+(nij i , n ij j ) is absent, whereas if (i, j ) ∈ E \ (F ∪E rec ), the edge 
+
+(i, n ij i ) is absent. Since the auxiliary nodes associated with distinct edges of G are distinct, an edge (i, j ) ∈ E connects its two endpoints through A if and only if (i, j ) ∈ F . Hence two nodes of V are connected through A if and only if they are connected through F. It follows that I(A) = I.The reference edge of island r is incident to s0 exactly when r ∈ S , so the induced island labels agree with those of I. Moreover, an edge joining two distinct islands cannot belong to F. Hence, for every edge (i, j ) joining two distinct stable islands, 
+
+(nij i , n ij j ) /∈ A ⇐⇒ (i, j ) ∈ E rec .
+
+By (25), Erec (A) = Erec . Therefore, Ξ( A) = ( I, Erec ), and Ξ
+
+is surjective. 
+
+Remark : The map Ξ need not be injective. For a fixed ad-missible pair (I, Erec ), different choices of the reference nodes and intra-island spanning trees in the construction above may yield distinct bases A1 and A2 satisfying Ξ( A1) = Ξ( A2).This nonuniqueness does not affect the reformulation, since the objective on B(Mc) depends on A only through Ξ( A).We next express the objective terms in (22) as functions of a basis A ∈ B (Mc). For i ∈ V , define 
+
+χsi (A) ≜
+
+(
+
+1, if (s0, i ) ∈ A, 
+
+0, otherwise ,χdi (A) ≜
+
+(
+
+1, if (d0, i ) ∈ A, 
+
+0, otherwise .
+
+For i ∈ V and j ∈ V \ { s0, d 0} with j̸ = i, define 
+
+χij (A) ≜
+
+
+
+1, if i is a reference node and i and j are connected by a path using edges in A \ P , 
+
+0, otherwise ,
+
+where P ≜ {(s0, d 0)} ∪ { (s0, k ), (d0, k ) : k ∈ V} , and 
+
+χii (A) ≜ χsi (A) + χdi (A) for all i ∈ V . By Lemma 9, every node j ∈ V belongs to exactly one island with a unique reference node, and hence PNi=1 χij (A) = 1 for every j ∈ V .For (i, j ) ∈ E , define 
+
+ϕij (A) ≜
+
+(
+
+1, (nij i , n ij j ) /∈ A, 
+
+0, otherwise .
+
+For set functions h1, . . . , h q , define 
+
+Γ( h1, . . . , h q )( A) ≜
+
+( qX
+
+> p=1
+
+hp(A) − (q − 1) 
+
+)
+
+> +
+
+.
+
+If h1(A), . . . , h q (A) ∈ {0, 1}, then Γ( h1, . . . , h q )( A) =Qqp=1 hp(A). Accordingly, define 
+
+ψsv,i (A) ≜ Γ( χsv , χ vi )( A),ψsv,i,j (A) ≜ Γ( χsv , χ vi , χ vj )( A),ψsv,i,j,k (A) ≜ Γ( χsv , χ vi , χ vj , χ vk )( A).
+
+Thus, ψsv,i (A), ψsv,i,j (A), and ψsv,i,j,k (A) indicate, respec-tively, that the corresponding one, two, or three nodes belong 10 
+
+to the island labeled stable whose reference node is v. For 
+
+(i, j ) ∈ E , define 
+
+χrec  
+
+> ij
+
+(A) ≜
+
+> N
+
+X
+
+> v=1
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+Γ ψsv,i , ψ sv′,j , ϕ ij 
+
+(A). (27) Since each node belongs to a unique island with a unique reference node, at most one pair (v, v ′) in (27) can yield a nonzero term. Hence, for (i, j ) ∈ E , χrec  
+
+> ij
+
+(A) = 1 if and only if i and j belong to distinct islands labeled stable and 
+
+(nij i , n ij j ) /∈ A. By (25), this is equivalent to (i, j ) ∈ E rec (A).For A ∈ B (Mc), define F1(A) ≜ F1
+
+ I(A), Erec (A). Using the indicators above, 
+
+F1(A) = 
+
+> N
+
+X
+
+> i=1
+> N
+
+X
+
+> v=1
+
+Γ( χdv , χ vi )( A)ci
+
++ α0
+
+X
+
+> (i,j )∈E
+> N
+
+X
+
+> v=1
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+Γ( χvi , χ v′j )( A)cij 
+
+− α1
+
+X
+
+> (i,j )∈E
+
+χrec  
+
+> ij
+
+(A)cij . (28) For each v ∈ V , let 
+
+Wv (x, A ) ≜
+
+> N
+
+X
+
+> i=1
+
+ψsv,i (A)Wi(xi)+ 12
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+ψsv,i,j (A)Wij (xi, x j ),
+
+and 
+
+Φv (x, A ) ≜
+
+> N
+
+X
+
+> i=1
+
+ψsv,i (A) ∂W i(xi)
+
+∂x i
+
+fi(xi)+
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+ψsv,i,j (A)
+
+ ∂W ij (xi, x j )
+
+∂x i
+
+fi(xi)+ ∂W i(xi)
+
+∂x i
+
+fij (xi, x j )
+
+
+
++
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+X
+
+> k∈N i
+
+ψsv,i,j,k (A) ∂W ij (xi, x j )
+
+∂x i
+
+fik (xi, x k)+ k1Wv (x, A ).
+
+If v = vr is the reference node of an island r labeled stable, then Wv (x, A ) = W r (xr ) and Φv (x, A ) = Φr (x; I(A)) ;otherwise, Wv (x, A ) = Φ v (x, A ) = 0 . Therefore, for A ∈B(Mc),
+
+F2(A) ≜ F2(I(A)) = 
+
+Z
+
+> Ω
+> N
+
+X
+
+> v=1
+
+{Φv (x, A )}+ dx. 
+
+Similarly, define 
+
+ψrv,i,k (A) ≜ Γ( χsv , χ vi , χ rec  
+
+> ik
+
+)( A),ψsr v,i,j,k (A) ≜ Γ( χsv , χ vi , χ vj , χ rec  
+
+> ik
+
+)( A),ψrr v,i,j,k (A) ≜ Γ( χsv , χ vi , χ rec  
+
+> ij
+
+, χ rec  
+
+> ik
+
+)( A).
+
+For each v ∈ V , let 
+
+Ψv (x, A ) ≜
+
+> N
+
+X
+
+> i=1
+
+X
+
+> k∈N i
+
+ψrv,i,k (A)
+
+ ∂W i(xi)
+
+∂x i
+
+fik (xi, x k)+ ∂W ik (xi, x k)
+
+∂x i
+
+fi(xi)
+
+
+
++
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+X
+
+> k∈N i
+
+ψsr v,i,j,k (A)
+
+ ∂W ij (xi, x j )
+
+∂x i
+
+fik (xi, x k)+ ∂W ik (xi, x k)
+
+∂x i
+
+fij (xi, x j )
+
+
+
++
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+X
+
+> k∈N i
+
+ψrr v,i,j,k (A) ∂W ij (xi, x j )
+
+∂x i
+
+fik (xi, x k)+ k2
+
+2
+
+> N
+
+X
+
+> i=1
+
+X
+
+> k∈N i
+
+ψrv,i,k (A)Wik (xi, x k) − (k1 − k2)Wv (x, A ).
+
+(29) If v = vr is the reference node of an island r labeled stable, then Ψv (x, A ) = Ψ r
+
+ x; I(A), Erec (A). Otherwise, 
+
+Ψv (x, A ) = 0 . Therefore, for A ∈ B (Mc),
+
+F3(A) ≜ F3
+
+ I(A), Erec (A) =
+
+Z
+
+> bΩ
+> N
+
+X
+
+> v=1
+
+{Ψv (x, A )}+ dx. 
+
+Let F (A) ≜ F1(A)+ α2F2(A)+ α3F3(A) for A ∈ B (Mc).By Lemma 10, the map Ξ is surjective, and the objective value associated with a basis A depends only on Ξ( A). Hence, (22) is equivalently reformulated as 
+
+min  
+
+> A
+
+F (A) (30a) s.t. A ∈ B (Mc) (30b) While (30) has a matroid constraint, the objective function is not submodular. In what follows, we prove that (30) is equivalent to a submodular optimization problem. We define 
+
+F (A) ≜ F1(A) + α2F2(A) + α3F3(A).
+
+Theorem 1. There exist set functions F 1, F 2, F 3 : 2 E → R
+
+such that, for every A ∈ B (Mc),
+
+F 1(A) = F1(A), F 2(A) = F2(A), F 3(A) = F3(A).
+
+Moreover, F 1, F 2, and F 3 are nonincreasing and supermod-ular on 2E . Consequently, the function 
+
+F (A) ≜ F 1(A) + α2F 2(A) + α3F 3(A)
+
+is nonincreasing and supermodular on 2E and satisfies 
+
+F (A) = F (A) for every A ∈ B (Mc).Proof. See Appendix B. By Theorem 1, (30) is equivalently reformulated as 
+
+min  
+
+> A
+
+F (A) (31a) s.t. A ∈ B (Mc) (31b) Although Theorem 1 establishes an equivalent nonincreas-ing supermodular formulation of (22), evaluating F 2 and 
+
+F 3 requires integration over continuous state spaces and is 11 
+
+generally impractical. We therefore introduce a sample-based approximation. Let Ωsample ⊆ Ω and bΩsample ⊆ bΩ denote finite sample sets. Initially, Ωsample and bΩsample contain P1 and P2 points, respectively, drawn independently and uniformly from the corresponding sets. For A ∈ B (Mc), define 
+
+bF (A) ≜ F1(A) + α2 bF2(A) + α3 bF3(A), (32) where 
+
+bF2(A) ≜ 1
+
+|Ωsample |
+
+X
+
+> x∈Ωsample
+> N
+
+X
+
+> v=1
+
+{Φv (x, A )}+ ,
+
+bF3(A) ≜ 1
+
+|bΩsample |
+
+X
+
+> x∈bΩsample
+> N
+
+X
+
+> v=1
+
+{Ψv (x, A )}+ .
+
+The constant scaling factors associated with the volumes of Ω
+
+and bΩ are absorbed into the penalty weights α2 and α3.For fixed sample sets, the pointwise constructions used in the proof of Theorem 1 imply that bF2 and bF3 admit nonincreasing supermodular extensions to 2E . Consequently, 
+
+bF also admits a nonincreasing supermodular extension to 2E .We therefore consider the sampled optimization problem 
+
+min 
+
+> A∈B (Mc)
+
+bF (A). (33) For any A ∈ B (Mc), define the set of feasible single-edge exchanges by 
+
+Q(A) ≜ (e, f ) ∈ A × (E \ A) : A \ { e} ∪ { f } ∈ B (Mc) .
+
+Moreover, define the counterexample sets 
+
+D2(A) ≜
+
+(
+
+x ∈ Ω : 
+
+> N
+
+X
+
+> v=1
+
+{Φv (x, A )}+ > 0
+
+)
+
+, (34) 
+
+D3(A) ≜
+
+(
+
+x ∈ bΩ : 
+
+> N
+
+X
+
+> v=1
+
+{Ψv (x, A )}+ > 0
+
+)
+
+. (35) Algorithm 1 alternates between a sample-based local search and counterexample refinement. For fixed sample sets Ωsample 
+
+and bΩsample , the inner loop searches over feasible single-edge exchanges. At each iteration, one edge in the current basis is removed and one edge outside the basis is added, while preserving membership in B(Mc). Among all such exchanges, the algorithm selects one that minimizes the sampled objective 
+
+bF . The current basis is updated whenever the resulting objec-tive value satisfies the prescribed multiplicative improvement condition. After the local search terminates, the algorithm checks whether the current basis admits counterexamples associated with the stability penalties. If D2(A)̸ = ∅, a point in D2(A) is added to Ωsample ; similarly, if D3(A)̸ = ∅, a point in D3(A) is added to bΩsample . The local-search procedure is then repeated using the augmented sample sets. The algorithm terminates when both counterexample sets are empty. 
+
+Algorithm 1 Sample-Based Local Search for Controlled Is-landing and Reconnection  
+
+> 1:
+
+Initialize Ωsample with P1 samples drawn independently and uniformly from Ω 
+
+> 2:
+
+Initialize bΩsample with P2 samples drawn independently and uniformly from bΩ 
+
+> 3:
+
+while true do  
+
+> 4:
+
+Initialize A ∈ B (Mc) 
+
+> 5:
+
+while true do  
+
+> 6:
+
+Select (e∗, f ∗) ∈ arg min  
+
+> (e,f )∈Q (A)
+
+bF (A \ { e} ∪ { f }) 
+
+> 7:
+
+A′ ← A \ { e∗} ∪ { f ∗} 
+
+> 8:
+
+if bF (A) > (1 + bϵ) bF (A′) then  
+
+> 9:
+
+A ← A′ 
+
+> 10:
+
+else  
+
+> 11:
+
+break  
+
+> 12:
+
+end if  
+
+> 13:
+
+end while  
+
+> 14:
+
+if D2(A) = ∅ and D3(A) = ∅ then  
+
+> 15:
+
+return A 
+
+> 16:
+
+end if  
+
+> 17:
+
+if D2(A)̸ = ∅ then  
+
+> 18:
+
+Select xisland ∈ D 2(A) 
+
+> 19:
+
+Ωsample ← Ωsample ∪ { xisland } 
+
+> 20:
+
+end if  
+
+> 21:
+
+if D3(A)̸ = ∅ then  
+
+> 22:
+
+Select xrec ∈ D 3(A) 
+
+> 23:
+
+bΩsample ← bΩsample ∪ { xrec } 
+
+> 24:
+
+end if  
+
+> 25:
+
+end while 
+
+B. Optimization Analysis 
+
+We next analyze the performance guarantee and evaluation complexity of the inner loop of Algorithm 1. The following analysis follows the local-search arguments in [15], [18], applied here to the sampled objective bF and the matroid Mc.For fixed sample sets, let eF : 2 E → R denote a nonincreasing supermodular extension of bF established above, so that 
+
+eF (A) = bF (A), A ∈ B (Mc).
+
+Since eF is nonincreasing, eF (∅) − eF (S) ≥ 0 for all S ⊆ E .
+
+Theorem 2. Fix the sample sets Ωsample and bΩsample , and let A∗ ∈ arg min B∈B (Mc) bF (B). As bϵ → 0, the inner loop of Algorithm 1 yields a basis A ∈ B (Mc) satisfying 
+
+eF (∅) − bF (A) ≥ 12
+
+ eF (∅) − bF (A∗)
+
+
+
+. (36) 
+
+Proof. For fixed sample sets, define σ(S) ≜ eF (∅) − eF (S).Then σ is nonnegative, monotone nondecreasing, and sub-modular. As bϵ → 0, termination of the inner loop implies that A is locally optimal with respect to all feasible single-edge exchanges. Hence, by the standard 1/2 local-search bound for monotone submodular maximization over a matroid basis [25], σ(A) ≥ 12 max B∈B (Mc) σ(B) = 12 σ(A∗). Since 
+
+eF (B) = bF (B) for all B ∈ B (Mc), substituting the definition of σ yields the result. 12 
+
+We next analyze the computational complexity of the inner loop of Algorithm 1. For fixed bϵ > 0, let A0, A 1, . . . , A K
+
+denote the bases obtained after the accepted updates, where 
+
+K is the total number of accepted updates. By the update rule, 
+
+bF (Ak) < 11 + bϵ bF (Ak−1), k = 1 , . . . , K. 
+
+Hence, bF (AK ) < bF (A0)(1+ bϵ)T . If bF (AK ) > 0, then 
+
+K < 
+
+log 
+
+ bF (A0)/ bF (AK )
+
+
+
+log(1 + bϵ) . (37) For any A ∈ B (Mc), the number of candidate exchanges satisfies |Q (A)| ≤ | A| |E|−| A| = O |E| 2. By construction, 
+
+|E| = 3 M +2 N +1 , and since the original graph is connected, 
+
+M ≥ N − 1. Thus |E| = O(M ), and each search evaluates at most O(M 2) candidate exchanges. Since K accepted updates are followed by one final search, the total number of sampled-objective evaluations is 
+
+O
+
+M 2
+
+1 + log 
+
+ bF (A0)/ bF (AK )
+
+
+
+log(1 + bϵ)
+
+ , (38) provided that bF (AK ) > 0.This bound counts sampled-objective evaluations for one execution of the inner loop with fixed sample sets and does not include the counterexample-refinement iterations of the outer loop. VI. N UMERICAL STUDIES 
+
+In this section, we evaluate the proposed islanding and reconnection framework on networked linear systems. We first introduce the linear network model, fault setting, and the eigenvalue-based counterexample search used in the numerical implementation. We then present numerical results illustrating the islanding and reconnection procedure, examining its sensi-tivity to fault configurations, and comparing its solution quality and computational performance with a MILP benchmark. 
+
+A. Linear Network Model and Counterexample Search 
+
+We consider a connected undirected network G = ( V, E),where each node i ∈ V has state xi ∈ R2 and dynamics 
+
+˙xi = −wixi − X
+
+> j∈N i
+
+wij (xi − xj ), (39) where wi ∈ R is the local coefficient of node i and wij =
+
+wji ∈ R is the coupling coefficient associated with edge 
+
+(i, j ). Let Dw ≜ diag( w1, . . . , w N ) and let L(E) denote the corresponding weighted Laplacian. By stacking the node states, the overall network dynamics can be written as 
+
+˙x = − [( Dw + L(E)) ⊗ I2] x, (40) where I2 denotes the 2 × 2 identity matrix. The nominal net-work is constructed using positive node and edge coefficients. Faults are introduced by changing selected coefficients from their nominal positive values to negative values. A node fault changes the corresponding local coefficient wi, whereas an edge fault changes the corresponding coupling coefficient wij .Such faults may cause Dw +L(E) to lose positive definiteness and thereby destabilize the origin. For the numerical studies, we choose Wi(xi) = 12 xTi xi and 
+
+Wij (xi, x j ) = 0 , which gives η = 0 . We set β = γ = 1 , so that Ω = bΩ = {x ∈ R2N : ∥x∥2 ≤ √2}.We next describe the counterexample search used in the numerical implementation of Algorithm 1. For the linear systems considered here, stability violations can be detected directly through eigenvalue analysis. Consider a post-islanding island Ir = ( Vr , Er ) and define Hr ≜ Dw,r + L(Er ), where 
+
+Dw,r denotes the restriction of Dw to the nodes in Vr . The post-islanding dynamics are 
+
+˙xr = − (Hr ⊗ I2) xr . (41) Since Hr is symmetric, the island is asymptotically stable if and only if λmin (Hr ) > 0. In the numerical counterexample search, we use a tolerance τ = 10 −9 and declare a stability violation whenever an eigenvalue λk of Hr satisfies λk ≤ τ .For each such eigenvalue, let uk be a corresponding unit eigenvector and let e1 = [1 , 0] T . We embed uk ⊗ e1 into the full network state by setting the states of all nodes outside Vr
+
+to zero, scale it to the boundary of Ω, and add it to Ωsample .Counterexamples for the reconnection stage are constructed analogously. For a reconnected component Cs = ( Vcs , Ecs ),define Hcs ≜ Dw,s + L(Ecs ), where Dw,s is the restriction of 
+
+Dw to Vcs . The component is asymptotically stable if and only if λmin (Hcs ) > 0. Eigenpairs satisfying λk ≤ τ are treated using the same lifting construction as above, with the resulting directions scaled to the boundary of bΩ and added to bΩsample .The eigenvalue tests above are used to determine the actual asymptotic stability of the resulting islands and reconnected components. In contrast, the stability-penalty terms F2 and 
+
+F3 are constructed from the sufficient Lyapunov conditions derived in Section IV. Consequently, F2 or F3 may remain positive even when all resulting components are asymptotically stable. Stability of the final solution is therefore verified using the eigenvalue tests described above rather than by requiring the stability penalties to vanish. 
+
+B. Numerical Results 
+
+The network instances are generated as random geometric graphs. For each network size, node locations are sampled uniformly from a square region in R2, and an edge is added between two nodes if their Euclidean distance is no greater than 2. The sampling is repeated until the resulting graph is connected. The first two studies use the same realization of a 30 -node network generated over [0 , 7.75] 2, resulting in 82 
+
+edges. Before faults are introduced, the node and edge coefficients are independently sampled as wi ∼ Unif[1 , 5] and wij ∼
+
+Unif[1 , 10] , where Unif denotes the uniform distribution.. For a faulty node i, we set wi = − P 
+
+> j∈N i
+
+wnom  
+
+> ij
+
+− 1, where wnom 
+
+> ij
+
+denotes the nominal edge coefficient, while each faulty edge is assigned wij = −20 .Unless otherwise specified, we set α0 = 1 , α1 = 0 .7,
+
+α2 = α3 = 5 , ci = 2 , cij = 1 , k1 = 0 .3, k2 = 0 .1, and 13   
+
+> (a) Original system (b) Post-islanding system (c) Reconnected system
+
+Fig. 3: Islanding and reconnection on a 30 -node network with 82 edges. (a) Original network, with faulty nodes and edges shown in red. (b) Post-islanding network returned by Algorithm 1, consisting of two stable islands (blue and green) and one unstable island (red). Removed edges are shown as dashed gray lines, and the dashed violet edge is selected from Eelg (I) for reconnection. (c) Reconnected network, where the selected edge merges the two stable islands into a single stable reconnected component while the unstable island remains isolated. 
+
+ˆϵ = 0 .01 . Both Ωsample and bΩsample are initialized with 20 
+
+samples drawn uniformly from the corresponding domains. All computations were performed on a MacBook Pro equipped with an Apple M3 Pro chip and 36 GB of unified memory. 
+
+1) Illustrative Islanding and Reconnection Example: We first illustrate the proposed islanding and reconnection pro-cedure on a 30 -node network with 82 edges. The original network contains faulty nodes and edges, as shown in Fig. 3a, and is unstable. Algorithm 1 partitions the network into two stable islands and one unstable island, as shown in Fig. 3b. The stable islands, shown in blue and green, have minimum eigenvalues 
+
+3.1083 and 1.9670 , respectively, while the unstable island is shown in red. Removed edges are shown as dashed lines, where gray denotes edges that remain disconnected and vi-olet denotes the edge selected for reconnection. As shown in Fig. 3c, reconnecting the selected edge merges the two stable islands into a single reconnected component while the unstable island remains isolated. The minimum eigenvalue of the reconnected component is 2.2520 > 0, verifying its asymptotic stability. 
+
+2) Sensitivity to Fault Configurations: We next examine the sensitivity of the proposed method to the locations of the faults. We use the same 30 -node, 82 -edge network as in the preceding example and consider ten randomly generated fault configurations. Each configuration contains two faulty nodes and four faulty edges. The network topology, nominal node and edge weights, fault-generation rule, and algorithmic parameters are fixed, while only the fault locations are varied. Table I reports the number of inner optimization solves required for convergence, the total computation time, and the resulting value of F1. Here, the number of inner solves denotes the total number of times the sampled inner opti-mization problem is solved throughout the counterexample-guided procedure until convergence. All ten runs terminate by convergence before reaching the maximum of 20 outer iterations, and every stable island and reconnected component in the final solutions satisfies the eigenvalue-based stability test TABLE I: Sensitivity to fault locations on the fixed 30 -node network.                                  
+
+> Config. Inner solves Time (s) F1
+> 181111.9 27.1 29862.4 32.5 34527.4 19.0 43359.5 23.4 54536.5 22.5 66954.5 20.2 73379.3 31.2 88897.7 27.8 912 1457.9 22.7 10 3342.2 35.6
+
+TABLE II: Comparison of the proposed method with the MILP benchmark.                                      
+
+> NMMethod Inner solves Time (s) F1
+> 10 19 Proposed 22.9 8.3 MILP 20.4 8.3 20 42 Proposed 788.1 21.0 MILP 75.4 17.0 30 82 Proposed 4433.2 22.3 MILP 459.6 22.3 40 109 Proposed 71490.9 37.0 MILP 5239.1 25.3
+
+described in Section VI-A. Hence, the reported values of F1
+
+correspond to final solutions satisfying the numerical stability criterion. The total computation time ranges from 342 .2 s to 1457 .9 s, with an average of 742 .9 s, while the number of inner solves ranges from 3 to 12 . Longer computation times are generally associated with a larger number of inner optimization solves required before convergence, indicating that the computational effort varies with the fault placement. The resulting values of 
+
+F1 range from 19 .0 to 35 .6, indicating that the fault locations also affect the resulting islanding and reconnection cost. 
+
+3) Comparison with the MILP Benchmark: We next com-pare the proposed method with a MILP benchmark on four 14 
+
+network instances of increasing size. The benchmark replaces only the inner optimization solver in Algorithm 1 and is implemented using Gurobi 13.0.2 [26]. For fixed sample sets, the MILP exactly represents the corresponding sampled inner optimization problem and is solved to the prescribed optimality tolerance. The counterexample search, sample aug-mentation, and stopping criterion remain unchanged. We consider networks with N ∈ { 10 , 20 , 30 , 40 } and M ∈{19 , 42 , 82 , 109 }, respectively, generated according to the ran-dom geometric graph construction described above. The 30 -node network is the same realization used in the preceding two studies. For each network size, the two methods use the same topology, nominal and faulted coefficients, fault configuration, and initial sample sets. Table II reports the number of inner solves, the end-to-end computation time, and the resulting value of F1. Since the two methods may generate different counterexamples, their final augmented sample sets need not coincide. We therefore report F1, which is independent of the sample sets, rather than the final sampled objective values. All eight runs terminate by convergence before reaching the maximum of 20 outer iterations, and every stable island and reconnected component satisfies the eigenvalue-based stability test described in Section VI-A. VII. C ONCLUSION 
+
+This paper studied controlled islanding and reconnection in networked dynamical systems. The main challenge arises from the coupling between the two stages, since the islanding decision determines the available reconnection options while the reconnected edges may affect the stability of the resulting components. We showed that the coupled islanding and re-connection decisions can be represented as bases of a graphic matroid and that the resulting optimization problem admits an equivalent nonincreasing supermodular formulation. This structure supports a local-search solution method with coun-terexample refinement for enforcing the stability requirements. Numerical studies on linear networked systems demonstrated the resulting islanding and reconnection strategies under dif-ferent fault configurations and quantified their solution quality and computational performance relative to a MILP benchmark. In this work, an island or reconnected component is stable if its states converge to the origin. Future work will investigate other stability or collective-behavior requirements in nonlinear networked systems, such as synchronization, by deriving the corresponding sufficient conditions and incorporating them into the islanding and reconnection formulation. REFERENCES [1] F. D¨ orfler and F. Bullo, “Synchronization in complex networks of phase oscillators: A survey,” Automatica , vol. 50, no. 6, pp. 1539–1564, 2014. [2] R. Olfati-Saber, J. A. Fax, and R. M. Murray, “Consensus and coop-eration in networked multi-agent systems,” Proceedings of the IEEE ,vol. 95, no. 1, pp. 215–233, 2007. [3] J. W. Busby, K. Baker, M. D. Bazilian, A. Q. Gilbert, E. Grubert, V. Rai, J. D. Rhodes, S. Shidore, C. A. Smith, and M. E. Webber, “Cascading risks: Understanding the 2021 winter blackout in Texas,” 
+
+Energy Research & Social Science , vol. 77, p. 102106, 2021. [4] G. Xu, V. Vittal, A. Meklin, and J. E. Thalman, “Controlled islanding demonstrations on the wecc system,” IEEE Transactions on Power Systems , vol. 26, no. 1, pp. 334–343, 2010. [5] T. Amraee and H. Saberi, “Controlled islanding using transmission switching and load shedding for enhancing power grid resilience,” 
+
+International Journal of Electrical Power & Energy Systems , vol. 91, pp. 135–143, 2017. [6] S. Cheng, L. Niu, A. Clark, and R. Poovendran, “A submodular energy function approach to controlled islanding with provable stability,” in 
+
+2023 62nd IEEE Conference on Decision and Control (CDC) . IEEE, 2023, pp. 7635–7642. [7] H. You, V. Vittal, and X. Wang, “Slow coherency-based islanding,” IEEE Transactions on power systems , vol. 19, no. 1, pp. 483–491, 2004. [8] G. Xu and V. Vittal, “Slow coherency based cutset determination algo-rithm for large power systems,” IEEE Transactions on Power Systems ,vol. 25, no. 2, pp. 877–884, 2009. [9] L. Ding, F. M. Gonzalez-Longatt, P. Wall, and V. Terzija, “Two-step spectral clustering controlled islanding algorithm,” IEEE Transactions on Power Systems , vol. 28, no. 1, pp. 75–84, 2012. [10] G. Patsakis, D. Rajan, I. Aravena, and S. Oren, “Strong mixed-integer formulations for power system islanding and restoration,” IEEE Trans-actions on Power Systems , vol. 34, no. 6, pp. 4880–4888, 2019. [11] F. Teymouri and T. Amraee, “An milp formulation for controlled islanding coordinated with under frequeny load shedding plan,” Electric Power Systems Research , vol. 171, pp. 116–126, 2019. [12] M. Esmaili, M. Ghamsari-Yazdel, N. Amjady, and C. Chung, “Convex model for controlled islanding in transmission expansion planning to improve frequency stability,” IEEE Transactions on Power Systems ,vol. 36, no. 1, pp. 58–67, 2020. [13] Z. Liu, A. Clark, L. Bushnell, D. S. Kirschen, and R. Poovendran, “Controlled islanding via weak submodularity,” IEEE Transactions on Power Systems , vol. 34, no. 3, pp. 1858–1868, 2018. [14] D. Sahabandu, L. Niu, A. Clark, and R. Poovendran, “A submodular optimization approach to stable and minimally disruptive controlled islanding in power systems,” in 2022 American Control Conference (ACC) . IEEE, 2022, pp. 4587–4594. [15] ——, “A hybrid submodular optimization approach to controlled island-ing with heterogeneous loads,” in 2022 IEEE International Conference on Communications, Control, and Computing Technologies for Smart Grids (SmartGridComm) . IEEE, 2022, pp. 252–258. [16] M. H. Kazm and A. F. Taha, “Partitioning and observability in linear systems via submodular optimization,” IEEE Transactions on Automatic Control , 2026. [17] S. Cheng, L. Niu, B. Ramasubramanian, A. Clark, and R. Pooven-dran, “Modeling and designing non-pharmaceutical interventions in epidemics: A submodular approach,” IEEE Control Systems Letters ,vol. 8, pp. 2601–2606, 2024. [18] L. Niu, D. Sahanbandu, A. Clark, and R. Poovendran, “A hybrid submodular optimization approach to controlled islanding with post-disturbance stability guarantees,” IEEE Transactions on Power Systems ,vol. 39, no. 2, pp. 4486–4497, 2023. [19] S. N. Dashkovskiy, B. S. R¨ uffer, and F. R. Wirth, “Small gain theorems for large scale systems and construction of iss lyapunov functions,” 
+
+SIAM Journal on Control and Optimization , vol. 48, no. 6, pp. 4089– 4118, 2010. [20] U. Topcu, A. K. Packard, and R. M. Murray, “Compositional stability analysis based on dual decomposition,” in Proceedings of the 48h IEEE Conference on Decision and Control (CDC) held jointly with 2009 28th Chinese Control Conference . IEEE, 2009, pp. 1175–1180. [21] P. Demetriou, M. Asprou, and E. Kyriakides, “A real-time controlled islanding and restoration scheme based on estimated states,” IEEE Transactions on Power Systems , vol. 34, no. 1, pp. 606–615, 2018. [22] J. Oxley, Matroid Theory , 2nd ed. Oxford University Press, 2011. [23] R. Diestel, Graph Theory , 5th ed., ser. Graduate Texts in Mathematics. Springer, 2017, vol. 173. [24] N. Chopra and M. W. Spong, “On exponential synchronization of kuramoto oscillators,” IEEE transactions on Automatic Control , vol. 54, no. 2, pp. 353–357, 2009. [25] M. Fisher, G. Nemhauser, and L. Wolsey, “An analysis of approximations for maximizing submodular set functions-II,” Mathematical Program-ming Studies , vol. 8, p. 73, 1978. [26] Gurobi Optimization, LLC, “Gurobi Optimizer Reference Manual,” 2026. [Online]. Available: https://www.gurobi.com 
+
+APPENDIX 
+
+This appendix provides the technical details omitted from the main text. 15 
+
+A. Proof of Lemma 9 Proof. By construction, V1(A), . . . , Vm(A)(A) form a parti-tion of V. Hence, the first two conditions in Definition 1 are satisfied. For any r ∈ {1, . . . , m (A)} and i, j ∈ Vr (A), there exists a path between i and j using only edges in A. Let 
+
+i = v0, v 1, . . . , v q = j be the nodes in V encountered along this path, in order. For each k ∈ { 1, . . . , q }, the portion of the path between vk−1 and vk is 
+
+vk−1, n vk−1vk 
+
+> vk−1
+
+, n vk−1vk 
+
+> vk
+
+, v k,
+
+and hence (vk−1, v k) ∈ E . Moreover, each vk is connected to 
+
+i using edges in A and therefore belongs to Vr (A). It follows that (vk−1, v k) ∈ E r (A) for every k ∈ { 1, . . . , q }. Thus, i =
+
+v0, v 1, . . . , v q = j is a path in Ir (A), so Ir (A) is connected. Therefore, I(A) is a valid islanding of G.By Lemma 8, A can be viewed as a spanning tree of G
+
+containing e0. For each r ∈ { 1, . . . , m (A)}, let Cr denote the connected component of the subgraph with vertex set V \ {s0, d 0} and edge set A that contains Vr (A). By construction, 
+
+Cr ∩ V = Vr (A).Since A is a spanning tree of G, there exists at least one edge of A with one endpoint in Cr and the other outside Cr .By the definition of A and Cr , any such edge must connect 
+
+Cr to either s0 or d0. Moreover, since s0 and d0 are adjacent only to nodes in V, this edge is of the form (s0, i ) or (d0, i )
+
+for some i ∈ V r (A).It remains to show that there cannot be two such edges. Suppose that two distinct edges connect Cr to {s0, d 0}, and let their endpoints in Cr be i and j. Since Cr is connected, there exists a path in Cr between i and j. If the two edges are both incident to s0 or both incident to d0, this path together with the two edges forms a cycle in A. If one edge is incident to s0
+
+and the other to d0, this path, the two edges, and e0 = ( s0, d 0)
+
+form a cycle in A. Both cases contradict the acyclicity of A.Therefore, A contains exactly one edge in {(s0, i ), (d0, i ) : i ∈Vr (A)}.
+
+B. Proof of Theorem 1 
+
+We first introduce a property of submodular functions that will be used repeatedly in this section. 
+
+Lemma 11. Let μ : 2 Λ → R be monotone nondecreasing and submodular, and let C0, C 1 ⊆ Λ be fixed. Define ν : 2 Λ → R
+
+by 
+
+ν(∆) ≜ μ (∆ ∩ C0) ∪ C1
+
+, ∆ ⊆ Λ. (42) 
+
+Then ν is monotone nondecreasing and submodular. Proof. Let ∆1 ⊆ ∆2 ⊆ Λ. Since (∆ 1 ∩ C0) ∪ C1 ⊆ (∆ 2 ∩
+
+C0) ∪ C1, the monotonicity of μ implies ν(∆ 1) ≤ ν(∆ 2).To prove submodularity, let ξ ∈ Λ \ ∆2. If ξ / ∈ C0 \ C1,then adding ξ does not change either (∆ 1 ∩ C0) ∪ C1 or (∆ 2 ∩
+
+C0) ∪ C1, and hence 
+
+ν(∆ 1 ∪ { ξ}) − ν(∆ 1) = ν(∆ 2 ∪ { ξ}) − ν(∆ 2) = 0 .
+
+If ξ ∈ C0 \ C1, then ((∆ 1 ∪ { ξ}) ∩ C0) ∪ C1 = ((∆ 1 ∩ C0) ∪
+
+C1) ∪ { ξ}, and similarly for ∆2. Since (∆ 1 ∩ C0) ∪ C1 ⊆
+
+(∆ 2 ∩ C0) ∪ C1 and ξ / ∈ (∆ 2 ∩ C0) ∪ C1, the submodularity of μ gives 
+
+ν(∆ 1 ∪ { ξ}) − ν(∆ 1) ≥ ν(∆ 2 ∪ { ξ}) − ν(∆ 2).
+
+Therefore, ν is monotone nondecreasing and submodular. To obtain a supermodular reformulation of (30), we con-struct extensions of the indicators χsi , χdi , and ϕij that agree with the original functions on B(Mc) and are nonincreasing and supermodular on 2E . Let Qsi ≜ {(s0, d 0)} ∪ { (s0, j ) : 
+
+j ∈ V} \ { (s0, i )} and Qdi ≜ {(s0, d 0)} ∪ { (d0, j ) : j ∈V} \ { (d0, i )}. We first define 
+
+χsi (A) ≜ {|V| − | A ∩ Qsi | − ρM
+
+ (A \ Qsi ) ∪ { (s0, i )}}+,χdi (A) ≜ {|V| − | A ∩ Qdi | − ρM
+
+ (A \ Qdi ) ∪ { (d0, i )}}+,ϕij (A) ≜ 1 − | A ∩ { (nij i , n ij j )}| ,
+
+with |V| = N + 2 M + 2 .
+
+Lemma 12. For any A ∈ B (Mc), we have χsi (A) = χsi (A)
+
+and χdi (A) = χdi (A) for any i ∈ V , and ϕij (A) = ϕij (A) for any (i, j ) ∈ E . Moreover, we have χsi (A), χdi (A), and ϕij (A)
+
+are nonincreasing and supermodular on 2E .Proof. Let A ∈ B (Mc). We first prove χsi (A) = χsi (A). By Lemma 8, A is a spanning tree of G, and hence |A| = |V| − 1.Since A\Qsi ⊆ A, the set A\Qsi is independent in the graphic matroid M. Therefore, 
+
+ρM(A \ Qsi ) = |A \ Qsi | = |V| − 1 − | A ∩ Qsi |.
+
+Substituting this identity into the definition of χsi gives 
+
+χsi (A) = 
+
+n
+
+1 − ρM(( A \ Qsi ) ∪ { (s0, i )}) − ρM(A \ Qsi )o
+
+> +
+
+.
+
+Let δsi (A) ≜ ρM(( A \ Qsi ) ∪ { (s0, i )}) − ρM(A \ Qsi ). By Lemma 1, δsi (A) ∈ { 0, 1}. Since (s0, i ) /∈ Qsi , if (s0, i ) ∈ A,then (s0, i ) ∈ A \ Qsi , and hence δsi (A) = 0 . Now suppose 
+
+(s0, i ) /∈ A. By the definition of Qsi , every edge incident to s0
+
+other than (s0, i ) belongs to Qsi . Hence s0 is an isolated vertex in the subgraph induced by A \ Qsi . Since s0̸ = i, the vertices 
+
+s0 and i belong to distinct connected components of this subgraph. Therefore, adding (s0, i ) increases the rank of the graphic matroid by one, so δsi (A) = 1 . By the definition of χsi ,it follows that δsi (A) = 1 − χsi (A). Since χsi (A) ∈ { 0, 1}, we obtain χsi (A) = χsi (A). The same argument, with s0 and Qsi
+
+replaced by d0 and Qdi , respectively, proves χdi (A) = χdi (A).For (i, j ) ∈ E, ϕij (A) = 1 − A ∩ { (nij i , n ij j )} . Thus 
+
+ϕij (A) = 1 if and only if (nij i , n ij j ) /∈ A, and ϕij (A) = 0 oth-erwise. By the definition of ϕij , this gives ϕij (A) = ϕij (A).We next establish nonincreasing supermodularity on 2E . By Lemma 11, the function A 7 → ρM(( A \ Qsi ) ∪ { (s0, i )}) is monotone nondecreasing and submodular. Moreover, A 7 →|A ∩ Qsi | is modular and monotone nondecreasing. Hence 
+
+A 7 → |V| − | A ∩ Qsi | − ρM(( A \ Qsi ) ∪ { (s0, i )})
+
+is nonincreasing and supermodular. By the positive-part trun-cation property in Section III-C, the positive part of a non-increasing supermodular function is also nonincreasing and 16 
+
+supermodular. Therefore, χsi is nonincreasing and supermod-ular. The same argument applies to χdi . Finally, ϕij (A) = 1 − | A ∩ { (nij i , n ij j )}| is modular and nonincreasing, and is therefore supermodular. For i ∈ V and j ∈ V \ { s0, d 0} with j̸ = i, let eij be a new edge element with endpoints {i, j }, define the labeled multigraph Gij ≜ (V, E ∪ { eij }, Θij ), and let Mij ≜ M(Gij )
+
+denote its graphic matroid. We define 
+
+χij (A) ≜ max 
+
+n
+
+χsi (A) + χdi (A) + |V| − | A ∩ P |− ρMij 
+
+ (A \ P ) ∪ { eij }, 1
+
+o
+
+− 1,χii (A) ≜ χsi (A) + χdi (A).
+
+Lemma 13. For any A ∈ B (Mc), any i ∈ V , and any j ∈V \ { s0, d 0}, we have χij (A) = χij (A). Moreover, χij is nonincreasing and supermodular on 2E .Proof. We first consider j̸ = i. Let A ∈ B (Mc) and define 
+
+δij (A) ≜ ρMij 
+
+ (A \ P ) ∪ { eij } − ρMij (A \ P ).
+
+By Lemma 1, δij (A) ∈ { 0, 1}. Since Mij is the graphic matroid of Gij and eij is a new edge with endpoints i and 
+
+j, δij (A) = 0 if and only if i and j are connected by a path in A \ P . By Lemma 9, χsi (A) + χdi (A) ∈ { 0, 1}, and this quantity equals one if and only if i is a reference node. Hence, by the definition of χij ,
+
+χij (A) = max 
+
+n
+
+χsi (A) + χdi (A) + 1 − δij (A), 1
+
+o
+
+− 1. (43) By Lemma 8, A is a spanning tree of G. Thus |A| = |V| − 1.Moreover, A\P is acyclic in G, and the edge elements in A\P
+
+have the same endpoints in Gij as in G. Therefore, A \ P is independent in Mij , and 
+
+ρMij (A \ P ) = |V| − 1 − | A ∩ P |.
+
+Substituting this identity into (43) and using Lemma 12 yields exactly χij (A), proving χij (A) = χij (A).We next establish nonincreasing supermodularity on 2E .Define 
+
+gij (A) ≜ χsi (A)+ χdi (A)+ |V|−| A∩P |− ρMij 
+
+ (A\P )∪{ eij }.
+
+By Lemma 12, χsi and χdi are nonincreasing and supermod-ular, while A 7 → −| A ∩ P | is modular and nonincreasing. Applying Lemma 11 on E ∪ { eij } with C0 = E \ P
+
+and C1 = {eij }, and then restricting to A ⊆ E, shows that A 7 → ρMij 
+
+ (A \ P ) ∪ { eij } is nondecreasing and submodular. Hence gij is nonincreasing and supermodular. By Section III-C, taking the maximum of a nonincreasing supermodular function and a constant preserves nonincreasing supermodularity. Therefore, max {gij (A), 1} is nonincreasing and supermodular. Since subtracting a constant preserves both properties, χij is nonincreasing and supermodular. The extensions constructed above directly handle terms with nonnegative coefficients. However, F1, F2, and F3 also contain coefficients that may be negative, for which direct multiplication does not preserve nonincreasing supermodular-ity. To handle both cases uniformly, for each set function 
+
+h : B(Mc) → { 0, 1} considered below, we construct non-increasing supermodular functions h and eh satisfying 
+
+h(A) = h(A), eh(A) = 1 − h(A), A ∈ B (Mc).
+
+For any a ∈ R, define 
+
+T (a; h)( A) ≜
+
+(a h (A), a ≥ 0,a 1 − eh(A), a < 0.
+
+On B(Mc), T (a; h)( A) = ah (A). If a ≥ 0, then T (a; h) = 
+
+ah ; if a < 0, then T (a; h) = a + ( −a)eh. Hence T (a; h) is nonincreasing and supermodular on 2E in either case. We next construct eh for χsi , χdi , χij , and ϕij . For each 
+
+i ∈ V , define χ0 
+
+> i
+
+(A) ≜ 1 − | A ∩ { (s0, i ), (d0, i )}| , eχsi (A) ≜
+
+χdi (A) + χ0 
+
+> i
+
+(A), and eχdi (A) ≜ χsi (A) + χ0 
+
+> i
+
+(A). For i ∈ V and 
+
+j ∈ V \{ s0, d 0}, define eχij (A) ≜ PNv=1   
+
+> v̸=i
+
+χvj (A), and, for each 
+
+(i, j ) ∈ E , define eϕij (A) ≜ ρM(E) − ρM
+
+
+
+A \ { (nij i , n ij j )}
+
+
+
+.
+
+Lemma 14. For every A ∈ B (Mc),
+
+eχsi (A) = 1 − χsi (A), eχdi (A) = 1 − χdi (A),
+
+eχij (A) = 1 − χij (A), eϕij (A) = 1 − ϕij (A).
+
+Moreover, eχsi , eχdi , eχij , and eϕij are nonincreasing and super-modular on 2E .Proof. We first establish the identities on B(Mc). By Lemma 9, node i is adjacent in A to at most one of s0
+
+and d0. Hence, by definition, χsi (A) + χdi (A) + χ0 
+
+> i
+
+(A) = 1 .Together with Lemma 12, this yields eχsi (A) = 1 − χsi (A),and eχdi (A) = 1 − χdi (A). Moreover, by Lemma 9, each 
+
+j ∈ V \{ s0, d 0} is associated with exactly one reference node, and hence PNv=1 χvj (A) = 1 . Therefore, using Lemma 13, 
+
+eχij (A) = 
+
+> N
+
+X 
+
+> v=1
+> v̸=i
+
+χvj (A) = 1 − χij (A).
+
+Finally, let emij ≜ (nij i , n ij j ). By Lemma 8, A is a basis of M.Thus A \ { emij } is independent and 
+
+ρM
+
+ A \ { emij } = ρM(E) − A ∩ { emij } .
+
+It follows that eϕij (A) = A ∩ { emij } = 1 − ϕij (A).We next establish nonincreasing supermodularity. Since 
+
+χ0 
+
+> i
+
+(A) = 1 − | A ∩ { (s0, i ), (d0, i )}| 
+
+is modular and nonincreasing, Lemma 12 implies that eχsi and 
+
+eχdi are nonincreasing and supermodular. Similarly, Lemma 13 implies that eχij is nonincreasing and supermodular. Finally, by Lemma 11, A 7 → ρM
+
+ A \ { emij } is nondecreasing and submodular. Therefore, eϕij is nonincreasing and supermodu-lar. The objective functions F1, F2, and F3 also involve higher-order set functions recursively constructed through C. We next show that the existence of h and eh is preserved under Γ,allowing the same construction to be applied recursively. 17 
+
+Lemma 15. Let q ∈ N+ and h1, . . . , h q : B(Mc) → { 0, 1}.Suppose that, for each r ∈ { 1, . . . , q }, there exist nonincreas-ing supermodular functions hr , ehr : 2 E → R such that, for every A ∈ B (Mc), hr (A) = hr (A), and ehr (A) = 1 − hr (A).Define 
+
+h(A) ≜ Γ( h1, . . . , h q )( A),h(A) ≜ Γ  h1, . . . , h q
+
+ (A),
+
+eh(A) ≜
+
+> q
+
+X
+
+> r=1
+
+Γ
+
+
+
+h1, . . . , h r−1, ehr
+
+
+
+(A).
+
+Then h and eh are nonincreasing and supermodular on 2E , and, for every A ∈ B (Mc), h(A) = h(A), and eh(A) = 1 − h(A).Proof. Let A ∈ B(Mc). Since each hr (A) is bi-nary, the definition of Γ gives Γ( h1, . . . , h q )( A) =Qqr=1 hr (A). Using hr (A) = hr (A) therefore yields h(A) = 
+
+h(A). Similarly, for each r, Γ
+
+
+
+h1, . . . , h r−1, ehr
+
+
+
+(A) =
+
+Qr−1 
+
+> s=1
+
+hs(A)
+
+
+
+(1 − hr (A)) , where the empty product for 
+
+r = 1 equals one. Hence 
+
+eh(A) = 
+
+> q
+
+X
+
+> r=1
+> r−1
+
+Y
+
+> s=1
+
+hs(A)
+
+!
+
+(1 − hr (A)) = 1 −
+
+> q
+
+Y
+
+> r=1
+
+hr (A) = 1 − h(A),
+
+where the second equality follows by telescoping. It remains to establish nonincreasing supermodularity. Since each hr is nonincreasing and supermodular, 
+
+A 7 →
+
+> q
+
+X
+
+> r=1
+
+hr (A) − (q − 1) 
+
+is also nonincreasing and supermodular. By the definition of Γ and Section III-C, h is therefore nonincreasing and supermodular. Similarly, for each r, h1, . . . , h r−1, ehr are nonincreasing and supermodular. Thus, by the same argu-ment, Γ
+
+
+
+h1, . . . , h r−1, ehr
+
+
+
+is nonincreasing and supermod-ular. Since eh is the sum of these functions, it is also nonin-creasing and supermodular. We now apply the preceding constructions to F1. Instead of constructing a separate extension of χrec  
+
+> ij
+
+, we directly define 
+
+F 1(A) ≜
+
+> N
+
+X
+
+> i=1
+> N
+
+X
+
+> v=1
+
+ci Γ  χdv , χ vi 
+
+ (A)+ α0 − α1
+
+2
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+> N
+
+X
+
+> v=1
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+cij Γ  χvi , χ v′j
+
+ (A)+ α1
+
+2
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+> N
+
+X
+
+> v=1
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+cij 
+
+h
+
+Γ  χvi , χ v′j , eχsv
+
+ (A)+ Γ  χvi , χ v′j , χ sv , eχsv′
+
+ (A)+ Γ 
+
+
+
+χvi , χ v′j , χ sv , χ sv′ , eϕij 
+
+
+
+(A)
+
+i
+
+. (44) We are now ready to prove Theorem 1. 
+
+Proof of Theorem 1. Fix A ∈ B (Mc). By the definitions of 
+
+ψsv,i and χrec  
+
+> ij
+
+,
+
+χrec  
+
+> ij
+
+(A) = 
+
+> N
+
+X
+
+> v=1
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+χvi (A)χv′j (A)χsv (A)χsv′ (A)ϕij (A).
+
+Substituting this identity into F1 gives 
+
+F1(A) = 
+
+> N
+
+X
+
+> i=1
+> N
+
+X
+
+> v=1
+
+ci Γ  χdv , χ vi 
+
+ (A)+ 12
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+> N
+
+X
+
+> v=1
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+cij χvi (A)χv′j (A)
+
+· (α0 − α1χsv (A)χsv′ (A)ϕij (A)) . (45) For each summand in (45), 
+
+α0 − α1χsv (A)χsv′ (A)ϕij (A)= ( α0 − α1) + α1
+
+h
+
+(1 − χsv (A)) + χsv (A)(1 − χsv′ (A)) + χsv (A)χsv′ (A)(1 − ϕij (A)) 
+
+i
+
+.
+
+By Lemmas 12, 13, and 14, the functions χ and eχ appearing in (44) agree on B(Mc) with the corresponding indicators and their complements, respectively. Since these quantities are binary on B(Mc), the definition of Γ implies that every Γ
+
+term in (44) agrees with the corresponding product above. Comparing (44) and (45) therefore yields F 1(A) = F1(A).We next establish that F 1 is nonincreasing and supermod-ular. By Lemmas 12, 13, and 14, all functions appearing as arguments of Γ in (44) are nonincreasing and supermodular on 2E . By the definition of Γ and Section III-C, every Γ
+
+term in (44) has the same properties. Since ci, c ij ≥ 0 and 
+
+0 < α 1 < α 0, all coefficients in (44) are nonnegative. Hence 
+
+F 1 is nonincreasing and supermodular on 2E .We next consider F2. Unlike F1, the coefficients multiplying the indicator functions in Φv (x, A ) depend on x and may have either sign. We therefore use the signed-coefficient construc-tion T introduced above. Recall that 
+
+ψsv,i = Γ ( χsv , χ vi ) ,ψsv,i,j = Γ ( χsv , χ vi , χ vj ) ,ψsv,i,j,k = Γ ( χsv , χ vi , χ vj , χ vk ) .
+
+By Lemma 15, there exist nonincreasing supermodular func-tions ψsv,i , eψsv,i , ψ sv,i,j , eψsv,i,j , ψ sv,i,j,k , eψsv,i,j,k : 2 E → R
+
+such that, for every A ∈ B (Mc),
+
+ψsv,i (A) = ψsv,i (A), eψsv,i (A) = 1 − ψsv,i (A),ψsv,i,j (A) = ψsv,i,j (A), eψsv,i,j (A) = 1 − ψsv,i,j (A),ψsv,i,j,k (A) = ψsv,i,j,k (A), eψsv,i,j,k (A) = 1 − ψsv,i,j,k (A).
+
+We first define a function corresponding to Wv (x, A ) as 
+
+W v (x, A ) ≜
+
+> N
+
+X
+
+> i=1
+
+ψsv,i (A)Wi(xi)+ 12
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+ψsv,i,j (A)Wij (xi, x j ). (46) 18 
+
+Since Wi(xi) ≥ 0 and Wij (xi, x j ) ≥ 0, W v (x, A ) is nonin-creasing and supermodular in A for every fixed x. Moreover, for every A ∈ B (Mc), W v (x, A ) = Wv (x, A ).For notational convenience, define 
+
+ζi(x) ≜ ∂W i(xi)
+
+∂x i
+
+fi(xi),ζij (x) ≜ ∂W ij (xi, x j )
+
+∂x i
+
+fi(xi) + ∂W i(xi)
+
+∂x i
+
+fij (xi, x j ),ζijk (x) ≜ ∂W ij (xi, x j )
+
+∂x i
+
+fik (xi, x k).
+
+Using the signed-coefficient construction T , define 
+
+Φv (x, A ) ≜
+
+> N
+
+X
+
+> i=1
+
+T  ζi(x); ψsv,i 
+
+ (A)+
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+T  ζij (x); ψsv,i,j 
+
+ (A)+
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+X
+
+> k∈N i
+
+T  ζijk (x); ψsv,i,j,k 
+
+ (A)+ k1W v (x, A ). (47) We then define 
+
+F 2(A) ≜
+
+Z
+
+> Ω
+> N
+
+X
+
+> v=1
+
+Φv (x, A ) + dx. (48) Fix A ∈ B (Mc) and x ∈ Ω. By the construction of T , for any 
+
+a ∈ R and any binary set function h for which the correspond-ing extensions have been constructed, T (a; h)( A) = ah (A).Hence, 
+
+T  ζi(x); ψsv,i 
+
+ (A) = ζi(x)ψsv,i (A),
+
+T  ζij (x); ψsv,i,j 
+
+ (A) = ζij (x)ψsv,i,j (A),
+
+T  ζijk (x); ψsv,i,j,k 
+
+ (A) = ζijk (x)ψsv,i,j,k (A).
+
+Moreover, by (46), we have W v (x, A ) = Wv (x, A ). Substi-tuting these identities into (47) gives 
+
+Φv (x, A ) = Φ v (x, A ).
+
+Therefore, for every A ∈ B (Mc),
+
+F 2(A) = 
+
+Z
+
+> Ω
+> N
+
+X
+
+> v=1
+
+Φv (x, A ) + dx 
+
+=
+
+Z
+
+> Ω
+> N
+
+X
+
+> v=1
+
+{Φv (x, A )}+ dx = F2(A).
+
+It remains to establish nonincreasing supermodularity. For each fixed x ∈ Ω, the construction of T implies that 
+
+T  ζi(x); ψsv,i 
+
+, T  ζij (x); ψsv,i,j 
+
+, and T
+
+
+
+ζijk (x); ψsv,i,j,k 
+
+
+
+are nonincreasing and supermodular on 2E . Furthermore, 
+
+W v (x, A ) is nonincreasing and supermodular in A, and k1 >
+
+0. It follows from (47) that Φv (x, A ) is nonincreasing and supermodular in A for every fixed x ∈ Ω.Consequently, Φv (x, A ) + = max Φv (x, A ), 0 is non-increasing and supermodular in A. Finite sums preserve both properties, and integration over the fixed domain Ω preserves the corresponding inequalities. Therefore, F 2 is nonincreasing and supermodular on 2E .We next consider F3. The functions ψrv,i,k , ψsr v,i,j,k , and 
+
+ψrr v,i,j,k appearing in Ψv (x, A ) involve the reconnection in-dicators. Rather than constructing extensions of the reconnec-tion indicators separately, we first rewrite these functions as sums of conjunctions of the basic binary set functions. Fix 
+
+A ∈ B (Mc). By the definition of χrec  
+
+> ik
+
+and the uniqueness of the reference node associated with each island, we have 
+
+ψrv,i,k (A) = 
+
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+Γ ( χsv , χ vi , χ v′k, χ sv′ , ϕ ik ) ( A),ψsr v,i,j,k (A) = 
+
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+Γ ( χsv , χ vi , χ vj , χ v′k, χ sv′ , ϕ ik ) ( A),ψrr v,i,j,k (A) = 
+
+> N
+
+X 
+
+> v′=1
+> v′̸=vN
+
+X 
+
+> v′′ =1
+> v′′ ̸=v
+
+Γ
+
+
+
+χsv , χ vi , χ v′j , χ sv′ , ϕ ij ,χv′′ k, χ sv′′ , ϕ ik 
+
+
+
+(A).
+
+Note that v′ and v′′ are not required to be distinct, since j and 
+
+k may belong to the same stable island. By Lemma 15, every 
+
+Γ-based conjunction appearing above admits nonincreasing supermodular extensions satisfying the requirements of the signed-coefficient construction T . To keep the construction of 
+
+Ψv compact, for any a ∈ R define 
+
+Rrv,i,k (a; A) ≜
+
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+T (a; Γ( χsv , χ vi , χ v′k, χ sv′ , ϕ ik )) ( A),
+
+Rsr v,i,j,k (a; A) ≜
+
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+T (a; Γ( χsv , χ vi , χ vj , χ v′k, χ sv′ , ϕ ik )) ( A),
+
+Rrr v,i,j,k (a; A) ≜
+
+> N
+
+X 
+
+> v′=1
+> v′̸=vN
+
+X 
+
+> v′′ =1
+> v′′ ̸=v
+
+T
+
+
+
+a; Γ  χsv , χ vi , χ v′j , χ sv′ ,ϕij , χ v′′ k, χ sv′′ , ϕ ik 
+
+
+
+(A).
+
+By Lemma 15 and the definition of T , Rrv,i,k (a; A),
+
+Rsr v,i,j,k (a; A), and Rrr v,i,j,k (a; A) are nonincreasing and su-permodular in A for every fixed a ∈ R. Moreover, for every 
+
+A ∈ B (Mc), we have 
+
+Rrv,i,k (a; A) = aψ rv,i,k (A),
+
+Rsr v,i,j,k (a; A) = aψ sr v,i,j,k (A),
+
+Rrr v,i,j,k (a; A) = aψ rr v,i,j,k (A).
+
+For notational convenience, define 
+
+ζrik (x) ≜ ∂W i(xi)
+
+∂x i
+
+fik (xi, x k) + ∂W ik (xi, x k)
+
+∂x i
+
+fi(xi),ζsr ijk (x) ≜ ∂W ij (xi, x j )
+
+∂x i
+
+fik (xi, x k)+ ∂W ik (xi, x k)
+
+∂x i
+
+fij (xi, x j ),19 
+
+ζrr ijk (x) ≜ ∂W ij (xi, x j )
+
+∂x i
+
+fik (xi, x k).
+
+We then define 
+
+F 3(A) ≜
+
+Z
+
+> bΩ
+> N
+
+X
+
+> v=1
+
+Ψv (x, A ) + dx. (49) where 
+
+Ψv (x, A ) ≜
+
+> N
+
+X
+
+> i=1
+
+X
+
+> k∈N i
+
+Rrv,i,k (ζrik (x); A)+
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+X
+
+> k∈N i
+
+Rsr v,i,j,k 
+
+ ζsr ijk (x); A
+
++
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+X
+
+> k∈N i
+
+Rrr v,i,j,k 
+
+ ζrr ijk (x); A
+
++
+
+> N
+
+X
+
+> i=1
+
+X
+
+> k∈N i
+
+Rrv,i,k 
+
+ k2
+
+2 Wik (xi, x k); A
+
+
+
++
+
+> N
+
+X
+
+> i=1
+
+T  −(k1 − k2)Wi(xi); ψsv,i 
+
+ (A)+ 12
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j∈N i
+
+T  −(k1 − k2)Wij (xi, x j ); ψsv,i,j 
+
+ (A). (50) Fix A ∈ B(Mc) and x ∈ bΩ. By the construction of 
+
+T , T (a; h)( A) = ah (A) for every binary set function h
+
+considered above and every a ∈ R. Applying this identity to the first three groups in (50), together with the preceding representations of ψrv,i,k , ψsr v,i,j,k , and ψrr v,i,j,k , gives 
+
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+T (ζrik (x); Γ ( χsv , χ vi , χ v′k, χ sv′ , ϕ ik )) ( A)= ζrik (x)ψrv,i,k (A),
+
+and analogously, 
+
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+T  ζsr ijk (x); Γ( ·) (A) = ζsr ijk (x)ψsr v,i,j,k (A),
+
+> N
+
+X 
+
+> v′=1
+> v′̸=vN
+
+X 
+
+> v′′ =1
+> v′′ ̸=v
+
+T  ζrr ijk (x); Γ( ·) (A) = ζrr ijk (x)ψrr v,i,j,k (A),
+
+where Γ( ·) denotes the corresponding conjunction in the definitions above. Moreover, since the extensions agree with the original indicators on B(Mc), we have 
+
+> N
+
+X 
+
+> v′=1
+> v′̸=v
+
+Γ  χsv , χ vi , χ v′k, χ sv′ , ϕ ik 
+
+ (A) = ψrv,i,k (A).
+
+Finally, we have 
+
+T   − (k1 − k2)Wi(xi); ψsv,i 
+
+(A)= −(k1 − k2)Wi(xi)ψsv,i (A),
+
+T   − (k1 − k2)Wij (xi, x j ); ψsv,i,j 
+
+(A)= −(k1 − k2)Wij (xi, x j )ψsv,i,j (A).
+
+Substituting these identities into (50) yields 
+
+Ψv (x, A ) = Ψ v (x, A ).
+
+Consequently, 
+
+F 3(A) = 
+
+Z
+
+> bΩ
+> N
+
+X
+
+> v=1
+
+{Ψv (x, A )}+ dx = F3(A).
+
+It remains to establish nonincreasing supermodularity. By Lemma 15, every conjunction appearing in the first three groups of (50) admits the extensions required by T . Hence, for every fixed x ∈ bΩ, each corresponding T term is nonin-creasing and supermodular on 2E .The terms in the fourth group of (50) are nonincreasing and supermodular in A by the properties of Rrv,i,k (a; A)
+
+established above. The last two groups are nonincreasing and supermodular by the definition of T . Therefore, Ψv (x, ·) is nonincreasing and supermodular on 2E for every fixed x ∈ bΩ.It follows that Ψv (x, A ) + = max Ψv (x, A ), 0 is nonin-creasing and supermodular in A. Finite sums preserve both properties, and integration over the fixed domain bΩ preserves the corresponding inequalities. Hence F 3 is nonincreasing and supermodular on 2E .Finally, since α2, α 3 ≥ 0, the function F defined in Theo-rem 1 is a nonnegative weighted sum of F 1, F 2, and F 3, and is therefore nonincreasing and supermodular on 2E . Moreover, for every A ∈ B(Mc), F (A) = F1(A) + α2F2(A) + 
+
+α3F3(A) = F (A).

@@ -6,26 +6,31 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-09-13
-- 运行时间：2026-09-13 21:15:50 UTC
+- 最新运行日期：2026-09-14
+- 运行时间：2026-09-14 22:25:35 UTC
 - 运行状态：成功
-- 本次总论文数：1
-- 精读区：1
-- 速读区：0
+- 本次总论文数：3
+- 精读区：0
+- 速读区：3
 
 ### 今日简报（AI）
-今天精读1篇8.0分论文，主题是用大语言模型对符号回归结果做"生理合理性"事后审计，并由临床医生参与评估。
-最值得看的方向是：把LLM当成模型输出的审查员，在医学等专业场景中判断结果是否符合生理常识，而不仅是拟合精度。
-普通读者可留意AI结论的"可信度审计"思路——看模型给出的结果是否经得起领域专家和常识的检验。
-- 详情：[/202609/13/README](/202609/13/README)
+2026-09-14日报：3篇全部速读、0篇精读，最高分7.0，主题集中在控制、优化与Lyapunov稳定性。  
+最值得先看的是《Controlled Islanding and Reconnection with Stability Guarantees via Submodular Optimization》（7.0/10），把孤岛控制/重连与子模优化、稳定性保证放在一起；其次可扫《Abstract homogeneous chains: a Lyapunov framework for high-order sliding modes in multi-agent systems》（6.0/10
+- 详情：[/202609/14/README](/202609/14/README)
 
 ### 精读区论文标签
-1. [LLMs as Post-hoc Auditors of Physiological Plausibility in Symbolic Regression: A Clinician-Evaluated Case Study](/202609/13/2609.11431v1-llms-as-post-hoc-auditors-of-physiological-plausibility-in-symbolic-regression-a-clinician-evaluated-case-study)  
-   标签：评分：8.0/10、query:sr
-   evidence：大语言模型辅助提升符号回归模型的可解释性
+- 本次无精读推荐。
 
 ### 速读区论文标签
-- 本次无速读推荐。
+1. [Controlled Islanding and Reconnection with Stability Guarantees via Submodular Optimization](/202609/14/2609.12335v1-controlled-islanding-and-reconnection-with-stability-guarantees-via-submodular-optimization)  
+   标签：评分：7.0/10、query:lyapunov-ai
+   evidence：用李雅普诺夫方法给出网络动力系统稳定性的充分条件
+2. [Lyapunov Functions and $R$-Linear Convergence for Quadratic Barzilai-Borwein Dynamics](/202609/14/2609.12084v1-lyapunov-functions-and-r-linear-convergence-for-quadratic-barzilai-borwein-dynamics)  
+   标签：评分：6.0/10、query:lyapunov-ai
+   evidence：为二次Barzilai-Borwein动力学构造显式李雅普诺夫函数
+3. [Abstract homogeneous chains: a Lyapunov framework for high-order sliding modes in multi-agent systems](/202609/14/2609.12250v1-abstract-homogeneous-chains-a-lyapunov-framework-for-high-order-sliding-modes-in-multi-agent-systems)  
+   标签：评分：6.0/10、query:lyapunov-ai
+   evidence：构造齐次李雅普诺夫函数用于滑模系统全局有限时间稳定性
 
 
 <div class="dpr-home-promo-card">

@@ -1,0 +1,533 @@
+Title: Inverting Self-Triggered Control: Adversarial Reinforcement Learning for Sparse Denial-of-Service Attacks
+
+URL Source: https://arxiv.org/pdf/2609.12016v1
+
+Published Time: Mon, 14 Sep 2026 00:03:25 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Inverting Self-Triggered Control: Adversarial Reinforcement Learning for Sparse Denial-of-Service Attacks 
+
+Adam Haroon 1, Erick J. Rodr´ ıguez-Seda 2, Tristan Schuler 3, and Cody Fleming 1
+
+Abstract — Self-triggered reinforcement learning control (RL-STC) learns the sparsest control schedule that preserves Lyapunov-decreasing stability under a Run-Time Assurance (RTA) override. We invert this: an adversarial RL agent learns the sparsest jamming or Denial-of-Service (DoS) schedule that destabilizes the closed loop, with a Lyapunov-increase admis-sibility predicate mirroring the defender’s safety certificate. We prove a plant-property lower bound on the minimum jam count required for an immediate hold-last medium-access-control adversary to force a crash against a self-triggered controller (STC) satisfying a Lyapunov contract, and recover a certificate-level analog of the consecutive-grouping optimality of prior count-budget DoS scheduling as a corollary. This extends the DoS-scheduling count-budget analysis from periodic and linear-time-invariant to STC controllers. Empirically, we train against four fixed defenders per plant (one Linear Quadratic Regulator (LQR) and three RL-STC) on Pendulum, CartPole, and Quadrotor2D. The learned adversary is the only adversary that crashes every defender on every plant at 100% : greedy misses Quadrotor2D LQR on 42% of episodes and periodic misses Pendulum LQR on 97% . On jam-time-per-failure it beats baselines by up to 2.8×, and shows its widest absolute margin on Quadrotor2D LQR. Robustness ablations show that Gaus-sian observation noise exceeding the initial-state magnitude and position-only observation both preserve 100% failure rate and keep the learned adversary strictly ahead of both baselines on jam-time-per-failure. 
+
+I. I NTRODUCTION 
+
+A Denial-of-Service (DoS) adversary on a networked cyber-physical system destabilizes the plant by withholding control updates alone, without ever physically touching it. Certifying such systems requires understanding the most resource-efficient adversary, not only the worst-case contin-uous jammer. On a shared wireless channel, communication is a scarce resource on both sides: the defender expends sensing, computation, and bandwidth on every decision; the adversary expends presence and energy on every jam. The Self-triggered Reinforcement Learning Control (RL-STC) framework of [1] produces a communication-efficient defender by learning the sparsest transmission schedule that preserves Lyapunov-decreasing stability. This paper asks the symmetric question: what does a communication-efficient                 
+
+> 1A. Haroon and C. Fleming are with the Department of Mechanical Engineering, Iowa State University, Ames, IA, USA
+
+aharoon@iastate.edu 
+
+> 2E. J. Rodr´ ıguez-Seda is with the Department of Weapons, Robotics, and Control Engineering, United States Naval Academy, Annapolis, MD, USA
+> 3T. Schuler is with the Navy Center for Applied Research in Artificial Intelligence (NCARAI), U.S. Naval Research Laboratory, Washington, D.C., USA The views expressed in this document are those of the author(s) and do not reflect the official policy or position of the U.S. Naval Academy, Department of the Navy, the Department of War, or the U.S. Government.
+
+adversary look like when we invert the same self-triggered structure onto the attack side? Optimal-DoS-scheduling theory addresses a related ques-tion for periodic and linear-time-invariant (LTI) controllers. Prior work gives consecutive-grouping optimality under count-budget and packet-dropping models [2], [3]; [4] ex-tends this to time-varying interference. A parallel line studies stability under frequency- and duration-limited DoS [5]– [8]. Recent Reinforcement Learning (RL) based work game-theorizes attacker-defender interactions for Linear Quadratic Regulator (LQR) control [9] and applies deep RL to multi-channel jamming of remote state estimation and event-triggered control [10]–[12]. Surveys cover the wireless-jamming taxonomy [13] and the broader RL for cyber-physical systems (CPS) security landscape [14], [15]. Across this work the adversary’s schedule is fixed, grid-scheduled, or energy-budgeted; none of it produces a self-triggered adversary against a self-triggered defender. This paper contributes that construction. We invert RL-STC’s self-triggered structure onto the adversary and produce the resulting attacker in two coupled components. Empir-ically , a Deep Q-Network (DQN) adversary acts on the same discrete grid as the RL-STC defender, with a per-step reward that mirrors the defender’s: Lyapunov-increase flag, graded Lyapunov term, jam-activity penalty wa, and crash bonus. A Lyapunov-increase admissibility predicate provides the structural inverse of the Run-Time Assurance (RTA) certificate of [1, Prop. 1]. We train against four fixed defenders per plant (one LQR and three RL-STC at Pareto-spread wc values) on Pendulum, CartPole, and Quadrotor2D, sweeping wa across two orders of magnitude. Theoretically ,we prove a plant-property lower bound (Theorem 1) on the minimum jam count required for an immediate hold-last Medium Access Control (MAC) adversary to force a crash against any Self-Triggered Controller (STC) satisfying a Lyapunov contract, and recover a certificate-level analog of the consecutive-grouping optimality of [2] as Corollary 1. This extends the count-budget analysis of [2], [3] from periodic and LTI controllers to STC. Three findings drive the rest of the paper. First, the learned adversary is the only adversary that crashes every defender on every plant at 100% : predicate-greedy misses Quadro-tor2D LQR on 42% of episodes and periodic misses Pendu-lum LQR on 97% . Second, on jam-time-per-failure ( jtf ) the learned adversary strictly beats the best baseline on all four CartPole defenders and on Quadrotor2D LQR ( 2.6× faster than either baseline, 2.7× than greedy), and matches greedy on Pendulum where two-state dynamics leave predicate-DISTRIBUTION STATEMENT A: Approved for public release, distribution is unlimited. arXiv:2609.12016v1 [cs.LG] 10 Sep 2026 MAC ZOH Plant Defender Adversary                                  
+
+> commit-and-wait
+> uku(t)
+> uk,dkuk1(held)
+> xkak
+> V(xk+ 1 )V(xk) > att
+> ak(held) Fig. 1. Self-triggered adversary framework, the structural inverse of the RTA defender of [1]. A fixed defender outputs (uk, τ dk); the learned adver-sary commits a jam duration τakat each decision instant and holds it over the resulting window. The Lyapunov-increase predicate ˆV(xk+1 )−V(xk)>θatt is the adversary-side analog of the defender’s RTA certificate; it defines the predicate-greedy baseline, while the learned adversary is left unshielded (Sec. II-C). Under the hold-last MAC model a committed jam latches uk−1
+> at the actuator, while τak= 0 passes the fresh update; both policies close the loop on the shared state xk.
+
+greedy near-optimal. Third, on Quadrotor2D under realistic drone-adversary sensing constraints, the learned adversary retains 100% failure rate and strict jtf dominance under Gaussian observation noise exceeding the initial-state mag-nitude and under position-only observation. II. P ROBLEM FORMULATION 
+
+We adopt the plant, defender, and clock of [1] unchanged and add the adversary as a symmetric self-triggered agent on the same discretization grid. Fig. 1 shows the resulting jammer framework. 
+
+A. Nonlinear plant 
+
+We consider a continuous, data-sampled, nonlinear dy-namic system of the form 
+
+˙x(t) = f (x(t), uk) (1) where x ∈ Rn is the state vector, u ∈ U ⊂ Rm is the control input, and f : Rn × U → Rn is continuously differentiable. It is assumed that there is a bounded data-sample control law 
+
+u(t) = uk := u(tk) ∀ t ∈ [tk, t k+1 ) capable of stabilizing the system around an equilibrium point xeq . The defender, adversary, and clock all act on this plant through the sampled input uk.
+
+B. Defender (RL-STC baseline) 
+
+At decision instant tk the defender selects (uk, τ dk ) with 
+
+τ dk ∈ T = {τmin , 2τmin , . . . , N τ τmin } and τmax := Nτ τmin ,held by zero-order hold over [tk, t k +τ dk ); Nτ is the grid size, reserved throughout from the jam count N of Sec. II-E. An RTA layer overrides the action with a clipped LQR backup 
+
+uk ← clip( −Kxk) at τ dk ← τmin whenever the linearized one-step safety prediction leaves the safe set. [1, Prop. 1] certifies that an unsaturated backup is Lyapunov-decreasing under the quadratic Lyapunov function V (x) = x⊤P x,where P solves the Continuous Algebraic Riccati Equation (CARE) for the linearization (A, B ) of (1) with input weight 
+
+R, and K = R−1B⊤P is the corresponding LQR gain. The defender reward sums a Lyapunov-decrease flag, agraded term 1 − V (xk+1 )/V scale (Vscale fixed per plant), a communication term wc((MSI k − τmin )/(τmax − τmin )) 2 on the mean sampling interval MSI (the causal moving average of the applied τ dk ), a penalty rsafe on RTA activation, and a crash penalty of −1000 . A crash is the moment the plant’s state vector reaches a predefined unrecoverable unsafe set. 
+
+C. Self-triggered adversary 
+
+The adversary selects a jam duration τ ak ∈ { 0} ∪ T at every commit-and-wait decision instant. Over [tk, t k + τ ak )
+
+no control update reaches the actuator, which holds the last applied input. τ ak = 0 admits the defender update at tk to pass unjammed; τ ak = ℓτ min blocks the channel for ℓ ticks of the underlying grid before the adversary decides again. The threat model is a MAC layer drop with a held actuator: the actuator latches the most recent successfully delivered 
+
+uk while jammed. The adversary’s per-step reward mirrors the defender’s: 
+
+rak = ra 
+
+> stab
+
++ V (xk+1 )
+
+Vscale 
+
+− wa
+
+ ¯τ ak
+
+τmax 
+
+2
+
++ resc [terminated] ,
+
+(2) where ¯τ ak is the causal exponential moving average ¯τ ak ←
+
+(( nMSI − 1)¯ τ ak + τ ak )/n MSI with nMSI = 5 (reserved from the state dimension n) and ¯τ a 
+
+> 0
+
+= 0 , the same recursion the de-fender’s MSI k uses in [1]; ra 
+
+> stab
+
+= +1 if V (xk+1 ) > V (xk)
+
+and −1 otherwise; resc is the crash bonus. wa mirrors wc and sweeps the adversary frontier. The admissibility predicate of Sec. II-D is not enforced on the learned adversary; a hard shield would forbid near-equilibrium jams that lack a one-step Lyapunov increase but are needed to drive the system out. 
+
+D. Lyapunov-increase admissibility predicate 
+
+The defender’s RTA fires when the predicted safety scalar leaves the safe set. The adversary-side analog admits a jam only if a one-tick probe under the held input shows destabilization: 
+
+ˆV (xk+1 ) − V (xk) > θ att , (3) where ˆV (xk+1 ) = ˆxk+1 ⊤P ˆxk+1 and ˆxk+1 integrates the plant’s nonlinear dynamics forward over a single τmin under 
+
+ulast , on the same semi-implicit Euler substep the simulator uses. The probe is one tick deep whatever duration the adversary then commits. This is the structural inverse of Proposition 1’s conclusion in [1]. We fix θatt = 0 throughout, so any predicted Lyapunov increase passes. 
+
+E. Two-player game and metrics 
+
+Defender and adversary share xk and play (uk, τ dk , τ ak )
+
+with rewards rdk, r ak . Fixing the defender at one of four rep-resentative policies reduces the co-trained game to a single-player Markov Decision Process (MDP) for the adversary. Over an episode of Tep grid ticks with block indicators 
+
+bk ∈ { 0, 1} and jam count N = P 
+
+> k
+
+bk, we report: MSI ctrl 
+
+(defender’s nominal mean inter-sample interval, in seconds); 
+
+ρjam = N/T ep (fraction of episode ticks blocked); and 
+
+jtf = τmin N averaged over crashing episodes. ρfail jam restricts 
+
+ρjam to crashing episodes. 
+
+Remark 1 (Jam-time / attack-energy identity): Under the hold-last MAC model, a constant-power jammer satisfies 
+
+energy = Pjam τmin N (with Pjam the transmit power, distinct from the Lyapunov matrix P ): jam time, jam fraction, and expended energy are affine in N . N is thus the count budget of [2], [3] up to a per-jam energy constant, so jtf is attack energy per successful destabilization and the wa sweep is a Lagrangian traversal of that budget. III. M INIMUM -J AM -C OUNT BOUND FOR STC Remark 1 makes N the count budget of [2], [3], but their optimality results assume periodic or LTI controllers. We bridge to STC: for any STC controller ( [16] introduced the self-triggered paradigm; [17] gives the exponential-decay Lyapunov contract we use, their eq. 14), we derive a plant-property lower bound on N under a hold-last MAC adver-sary. 
+
+A. Lower bound and corollaries 
+
+Fix the plant with linearization ˙x = Ax + Bu around an equilibrium (xeq , ueq ) satisfying Axeq + Bueq = 0,safety Lyapunov V (x) = (x − xeq )⊤P (x − xeq ) with 
+
+P ≻ 0, and safety threshold Vcrit such that the safety region is {x : V (x) ≤ Vcrit }. Since xeq = 0 on all three plants, this V is the V of Sec. II-B. Let Φ( τ ) := eAτ be the transition matrix of the autonomous linearization; when held-last input equals ueq (which any Lyapunov-stabilizing controller supplies at the equilibrium), the jam-window dy-namics reduce to ˙(δx) = A δ x with δx := x − xeq , and 
+
+δx(t + τ ) = Φ( τ ) δx(t). Non-equilibrium held inputs add a bounded affine translation that we absorb into the empirical margin of Table I. Define the per-tick growth factor in the P -metric: 
+
+G1 := sup 
+
+> x̸=0
+
+r x⊤Φ( τmin )⊤P Φ( τmin ) xx⊤P x . (4) 
+
+G1 is a plant property depending only on A, P , and τmin :the operator norm of Φ( τmin ) in the P -norm. It handles both exponentially growing plants ( G1 ∼ exp( ατ min ) with α
+
+the dominant unstable-mode rate) and polynomially growing ones such as integrator chains ( G1 > 1 from Jordan-block transient amplification at spectral radius 1). Thm. 1 below bounds an immediate adversary whose jam sequence begins at t = 0 from the plant’s reset dis-tribution, without pre-conditioning on observed closed-loop state; Sec. III-C compares the bound, and that adversary’s measured threshold, to the learned adversary. 
+
+Theorem 1 (Immediate-jam crash-count bound): 
+
+Represent the plant of (1) over a jam window by its linearization about the equilibrium (fixed above; the experiments of Sec. IV simulate the full nonlinear dynamics). Let an STC controller satisfy the exponential-decay Lyapunov contract V (ˆ x(tk + τ d)) ≤ V (xk) exp( −λτ d) at each unjammed decision (as in [17, eq. 14]), and consider a hold-last MAC adversary whose first jam decision occurs at t = 0 from initial state x0 with V (x0) = V0 < V crit . Let 
+
+G1 be defined by (4) and assume G1 > 1 (the held-input mode is P -expansive; otherwise no finite jam count crashes the plant). Then the minimum tick count N ⋆ in a single contiguous jam block required to drive V (xT ) ≥ Vcrit 
+
+satisfies 
+
+N ⋆ ≥
+
+ log( Vcrit /V 0)2 log G1
+
+
+
+. (5) 
+
+Proof: Working in δx-coordinates, held-last input at ueq gives autonomous jam-window dynamics δxT =Φ( N τ min ) δx0 = Φ( τmin )N δx0. Submultiplicativity of the P -metric operator norm yields ∥Φ( τmin )N ∥P ≤∥Φ( τmin )∥NP = GN 
+
+> 1
+
+, hence 
+
+V (xT ) = δx⊤ 
+
+> T
+
+P δ xT ≤ G2N 
+
+> 1
+
+δx⊤ 
+
+> 0
+
+P δ x0 = V0 G2N 
+
+> 1
+
+.
+
+A crash requires V (xT ) ≥ Vcrit , which by the display forces 
+
+V0G2N 
+
+> 1
+
+≥ Vcrit ; since G1 > 1 gives log G1 > 0, solving for N and taking the ceiling yields (5). The same holds for any schedule of N jam ticks, not only the contiguous one: unjammed epochs contribute factors exp( −λτ d) ≤ 1 by the STC contract, so V (xT ) ≤ V0G2N 
+
+> 1
+
+regardless of schedule and V0G2N 
+
+> 1
+
+≥ Vcrit stays necessary for a crash. □
+
+Remark 2: Beyond the linearization, a non-equilibrium held input ulast adds the affine term (R τ 
+
+> 0
+
+Φ( τ −
+
+s) ds )B(ulast −ueq ) to the jam-window map; over a window of N ticks this is a bounded translation of norm O(∥ulast −
+
+ueq ∥), which shifts V0 by a bounded amount absorbed into the empirical margin of Table I. The linearization is exact only to first order in δx, so (5) certifies the linearized model while Table I measures the full nonlinear dynamics; that margin is consistent with a small combined higher-order and affine correction but does not isolate it. Two corollaries follow. 
+
+Corollary 1 (Consecutive-jam optimality on STC): For aschedule π with N jam ticks and unjammed epochs of durations {τ dj }Mj=1 , the certified terminal Lyapunov bound is V (π) := V0 G2N
+
+> 1
+
+QMj=1 e−λτ dj , i.e. V π (xT ) ≤ V (π).Among all schedules of fixed count N , V is maximized by the contiguous block ( M = 0 ), with value V0G2N 
+
+> 1
+
+.
+
+Proof: Write ∥v∥P := ( v⊤P v)1/2, so V = ∥·∥ 2 
+
+> P
+
+. Each jam tick applies the linear map Φ( τmin ), of P -operator norm 
+
+G1; each unjammed epoch contracts ∥ · ∥ P by e−λτ dj /2 at the realized state, which is all the composition needs and does not require the closed-loop STC map to be linear. Chaining these N + M inequalities along the trajectory and squaring gives V π (xT ) ≤ V0G2N
+
+> 1
+
+QMj=1 e−λτ dj = V (π). Every dwell time is drawn from T , so τ dj ≥ τmin > 0 and each factor is strictly below 1; hence V (π) ≤ V0G2N 
+
+> 1
+
+= V (πcont ), strict whenever M ≥ 1. □
+
+Corollary 1 extends the consecutive-grouping optimality of [2], [3] from periodic and LTI controllers to STC at the level of the certified growth bound: their proof requires the TABLE I EMPIRICAL VALIDATION OF THEOREM 1 AGAINST AN IMMEDIATE CONSECUTIVE -JAM ATTACKER ON THE PERIODIC LQR DEFENDER .Plant G1 log Vcrit                                        
+
+> V0N⋆(pred. a)N(meas. a,95% )Pendulum 1.22 3.29 930
+> CartPole 1.23 1.02 330
+> Quadrotor2D 1.26 2.21 5>80
+> aAll counts in τmin ticks. Predicted N⋆computed from (5); G1,V0and
+> Vcrit are produced by stage1/compute bridge theory vals.py .Measured Nis the smallest jam count achieving ≥95% crash rate over 100
+> evaluation episodes; the Quadrotor2D scan reaches only 91% at N= 80 ,where it was stopped.
+
+LTI closed-loop transition matrix, whereas ours needs only the STC contract and the P -norm growth factor G1. The bound is order-independent because submultiplicativity does not depend on segment order; it is attained exactly when 
+
+∥Φ( τmin )∥P equals the spectral radius (as when Φ( τmin ) is 
+
+P -normal), and the G1-based certificate is the worst case otherwise. 
+
+Corollary 2 (Plant-property gradient): For fixed V0 and 
+
+Vcrit , the pre-ceiling bound log( Vcrit /V 0)/(2 log G1) is strictly decreasing in G1, so N ⋆ is non-increasing in G1.
+
+Proof: log( Vcrit /V 0) > 0 is fixed and log G1 is positive and strictly increasing for G1 > 1, so the ratio strictly decreases; the ceiling is monotone, hence N ⋆ is non-increasing. □
+
+Corollary 2 is a ceteris paribus statement. Across plants 
+
+Vcrit /V 0 also varies, so N ⋆ need not order by G1 alone (Table I: the Pendulum’s larger log( Vcrit /V 0) gives it the largest N ⋆ despite the smallest G1, and the CartPole’s small ratio the smallest N ⋆ despite an intermediate G1). The jtf 
+
+trend, however, is monotone across the three LQR points (0.755 < 0.876 < 1.136 s as G1 decreases from 1.26 to 
+
+1.22 ), a suggestive but small-n signature of the gradient. 
+
+B. Empirical validation 
+
+Table I reports G1 and predicted N ⋆ per plant against a controlled immediate-jam attacker that begins at t =0 from the plant’s reset distribution and applies a single contiguous jam block of N ticks, matching the theorem’s assumption class. For each plant we sweep N and record the smallest N yielding crash rate ≥ 95% over 100 evaluation episodes against the periodic LQR defender, which satisfies the Lyapunov contract trivially at τ d = τmin . V0 is the sample mean of V (x0) over 100 resets; Vcrit is the minimum V over the plant’s safety-region boundary. The bound holds on every plant, with measured N ≥ N ⋆
+
+throughout at a ratio of at least 3.3× (the Quadrotor2D entry is right-censored, so no upper end is measured). The two counts answer different questions, so a ratio above one is expected rather than slack. N ⋆ is a floor on the certified model: no jam sequence of fewer ticks can carry V from 
+
+V0 past Vcrit , in any direction and under any schedule. The measured N is an operational threshold : the count at which one contiguous block crashes 95% of episodes drawn from the reset distribution. A worst case over all directions and schedules exceeds a typical case under one schedule even for an exact model, and Remark 2 addresses what the linearization itself adds. The bound’s use is that it is a plant property, computable before any experiment. 
+
+C. Learned adversary vs. the immediate-jam bound 
+
+The learned adversary of Sec. IV does not defer its attack. Against the same LQR defender it fires on the first tick in every episode on Pendulum and CartPole and commits one contiguous block; on Quadrotor2D it fires at median tick 1,from a state whose Lyapunov value is 0.87 V0, so (5) applied at fire time returns a floor one tick larger than at reset. Its advantage is therefore not a better starting state. The immediate attacker of Table I needs 30 , 30 and > 80 
+
+ticks ( 1.50 , 1.20 and > 3.20 s) to crash 95% of episodes with one contiguous block; the learned adversary crashes on 1.136 , 0.876 and 0.755 s of jam time, i.e. 22 .7, 21 .9
+
+and 18 .9 ticks on average. These are different statistics, a mean over crashing episodes against the smallest fixed count reaching 95% , so the 24 –76% gap they imply is mean-versus-threshold rather than matched. Matched at the 95 th percentile the learned adversary needs 34 , 35 and 31 ticks: on Pendulum and CartPole it is no cheaper than jamming from 
+
+t = 0 . There it reproduces the predicate-greedy schedule of Sec. IV-C, matching greedy’s tick count to within about one tick; what it adds on those plants is reliability rather than efficiency (Sec. IV). The robust gap is entirely on Quadrotor2D, where greedy also fires immediately in one block but needs 2.7× the jam time at 58% reliability, while the learned adversary waits a tick, splits its budget across 
+
+1.79 blocks, and crashes every episode. Multi-step schedule structure, not pre-observation, is what the immediate-jam threshold leaves unpriced. IV. E XPERIMENTS 
+
+A. Setup 
+
+Plants and defender checkpoints are reused from [1]: an inverted Pendulum ( n = 2 , m = 1 ), a CartPole ( n = 4 ,
+
+m = 1 ), and a planar Quadrotor2D ( n = 6 , m = 2 ), each run at τmin = 0 .04 s ( 0.05 s on the Pendulum) with Nτ = 8 ,and each carrying an angle or position bound as its unsafe set. For each plant we train 7×4×3 = 84 adversaries across 
+
+wa ∈ { 0.01 , 0.1, 0.5, 1.0, 2.0, 5.0, 10 .0}, four fixed defenders (a periodic LQR controller, baseline B1 of [1], and three RL-STC defenders at wc ∈ { 1.0, 6.0, 14 .0}, Pareto-spread points from its eleven-value wc sweep), and three seeds. Each adversary is evaluated over 100 episodes against the three non-learned baselines of Sec. IV-C and three learned seeds. Periodic and predicate-greedy are deterministic given the defender; the learned column reports mean ± cross-seed std. The primary metric is jam-time-per-failure, the mean jammed seconds over crashing episodes; by Remark 1 this is attack energy per successful destabilization. The jam fraction on failures ρfail jam is reported alongside as a secondary metric. Because periodic sits at ρfail jam ∈ [49% , 82%] , jam fraction alone would conflate structural sparsity with strategic timing. A learned adversary is strategic on a defender when its mean 
+
+jtf is strictly below both baselines and its cross-seed std is small relative to the smaller gap. 
+
+B. Adversary training and reward calibration 
+
+The defender set is identical across plants. The adversary is a DQN over {0, . . . , N τ = 8 } with learning rate 10 −3,replay buffer 10 6, γ = 0 .99 , and an episode-bounded budget of 25 ,000 ; the best-per-step checkpoint is typically reached within ∼ 10% of the budget. The terminal bonus resc in (2) is the one term requiring explicit calibration. Naively mirroring the defender’s −1000 
+
+penalty places the terminal at least two orders of magnitude above the differential jam cost between full-jam and half-jam schedules, so DQN Q-targets become terminal-dominated and the Bellman residual on jam-or-not decisions is lost. We set resc = 100 across all plants and wa values: still exceeds worst-case non-terminal accumulation, but no longer dominates the per-decision gradient. Every other term in (2) is a direct structural mirror of the defender’s reward. 
+
+C. Baselines 
+
+We compare the learned adversary to three non-learned adversaries on every (defender, wa) combination, each eval-uated for 100 episodes: 
+
+NoJam. A no-adversary control ( τ ak = 0 ) measuring the defender’s nominal behavior in isolation. 
+
+Periodic burst. A state-independent jammer playing τ ak =4τmin every other decision, giving ρfail jam ∈ [49% , 82%] . Non-learned analog of the fixed-rate schedules contrasted with the grouped optimal of [2], [3]. 
+
+Predicate-greedy. A model-based adversary committing the longest available jam, τ ak = Nτ τmin , whenever the predicate (3) holds. It idles until the predicate first fires and then jams continuously, giving jam fraction 93 –100% .It computes ˆV from the same state xk the learned adversary observes, so learned-vs-greedy is a same-information com-parison isolating the value of multi-step strategic timing over a one-step predicate rule. 
+
+D. Pendulum 
+
+Table II reports the Pendulum frontier at wa = 10 .0 (the same wa used throughout). All four defenders are NoJam-self-stable ( 0% failure). The learned adversary crashes every defender at 100% ; predicate-greedy misses LQR on 13% of episodes and periodic misses on 97% , making learned the sole reliable LQR crasher. On jtf , learned matches greedy within measurement precision ( 1.06 –1.14 s vs. 1.04 –1.08 s) and beats periodic by 1.2–2.3×; on Pendulum, learned’s 
+
+100% headline comes from reliability rather than strict jtf 
+
+dominance, since two-state dynamics leave predicate-greedy near-optimal. On jam fraction, periodic sits at 56 –66% on the three RL-STC defenders (sparse by construction; its LQR figure rests on the 3% of episodes it crashes) while learned and greedy co-locate at 95 –100% . The Pendulum panel of Fig. 2 tracks this pattern across the wa sweep.                                                                                
+
+> TABLE II PENDULUM FRONTIER AT wa= 10 .0:JAM -TIME -PER -FAILURE IN SECONDS ,MEAN ±CROSS -SEED STD OVER THREE SEEDS AND 100
+> EVALUATION EPISODES PER SEED .†NOPENDULUM DEFENDER ADMITS Astrategic LEARNED ADVERSARY IN THE SENSE OF SEC . IV-A (LEARNED NEVER FALLS BELOW GREEDY HERE ), SO NO ROW IS BOLD ;
+> CONTRAST TABLES III AND IV. defender periodic greedy learned LQR (periodic) 1.400 †1.076 †1.136 ±0.068
+> RL-STC wc=1 .01.548 1.044 1.064 ±0.100
+> RL-STC wc=6 .01.986 1.076 1.119 ±0.050
+> RL-STC wc=14 .02.572 1.048 1.130 ±0.073
+> TABLE III CART POLE FRONTIER AT wa= 10 .0:JAM -TIME -PER -FAILURE IN SECONDS ,MEAN ±CROSS -SEED STD OVER THREE SEEDS AND 100
+> EVALUATION EPISODES PER SEED .†BOLD MARKS A DEFENDER ON WHICH THE LEARNED ADVERSARY IS strategic IN THE SENSE OF
+> SEC . IV-A. defender periodic greedy learned LQR (periodic) –†0.889 †0.876 ±0.033
+> RL-STC wc=1 .00.592 0.890 0.545 ±0.188
+> RL-STC wc=6 .00.342 0.861 0.320 ±0.000
+> RL-STC wc=14 .00.606 0.906 0.396 ±0.014
+
+Per-defender MSI ctrl : LQR 0.050 s, wc ∈ { 1.0, 6.0, 14 .0}
+
+at {0.276 , 0.398 , 0.382 } s. The continuous-jam optimum has a structural cause: under held-actuator MAC drop, MSI ctrl is irrelevant during a jam window, so the cheapest crash blocks continuously until the Pendulum falls. Learned and greedy both settle near this lower bound. †Periodic and greedy fail to crash LQR reliably (failure rate 3% and 87% ); all other cells achieve 100% failure. E. CartPole 
+
+Table III reports the CartPole frontier at wa = 10 .0.Three of four defenders are self-stable; wc = 6 .0 falls on its own in 31% of NoJam episodes, so its learned-vs-baseline comparison is relative. Two of the four defenders admit a 
+
+strategic learned adversary under the jtf gate; on the other two it is faster than greedy but its cross-seed spread exceeds the margin: 
+
+LQR: learned 0.876 ± 0.033 s vs greedy 0.889 s ( 1.5% 
+
+faster). Periodic 4τmin bursts fall inside the LQR sampling-rate margin and never crash ( 0% ), so learned is the only reliable LQR crasher. 
+
+wc = 1 .0: learned 0.545 ± 0.188 s vs periodic 0.592 ,greedy 0.890 : 8% / 39% faster, jam fraction 68 .24 ± 11 .35% 
+
+(vs 69% / 99% ). 
+
+wc = 6 .0: learned 0.320 ± 0.000 s matches periodic 0.342 
+
+with tighter variance and beats greedy 0.861 by 2.7×.
+
+wc = 14 .0: learned 0.396 ± 0.014 s vs periodic 0.606 ,greedy 0.906 : 35% / 2.3× faster, jam fraction 52 .14 ±2.26% 
+
+(vs 49% / 99% ). Per-defender MSI ctrl : LQR 0.040 s, wc ∈ { 1.0, 6.0, 14 .0}
+
+at {0.087 , 0.201 , 0.316 } s. NoJam failure rate is 0% except TABLE IV QUADROTOR 2D FRONTIER AT wa = 10 .0: JAM -TIME -PER -FAILURE IN SECONDS , MEAN ± CROSS -SEED STD OVER THREE SEEDS AND 100                              
+
+> EVALUATION EPISODES PER SEED .†BOLD MARKS A DEFENDER ON WHICH THE LEARNED ADVERSARY IS strategic IN THE SENSE OF
+> SEC . IV-A. defender periodic greedy learned LQR (periodic) 1.994 2.074 †0.755 ±0.099
+> RL-STC wc=1 .00.602 1.558 1.068 ±0.868
+> RL-STC wc=6 .00.637 1.846 1.237 ±0.750
+> RL-STC wc=14 .00.920 1.830 0.654 ±0.195
+
+wc = 6 .0 (31% , so its learned-vs-baseline comparison is relative). † Periodic fails to crash LQR (failure rate 0% )and predicate-greedy reaches 95% there; every other cell achieves 100% failure. 
+
+Fig. 3 compares four CartPole episodes at wc = 14 .0,
+
+wa = 10 : no-adversary θ stays near zero; periodic bursts crash at 1.32 s; predicate-greedy jams continuously and crashes at 0.64 s; the learned adversary idles ∼ 0.24 s while 
+
+θ drifts under the defender, then commits one sustained burst that crashes at 0.56 s. The learned policy is neither schedule-driven nor reactive but state-timed. The CartPole panel of Fig. 2 shows the strategic plateau on 
+
+wc = 14 .0 persisting across the sweep and extending to wc =1.0; both stay below the greedy line for every wa ≥ 0.1.LQR sits at ρfail jam ≈ 100% (no exploitable timing structure) but learned still crashes 1.5% faster on jam time. wc = 6 .0
+
+enters the below-greedy regime from wa = 2 .
+
+F. Quadrotor2D 
+
+Table IV reports the Quadrotor2D frontier at wa = 10 .0.All four defenders are self-stable under NoJam ( 0% failure); two admit strategic learned adversaries. LQR shows the largest learned-vs-baseline gap in the paper. 
+
+LQR: learned 0.755 ±0.099 s vs periodic 1.994 and greedy 
+
+2.074 : 2.7× faster than greedy, and the only reliable LQR crasher ( 100% vs greedy 58% ). Jam fraction 91 .31 ± 3.41% 
+
+(periodic 82% , greedy 99 .8% ). 
+
+wc = 14 .0: learned 0.654 ± 0.195 s vs periodic 0.920 ,greedy 1.830 : 29% / 2.8× faster, jam fraction 68 .95 ±
+
+10 .01% . Its spread is 73% of the margin to periodic, the loosest of the four strategic cells (the others are under 10% ), so it is the weakest of the four. 
+
+wc ∈ { 1.0, 6.0}: both learned adversaries crash at 100% 
+
+but at jtf higher than periodic ( 1.068 s and 1.237 s vs. 0.602 sand 0.637 s). Their short MSI ctrl (0.108 s, 0.206 s) keeps the plant close to equilibrium, and the state-uniform reward shaping (Sec. II-C) trades strategic-timing performance here for uniform crash reliability across the state space (discussed in Sec. IV-H). Both cells still beat greedy by 31 –33% on jtf 
+
+and by 9–18 pp on jam fraction. Per-defender MSI ctrl : LQR 0.040 s, wc ∈ { 1.0, 6.0, 14 .0}
+
+at {0.108 , 0.206 , 0.257 } s. NoJam failure rate is 0% across defenders. † Predicate-greedy crashes LQR on only 58% of episodes; learned achieves 100% failure on every defender.                                                 
+
+> TABLE V QUADROTOR 2D ROBUSTNESS ABLATION ON wc= 14 .0,wa= 10 ,
+> JAM -TIME -PER -FAILURE IN SECONDS . A LL ADVERSARIES SEE THE SAME PERTURBED OBSERVATION CHANNEL ;LEARNED REPORTS MEAN
+> ±CROSS -SEED STANDARD DEVIATION OVER THREE TRAINING SEEDS .FAILURE RATE IS 100% IN EVERY ROW ;BOLD MARKS THE LEARNED ADVERSARY BEATING BOTH BASELINES ,WHICH IT DOES IN ALL SIX .condition periodic greedy learned clean (reference) 0.920 1.830 0.654 ±0.195
+> σobs = 0 .01 0.920 1.856 0.532 ±0.097
+> σobs = 0 .05 0.920 1.862 0.471 ±0.123
+> σobs = 0 .10 0.920 1.856 0.606 ±0.047
+> σobs = 0 .20 0.920 1.747 0.631 ±0.037
+> position-only 0.920 1.811 0.681 ±0.091
+
+The Quadrotor2D LQR result is the largest learned-vs-baseline gap in the paper. The reason is multi-mode: termi-nation fires on any of |θ|, |x|, or |z| exceeding threshold, giving three destabilization routes whose joint coverage ad-mits timing structure even against continuous-sampling LQR. Neither periodic nor greedy exploits this structure. On short-
+
+MSI ctrl RL-STC defenders ( wc ∈ {1.0, 6.0}), periodic’s burst cadence happens to align with the defender’s sampling, producing shorter jtf than the learned adversary. 
+
+G. Deploy-realism ablation (Quadrotor2D) 
+
+The three plants above establish cross-plant generality. We now stress-test the framework on Quadrotor2D under the sensing constraints a real drone-jamming adversary would face: noisy radio-frequency (RF) or visual state estimates, and velocity-blind observation when the adversary lacks derivative estimators. We re-train the learned adversary on Quadrotor2D wc = 14 .0, wa = 10 under two perturbations mirroring these constraints: (i) Gaussian noise N (0 , σ 2obs )
+
+per state component, σobs ∈ {0, 0.01 , 0.05 , 0.1, 0.2}, the largest exceeding the mean magnitude of every state compo-nent at reset ( ≤ 0.17 ); and (ii) position-only, masking veloc-ity components ( ˙ x, ˙z, ˙θ) to zero. Periodic is observation-blind (invariant jtf ); predicate-greedy uses the same perturbed ob-servation as learned. Three training seeds per configuration. Failure rate stays at 100% everywhere (Table V). Learned strictly beats both baselines on jtf in all six conditions, holding at 0.47 –0.68 s vs. periodic 0.92 s and greedy 1.75 –
+
+1.86 s, with cross-seed variance ≤ 0.20 s. The framework remains deployable under realistic drone-adversary sensing constraints. 
+
+H. Discussion Plants stratify on reliability and strict jtf dominance. 
+
+Learned crashes all 12 (plant, defender) cells at 100% ;baselines miss (greedy 42% on Quadrotor2D LQR, periodic 
+
+97% on Pendulum LQR). On jtf learned strictly beats the best baseline on 4/4 CartPole cells and 2/4 Quadrotor2D cells (largest gap 2.6× on LQR, against its best baseline) and matches greedy on Pendulum. The stratification tracks constraint width (single-scalar for Pendulum/CartPole vs. disjunctive for Quadrotor2D) and near-equilibrium trajectory 10 2 10 1 10 0 10 1
+
+wa
+
+> 40 50 60 70 80 90 100
+> learned  jam  on failures (%)
+
+Pendulum      
+
+> 10 210 110 010 1
+
+wa
+
+CartPole      
+
+> 10 210 110 010 1
+
+wa
+
+> sparsity gate
+
+Quadrotor2D        
+
+> LQR (periodic) RL-STC wc=1.0 RL-STC wc=6.0 RL-STC wc=14.0 greedy avg
+
+Fig. 2. Cross-plant wa frontier. Each panel shows learned adversary jam fraction on crashing episodes versus jam-activity weight, per defender, with shaded band the three-seed standard deviation. The dashed line in each panel is the per-plant mean greedy jam fraction; the dotted line is the 90% sparsity gate. Pendulum (left) keeps all defenders close to continuous jamming; CartPole (middle) sparsifies all three RL-STC defenders below the gate at wa = 10 
+
+(68 , 80 and 52% ); Quadrotor2D (right) sparsifies three RL-STC defenders across most of the sweep and pulls even the LQR row toward the gate. 40 
+
+> 20
+> 020 40
+> (deg)
+
+no attacker (defender alone)  
+
+> 40
+> 20
+> 020 40 crashed 1.32s
+
+periodic-burst attacker  
+
+> 40
+> 20
+> 020 40 crashed 0.64s
+
+predicate-greedy attacker  
+
+> 40
+> 20
+> 020 40 crashed 0.56s
+
+learned attacker   
+
+> 020 40
+
+time (s)    
+
+> pass jam 0.0 0.5 1.0 1.5
+
+time (s)    
+
+> pass jam 0.0 0.5 1.0 1.5
+
+time (s)    
+
+> pass jam 0.0 0.5 1.0 1.5
+
+time (s) 
+
+> pass jam
+
+Fig. 3. Representative CartPole episodes at wc = 14 .0, wa = 10 . Left to right: no adversary (stable over 50 s); periodic-burst (crash at 1.32 s, 49% 
+
+jam fraction); predicate-greedy (continuous jam, crash at 0.64 s, 100% fraction); learned (idle then sustained burst, crash at 0.56 s, 57% fraction). Top row: θ vs time; dashed line is the constraint |θ|max = 12 ◦. Bottom row: jam mask. Adversary panels share a time axis; shading marks post-crash region. The no-adversary panel uses its own axis (episode two orders of magnitude longer than any crash). 
+
+density (short-MSI ctrl RL-STC on Quadrotor2D has wider 
+
+jtf variance; see the reward-shaping trade-off below). 
+
+Continuous jamming is the count-budget optimum against conventional LQR. [2], [3] prove consecutive-grouping op-timality under count-budget and packet-dropping models. Against periodic LQR, the learned adversary settles into this continuous-jam optimum on Pendulum and CartPole; only Quadrotor2D’s disjunctive constraint breaks the single-mode geometry and lets learned beat continuous. Against RL-STC, the defender’s learned timing exposes strategic windows even on single-scalar plants (CartPole). 
+
+Learned timing dominates greedy on jtf ; defender struc-ture dominates MSI ctrl in attackability. Learned is strictly faster than greedy on all four CartPole cells ( 1.01 –2.7×) and on Quadrotor2D LQR ( 2.7×), and matches greedy within measurement precision on Pendulum, where the two-state dy-namics leave predicate-greedy near-optimal. Against periodic it is faster on 9/12 cells and slower on the two short-MSI ctrl 
+
+Quadrotor2D cells ( wc ∈ { 1.0, 6.0}), where periodic’s fixed cadence aligns with the sampling rate. CartPole LQR is not comparable, since periodic never crashes there. CartPole 
+
+wc = 14 .0 stays below greedy across wa ∈ [0 .1, 10] while 
+
+wc = 6 .0 enters the below-greedy regime only from wa =2, despite similar MSI ctrl ; the defender’s internal policy structure, not its nominal communication budget, drives what the adversary can exploit. 
+
+Trade-off in state-uniform reward shaping. ra 
+
+> stab
+
+applies uniformly across the state space to mirror the defender’s RTA. Near equilibrium the graded reward V (xk+1 )/V scale is small while the ±1 shaping term still fires on any drift, incen-tivizing continuous near-equilibrium jamming. On the two Quadrotor2D cells with the largest bias ( wc ∈ { 1.0, 6.0}), learned crashes at 100% but at 1.6× the jtf and 5.5×
+
+the cross-seed spread of that plant’s two strategic cells. A potential-based reward that vanishes at safe equilibrium is left for future work. Three further limits bound the scope. The count bound of Sec. III is stated on the linearization, and Table I measures the nonlinear plant (Remark 2); the adversary is a single DQN architecture evaluated on three plants; and on the Pendulum it is reliable rather than strate-gic, matching predicate-greedy on jtf .V. C ONCLUSION AND FUTURE WORK 
+
+We presented a self-triggered adversary that inverts the RL-STC defender of [1] and is defender-agnostic: it treats any fixed defender as a closed-loop black box and applies the same training pipeline. Under the hold-last MAC model, jam time, attack energy, and jam fraction are a single resource, and the wa sweep traverses the energy budget of the optimal-DoS literature. We validated the formulation on periodic LQR and three RL-STC defenders across Pendulum, CartPole, and Quadrotor2D; on Quadrotor2D, the framework retains 100% failure rate and strict dominance over predicate-greedy under realistic drone-adversary sensing constraints. Two follow-ons are immediate. 
+
+Co-training as a two-player Markov game. Replace the fixed defender with an RL-STC agent learning concurrently against the adversary; this tests whether the defender can learn timing patterns the adversary cannot exploit. 
+
+Predicate as action mask. The admissibility predicate defines the greedy baseline and shapes the adversary reward but is not enforced on the learned adversary. Hard-masking inadmissible jams would mirror the defender’s RTA shield and isolate the sparsity gains from reward shaping (with the caveat in Sec. II-C that a hard mask forbids equilibrium-time jams needed to drive the system out). REFERENCES [1] A. Haroon, E. J. Rodr´ ıguez-Seda, C. Fleming, and T. Schuler, “Learn-ing when to act: Communication-efficient reinforcement learning via run-time assurance,” arXiv preprint arXiv:2605.12561 , 2026. [2] H. Zhang, P. Cheng, L. Shi, and J. Chen, “Optimal denial-of-service attack scheduling with energy constraint,” IEEE Transactions on Automatic Control , vol. 60, no. 11, pp. 3023–3028, 2015. [3] J. Qin, M. Li, L. Shi, and X. Yu, “Optimal denial-of-service attack scheduling with energy constraint over packet-dropping networks,” 
+
+IEEE Transactions on Automatic Control , vol. 63, no. 6, pp. 1648– 1663, 2017. [4] X. Yang, Y. Ni, Z. Wu, W. Yang, and F. Liu, “Optimal denial-of-service attack scheduling for remote state estimation with time-varying interference power,” International Journal of Robust and Nonlinear Control , vol. 34, no. 6, pp. 3962–3974, 2024. [5] M. Wakaiki, A. Cetinkaya, and H. Ishii, “Stabilization of networked control systems under dos attacks and output quantization,” IEEE Transactions on Automatic Control , vol. 65, no. 8, pp. 3560–3575, 2019. [6] J. Lu and D. E. Quevedo, “A jointly optimal design of control and scheduling in networked systems under denial-of-service attacks,” 
+
+Automatica , vol. 148, p. 110774, 2023. [7] C. De Persis and P. Tesi, “Input-to-state stabilizing control under denial-of-service,” IEEE Transactions on Automatic Control , vol. 60, no. 11, pp. 2930–2944, 2015. [8] A. Cetinkaya, H. Ishii, and T. Hayakawa, “An overview on denial-of-service attacks in control systems: Attack models and security analyses,” Entropy , vol. 21, no. 2, p. 210, 2019. [9] W. Xing, X. Zhao, Y. Li, and L. Liu, “Denial-of-service attacks on cyber-physical systems against linear quadratic control: A stackelberg-game analysis,” IEEE Transactions on Automatic Control , vol. 70, no. 1, pp. 595–602, 2024. [10] L. Xue, B. Ma, J. Liu, and Y. Yu, “Jamming attack against remote state estimation over multiple wireless channels: A reinforcement learning based game theoretical approach,” ISA Transactions , vol. 130, pp. 1–9, 2022. [11] F. Hou, J. Sun, Q. Yang, and Z. Pang, “Deep reinforcement learn-ing for optimal denial-of-service attacks scheduling,” Science China Information Sciences , vol. 65, no. 6, p. 162201, 2022. [12] Q. Geng, H. Ma, and L. Li, “Security event-triggered control for uncertain ncss against multi-channel optimal jamming attacks,” In-ternational Journal of Robust and Nonlinear Control , vol. 33, no. 16, pp. 10 098–10 110, 2023. [13] H. Pirayesh and H. Zeng, “Jamming attacks and anti-jamming strate-gies in wireless networks: A comprehensive survey,” IEEE communi-cations surveys & tutorials , vol. 24, no. 2, pp. 767–809, 2022. [14] Y. Huang, L. Huang, and Q. Zhu, “Reinforcement learning for feedback-enabled cyber resilience,” Annual reviews in control , vol. 53, pp. 273–295, 2022. [15] A. Cetinkaya, H. Ishii, and T. Hayakawa, “Analysis of stochastic switched systems with application to networked control under jam-ming attacks,” IEEE Transactions on Automatic Control , vol. 64, no. 5, pp. 2013–2028, 2018. [16] X. Wang and M. D. Lemmon, “Self-triggered feedback control systems with finite-gain L2 stability,” IEEE transactions on automatic control ,vol. 54, no. 3, pp. 452–467, 2009. [17] W. P. Heemels, K. H. Johansson, and P. Tabuada, “An introduction to event-triggered and self-triggered control,” in 2012 ieee 51st ieee conference on decision and control (cdc) . IEEE, 2012, pp. 3270– 3285.

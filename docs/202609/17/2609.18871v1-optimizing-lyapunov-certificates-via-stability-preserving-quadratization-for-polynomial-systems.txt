@@ -1,0 +1,2669 @@
+Title: Optimizing Lyapunov Certificates via Stability-Preserving Quadratization for Polynomial Systems
+
+URL Source: https://arxiv.org/pdf/2609.18871v1
+
+Published Time: Thu, 17 Sep 2026 01:25:47 GMT
+
+Number of Pages: 43
+
+Markdown Content:
+OPTIMIZING LYAPUNOV CERTIFICATES VIA STABILITY-PRESERVING QUADRATIZATION FOR POLYNOMIAL SYSTEMS 
+
+YUBO CAI ∗ AND GIOELE ZARDINI ∗
+
+Abstract. Region-of-attraction certificates for polynomial systems become expensive as the state dimension and polynomial degree grow, because direct sum-of-squares formulations require a monomial basis whose size grows combinatorially. Quadratization sidesteps this cost by representing a polynomial vector field exactly on an invariant manifold of a quadratic system, so that a quadratic Lyapunov function can certify the region of attraction directly. Even once the lifting map is fixed, this exactness constrains the lifted dynamics only on the manifold, leaving freedom in how they extend off it. Stabilizer gains shape this off-manifold extension and change the transverse dynamics, while representation gauges leave the vector field unchanged but change its matrix representation. Both choices affect the resulting spectral-norm certificate, yet prior work has treated them separately, fixing the gain with a feasibility heuristic and optimizing the gauge only afterward, for that fixed pair. We formulate optimal dissipative quadratization ( ODQ ), which designs the gain and the gauge together for a fixed monomial lift, reference extension, and stabilizer factorization, with the Lyapunov weight fixed to the identity. ODQ selects stabilizer gains within a prescribed compact Hurwitz box and, for each candidate gain, optimizes the representation gauge by an exact semidefinite program that attains the global minimum of the spectral-norm bound at that gain. Residual-aware bounds turn this spectral-norm bound into a certified closed Lyapunov sublevel set, accounting for the floating-point residual of the underlying Lyapunov solve. Under our stated assumptions, every accumulation point of the idealized outer search is box-Clarke stationary. A finite run instead returns the best candidate it can independently verify, and we do not claim global optimality for the gain search. On a planar quintic system, optimizing the gain increases the certified area by a factor of 2.238 
+
+over a matched zero-gain gauge. Across a benchmark of 16 heterogeneous polynomial systems with stabilizer freedom, ODQ improves on both fixed-gain lifted baselines. All 36 ODQ runs on the relay benchmark complete, and ODQ is favored in all 27 repeat-level comparisons across the nine fully paired relay cases against a sum-of-squares baseline with a fixed quadratic Lyapunov function, in both the fixed-direction proxy and construction time. Broader comparisons with direct sum-of-squares methods remain mixed. 
+
+Key words. polynomial systems, quadratization, region of attraction, Lyapunov functions, semidefinite programming 
+
+MSC codes. 93D05, 93D20, 90C22, 93D30 
+
+1. Introduction. The region of attraction (ROA) of an asymptotically stable equilibrium is the set of initial states from which trajectories return to it. Exact quadratization represents a polynomial system on an invariant lifting manifold of a quadratic system. Even with the lifting map fixed, any vector-valued polynomial of total degree at most two that vanishes on this manifold may be added to the lifted right-hand side [7, Ex. 2]. These additions preserve the original trajectories from compatible lifted initial conditions, while they can change transverse stability and the resulting Lyapunov certificate. We treat this off-manifold extension as a design variable for ROA estimation. ROA estimates are required for post-fault screening in power systems [9] and safe exploration in learning-based control [3]. A closed-form description of the ROA is generally unavailable for nonlinear systems, and the standard substitute is a certified 
+
+> ∗
+
+Laboratory for Information & Decision Systems, Massachusetts Institute of Technology, Cambridge, MA (yubocai@mit.edu; gzardini@mit.edu). 
+
+Funding: Y. Cai was partially supported by the MathWorks Research Fellowship. Cai and Zardini were sponsored by the Air Force Office of Scientific Research under agreement number FA9550261B038, and by the Defense Advanced Research Projects Agency (DARPA) under Award No. D25AC00373. 1arXiv:2609.18871v1 [math.OC] 16 Sep 2026 2 Y. CAI AND G. ZARDINI 
+
+inner approximation: a sublevel set of a Lyapunov function, together with a proof that this sublevel set is contained in the ROA. For polynomial vector fields this construction has been carried out by convex optimization for two decades, through sum-of-squares (SOS) programming [25, 27], the V –s iterations and shape-function enlargements built on it [14, 31, 33], and cheaper relaxations of the SOS cone [1]. These programs work over a monomial basis whose size grows combinatorially in the state dimension and the polynomial degree, and the effect is visible in the size of the published examples: many illustrative ROA studies for polynomial systems use two state variables [20, 26, 29], occasionally three [24, 36]. Quadratization trades that degree for dimension. Adjoining auxiliary variables y = g(x) makes the augmented state w = ( x, y) ∈ RN obey an exactly quadratic system ˙w = Aw + H(w ⊗ w). Such a lift always exists [8, 15], modern algorithms produce monomial lifts with provably few auxiliary variables [6], and for a quadratic system with a Hurwitz linear part, a quadratic Lyapunov function yields an ellipsoidal certificate from a closed-form radius or a single semidefinite program [16, 32]. The same quadratic form recurs across otherwise unrelated settings: it is the working class of lift-and-learn [19, 30] and of operator inference [17, 28], it is the entry point of Carleman linearization for reachability analysis [13], and bimolecular mass-action chemical kinetics is quadratic outright [12]. Quadratizations of the same system differ in structure and in how many variables they introduce [2]. Every polynomial system with a dissipative equilibrium admits a 
+
+dissipative quadratization, obtained by doubling a stabilizer gain until the lifted origin passes a Routh–Hurwitz test [7, Thm. 1, Alg. 2, Prop. 3]. There is also a representation gauge: adding a matrix K satisfying K(w ⊗ w) = 0 leaves the quadratic vector field unchanged but can alter the spectral-norm bound. This gauge has been optimized for a fixed pair (A, H ) [16]. The two choices are coupled at the certificate level, since the stabilizer gain changes A and H, while A determines the Lyapunov metric in which the gauge is evaluated. We characterize the full affine space of admissible quadratic extensions for a fixed embedding and restrict the optimization to the stabilizer family. For a fixed monomial inner-quadratic lift, reference extension, prescribed stabilizer factorizations, and Lya-punov weight Q = IN , we optimize the diagonal stabilizer gains Λ and the Kronecker representation coefficients μ. The gains determine the lifted dynamics, while the repre-sentation coefficients determine the spectral-norm bound used in the certificate. Over a prescribed compact box B contained in the Hurwitz set, we formulate optimal dissi-pative quadratization ( ODQ ) with optimal value ϕB := min Λ∈B min μ∈Rd ∥J(Λ , μ )∥,where d = N 2(N − 1) /2. Its reciprocal ρB := ϕ−1 
+
+> B
+
+is the optimal Lyapunov-level threshold within this family and box, with 1/0 := + ∞. For fixed Λ, the gauge problem is an exact convex semidefinite program (SDP); the outer value function is generally nonsmooth and nonconvex. 
+
+Contributions and organization. Within this fixed family, we first derive a tangent– transverse spectral splitting that reduces Hurwitz feasibility to the auxiliary block. We prove that the outer value is locally Lipschitz and attains its minimum on every admissible box, and give an example for which the unrestricted threshold is unbounded. We then derive a residual-aware rule for reporting a strict closed certificate and show that, when ϕB > 0 and Q = IN , threshold maximization orders the leading coefficients of scaled small-radius pullback volumes. For computation, we remove gauge directions invisible to the certificate and obtain an exact fixed-gain SDP with q = N (N 2 − 1) /3
+
+effective gauge coordinates. Analytic sensitivities at regular points are combined with OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 3a box-constrained gradient-sampling L-BFGS method. Under the stated assumptions, every accumulation point of the idealized sequence is box-Clarke stationary; finite runs instead return the best independently screened candidate encountered, and we do not claim global optimality of the outer gain search. The numerical study comprises a planar quintic, a heterogeneous suite of 19 polynomial systems, and a 12-system single-link relay grid. On the planar example, gain optimization increases the certified area by a factor of 2.238 over the matched zero-gain gauge; on all 16 heterogeneous systems with nontrivial stabilizer freedom, 
+
+ODQ improves the reported size metric over both fixed-gain lifted baselines. Direct sum-of-squares (SOS) methods with quadratic or quartic Lyapunov functions give a structure-dependent size–time tradeoff rather than uniform dominance. All 36 
+
+ODQ relay runs completed, and each of the nine fully paired sos -2 cells favors 
+
+ODQ in both proxy and time. Within the tested dimensions, the favorable cases are higher-degree, higher-dimensional systems whose sparse nonlinear structure admits a compact quadratic lift. Section 2 gives the required background, Section 3 develops the certificate problem, Section 4 presents the algorithm, and Section 5 reports the experiments. 
+
+2. Preliminaries. 2.1. Notation. Vectors are set in bold and their scalar entries in plain type: 
+
+x = ( x1, . . . , x n), and the origin of Rn is 0. Matrices are plain capitals ( A, H, P ), and scalars are plain lowercase. We write R for the real numbers and R[x] for the ring of polynomials in x, with R[x]n its n-vectors. For a matrix M , M⊤ is the transpose, 
+
+∥M ∥ the spectral norm (its largest singular value), and eig( M ) is the spectrum; for a vector, ∥·∥ is the Euclidean norm. We index eigenvalues by decreasing real part, 
+
+Re λ1(M ) ≥ · · · ≥ Re λN (M ), so M is Hurwitz precisely when Re λ1(M ) < 0; the quantity − Re λ1(M ) > 0 is then its stability margin . SN denotes the symmetric N ×N
+
+matrices, P ≻ 0 (P ⪰ 0) positive (semi)definiteness, and ⪯ the Loewner order. The Jacobian of a differentiable map f is Jx(f ) = [ ∂f i/∂x j ]. We use ⊗ for the Kronecker product and write w⊗j = w ⊗ · · · ⊗ w (j factors) for Kronecker powers; Ik is the 
+
+k × k identity and ek the k-th standard basis vector. A homogeneous quadratic vector field on RN is written H(w ⊗ w) with H ∈ RN ×N 2
+
+, so that its r-th component is the quadratic form w⊤Hr w, where Hr ∈ RN ×N is the r-th row of H reshaped to a matrix. 
+
+2.2. Polynomial systems and dissipative equilibria. We study polynomial systems of ordinary differential equations (ODEs), (2.1) ˙x = p(x), x(t) ∈ Rn, p = ( p1, . . . , p n) ∈ R[x]n.
+
+Each component pi ∈ R[x] is a polynomial in the state x = ( x1, . . . , x n). Our interest is in the behaviour of (2.1) near an equilibrium at which it is locally stable. 
+
+Definition 2.1 (equilibrium; dissipativity [7]). A point x∗ ∈ Rn is an equilib-rium of (2.1) if p(x∗) = 0, and (2.1) is dissipative at x∗ if every eigenvalue of the Jacobian Jx(p)|x=x∗ has negative real part. 
+
+We analyse one equilibrium at a time and place it at the origin without loss of generality. The substitution z = x − x∗ takes (2.1) to ˙z = p(z + x∗), which is again polynomial, has an equilibrium at 0, and has the same Jacobian there. We retain the notation x and p for the translated coordinates and vector field, so p(0) = 0.4 Y. CAI AND G. ZARDINI 
+
+Definition 2.2 (dissipativity margin). The dissipativity margin of the origin is 
+
+(2.2) αp := − Re λ1
+
+ Jx(p)|0
+
+,
+
+so that (2.1) is dissipative at 0 precisely when αp > 0.
+
+Our analysis assumes that the original system (2.1) is dissipative at the origin, equivalently, αp > 0, since exact quadratization preserves the original dynamics and cannot alter the local stability of this equilibrium. By Lyapunov’s indirect method, for every rate a < α p there exist a neighbourhood of the origin and a constant C ≥ 1 such that ∥x(t)∥ ≤ C e −at ∥x(0) ∥ for all t ≥ 0. Trajectories therefore relax on the asymptotic time scale 1/α p and the constant C absorbs nonnormal transient amplification, which 
+
+αp does not bound. Geometrically, −αp is the spectral abscissa of Jx(p)|0, so the spectrum lies at least αp to the left of the imaginary axis and αp is its distance to the stability boundary. Thus, the margin is intrinsic to (2.1) and fixed before any lift is chosen. 
+
+2.3. Quadratization, stabilizers, and the quadratic form. A quadratic right-hand side permits closed-form Lyapunov bounds and convex certificate optimiza-tion. For a fixed Hurwitz linear part and a fixed positive definite Lyapunov weight, the analytic ellipsoidal ROA radius scales as 1/∥H∥ when H̸ = 0 and is inexpensive to evaluate once the Lyapunov equation is solved [16, Prop. 3.1 and §4]. The non-linear term is represented by a fixed tensor whose projection can be precomputed, allowing exact evaluation of the projected nonlinearity in reduced coordinates without interpolation [18, 30]. Reducing the polynomial degree requires auxiliary state variables. Any polynomial system admits a finite quadratic extension [7, Prop. 1], with freedom in both the lifting map and the off-manifold dynamics. Algorithms for optimal monomial quadratization 
+
+minimize the number of auxiliary variables [5, 6], whereas dissipative quadratization 
+
+also requires the lifted equilibrium to have a Hurwitz Jacobian [7]. We describe these freedoms below and formulate the gain and gauge optimization in Section 3. 
+
+Definition 2.3 (quadratization [7]). A quadratization of (2.1) consists of new variables yi = gi(x), i = 1 , . . . , m , together with polynomial vectors q1(x, y) ∈ R[x, y]n
+
+and q2(x, y) ∈ R[x, y]m of total degree at most two such that 
+
+(2.3) ˙x = q1(x, y), ˙y = q2(x, y)
+
+holds along y = g(x). It is monomial quadratization if every gi is a monomial, and its lifting manifold is M = {(x, g(x)) : x ∈ Rn} ⊂ RN with N = n + m.
+
+We restrict attention to monomial quadratizations with nonconstant auxiliary monomials, so g(0) = 0 and exactness places the lifted equilibrium at the origin. With 
+
+w = ( x, y) ∈ RN , collecting the linear and quadratic terms in (2.3) gives the lifted vector field (2.4) ˙w = F(w) := Aw + H(w ⊗ w), A ∈ RN ×N , H ∈ RN ×N 2
+
+.
+
+Here A = Jw(F)|0 is the linearization at the lifted equilibrium, and H is a Kronecker representation of the homogeneous quadratic term. Reading off the coefficients of q1, q2 gives one such pair, written (A0, H 0) and called the zero-gain lift . The corresponding field F0(w) := A0w + H0(w ⊗ w) serves as the reference extension below. The original dynamics are exactly the restriction of (2.4) to the invariant manifold M. Off M, equation (2.4) is an extension of those OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 5dynamics, and the quadratization is free to shape that extension without touching the system it represents. 
+
+Definition 2.4 (admissible quadratic extensions). Fix the polynomial embedding 
+
+Φ : Rn → RN , Φ( x) = ( x, g(x)) , with image M and N = n + m. Let P2 := R[w]≤2
+
+denote the scalar polynomials of total degree at most two, and define the vanishing ideal 
+
+I(M) := {r ∈ R[w] : r(Φ( x)) = 0 for all x ∈ Rn}.
+
+The admissible quadratic extension space of p for the fixed embedding is 
+
+(2.5) EΦ(p) := {F ∈ P N 
+
+> 2
+
+: F(Φ( x)) = Jx(Φ)( x) p(x) for all x ∈ Rn}.
+
+Given a reference extension F0 ∈ E Φ(p), this is the affine space 
+
+(2.6) EΦ(p) = F0 + VΦ, VΦ := I(M)N ∩ P N 
+
+> 2
+
+,
+
+where I(M)N denotes the Cartesian product of N copies of I(M).
+
+Indeed, for F ∈ P N 
+
+> 2
+
+and the fixed reference F0, exactness in (2.5) is equivalent to 
+
+F − F0 vanishing componentwise on M. A basis of I(M) ∩ P 2 can be computed by substituting w = Φ( x) into a general linear combination of 1, w i, w iwj (1 ≤ i ≤ j ≤ N )and taking the null space of the resulting coefficient equations. If r1, . . . , r s is such a basis, then {ekrℓ : 1 ≤ k ≤ N, 1 ≤ ℓ ≤ s} is a basis of VΦ.
+
+Example 2.5 (Admissible extensions of a scalar cubic system). Consider ˙x =
+
+p(x) := −x − x3 and fix Φ( x) = ( x, x 2), so M = {(x, y ) : y = x2}. The quadratic vector field 
+
+F0(x, y ) = 
+
+ −x − xy 
+
+−2y − 2y2
+
+
+
+is an admissible extension because F0(x, x 2) = ( p(x), 2xp (x)) ⊤ = Jx(Φ)( x)p(x).To find all such extensions, write r = c0 + c1x + c2y + c3x2 + c4xy + c5y2 ∈ P 2.Substitution gives 
+
+r(x, x 2) = c0 + c1x + ( c2 + c3)x2 + c4x3 + c5x4.
+
+This vanishes identically if and only if c0 = c1 = c4 = c5 = 0 and c3 = −c2. Thus 
+
+I(M) ∩ P 2 = span {h}, where h(x, y ) = y − x2, and 
+
+VΦ = span 
+
+ h
+
+0
+
+
+
+,
+
+0
+
+h
+
+ 
+
+, EΦ(p) = 
+
+
+
+F0 +
+
+ah bh 
+
+
+
+: a, b ∈ R
+
+
+
+.
+
+The two parameters independently modify the lifted equations away from M while preserving the dynamics on M. The choice a = 0 , b = −λ gives the family in Example 3.11. 
+
+Definition 2.6 (inner-quadratic lift; stabilizers [7]). A quadratization is inner-quadratic if each gi factors as gi = aibi with ai, b i ∈ { x1, . . . , x n, y 1, . . . , y i−1}. Its i-th 
+
+stabilizer is the quadratic polynomial 
+
+(2.7) hi(x, y) := yi − aibi,
+
+which vanishes identically on M and therefore belongs to I(M) ∩ P 2 in Definition 2.4. 6 Y. CAI AND G. ZARDINI 
+
+Every polynomial system admits an inner-quadratic monomial quadratization [7, Prop. 1], computable by branch and bound [6]. Since ekhi ∈ V Φ for every k = 1 , . . . , N ,adding −λihi to the k-th lifted equation, with λi ∈ R, gives another element of EΦ(p):its restriction to M is unchanged, while its off-manifold dynamics may change. Those transverse dynamics determine the stability of the lifted equilibrium, which makes the stabilizers the natural design variables. Dissipative quadratization [7] exploits exactly this: it replaces q2 by q2 − λh with h = ( h1, . . . , h m) and raises λ through 1, 2, 4, . . . 
+
+until the lifted origin is dissipative, a search that always terminates [7, Alg. 2, Prop. 3]. It returns the first gain that works. 
+
+2.4. Ellipsoidal Lyapunov certificates. Suppose that A in (2.4) is Hurwitz. For a prescribed Q ≻ 0, let P ≻ 0 be the unique Lyapunov solution and define V by 
+
+A⊤P + P A = −Q, V (w) = w⊤P w, ˙V (w) = −w⊤Qw + 2 w⊤P H (w ⊗ w).(2.8) Write q(w) := H(w ⊗ w) for the homogeneous quadratic term. For symmetric positive definite P, Q , define its intrinsic normalized cubic growth by (2.9) β(P, Q, q) := sup  
+
+> w̸=0
+
+2|w⊤P q(w)|√w⊤P w w ⊤Qw .
+
+This quantity depends on the quadratic map, independently of its matrix representation. For the exact Lyapunov solution in (2.8), set c(u) := u⊤P q(u) and define (2.10) ρrad := inf  
+
+> u⊤Pu=1
+> c(u)>0
+
+u⊤Qu
+
+2 c(u) , inf ∅ := + ∞.
+
+Proposition 2.7 (Ellipsoidal Lyapunov certificate). For the exact Lyapunov solution in (2.8) , ρrad = 1 /β (P, Q, q) is the supremal r > 0 for which ˙V (w) < 0
+
+whenever 0 < V (w) < r 2, with 1/0 := + ∞. For every 0 < ρ < ρ rad , the closed ellipsoid D(P, ρ ) := {w ∈ RN : V (w) ≤ ρ2} is positively invariant and contained in the ROA of the origin. For the chosen Kronecker representation H,
+
+(2.11) ρan (A, H, Q ) := λmin (Q)2∥H∥p∥P ∥ ≤ ρrad , 1/0 := + ∞.
+
+Thus D(P, ρ ) is certified for every 0 < ρ < ρ an (A, H, Q ).More generally, let bP = bP⊤ ≻ 0 be any computed matrix, put bV (w) := w⊤ bP w,and set 
+
+(2.12) R := A⊤ bP + bP A + Q, δ := ∥Q−1/2RQ −1/2∥.
+
+If δ < 1 and γ ≥ β( bP , Q, q), then 
+
+(2.13) ˙bV (w) ≤ −  1 − δ − γ
+
+qbV (w)w⊤Qw.
+
+For γ > 0 and θ ∈ (0 , 1) , the closed ellipsoid 
+
+(2.14) D
+
+bP , θ 1 − δγ
+
+
+
+=
+
+(
+
+w : bV (w) ≤ θ2
+
+ 1 − δγ
+
+2)
+
+is positively invariant, has strict Lyapunov decrease away from the origin, and is contained in the region of attraction of the origin. If γ = 0 , bV is a global Lyapunov function. Verified upper bounds may replace δ and γ, provided the residual bound is below one. OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 7
+
+Proof. See the proof of Proposition 2.7 in Appendix A (p. 28). The bound (2.11) is the E = IN case of [16, Prop. 3.1]. For fixed P and Q, ρrad 
+
+depends only on the quadratic vector field, whereas ρan depends on its Kronecker representation; the gauge-optimized bound is introduced after the dynamics-preserving gauge. 
+
+3. Problem formulation. Under the standing assumptions of Section 2, fix an inner-quadratic monomial lift g with deg gi ≥ 2. The original system p, embedding 
+
+Φ( x) = ( x, g(x)) , and lifting manifold M remain fixed throughout the optimization. Every admissible extension has the form (2.4), with a homogeneous quadratic term and no constant term. For this fixed embedding, we first select an off-manifold extension and then a matrix representation of its quadratic term. The design variables are the stabilizer gains Λ ∈ Rm and the representation coefficients μ ∈ Rd, with d = N 2(N − 1) /2.Fixing the lift keeps the state dimension and manifold unchanged; fixing the reference extension and stabilizer factorizations specifies the affine family below. We also fix the Lyapunov weight Q = IN to isolate gain and representation design. For each extension with A(Λ) Hurwitz, the certificate matrix P (Λ) ∈ SN , P (Λ) ≻ 0, is determined by the Lyapunov equation, rather than optimized independently. Figure 4 in Appendix B shows how these fixed data and the two design variables determine the certificate and the optimization problem. 
+
+3.1. The affine family of dissipative lifts. Fix the reference extension F0 =(q1, q2) represented by (A0, H 0) and one factorization gi = aibi for each stabilizer 
+
+hi = yi − aibi. These data are computed once using the implementation of DQbee 
+
+[7]. With these data fixed, Definition 2.4 gives the admissible extension family 
+
+EΦ(p) = F0 + VΦ, where VΦ = I(M)N ∩ P N 
+
+> 2
+
+.We restrict the extension freedom to the stabilizer subspace (3.1) Sh := span {en+ihi : 1 ≤ i ≤ m} ⊆ V Φ, FΛ := F0 −
+
+> m
+
+X
+
+> i=1
+
+λien+ihi.
+
+Thus {FΛ : Λ ∈ Rm} = F0 + Sh is an m-dimensional affine subspace of EΦ(p). The restriction gives one gain per auxiliary equation and the transverse matrix D(Λ) = 
+
+W − diag(Λ) established in Lemma 3.1. Directions in VΦ \ S h, including those that modify the physical equations off M, are excluded from the present family. Appendix B.1 (p. 29) gives the coefficient-matching construction of a basis of VΦ and verifies the inclusion and dimension stated above. Writing Λ = ( λ1, . . . , λ m), the selected extension is (3.2) ˙x = q1(x, y), ˙yi = q2,i (x, y) − λi hi(x, y), i = 1 , . . . , m. 
+
+Since hi ≡ 0 on M, system (3.2) is a valid quadratization of (2.1) for every Λ. Split the stabilizer (2.7) into linear and quadratic parts, −λihi = −λiyi + λiaibi. The term 
+
+−λiyi enters the linear part and +λiaibi the quadratic part, so (3.3) A(Λ) = A0 −
+
+> m
+
+X
+
+> i=1
+
+λi en+ie⊤
+
+> n+i
+
+, H(Λ) = H0 +
+
+> m
+
+X
+
+> i=1
+
+λi en+i s⊤ 
+
+> i
+
+,
+
+with si ∈ RN 2
+
+the Kronecker encoding of aibi. Both maps are affine in Λ. Each gain subtracts λi from one auxiliary diagonal entry of A and modifies one row of H.8 Y. CAI AND G. ZARDINI 
+
+The chart z = y − g(x) straightens M to {z = 0}. Since every auxiliary monomial has degree at least two, Jx(g)|0 = 0 , so this change of coordinates has identity derivative at the origin. The resulting tangent–transverse decomposition is the vector-gain specialization of [7, Eq. (9)]. 
+
+Lemma 3.1 (tangent–transverse spectrum splitting). Set Jp := Jx(p)|0 ∈ Rn×n,
+
+R := Jy (q1)|(0,0) ∈ Rn×m, and W := Jy (q2)|(0,0) ∈ Rm×m. Then, for every Λ ∈ Rm,
+
+(3.4) A(Λ) = 
+
+Jp R
+
+0 D(Λ) 
+
+
+
+, D(Λ) := W − diag(Λ) .
+
+Consequently, 
+
+(3.5) eig( A(Λ)) = eig( Jp) ∪ eig( D(Λ)) ,
+
+with algebraic multiplicities. Under the standing assumption αp > 0, A(Λ) is Hurwitz if and only if D(Λ) is Hurwitz. Moreover, its spectral margin satisfies 
+
+(3.6) α(Λ) := − Re λ1(A(Λ)) = min αp, α aux (Λ) , αaux (Λ) := − Re λ1(D(Λ)) .
+
+When m = 0 , A = Jp and we set αaux = + ∞. Thus the gains leave the original spectrum fixed and cannot raise the lifted margin above αp.Proof. See the proof of Lemma 3.1 in Appendix B.2 (p. 30). 
+
+Corollary 3.2 (closed-form transverse feasibility and saturation). Assume 
+
+m ≥ 1 and let 1 = (1 , . . . , 1) ∈ Rm. For every Λ ∈ Rm and c ∈ R,
+
+(3.7) D(Λ + c1) = D(Λ) − cI m, αaux (Λ + c1) = αaux (Λ) + c. 
+
+In particular, αaux (λ1) = λ − Re λ1(W ), so for every ε > 0,
+
+(3.8) αaux (λ1) ≥ ε ⇐⇒ λ ≥ Re λ1(W ) + ε. 
+
+The full lifted margin satisfies α(λ1) ≥ ε if and only if both λ ≥ Re λ1(W ) + ε
+
+and αp ≥ ε hold. Under the standing assumption αp > 0, the unrestricted set 
+
+{Λ ∈ Rm : A(Λ) is Hurwitz } is therefore nonempty, and 
+
+(3.9) α(λ1) = αp whenever λ ≥ Re λ1(W ) + αp.
+
+Let ∆H := Pmi=1 en+is⊤ 
+
+> i
+
+. Then H(λ1) = H0 + λ∆H and ∥H(λ1)∥ = O(λ) as λ → ∞ ;if ∆H̸ = 0 , then ∥H(λ1)∥/λ → ∥ ∆H∥.Proof. See the proof of Corollary 3.2 in Appendix B.2 (p. 31). The bound (3.8) provides an explicit uniform-gain initializer whenever the resulting vector lies in the prescribed gain box. Although the unrestricted family is feasible, its intersection with a prescribed box can be empty. Thus feasibility alone does not select a useful gain: once the lifted margin reaches 
+
+αp, increasing λ continues to change the quadratic term without improving the linear margin. 
+
+Remark 3.3 (Factorization freedom). The stabilizers of a fixed monomial lift need not be unique. Different factorizations into earlier coordinates give stabilizers with the same linear part, all vanishing on M. For example, for Φ( x) = ( x, x 2, x 3, x 4), both 
+
+h3 = y3 − y21 and eh3 = y3 − xy 2 are valid, with h3 − eh3 = xy 2 − y21 . With the reference extension and Λ fixed, changing the factorization can alter H(Λ) while leaving A(Λ) 
+
+unchanged. When A(Λ) is Hurwitz, its Lyapunov solution is therefore unchanged as well. We keep the stabilizer factorizations fixed throughout the optimization. OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 9After fixing Λ, a separate freedom remains in representing the same quadratic map. Let K ⊂ RN ×N 2
+
+be the space of matrices satisfying K(w ⊗ w) = 0 for every 
+
+w ∈ RN . Two matrices represent the same quadratic map if and only if their difference belongs to K. Thus H(Λ) + K contains all Kronecker representations of the quadratic term of FΛ. The space has dimension d = 12 N 2(N − 1) . See the representation-space derivation in Appendix B.3 (p. 31). For a fixed basis {Kk}dk=1 , write (3.10) H(Λ , μ ) := H(Λ) + K(μ), K(μ) := 
+
+> d
+
+X
+
+> k=1
+
+μkKk, μ ∈ Rd.
+
+Unlike the extension directions in VΦ, which need only vanish on M, the gauge contributes the zero vector field on all of RN . Varying μ therefore leaves FΛ, A(Λ) ,and every trajectory unchanged, while it can change the matrix norm used to bound Lyapunov growth. We optimize over all μ ∈ Rd in this exact representation class. The certificate construction below specifies which norm is minimized. 
+
+3.2. The certificate and the optimization problem. Fix an extension FΛ
+
+with A(Λ) Hurwitz. Its certificate is constructed from the quadratic Lyapunov function of Section 2.4 and the spectral-norm bound below. The choice Q = IN fixes the Lyapunov weight while the gains and representation vary. The construction is the 
+
+Q = IN specialization of [16, Thm. 4.1 and Eqs. (4.8)–(4.12)], building on [32]. Let 
+
+P = P (Λ) ≻ 0 solve (3.11) A(Λ) ⊤P + P A (Λ) = −IN ,
+
+and factor P = P⊤ 
+
+> f
+
+Pf . Since A is gauge-independent, P depends on Λ but not on μ.
+
+Remark 3.4 (Choice of Lyapunov weight). We fix Q = IN to isolate the lift and gauge design. A scalar rescaling is redundant: replacing Q by sQ replaces P by sP 
+
+and only rescales the level parameter of the same ellipsoids. The normalized shape of Q is a genuine design variable. For Q = Q⊤ 
+
+> f
+
+Qf , the general certificate replaces J
+
+below by JQ = ( P⊤ 
+
+> f
+
+⊗ Q⊤ 
+
+> f
+
+)−1GQ −1 
+
+> f
+
+; it could be optimized over, for example, Q ⪰ εI N
+
+and tr Q = N . This adds a nonconvex outer variable and is left open. Partition H(Λ , μ ) into blocks Mi = Mi(Λ , μ ) ∈ RN ×N defined by (Mi)rj := (H(Λ , μ )) r, (i−1) N +j , so that H(Λ , μ )( w ⊗ w) = PNi=1 wiMiw. With col denoting vertical stacking, define (3.12) G(Λ , μ ) := col Ni=1 
+
+ M⊤ 
+
+> i
+
+P + P M i
+
+ ∈ RN 2×N ,J(Λ , μ ) :=  P⊤ 
+
+> f
+
+⊗ IN
+
+−1G(Λ , μ ) ∈ RN 2×N .
+
+The spectral norm of J is independent of the factor: replacing Pf by U P f , with U
+
+orthogonal, replaces J by (U ⊗ IN )J. For V (w) = w⊤P w,
+
+˙V (w) = w⊤−IN + ( w⊤P⊤ 
+
+> f
+
+⊗ IN )J(Λ , μ )w ≤ ∥ w∥2 h
+
+−1 + pV (w) ∥J(Λ , μ )∥
+
+i(3.13) Hence ˙V (w) < 0 for every nonzero w with V (w) ≤ ρ2 whenever 0 < ρ < 1/∥J(Λ , μ )∥,with 1/0 := + ∞; Proposition 2.7 then certifies the corresponding closed ellipsoid. 10 Y. CAI AND G. ZARDINI 
+
+Proposition 3.5 (Intrinsic growth and spectral-norm relaxation). Fix symmetric positive definite P, Q and a homogeneous quadratic map q(w) = H(w ⊗ w). For each representation H + K(μ) in (3.10) , form G by (3.12) and JQ by Remark 3.4. Then 
+
+(3.14) β(P, Q, q) ≤ γ⋆ := min 
+
+> μ∈Rd
+
+∥JQ(H + K(μ)) ∥ ≤ ∥ JQ(H + K(μ)) ∥ (μ ∈ Rd).
+
+The minimum is attained. It is the smallest spectral-norm upper bound in this gauge and matricization class; gauge optimality does not establish equality with β.Proof. See the proof of Proposition 3.5 in Appendix B.4 (p. 31). For a fixed extension, β and P (Λ) are fixed, so the inner optimization improves the spectral-norm upper bound alone. We define its optimized threshold by (3.15) ρ⋆(Λ) := 
+
+
+
+min 
+
+> μ∈Rd
+
+∥J(Λ , μ )∥
+
+−1
+
+.
+
+For fixed Λ, the certificate map is affine in μ: J(Λ , μ ) = J(Λ , 0)+ Pdk=1 μkJk(Λ) , which implies μ 7 → ∥ J(Λ , μ )∥ is convex. Its minimum is attained because span {Jk(Λ) }dk=1 
+
+is a closed finite-dimensional subspace. Every μ already provides a valid threshold; minimizing the norm only enlarges it. Consequently, if A(Λ) is Hurwitz, then for every 
+
+0 < ρ < ρ ⋆(Λ) , D(P (Λ) , ρ ) is contained in the ROA of the lifted system. The value 
+
+ρ⋆(Λ) is the best threshold furnished by this norm bound and satisfies ρ⋆(Λ) ≤ ρrad ;equality need not hold. If the minimum in (3.15) is zero, we set ρ⋆(Λ) = + ∞; an optimizing gauge then has J = 0 , and (3.13) gives ˙V = −∥ w∥2, so every finite ρ
+
+is certified. Although H(Λ) is affine in Λ, the dependence across gains is generally nonconvex because P (Λ) and Pf (Λ) are obtained from the Lyapunov equation (3.11). The lifted certificate pulls back to the original coordinates through Φ( x) := (x, g(x)) . Define (3.16) S(Λ , ρ ) := x ∈ Rn : eVΛ(x) ≤ ρ2 , eVΛ(x) := Φ( x)⊤P (Λ)Φ( x).
+
+For 0 < ρ < ρ ⋆(Λ) , exactness and uniqueness imply that the lifted trajectory from 
+
+Φ( x0) is Φ( x(t)) and remains on M. Since the lifted ellipsoid is positively invariant and contained in the lifted ROA, this trajectory is global and converges to the origin. Hence S(Λ , ρ ) is positively invariant and contained in the ROA of (2.1). 
+
+Corollary 3.6 (Path-connected pullback). If A(Λ) is Hurwitz and 0 < ρ < ρ⋆(Λ) , then S(Λ , ρ ) is path-connected; its connected component containing the origin is therefore the entire set. Proof. See the proof of Corollary 3.6 in Appendix B.5 (p. 31). After optimizing the representation at each gain, the remaining choice is the extension FΛ. It changes both P (Λ) and ρ⋆(Λ) , and hence the pullback certificate (3.16), while preserving the original dynamics on M.By Lemma 3.1, feasibility reduces to the Hurwitz condition on the auxiliary block 
+
+D(Λ) . An unrestricted maximizing gain need not exist: Example 3.11 below gives a member of the present stabilizer family for which ρ⋆(λ) → +∞. We therefore include the gain domain, which is also the domain used by the implementation, in the problem data. 
+
+Definition 3.7 (admissible gain box). An admissible gain box is a nonempty box B = [Λ , Λ] ⊂ Rm contained in the Hurwitz set F := {Λ : A(Λ) is Hurwitz }.OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 11 
+
+Equivalently, compactness gives a uniform margin γB := min Λ∈B − Re λ1(A(Λ)) > 0.A common Lyapunov inequality checked at all vertices is a sufficient, implementation-verifiable certificate that B ⊂ F because A is affine in Λ. Since F is open and nonempty, every Λ0 ∈ F lies in the interior of some nondegenerate closed box B ⋐ F.
+
+Problem 3.8 (box-constrained certificate optimization). Given the fixed poly-nomial system p, embedding Φ, weight Q = IN , and lift data (A0, H 0, {hi}mi=1 ), the derived quantities (W, {si}mi=1 , {Kk}dk=1 ), and an admissible gain box B, solve 
+
+(3.17) ϕB := min  
+
+> Λ∈B
+
+ϕ(Λ) , ϕ(Λ) := min 
+
+> μ∈Rd
+
+∥J(Λ , μ )∥, ρB := ϕ−1 
+
+> B
+
+,
+
+with the convention 1/0 := + ∞. The map J(Λ , μ ) is assembled from (3.3) , (3.10) ,
+
+(3.11) , and (3.12) . Equivalently, using the definitions above, an expanded formulation of (3.17) is 
+
+(3.18) 
+
+min   
+
+> Λ∈B, μ ∈Rd,P∈SN, t ∈R
+
+t
+
+s.t.
+
+tI N 2 JJ⊤ tI N
+
+
+
+⪰ 0,J =  P⊤ 
+
+> f
+
+⊗ IN
+
+−1G(Λ , μ ), P = P⊤ 
+
+> f
+
+Pf ,A(Λ) ⊤P + P A (Λ) = −IN , P ≻ 0,A(Λ) = A0 −
+
+> m
+
+X
+
+> i=1
+
+λi en+ie⊤
+
+> n+i
+
+,H(Λ , μ ) = H0 +
+
+> m
+
+X
+
+> i=1
+
+λi en+is⊤ 
+
+> i
+
++
+
+> d
+
+X
+
+> k=1
+
+μkKk.
+
+Its optimal value is tB = ϕB . Proposition 3.10 below justifies attainment. A closed certified set is reported with the safe radius of Corollary 3.12, never with the open threshold ρB itself. 
+
+See the derivation of the box-constrained formulation in Appendix B.6 (p. 32), including the exact spectral-norm epigraph. 
+
+Remark 3.9. The optimization variables are Λ ∈ B and μ ∈ Rd. The embedding, reference extension, stabilizer factorizations, Lyapunov weight, and gain box are fixed problem data. Thus optimality in Problem 3.8 refers to the stated spectral-norm certificate within this family and box. The admissible-box condition guarantees a unique symmetric solution P (Λ) ≻ 0 of (3.11) at every outer point. Thus P is not a free design variable; it appears in (3.18) only to make the dependence on Λ explicit. After eliminating P , the outer dependence of J(Λ , μ ) on Λ combines the affine map 
+
+H(Λ) with the nonlinear Lyapunov–Cholesky map Λ 7 → P (Λ) 7 → Pf (Λ) . For fixed 
+
+Λ, the problem in (μ, t ) is an exact convex SDP; the box-constrained outer problem is generally nonsmooth and nonconvex. The objective optimizes the Lyapunov level threshold. Since P (Λ) also changes with the gain, it does not by itself order the volumes or set inclusions of pullbacks obtained at different gains. The next result removes gauge directions invisible to the certificate before applying Weierstrass’ theorem. 12 Y. CAI AND G. ZARDINI 
+
+Proposition 3.10 (well-posed box value). The value function ϕ is locally Lip-schitz on F. Consequently, it attains a global minimum on every admissible gain box 
+
+B. If ϕB > 0, then ρ⋆ = 1 /ϕ attains its box maximum at exactly the same gains. If 
+
+ϕB = 0 , an optimizing pair satisfies J = 0 and the corresponding quadratic Lyapunov function is global. Proof. See the proof of Proposition 3.10 in Appendix B.7 (p. 32). 
+
+Example 3.11 (unbounded spectral-norm threshold). For ˙x = −x − x3 with lift 
+
+y = x2, consider the stabilizer family (3.19) ˙x = −x − xy, ˙y = −(2 + λ)y + λx 2 − 2y2, λ > −2.
+
+Put s := λ+2 > 0. Then P = diag(1 /2, 1/(2 s)) and ˙V = −(x2 +y2)(1+2 y/s ). A gauge whose two blocks in G are 0 and −2I2/s gives ϕ(λ) ≤ 2p2/s . Taking x = 0 and y < 0,the cubic contribution is 2|y|3/s , while (3.13) bounds it above by |y|3∥J∥/√2s. Hence every gauge satisfies ∥J∥ ≥ 2p2/s , so ϕ(λ) = 2 p2/s and ρ⋆(λ) = √s/ (2 √2) → +∞.Thus the unrestricted problem need not have a maximizing gain; a boundary box optimum should be checked by widening B.
+
+Corollary 3.12 (Numerical certificate). Fix a gain, a gauge satisfying K(w ⊗
+
+w) ≡ 0, and bP = bP⊤ ≻ 0. Assemble bJ from bP by (3.12) . Suppose verified bounds satisfy 
+
+∥A(Λ) ⊤ bP + bP A (Λ) + IN ∥ ≤ bδ < 1, ∥ bJ∥ ≤ bj. 
+
+For η ∈ (0 , 1) and bj > 0, the ellipsoid D( bP , ρ safe ) with ρsafe := (1 − η)(1 − bδ)/bj is positively invariant and contained in the lifted ROA; its pullback under Φ is contained in the ROA of (2.1) . If bj = 0 is verified exactly, w⊤ bP w is a global Lyapunov function. Proof. Proposition 3.5 gives β( bP , I N , q) ≤ ∥ bJ∥ ≤ bj. Apply Proposition 2.7 with 
+
+Q = IN , θ = 1 − η, and the verified upper bounds bδ, bj. Exactness of the lift gives the pullback claim. For numerical use, symmetrize the returned P , verify positive definiteness, and bound the normalized residual and the norm of the reassembled matrix. The SDP epigraph variable alone does not bound the returned matrix. Check the gauge identity coefficien-twise; any nonzero defect must be included in the nonlinear growth bound using (B.3) in Appendix B.8. Verified bounds must account for rounding errors in assembly and norm evaluation. Certificate validity requires these bounds, independently of solver optimality. Problem 3.8 reduces to the fixed-pair convex construction in [16, §4] when m = 0 
+
+or Λ is fixed, since only the gauge μ remains. By contrast, the doubling rule in [7, Alg. 2] finds a feasible scalar gain but optimizes neither the gauge nor the certificate over B.
+
+Remark 3.13 (Multiple equilibria). To preserve dissipativity at several equilibria 
+
+x∗
+
+> 1
+
+, . . . , x ∗ 
+
+> ℓ
+
+simultaneously, as in [7], impose Dj (Λ) Hurwitz for every j, where 
+
+Dj (Λ) = Wj − diag(Λ) Lj , Wj = Jy q2(x∗ 
+
+> j
+
+, g(x∗ 
+
+> j
+
+)) − Jxg(x∗ 
+
+> j
+
+)Jy q1(x∗ 
+
+> j
+
+, g(x∗ 
+
+> j
+
+)) ,
+
+and Lj = Jy h(x∗ 
+
+> j
+
+, g(x∗ 
+
+> j
+
+)) . The second term in Wj vanishes at the standing origin because Jxg(0) = 0 , but it must be retained at a shifted equilibrium. The certificate itself remains anchored at one equilibrium. OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 13 
+
+3.3. The certified volume at leading order. Problem 3.8 maximizes the lifted level radius ρ⋆(Λ) , whereas the geometric quantity of interest is the volume of its pullback S(Λ , ρ ). These objectives need not agree a priori because the metric P (Λ) 
+
+varies with the gain and Φ is nonlinear. They do agree to leading order near the origin. Partition P conformally with w = ( x, y) as (3.20) P (Λ) = 
+
+ Pxx (Λ) Pxy (Λ) 
+
+Pxy (Λ) ⊤ Pyy (Λ) 
+
+
+
+, Pxx (Λ) ∈ Sn.
+
+Since every auxiliary monomial has degree at least two, Φ( x) = ( x, O (∥x∥2)) , and hence (3.21) eVΛ(x) = x⊤Pxx (Λ) x + O(∥x∥3).
+
+Proposition 3.14 (Leading-order certified volume). For every feasible Λ, as 
+
+ρ ↓ 0,
+
+(3.22) vol S(Λ , ρ ) = κn
+
+ρn
+
+pdet Pxx (Λ) + o(ρn), κn := πn/ 2
+
+Γ( n/ 2 + 1) .
+
+Proof. A two-sided quadratic sandwich gives the result; see the proof of Proposi-tion 3.14 in Appendix B.9 (p. 33). If ϕB > 0, all thresholds on B are finite, and the logarithm of the leading coefficient at the scaled level ρ = ερ ⋆(Λ) suggests the score (3.23) n log ρ⋆(Λ) − 12 log det Pxx (Λ) .
+
+The apparent correction is constant across gains. 
+
+Proposition 3.15 (Gain invariance of the quadratic germ). Fix Q ∈ SN , Q ≻ 0,and let PQ(Λ) ≻ 0 solve A(Λ) ⊤PQ + PQA(Λ) = −Q. Then, for every feasible Λ, its physical block satisfies 
+
+PQ,xx (Λ) = ¯PQ, J⊤ 
+
+> p
+
+¯PQ + ¯PQJp = −Qxx ,
+
+where Qxx is the physical block of Q. Thus ¯PQ is the unique solution and is independent of Λ; in particular, Pxx in (3.20) equals the gain-invariant matrix ¯PI obtained for 
+
+Q = IN .Proof. See the proof of Proposition 3.15 in Appendix B.10 (p. 33). 
+
+Corollary 3.16 (Radius and leading-order volume). If ϕB > 0, then, for every 
+
+Λ ∈ B and as ε ↓ 0,
+
+vol S Λ, ερ ⋆(Λ)  = κn
+
+ ρ⋆(Λ) n
+
+pdet ¯PI
+
+εn + o(εn).
+
+Hence Problem 3.8 ranks gains exactly by the leading coefficients of these scaled certified volumes. If ϕB = 0 , Proposition 3.10 instead gives an optimizing gain with a global quadratic Lyapunov certificate. 
+
+Thus, for the fixed weight Q = IN , the gain affects the leading-order volume only through the achievable radius, not through the local shape factor. This is a local statement: finite-radius volumes and set inclusions can still depend on the higher-order lift and on Pxy and Pyy . For Q = IN , ¯PI is precisely the Lyapunov matrix of the plant linearization, so all lifts share the plant’s quadratic germ. Within this family, changing that germ requires varying the normalized weight Qxx , as anticipated in Remark 3.4. 14 Y. CAI AND G. ZARDINI 
+
+4. Solving the fixed-family certificate problem. Problem 3.8 has one convex and one nonconvex level. For fixed Λ, the Lyapunov equation fixes P (Λ) and the gauge is optimized by an exact SDP; the remaining box-constrained value function ϕ
+
+is locally Lipschitz but generally nonsmooth and nonconvex. This section develops the corresponding value-and-derivative oracle and a gradient-sampling L-BFGS method. The lift, stabilizer factorizations, and admissible box are fixed throughout. 
+
+4.1. The exact reduced inner oracle. Fix Λ ∈ F and put J0 := J(Λ , 0) . The linear certificate gauge map and its image are TΛμ := J(Λ , μ ) − J0 and WΛ := im TΛ ⊂
+
+RN 2×N . Write ⟨U, V ⟩F := tr( U⊤V ) and let ∥Z∥∗ denote the nuclear norm, the sum of the singular values of Z.
+
+Proposition 4.1 (Gauge-image distance and duality). For every fixed Λ ∈ F ,
+
+(4.1) ϕ(Λ) = min  
+
+> W∈W Λ
+
+∥J0 + W ∥ = dist ∥·∥ (J0, WΛ),
+
+where the distance is induced by the spectral norm. Its dual is 
+
+(4.2) ϕ(Λ) = max  
+
+> Z∈RN2×N
+> ∥Z∥∗≤1, Z ∈W ⊥
+> Λ
+
+⟨Z, J 0⟩F .
+
+Here Z ∈ W ⊥ 
+
+> Λ
+
+is equivalent to ⟨Z, TΛek⟩F = 0 for k = 1 , . . . , d . Both optima are attained. A matrix J⋆ ∈ J0 + WΛ is optimal if and only if there exists Z⋆ ∈ W ⊥ 
+
+> Λ
+
+with 
+
+∥Z⋆∥∗ ≤ 1 and ⟨Z⋆, J ⋆⟩F = ∥J⋆∥; equivalently, ∂∥·∥ (J⋆) ∩ W ⊥
+
+> Λ
+
+̸ = ∅. For any gauge μ
+
+and any dual-feasible Z,
+
+(4.3) 0 ≤ ∥ J(Λ , μ )∥ − ϕ(Λ) ≤ ∥ J(Λ , μ )∥ − ⟨ Z, J 0⟩F .
+
+Thus a zero primal–dual gap certifies global inner optimality. Proof. See the proof of Proposition 4.1 in Appendix C.1 (p. 34). This formulation depends on the gauge image, not its basis; it still optimizes a spectral-norm upper bound on β. The distance dual and gap bound are standard convex norm duality. The quadratization-specific step is identifying WΛ and removing its redundant gauge coordinates. The proof of Proposition 3.10 identifies the P -independent space C seen by the certificate. Fix a basis (B(ℓ)1 , . . . , B (ℓ) 
+
+> N
+
+), ℓ = 1 , . . . , q , of C, where q = N (N 2 − 1) /3,and define (4.4) 
+
+Bℓ := col Nr=1 B(ℓ) 
+
+> r
+
+, X(Λ) := Pf (Λ) ⊤ ⊗ IN ,Gr(Λ , ν ) := G(Λ , 0) + 
+
+> q
+
+X
+
+> ℓ=1
+
+νℓBℓ, Jr(Λ , ν ) := X(Λ) −1Gr(Λ , ν ).
+
+The basis matrices Bℓ are independent of Λ and are computed once. Their images 
+
+Jℓ(Λ) := X(Λ) −1Bℓ form a basis of WΛ, so the reduced coordinates describe the same distance problem. 
+
+Proposition 4.2 (Exact reduced inner oracle). For every Λ ∈ F ,
+
+(4.5) 
+
+ϕ(Λ) 2 = τ ⋆(Λ) := min    
+
+> ν∈Rq, τ ∈R
+
+τ
+
+s.t. FΛ(ν, τ ) := 
+
+P (Λ) ⊗ IN Gr(Λ , ν )
+
+Gr(Λ , ν )⊤ τ I N
+
+
+
+⪰ 0.OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 15 
+
+The problem is strictly feasible and attains its optimum. If ν⋆ is returned, a raw gauge representative is recovered from the minimum-norm linear problem 
+
+(4.6) μ⋆ = arg min  
+
+> μ∈Rd
+> 12
+
+∥μ∥2 s.t. col Nr=1 
+
+ Sr (μ)⊤P + P S r (μ) =
+
+> q
+
+X
+
+> ℓ=1
+
+ν⋆ℓ Bℓ,
+
+where Sr (μ) are the slices of K(μ) in (3.10) . This reconstruction leaves the quadratic vector field and the value ϕ(Λ) unchanged. Proof. Since P ⊗IN = XX ⊤, the Schur complement of (4.5) is G⊤ 
+
+> r
+
+(P ⊗IN )−1Gr ⪯
+
+τ I N , equivalently J⊤ 
+
+> r
+
+Jr ⪯ τ I N . Thus the reduced generalized-Schur formulation is exactly the fixed-Λ spectral-norm problem, without placing X−1 in the cone model. For the full argument, including attainment and reconstruction, see the proof of Proposition 4.2 in Appendix C.2 (p. 34). 
+
+4.2. Inner optimality and value-function sensitivities. Let (ν⋆, τ ⋆) solve (4.5) and put J⋆ := Jr(Λ , ν ⋆). If J⋆̸ = 0 and U1, V 1 contain paired orthonormal leading singular vectors, so that J⋆V1 = ϕ(Λ) U1, then [34] (4.7) ∂∥·∥ (J⋆) = U1ΘV⊤ 
+
+> 1
+
+: Θ ⪰ 0, tr Θ = 1 ;
+
+at J⋆ = 0 it is the nuclear-norm unit ball. Convex optimality of the inner problem is therefore equivalent to the existence of Z⋆ ∈ ∂∥·∥ (J⋆) satisfying (4.8) ⟨Z⋆, J ℓ(Λ) ⟩F = 0 , ℓ = 1 , . . . , q, 
+
+with the condition vacuous when q = 0 .The gain derivatives can be evaluated without finite differences. Put Ei := 
+
+en+ie⊤ 
+
+> n+i
+
+and use a dot for ∂λi while holding ν = ν⋆ fixed. From (3.3) and (3.11), (4.9) 
+
+˙Ai = −Ei, ˙Hi = en+is⊤ 
+
+> i
+
+,A(Λ) ⊤ ˙Pi + ˙PiA(Λ) = EiP + P E i, ˙Pi = ˙P⊤
+
+> f,i
+
+Pf + P⊤ 
+
+> f
+
+˙Pf,i .
+
+Let M 0 
+
+> r
+
+be the rth slice of H(Λ) and ˙Mr,i the corresponding slice of ˙Hi. Differentiating (4.4) gives (4.10) 
+
+˙G0 
+
+> i
+
+= col Nr=1 
+
+ ˙M⊤
+
+> r,i
+
+P + ( M 0 
+
+> r
+
+)⊤ ˙Pi + ˙PiM 0 
+
+> r
+
++ P ˙Mr,i 
+
+
+
+,
+
+˙Ji = X−1h ˙G0 
+
+> i
+
+− ( ˙P⊤ 
+
+> f,i
+
+⊗ IN )J⋆i
+
+.
+
+The superscript in G0 
+
+> i
+
+emphasizes that the fixed reduced directions Bℓ have zero gain derivative. 
+
+Proposition 4.3 (Regularity and envelope sensitivities). Let U ⊂ F be open and let A, H be the affine maps in (3.3) . For any fixed Q ∈ SN , Q ≻ 0, the solution 
+
+PQ(Λ) ≻ 0 of A⊤PQ + PQA = −Q is real analytic on U, and 
+
+(4.11) A⊤PQ,i + PQ,i A = −  A⊤ 
+
+> i
+
+PQ + PQAi
+
+ , PQ,i := ∂λi PQ, Ai := ∂λi A. 
+
+For the fixed weight Q = IN in Problem 3.8, P = PIN , its positive-diagonal Cholesky factor Pf , and Jr depend real analytically on the gain. The value ϕ is locally Lipschitz, hence continuous, on U, and its reduced inner minimizers are locally uniformly bounded. 16 Y. CAI AND G. ZARDINI 
+
+Fix Λ ∈ U , let (ν⋆, τ ⋆) be a primal optimum and Y ⋆ ⪰ 0 a dual optimum of (4.5) ,and put J⋆ = Jr(Λ , ν ⋆). Partition Y ⋆ = ( Y ⋆ab )2 
+
+> a,b =1
+
+conformally with FΛ. The KKT conditions include 
+
+(4.12) tr Y ⋆ 
+
+> 22
+
+= 1 , ⟨Y ⋆
+
+> 12
+
+, Bℓ⟩F = 0 ( ℓ = 1 , . . . , q ), ⟨Y ⋆, F Λ(ν⋆, τ ⋆)⟩F = 0 .
+
+If ϕ(Λ) > 0, then 
+
+(4.13) Z⋆ := − X⊤Y ⋆
+
+> 12
+
+ϕ(Λ) ∈ ∂∥·∥ (J⋆), ∥Z⋆∥∗ = 1 ,
+
+and Z⋆ solves (4.2) and satisfies (4.8) . The vector g = ( g1, . . . , g m) with 
+
+(4.14) gi =
+
+D
+
+Z⋆, ˙Ji
+
+E
+
+> F
+
+= −
+
+D
+
+Y ⋆
+
+> 11
+
+, ˙Pi ⊗ IN
+
+E
+
+> F
+
++ 2 
+
+D
+
+Y ⋆
+
+> 12
+
+, ˙G0
+
+> i
+
+E
+
+> F
+
+2ϕ(Λ) 
+
+belongs to ∂C ϕ(Λ) and equals ∇ϕ(Λ) wherever ϕ is differentiable. If, in addition, the reduced minimizer ν⋆ is unique and the largest singular value of J⋆ is simple, with paired unit singular vectors u, v , then ϕ is differentiable at Λ and 
+
+(4.15) ∂λi ϕ(Λ) = gi = u⊤ ˙Jiv, i = 1 , . . . , m. 
+
+Proof. See the proof of Proposition 4.3 in Appendix C.3 (p. 35). The differentiability criterion concerns uniqueness of the reduced minimizer ν; raw gauge representatives can remain nonunique. The partial derivative in (4.15) holds 
+
+ν = ν⋆ fixed. The Clarke inclusion uses the fixed reduced basis Bℓ, which makes the conic dual feasible set independent of Λ; it requires neither a unique inner minimizer nor a simple leading singular value. At ϕ(Λ) = 0 , Z = 0 is a distance-dual optimum, but the normalization (4.13) is undefined. Approximate numerical multipliers remain sensitivity candidates unless the stated optimality conditions are established. A single Clarke subgradient does not generally certify descent, so the outer method samples nearby ordinary gradients. Let R ⊂ U be the set where ϕ is differentiable. For B ⋐ U ⋐ F, define (4.16) ∂ϵϕ(Λ) := cl co {∇ ϕ(z) : z ∈ Bϵ(Λ) ∩ U ∩ R} , ∂C ϕ(Λ) = \
+
+> ϵ> 0
+
+∂ϵϕ(Λ) .
+
+The equality follows from local Lipschitz continuity and is the target approximated by a finite bundle of nearby ordinary gradients. 
+
+4.3. Box-constrained GS–L-BFGS-B. Fixed gain coordinates can be removed, so we assume here that B is nondegenerate. For conditioning, the implementation uses DB := diag(Λ − Λ) , θ := D−1 
+
+> B
+
+(Λ − Λ) ∈ C := [0 , 1] m, and ψ(θ) := ϕ(Λ + DB θ),so ∇ψ(θ) = D⊤ 
+
+> B
+
+∇ϕ(Λ) . Let UB := D−1 
+
+> B
+
+(U − Λ) . At θk, continuously sample (4.17) 
+
+zkj = θk +ϵkξkj , ξkj ∼ Unif( B1), Gk := {gkj = ∇ψ(zkj )}pk 
+
+> j=1
+
+, pk ≥ m+1 ,
+
+retaining only samples in UB for which the derivative oracle is accepted. In the ideal algorithm below these are ordinary gradients; the finite implementation uses dual-envelope candidates that pass its numerical consistency checks. The points zkj 
+
+need not lie in C, and the deterministic center θk is not a bundle atom. OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 17 The L-BFGS memory supplies a Hessian metric. For a bundle-derived secant pair 
+
+(s, r ) and M ≻ 0, Powell damping with κ ∈ (0 , 1) uses (4.18) 
+
+ϑ =
+
+
+
+1, s⊤r ≥ κs ⊤M s, 
+
+(1 − κ)s⊤M s s⊤M s − s⊤r , s⊤r < κs ⊤M s, 
+
+er = ϑr + (1 − ϑ)M s, M + = M − M ss ⊤Ms⊤M s + erer⊤
+
+s⊤er .
+
+Here s is the most recent accepted displacement and r is the change from the preceding QP-dual aggregate to the next bundle mean. Only the most recent pairs are retained. Spectral clipping of the rebuilt matrix enforces 0 < bI ⪯ Mk ⪯ bI .For x ∈ C, use the convex-analysis convention NC (x) := {n : n⊤(y − x) ≤
+
+0 for all y ∈ C}. Given Gk and Mk, the finite-displacement model is (4.19) 
+
+min  
+
+> d∈Rm, ζ ∈R
+
+ζ + 12 d⊤Mkd
+
+s.t. g⊤ 
+
+> kj
+
+d ≤ ζ, j = 1 , . . . , p k,
+
+− θk ≤ d ≤ 1 − θk.
+
+Lemma 4.4 (Bundle model and residual). Problem (4.19) has a unique displace-ment dk. There exist αk ∈ Rpk 
+
+> +
+
+, 1⊤αk = 1 , ¯gk := P 
+
+> j
+
+αkj gkj , and nk ∈ NC (θk + dk)
+
+such that 
+
+(4.20) 
+
+Mkdk + ¯ gk + nk = 0 , ζk = max  
+
+> j
+
+g⊤ 
+
+> kj
+
+dk = ¯ g⊤ 
+
+> k
+
+dk = −d⊤ 
+
+> k
+
+Mkdk − n⊤ 
+
+> k
+
+dk ≤ − d⊤ 
+
+> k
+
+Mkdk.
+
+Consequently, with 
+
+(4.21) χk := ∥dk∥Mk := ( d⊤ 
+
+> k
+
+Mkdk)1/2,
+
+one has dk = 0 if and only if 0 ∈ co Gk + NC (θk); if dk̸ = 0 , every bundle atom satisfies 
+
+g⊤ 
+
+> kj
+
+dk ≤ − χ2 
+
+> k
+
+< 0.Proof. Strong convexity gives uniqueness of dk. The KKT multiplier of the epigraph inequalities lies in the simplex, complementarity gives ζk = ¯ g⊤ 
+
+> k
+
+dk, and the box multipliers form nk. Since the zero displacement is feasible, the normal-cone inequality gives n⊤ 
+
+> k
+
+dk ≥ 0, proving (4.20); setting dk = 0 gives the stated equivalence. For χk > ω k, define the first acceptable backtracking index and the next iterate by (4.22) 
+
+ℓk := min 
+
+n
+
+ℓ ∈ { 0, . . . , L k − 1} : ψ(θk + βℓdk) ≤ ψ(θk) − cβ ℓχ2
+
+> k
+
+o
+
+,θk+1 =
+
+(
+
+θk + βℓk dk, ℓk exists ,θk, otherwise .
+
+The endpoint bounds in (4.19) make every trial feasible. A missing ℓk is a null step, not a stationarity test. 18 Y. CAI AND G. ZARDINI 
+
+Algorithm 4.1 Box-constrained GS–L-BFGS-B 
+
+Require: θ0 ∈ C, c, β, κ ∈ (0 , 1) , pk ≥ m + 1 , radii ϵk, tolerances ωk, and caps Lk
+
+Require: 0 < b ≤ b and a finite L-BFGS memory cap  
+
+> 1:
+
+Evaluate the inner oracle at θ0 and initialize the set of screened records E. 
+
+> 2:
+
+for k = 0 , 1, . . . do  
+
+> 3:
+
+if ψ(θk) = 0 is verified exactly then  
+
+> 4:
+
+Return the corresponding global Lyapunov certificate.  
+
+> 5:
+
+end if  
+
+> 6:
+
+Sample (4.17) until pk ≥ m + 1 accepted derivatives are obtained; retain every residual-valid in-box value record in E. 
+
+> 7:
+
+Update and safeguard Mk from the most recent serious-step secant pair; solve (4.19) and compute χk. 
+
+> 8:
+
+if χk ≤ ωk then  
+
+> 9:
+
+Set θk+1 ← θk, reduce (ϵk, ω k), and reset the metric.  
+
+> 10:
+
+else  
+
+> 11:
+
+Apply (4.22); after a serious step retain its secant data, and after a null step reduce ϵk and reset the metric.  
+
+> 12:
+
+end if  
+
+> 13:
+
+Add every residual-valid in-box line-search record to E. 
+
+> 14:
+
+end for  
+
+> 15:
+
+return the element of E with smallest recomputed spectral norm. To make the anytime return rule precise, let AK contain every completed value-oracle record through iteration K, including sampled points and rejected Armijo trials, and define (4.23) EK := {a ∈ A K : Λ( a) ∈ B, a passes Corollary 3.12 } , baK ∈ arg min 
+
+> a∈E K
+
+bj(a),
+
+where bj(a) is the independently recomputed norm of J stored with the record. Writing 
+
+(bΛ, bP ) := (Λ( baK ), P (baK )) , the reported set is (4.24) Ssafe := 
+
+n
+
+x : Φ( x)⊤ bP Φ( x) ≤ ρsafe (baK )2o
+
+.
+
+The record baK may differ from the iterate at which χk is reported; a sample with an unusable derivative can still enter EK when its value and certificate pass their independent checks. If EK is empty, the finite run reports failure rather than a certificate. 
+
+4.4. Cost and conditional guarantee. An uncached generic value-oracle call requires one N × N Lyapunov solve, one Cholesky factorization, and the SDP (4.5), which has q + 1 = O(N 3) scalar variables and a positive-semidefinite block of order 
+
+N 2 + N . A direct full sensitivity evaluation adds m Lyapunov solves with the same coefficient operator. The bundle problem has m + 1 variables and pk + 2 m linear constraints. If an iteration dispatches nsamp  
+
+> k
+
+gradient-sample attempts and performs 
+
+nls  
+
+> k
+
+line-search evaluations, it uses nsamp  
+
+> k
+
++ nls  
+
+> k
+
+inner-oracle calls before caching, with 
+
+pk ≤ nsamp  
+
+> k
+
+because rejected derivatives still consume an evaluation. 
+
+Theorem 4.5 (Conditional box-Clarke stationarity). Consider the ideal sequence generated by Algorithm 4.1. Assume exact inner values and ordinary gradients, ϵk, ω k ↓OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 19 
+
+0, Lk → ∞ , and 0 < bI ⪯ Mk ⪯ bI . Suppose the finite hulls b∂k := co Gk are gradient-consistent: along every subsequence θkr → ¯θ,
+
+(4.25) dist H
+
+b∂kr , ∂ C ψ(¯θ)
+
+
+
+−→ 0.
+
+Here dist H is the Hausdorff distance. Then θk ∈ C, ψ(θk) is nonincreasing, and every accumulation point satisfies 
+
+(4.26) 0 ∈ ∂C ψ(¯θ) + NC (¯θ).
+
+Equivalently, for ¯Λ = Λ + DB ¯θ, 0 ∈ ∂C ϕ(¯Λ) + NB (¯Λ) . If ϕB > 0, this is also Clarke stationarity for maximizing ρ⋆ = 1 /ϕ on B.Proof. See the proof of Theorem 4.5 in Appendix C.4 (p. 37). Condition (4.25) is an explicit asymptotic assumption; a fixed bundle of m + 1 
+
+samples does not imply it [4]. Hence the theorem gives neither global optimality nor a convergence rate. With finite bundles, solver tolerances, and line-search caps, χk is only a sampled-bundle diagnostic; validity of the returned closed set follows instead from the independent screen in Corollary 3.12. 
+
+5. Numerical experiments. 
+
+Computational environment. All experiments were run in CPython 3.11.12 under macOS 26.6.1 (arm64) on an Apple M2 Pro with ten CPU cores and 16 GB of RAM. The implementation used DQbee 0.3.0 [7], NumPy 1.26.4, SciPy 1.17.1, and SymPy 1.14.0. The conic programs in our optimal dissipative quadratization ( ODQ ) method were modeled in CVXPY 1.7.5 and solved numerically by Mosek 11.2.1 [11, 23]. The SOS baselines, applied directly in the original coordinates, used SumOfSquares.py 1.3.1 [35] through PICOS 2.6.2 and the same Mosek backend. 
+
+Compared methods and implementation. For each system, DQbee generated one monomial lift and its inner-quadratic factorizations, which were fixed for all lifted methods with Q = IN . ODQ solves Problem 3.8 using Algorithm 4.1, searching over the stabilizer gain Λ with a convex gauge solve at each gain. In the benchmark suite, 
+
+Base uses the DQbee feasibility gain Λfeas with μ = 0 , whereas Gauge fixes Λfeas and optimizes only μ; the first experiment instead uses a matched Gauge arm at Λ = 0 .Thus all lifted comparisons share the same lift and Q, with no search over either. The direct SOS baselines act on the original system. sos -2 fixes the quadratic Lyapunov function from the linearization and maximizes only its certified level. sos -4( r) searches a quartic Lyapunov function using at most r alternations between V and the SOS multiplier s, followed by a final level search. Hence 2 and 4 denote deg V ,while r is a round budget, not a radius or ratio; a larger r need not give a nested or larger set. We compare the audited closed sets in the original coordinates, not the raw values of ρsafe or the SOS level c, whose scalings are method dependent. Each ODQ oracle call used the reduced generalized-Schur program (4.5). Gain-independent sparse operators were cached, and a parameterized CVXPY –Mosek 
+
+model was reused and warm-started across gains. The common outer settings were 
+
+m + 1 full-ball samples, five L-BFGS pairs, metric eigenvalues in [10 −3, 10 3], and halving updates of the sampling radius ϵ and stationarity tolerance ω from (ϵ0, ω 0) = (5 × 10 −2, 10 −2) to (ϵmin , ω min ) = (10 −4, 10 −4). Armijo backtracking used (c, β ) = (10 −4, 1/2) and at most 20 trials; the scaled bundle-QP feasibility and KKT tolerance was 2×10 −5. Gain boxes and computational budgets are specified with each experiment. 20 Y. CAI AND G. ZARDINI 
+
+Verification and timing. For m > 0, the gain box and its initially 5% -padded sampling neighborhood passed a common-Lyapunov vertex test with requested margin 
+
+10 −7; the padding was halved if necessary. Lifted certificates used Corollary 3.12 with η = 10 −6, and the nominal open threshold was diagnostic only. Each certificate was independently reassembled, with the floating-point estimates of ∥J∥ and the normalized Lyapunov residual moved upward by one unit in the last place. These are residual-aware floating-point checks, not interval or rational proofs. The direct SOS programs used εSOS = 10 −4 and the smallest even multiplier degree at least max {2, deg f − 1}. A reported set {V ≤ α2c} had to pass an independent audit of solver status, coefficient residuals, and Gram-matrix semidefiniteness at tolerance 
+
+10 −7; we used the largest passing α ∈ { 1 − 10 −k : k = 3 , . . . , 6} ∪ { 0.995 , 0.99 , 0.98 }.Construction time includes method-specific construction and auditing, DQbee for lifted methods, and the stable-box test for ODQ . The planar experiment uses one untimed warm-up per solver path; in the heterogeneous suite, each fresh-process execution group performs the corresponding untimed warm-up. Reported construction times exclude process startup, warm-up, geometry, and serialization, whereas the 600-second group deadline includes them. The relay protocol instead reports launch-to-serialization wall time. Monte Carlo checks, box widening, and plotting are excluded throughout. 
+
+Experimental questions. The planar-quintic experiment isolates gain selection by comparing ODQ with the matched Λ = 0 Gauge arm, and then compares both with 
+
+sos -2 and sos -4( r) in certified area and construction time. The second experiment compares Base, Gauge, and ODQ on a heterogeneous 19-system suite and tests the resulting structural hypothesis on a separately locked 12-system relay family. It includes m = 0 controls and direct-SOS references. The table retains separate cohort blocks because the timing boundaries differ, while the discussion considers the evidence jointly. 
+
+5.1. The pipeline end to end: a planar quintic. Consider (5.1) ˙x1 = −x1 + x2, ˙x2 = −2x2 − x51.
+
+Its linearization has eigenvalues −1 and −2, while V0 = x61 + 3 x22 satisfies ˙V0 =
+
+−6x61 − 12 x22. Thus the origin is globally asymptotically stable, and the finite areas below measure certificate conservatism rather than the true basin. 
+
+DQbee selects y1 = x21 and y2 = x31, giving, before stabilizer injection, (5.2) ˙x1 = −x1 +x2, ˙x2 = −2x2 −y1y2, ˙y1 = −2y1 +2 x1x2, ˙y2 = −3y2 +3 x2y1.
+
+The stabilizers are h1 = y1 − x21 and h2 = y2 − x1y1; hence N = 4 , m = 2 , and 
+
+q = 20 . We solve Problem 3.8 on B = [0 , 12] 2, with caps of 60 outer iterations and 300 
+
+oracle calls, and compare with the matched Λ = 0 Gauge arm, sos -2, and sos -4( r)for r ∈ { 2, 4, 6, 8, 10 }. The padded box passed the common stability screen. Areas are those of the full origin-connected pullbacks; an 8001 -slice integration agreed with 
+
+10 6-sample Monte Carlo estimates to within 0.081% .Figure 1 summarizes the results. ODQ terminates after 21 outer iterations and 
+
+135 oracle calls at bΛ = (0 .7337 , 1.5003) , with ρsafe = 3 .040679 , area 35 .44 , and total time 0.65 s. At Λ = 0 , separate gauge optimization gives ρsafe = 1 .832534 , area 15 .83 ,and time 0.10 s. Gain optimization therefore increases the certified area by a factor of 
+
+2.238 with the lift and Q fixed. The largest direct certificate tested, sos -4( 10 ), has area 34 .48 and takes 56 .27 s. In this single post-warm-up execution, ODQ is thus 2.8% 
+
+larger and about 87 times faster. OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 21 −2 −1 0 1 2                                                   
+
+> x1
+> −6 −4 −2 0246
+> x2
+> (a)
+> 10 −1 10 010 110 2
+> construction time [s]
+> 10 15 20 25 30 35 40
+> certified area  vol 2
+> r=2
+> r=4
+> r=6
+> r=8
+> r=10
+> £2:24
+> (b) (c) Numerical summary
+> certificate area DQbee total
+> vol 2[ms] [s]
+> SOS-2 10.28 --0.94 SOS-4, r=2 13.97 --14.03 SOS-4, r=4 18.34 --25.28 SOS-4, r=6 23.41 --35.33 SOS-4, r=8 30.25 --45.41 SOS-4, r=10 34.48 --56.27 lift, ¤ = 0 15.83 83 0.10 lift, c
+> ¤(ours) 35.44 83 0.65
+> SOS-2 SOS-4, r= 2 SOS-4, r= 6 SOS-4, r= 10 lift at ¤ = 0 lift at c
+> ¤(ours)
+
+Fig. 1 . Planar-quintic comparison. (a) Certified boundaries in the original coordinates; representative SOS-4 budgets are shown. (b) Certified area versus construction time for all eight runs. (c) Numerical summary. Panel (a) uses independent axis scales for readability; all areas are for the full origin-connected components, and all times follow the common convention above. 0 6 12 
+
+¸1
+
+> 0612
+> ¸2
+
+(a) Objective '  
+
+> 0612
+
+¸1
+
+> 0612
+> ¸2
+
+(b) Pullback area A   
+
+> 0.4 0.5 0.6 0.7
+
+'
+
+> 15 20 25 30 35
+> Area
+
+(c) All sampled gains 
+
+> Grid Saved ODQ Grid max. area
+> 0.35 0.5 0.7
+> 15 20 30
+
+Fig. 2 . Quintic objective and original-coordinate area. Panels (a)–(b) show values on the 
+
+11 × 11 full-box grid; panel (c) includes the 25 local-grid points, with the shared origin counted once. Stars mark the saved ODQ gain, and the cross marks the largest sampled area. Each point uses the residual-aware safe radius; colors in (a)–(b) use logarithmic scales. These are sampled values, not continuous bounds between grid points. 
+
+Repeating the search on [0 , 24] 2 and [0 , 48] 2 again returns an interior gain and changes ρsafe by at most 6.8 × 10 −8. This indicates insensitivity to the chosen upper endpoint for this instance, without asserting an unrestricted optimum. Figure 2 compares the objective with area at 145 fixed gains: an 11 × 11 grid on 
+
+[0 , 12] 2 and a 5 × 5 grid on [0 , 3] 2, sharing the origin. The rank correlation between 
+
+1/ϕ and area is 0.981 . The sampled gain (0 .75 , 1.5) has area 35 .4478 , slightly above the saved ODQ area 35 .4405 , although its objective is 0.010% larger. This finite-radius difference is consistent with the leading-order result in Section 3.3: minimizing ϕ need not maximize area at the reported level. The grid establishes neither optimum over the box. 
+
+5.2. Systematic comparison across a benchmark suite. 
+
+Benchmark design. We use two complementary, source-locked cohorts with three repeats each: a heterogeneous suite tests dependence on system structure, while a controlled relay grid probes dimensional scaling. The first contains 19 polynomial systems with 1 ≤ n ≤ 10 , 2 ≤ deg f ≤ 7, and 2 ≤ N ≤ 10 : standard and literature-derived models, synthetic degree and coupling probes, three already-quadratic controls 22 Y. CAI AND G. ZARDINI 
+
+with m = 0 , and one system with known basin area. Exact vector fields and provenance appear in Appendix D. We use an origin-connected physical measure only when every complete arm occupies multiple grid cells without boundary clipping, giving three length, seven area, and four volume rows. The remaining five use the same fixed-direction first-exit proxy R for all methods in the row, avoiding comparisons of unresolved or truncated measures. The quantity R is a numerical size score, not a certified inradius. To prevent a slow direct-SOS solve from suppressing completed methods, each system is split into one lifted group (Base, Gauge, and ODQ ) and three direct groups, one for each sos arm. Every group runs in a fresh process with an independent 600-second deadline; at most four groups run concurrently, with each child restricted to one numerical-solver thread. This common cap bounds the high-dimensional attempts while making every missing value an observed computational or audit outcome. A cell is displayed only when all three repeats return an audited certificate. For m > 0, both cohorts stop ODQ when the sampled residual in (4.21) satisfies 
+
+χk ≤ ωk at (ϵk, ω k) = ( ϵmin , ω min ), or at a cap of 40 outer iterations or 200 oracle calls. The caps bound repeated SDP work, whereas the residual test measures finite-sample stationarity at the prescribed resolution; neither a budget exit nor a failed line search certifies stationarity. The best screened candidate is returned as in (4.23). All lifted and sos -2 groups complete. The two quartic arms time out in every repeat on duffing-chain-3 and liu-10d ; sos -4(8) additionally passes the audit in only 
+
+1/3 repeats on cubic-ring-3 and 2/3 on shear-cubic-a1 . Appendix D records the execution and completeness checks. The relay grid is (p, n ) ∈ { 3, 5, 7} × { 2, 4, 6, 8}, with m = ( p − 1) /2 and N = n + m.Thus increasing n at fixed p leaves the number of stabilizer gains unchanged. All rows use R to avoid dimension-dependent volume grids. Each method runs in an isolated process with a predeclared 600-second deadline, bounding its cost independently of other methods. A timeout or completed budget crossing retires that method only at larger n within the same degree and repeat; numerical failures alone do not trigger retirement. These resource-limited outcomes are distinguished from completed comparisons in Appendix D.2. 
+
+Results and analysis. Table 1 gives the full comparison, while Figure 3 isolates the complete direct-SOS pairs. Across the 16 heterogeneous systems with m > 0, ODQ improves the reported metric over both Base and Gauge in every row, by median factors of 2.892 and 1.652 , respectively; the median ODQ/Gauge time factor is 7.172 .All returned sets pass the independent audit. Six outer searches reach the oracle cap, so those entries are best audited box candidates rather than stationary points. Against 
+
+sos -2, ODQ is larger on 6/19 systems, faster on 11 /19 , and both on three, with median size ratio MODQ /M sos −2 = 0 .951 . It is faster on all 17 and 15 repeat-complete quartic cells for two and eight rounds, respectively; the corresponding median sos /ODQ time factors are 12 .794 and 45 .814 , and ODQ is larger on five cells at each budget. On the relay grid, all 36 ODQ runs complete, and the 12 cell-median times remain between 
+
+1.69 and 13 .08 seconds for N ≤ 11 . All 27 repeat-level comparisons in the nine fully paired sos -2 cells favor ODQ in both proxy and time, with geometric-mean ODQ/ sos -2 proxy and sos -2/ODQ time factors of 1.162 and 4.305 . In the five repeat-complete relay quartic cells, the proxy is 1.03 –1.69 times larger, but construction is 7.41 –109 
+
+times slower; the missing high-dimensional endpoints rule out a family-wide quartic comparison. The favorable relay scaling is consistent with its one-link structure. For fixed odd degree p, DQbee introduces only m = ( p − 1) /2 auxiliary powers, so N = n + m,OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 23 
+
+Table 1 
+
+Relative results (three-repeat medians, two significant digits). For ODQ, the table reports the absolute pair (M/T ), where M ∈ { L, A, V, R } denotes length, area, volume, or the fixed-direction proxy and T is the construction time in seconds. Each complete comparator is reported as (RM /R T ),with RM = Mmethod /M ODQ and RT = Tmethod /T ODQ ; RM < 1 and RT > 1 favor ODQ. Bold marks strict joint ODQ dominance over every complete direct-SOS arm. Missing cells: −− R retired by the relay protocol, −− Ak/ 3 attempted but not repeat-complete ( k of three repeats), and TO three hard timeouts. Absolute pair results appear in Table 3. 
+
+Proposed Lifted baselines Direct SOS System or (p, n ) n/N/m M ODQ Base Gauge SOS–2 SOS–4(2) SOS–4(8) 
+
+Reference systems and scalar degree probes 
+
+vanderpol 2/3/1 A (2 .7/0.3) (0 .33 /0.38) (0 .73 /0.41) (2 .4/1.9) (2 .5/19) (2 .5/51) 
+
+planar-quintic 2/4/2 A (35 /0.72) (0 .21 /0.18) (0 .45 /0.19) (0 .29 /1.7) (0 .39 /21) (0 .85 /65) 
+
+cubic 1/2/1 L (1 .9/0.2) (0 .67 /0.59) (0 .67 /0.62) (1 /1.2) (1 /8.3) (1 /21) 
+
+quintic 1/3/2 L (1 .3/0.74) (0 .7/0.17) (0 .72 /0.19) (1 .5/0.46) (1 .5/3.8) (1 .5/4) 
+
+bistable 1/2/1 R (0 .051 /0.4) (0 .017 /0.27) (0 .052 /0.29) (2 /0.67) (2 /3.5) (2 /4.2) 
+
+duffing 2/3/1 A (3 .2/0.19) (0 .36 /0.51) (0 .64 /0.55) (1 .1/2.8) (1 .2/31) (1 .2/36) 
+
+Quadratic controls ( m = 0 )
+
+quad-cross 2/2/0 A (8 .9/0.0098) (0 .67 /0.35) (1 /0.95) (1 .2/49) (2 .1/570) (1 .8/1500) 
+
+quad-2d 2/2/0 A (3 .9/0.0096) (0 .99 /0.4) (1 /0.99) (1 .3/49) (2 .4/580) (2 .1/1100) 
+
+Synthetic degree and cascade probes 
+
+cubic-3d 3/7/4 V (36 /4.3) (0 .24 /0.036) (0 .53 /0.049) (0 .73 /0.21) (0 .92 /5.7) (0 .8/18) 
+
+cascade-3d 3/6/3 V (32 /2.3) (0 .3/0.056) (0 .54 /0.071) (0 .69 /0.39) (0 .76 /10) (0 .94 /33) 
+
+septic 1/4/3 L (1 .1/1.1) (0 .69 /0.12) (0 .71 /0.13) (1 .8/0.38) (1 .8/3) (1 .8/3.3) 
+
+septic-2d 2/5/3 A (18 /1.6) (0 .32 /0.093) (0 .57 /0.11) (0 .42 /1.8) (0 .57 /18) (0 .9/59) 
+
+Semidiscrete, chain, and ring models 
+
+chafee-3 3/6/3 V (6 .4/1.8) (0 .44 /0.11) (0 .45 /0.12) (1 .1/0.67) (0 .93 /13) (0 .93 /46) 
+
+duffing-chain-2 4/6/2 R (0 .98 /1.1) (0 .59 /0.13) (0 .72 /0.17) (1 .1/3.4) (1 .2/73) (1 .3/260) 
+
+duffing-chain-3 6/9/3 R (0 .95 /6.4) (0 .58 /0.023) (0 .73 /0.043) (1 /2.1) TO TO 
+
+cubic-ring-3 3/9/6 V (33 /11) (0 .24 /0.021) (0 .58 /0.033) (0 .81 /0.088) (1 .4/2) −− A
+
+> 1/3
+
+Literature-derived network models 
+
+networked-vdp-2 4/6/2 R (0 .48 /1.1) (0 .62 /0.12) (0 .93 /0.15) (1 .8/1.8) (2 /71) (2 /110) 
+
+liu-10d 10 /10 /0 R (19 /0.29) (0 .74 /0.26) (1 /1.1) (0 .53 /160) TO TO 
+
+Prescribed-basin geometry test 
+
+shear-cubic-a1 2/6/4 A (0 .63 /3.4) (0 .11 /0.12) (0 .25 /0.13) (1 .7/0.89) (3 .1/9.2) −− A
+
+> 2/3
+
+Single-link relay family (D.3) ; instances are indexed by (p, n )(3 , 2) 2/3/1 R (1 .2/1.7) (0 .75 /1) (0 .98 /0.94) (0 .87 /1.1) −− A 
+
+> 2/3
+
+(1 /10) (3 , 4) 4/5/1 R (0 .89 /2.3) (0 .51 /0.72) (0 .98 /0.77) (0 .77 /2) −− A 
+
+> 0/3
+
+−− A
+
+> 0/3
+
+(3 , 6) 6/7/1 R (0 .7/3.5) (0 .49 /0.43) (0 .99 /0.47) (0 .79 /3.6) −− A 
+
+> 0/3
+
+−− A
+
+> 0/3
+
+(3 , 8) 8/9/1 R (0 .53 /5.7) (0 .42 /0.3) (1 /0.28) (0 .85 /5.5) TO −− A
+
+> 0/3
+
+(5 , 2) 2/4/2 R (1 /1.9) (0 .7/0.92) (0 .91 /0.93) (0 .94 /1.3) (1 .1/7.4) −− A
+
+> 0/3
+
+(5 , 4) 4/6/2 R (0 .8/2.8) (0 .45 /0.63) (0 .96 /0.68) (0 .82 /6.2) (1 .7/110) TO 
+
+(5 , 6) 6/8/2 R (0 .62 /2.9) (0 .45 /0.62) (0 .99 /0.58) (0 .89 /51) TO −− R
+
+(5 , 8) 8/10 /2 R (0 .48 /7.7) (0 .37 /0.21) (0 .99 /0.24) TO −− R −− R
+
+(7 , 2) 2/5/3 R (0 .94 /2.2) (0 .64 /0.71) (0 .91 /0.64) (0 .99 /1.6) (1 .2/11) (1 .3/26) (7 , 4) 4/7/3 R (0 .74 /3.8) (0 .41 /0.51) (0 .96 /0.42) (0 .85 /20) TO TO 
+
+(7 , 6) 6/9/3 R (0 .57 /5.6) (0 .41 /0.29) (0 .98 /0.31) TO −− R −− R
+
+(7 , 8) 8/11 /3 R (0 .45 /13) (0 .33 /0.13) (0 .98 /0.15) −− R −− R −− R
+
+whereas the gain dimension and the m+1 -sample bundle do not grow with n. Increasing 
+
+n lengthens only the stable linear chain without adding nonlinear monomials. The cached reduced-Schur oracle therefore uses a sparse quadratic lift and a cone of order 
+
+N 2 + N , while the largest direct-SOS decrease Gram matrices have orders  n+( p+1) /2(p+1) /2
+
+
+
+for sos -2 and  n+( p+3) /2(p+3) /2
+
+ for sos -4. At (p, n ) = (7 , 8) , these orders are 495 and 1287 ,compared with 132 for the corresponding ODQ cone. The lifted comparison shows that Gauge closes most of the gap from Base to ODQ: MGauge /M ODQ ranges from 
+
+0.907 to 0.995 , whereas MBase /M ODQ ranges from 0.331 to 0.751 . Gain optimization adds a smaller but consistent improvement. The relay results suggest that ODQ may be especially useful for higher-degree, higher-dimensional nonlinear systems whose sparse structure admits a compact quadratic lift. This conclusion is empirical rather 24 Y. CAI AND G. ZARDINI 
+
+than asymptotic, and the advantage is not universal: sos -2 is both cheaper and larger on five low-dimensional heterogeneous systems. Numerical diagnostics, failures, and the timing breakdown appear in Appendix D.4. 10 −1 10 0 10 1 10 2 10 3                 
+
+> time ratio RT=Tmethod =T ODQ
+> 0.25 0.5 124
+> size ratio  RM = Mmethod =M ODQ
+> dominated by ODQ
+> (a) heterogeneous suite (19 systems)
+> 10 010 110 2
+> time ratio RT=Tmethod =T ODQ
+> 0.5 12
+> dominated by ODQ
+> (b) relay family (12 instances)
+> SOS-2 SOS-4(2) SOS-4(8) ODQ
+> Fig. 3 .Certified size versus construction time for the direct-SOS comparators, relative to ODQ. Each colored marker represents one complete direct-SOS cell of Table 1, placed at (RT, R M) = (Tmethod /T ODQ , M method /M ODQ ); the star marks ODQ at (1 ,1) . Points in the shaded quadrant are dominated by ODQ; axes are logarithmic and differ between panels.
+
+6. Conclusion and Future Work. This paper separates the choices that enter dissipative quadratization and its ROA analysis. These are the lifting map, the off-manifold extension, the representation of its quadratic term, and the Lyapunov certificate itself. For a fixed embedding, we characterize the full affine space of admissible quadratic extensions and identify the stabilizer family within it as a structured affine subspace. Extension choices can change transverse stability and the resulting Lyapunov metric, while representation gauges preserve the vector field but can change the spectral-norm bound used in the certificate. Fixing a monomial lift, a reference extension, stabilizer factorizations, the weight Q = IN , and an admissible gain box, we optimize the diagonal stabilizer gains together with the Kronecker gauge. The tangent–transverse splitting reduces feasibility to the auxiliary block, and the fixed-gain gauge problem is an exact reduced SDP whose global optimum minimizes the stated spectral-norm bound, though equality with the intrinsic cubic growth is not guaranteed. We prove attainment on the prescribed box, give a residual-aware closed certificate, and show that the level threshold ranks the leading-order volumes of scaled pullbacks when ϕB > 0. An explicit unbounded-ray example shows why the box must be part of the problem data. The resulting algorithm combines the reduced oracle with a box-constrained nonsmooth search, and under the hypotheses of Theorem 4.5, every accumulation point of the idealized sequence is box-Clarke stationary. Its finite implementation instead returns the best independently screened candidate encountered, and we do not claim global optimality. The experiments show both the benefit and the limits of this design. On the planar quintic, gain optimization increases the certified area from 15 .83 to 35 .44 with the lift and Q fixed, and ODQ improves on both fixed-gain lifted baselines for every OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 25 heterogeneous system with m > 0. Direct SOS nonetheless remains competitive, since 
+
+sos -2 is both larger and cheaper on five low-dimensional heterogeneous systems. In all nine fully paired single-link relay cells, ODQ has a larger fixed-direction proxy and is faster than sos -2, and the relay’s sparse nonlinear structure admits a compact quadratic lift as the physical dimension grows. We expect the method to extend to similarly structured higher-degree, higher-dimensional systems, but these finite experiments do not establish an asymptotic advantage or uniform dominance over direct SOS. Three directions would relax the present formulation. Optimizing over the full admissible extension space, allowing normalized metric design, and bounding the intrinsic cubic growth more tightly would each remove one of its current restrictions. Global gain optimization and interval or rational residual bounds remain separate questions, of search quality and of certificate validity respectively. Beyond ROA estimation, extension design could also be used to seek tighter truncation-error bounds and reachable-set enclosures in Carleman linearization [13], which would require finite-horizon error estimates and consistent lifting of initial sets that the present Lyapunov results alone do not provide. Barrier certificates and feedback synthesis offer further settings in which to study how extension choices affect safety and controlled invariance. The off-manifold extension of an exact lift should therefore be chosen together with the certificate used for the original system. 
+
+Acknowledgments. We thank Weihan Zhang for contributions during the early stages of this work. We also thank Dr. Runyu Zhang, Prof. Gleb Pogudin, and Prof. Georgina Hall for helpful discussions. 
+
+Declarations. The authors acknowledge the use of AI-assisted tools for improving grammar, clarity, and overall writing quality. 
+
+References. 
+
+[1] A. A. Ahmadi and A. Majumdar , DSOS and SDSOS optimization: More tractable alternatives to sum of squares and semidefinite optimization , SIAM Journal on Applied Algebra and Geometry, 3 (2019), pp. 193–230. [2] F. Alauddin , Quadratization of ODEs: Monomial vs. non-monomial , arXiv preprint arXiv:2011.03959, (2020). arXiv:2011.03959. [3] F. Berkenkamp, M. Turchetta, A. P. Schoellig, and A. Krause , Safe model-based reinforcement learning with stability guarantees , in Advances in Neural Information Processing Systems 30, 2017, pp. 908–918. [4] J. V. Burke, A. S. Lewis, and M. L. Overton , A robust gradient sampling algorithm for nonsmooth, nonconvex optimization , SIAM Journal on Optimization, 15 (2005), pp. 751–779, https://doi.org/10.1137/030601296. [5] A. Bychkov, O. Issan, G. Pogudin, and B. Kramer , Exact and optimal quadratization of nonlinear finite-dimensional non-autonomous dynamical systems ,SIAM Journal on Applied Dynamical Systems, 23 (2024), pp. 982–1016. [6] A. Bychkov and G. Pogudin , Optimal monomial quadratization for ODE systems , in International Workshop on Combinatorial Algorithms (IWOCA), Springer, 2021, pp. 122–136. [7] Y. Cai and G. Pogudin , Dissipative quadratizations of polynomial ODE systems ,in Tools and Algorithms for the Construction and Analysis of Systems (TACAS), Springer, 2024, pp. 323–342. [8] T. Carleman , Application de la théorie des équations intégrales linéaires aux systèmes d’équations différentielles non linéaires , Acta Mathematica, 59 (1932), 26 Y. CAI AND G. ZARDINI 
+
+pp. 63–87. [9] H.-D. Chiang, M. W. Hirsch, and F. F. Wu , Stability regions of nonlinear autonomous dynamical systems , IEEE Transactions on Automatic Control, 33 (1988), pp. 16–27. [10] F. H. Clarke , Optimization and Nonsmooth Analysis , Canadian Mathematical Society Series of Monographs and Advanced Texts, John Wiley & Sons, New York, 1983. [11] S. Diamond and S. Boyd , CVXPY: A Python-embedded modeling language for convex optimization , Journal of Machine Learning Research, 17 (2016), pp. 1–5. [12] M. Feinberg , Chemical reaction network structure and the stability of complex isothermal reactors I. The deficiency zero and deficiency one theorems , Chemical Engineering Science, 42 (1987), pp. 2229–2268. [13] M. Forets and C. Schilling , Reachability of weakly nonlinear systems using Carleman linearization , in Reachability Problems (RP), Springer, 2021, pp. 85–99. [14] Z. Jarvis-Wloszek, R. Feeley, W. Tan, K. Sun, and A. Packard , Some controls applications of sum of squares programming , in 42nd IEEE International Conference on Decision and Control (CDC), vol. 5, IEEE, 2003, pp. 4676–4681, https://doi.org/10.1109/CDC.2003.1272309. [15] E. H. Kerner , Universal formats for nonlinear ordinary differential systems ,Journal of Mathematical Physics, 22 (1981), pp. 1366–1371. [16] B. Kramer , Stability domains for quadratic-bilinear reduced-order models , SIAM Journal on Applied Dynamical Systems, 20 (2021), pp. 981–996, https://doi.org/ 10.1137/20M1364849. [17] B. Kramer, B. Peherstorfer, and K. E. Willcox , Learning nonlinear re-duced models from data with operator inference , Annual Review of Fluid Mechanics, 56 (2024), pp. 521–548. [18] B. Kramer and G. Pogudin , Discovering polynomial and quadratic structure in nonlinear ordinary differential equations , arXiv preprint arXiv:2502.10005, (2025). [19] B. Kramer and K. E. Willcox , Nonlinear model order reduction via lifting transformations and proper orthogonal decomposition , AIAA Journal, 57 (2019), pp. 2297–2307, https://doi.org/10.2514/1.J057791. arXiv:1808.02086. [20] A. Levin , An analytical method of estimating the domain of attraction for polynomial differential equations , IEEE Transactions on Automatic Control, 39 (1994), pp. 2471–2475. [21] J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou , Compositionally verifiable vector neural Lyapunov functions for stability analysis of interconnected nonlinear systems , in 2024 American Control Conference (ACC), 2024, pp. 4789–4794, https://doi.org/10.23919/ACC60939.2024.10644247. [22] J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou , Physics-informed neural network Lyapunov functions: PDE characterization, learning, and verification ,Automatica, 175 (2025), p. 112193, https://doi.org/10.1016/j.automatica.2025. 112193. [23] MOSEK ApS , The MOSEK Optimizer API for Python , 2024. Version 11. [24] E. Najafi, R. Babuška, and G. A. D. Lopes , A fast sampling method for estimating the domain of attraction , Nonlinear Dynamics, 86 (2016), pp. 823–834. [25] A. Papachristodoulou and S. Prajna , On the construction of Lyapunov functions using the sum of squares decomposition , in Proceedings of the 41st IEEE Conference on Decision and Control, vol. 3, 2002, pp. 3482–3487. [26] A. Papachristodoulou and S. Prajna , Analysis of non-polynomial systems using the sum of squares decomposition , in Positive Polynomials in Control, OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 27 Springer, 2005, pp. 23–43. [27] P. A. Parrilo , Structured Semidefinite Programs and Semialgebraic Geometry Methods in Robustness and Optimization , PhD thesis, California Institute of Technology, 2000. [28] B. Peherstorfer and K. Willcox , Data-driven operator inference for nonin-trusive projection-based model reduction , Computer Methods in Applied Mechanics and Engineering, 306 (2016), pp. 196–215. [29] J. L. Pitarch, A. Sala, and C. V. Ariño , Closed-form estimates of the domain of attraction for nonlinear systems via fuzzy-polynomial models , IEEE Transactions on Cybernetics, 44 (2014), pp. 526–538. [30] E. Qian, B. Kramer, B. Peherstorfer, and K. Willcox , Lift & learn: Physics-informed machine learning for large-scale nonlinear dynamical systems ,Physica D: Nonlinear Phenomena, 406 (2020), p. 132401. [31] W. Tan and A. Packard , Stability region analysis using polynomial and composite polynomial Lyapunov functions and sum-of-squares programming , IEEE Transactions on Automatic Control, 53 (2008), pp. 565–571. [32] A. Tesi, F. Villoresi, and R. Genesio , On the stability domain estimation via a quadratic Lyapunov function: Convexity and optimality properties for polynomial systems , IEEE Transactions on Automatic Control, 41 (1996), pp. 1650–1657, https://doi.org/10.1109/9.544002. [33] U. Topcu, A. Packard, and P. Seiler , Local stability analysis using simula-tions and sum-of-squares programming , Automatica, 44 (2008), pp. 2669–2675. [34] G. A. Watson , Characterization of the subdifferential of some matrix norms ,Linear Algebra and its Applications, 170 (1992), pp. 33–45, https://doi.org/10. 1016/0024-3795(92)90407-2. [35] C. Yuan , SumOfSquares.py: Sum-of-squares optimization in Python . https: //github.com/yuanchenyang/SumOfSquares.py, 2024. Version 1.3.1. [36] M. Zarei, A. Kalhor, and D. Brake , Arc length based maximal Lyapunov functions and domains of attraction estimation for polynomial nonlinear systems ,Automatica, 90 (2018), pp. 164–171. 28 Y. CAI AND G. ZARDINI 
+
+Appendix contents 
+
+Appendix A. Proof of the ellipsoidal Lyapunov certificate . . . . . . . . . . . . 28 Appendix B. Problem formulation: overview and proofs . . . . . . . . . . . . . 29 
+
+B.1 Extension space . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29 B.2 Transverse feasibility. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30 B.3 Representation space. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31 B.4 Intrinsic growth and spectral-norm relaxation . . . . . . . . . . . . . . . . . . . 31 B.5 Pullback connectedness . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31 B.6 Derivation of the box-constrained formulation. . . . . . . . . . . . . . . . . . . 32 B.7 Well-posedness of the box value. . . . . . . . . . . . . . . . . . . . . . . . . . . 32 B.8 Gauge-defect correction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33 B.9 Leading-order certified volume . . . . . . . . . . . . . . . . . . . . . . . . . . . 33 B.10 Gain invariance of the quadratic germ . . . . . . . . . . . . . . . . . . . . . . . 33 
+
+Appendix C. Inner-oracle and outer-convergence details . . . . . . . . . . . . . 34 
+
+C.1 The gauge-image distance and its dual . . . . . . . . . . . . . . . . . . . . . . . 34 C.2 The reduced oracle and its dual. . . . . . . . . . . . . . . . . . . . . . . . . . . 34 C.3 Proof of the sensitivity formula . . . . . . . . . . . . . . . . . . . . . . . . . . . 35 C.4 Proof of conditional Clarke stationarity . . . . . . . . . . . . . . . . . . . . . . 37 
+
+Appendix D. Benchmark definitions and supplementary results . . . . . . . . 38 
+
+D.1 Heterogeneous suite . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38 D.2 Single-link relay family . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39 D.3 Supplementary geometry . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40 D.4 Numerical diagnostics, failures, and timing . . . . . . . . . . . . . . . . . . . . 41 
+
+Appendix A. Proof of the ellipsoidal Lyapunov certificate. 
+
+Proof of Proposition 2.7. For any symmetric positive definite P, Q , the quotient in (2.9) is unchanged under positive rescaling of w. It can therefore be restricted to the compact ellipsoid {u : u⊤P u = 1 }. Its denominator is positive there, so the supremum is finite and attained. Since q is homogeneous quadratic, q(−u) = q(u),whereas u⊤P q(u) changes sign. Consequently, (A.1) β(P, Q, q) = max  
+
+> u⊤Pu=1
+
+2|u⊤P q(u)|
+
+u⊤Qu = max  
+
+> u⊤Pu=1
+
+2u⊤P q(u)
+
+u⊤Qu .
+
+For the exact Lyapunov solution, write each nonzero w = tu, where t = pV (w) >
+
+0 and u⊤P u = 1 . Homogeneity gives (A.2) ˙V (tu) = t2u⊤Qu
+
+
+
+−1 + t 2u⊤P q(u)
+
+u⊤Qu
+
+
+
+.
+
+If β > 0, this is negative for 0 < t < 1/β . At a maximizing direction in (A.1), it equals zero at t = 1 /β ; hence no larger radius has strict decrease throughout its punctured interior. Taking reciprocals over the positive directions in (A.1) gives (2.10) and 
+
+ρrad = 1 /β . If β = 0 , the cubic contribution vanishes identically and ˙V = −w⊤Qw < 0
+
+for every nonzero w, so ρrad = + ∞.For any representation q(w) = H(w ⊗ w), Cauchy–Schwarz in the P inner product and ∥w ⊗ w∥ = ∥w∥2 yield 
+
+2|w⊤P q(w)| ≤ 2pV (w)p∥P ∥ ∥ H∥ ∥ w∥2.OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 29 Using w⊤Qw ≥ λmin (Q)∥w∥2 gives (A.3) β(P, Q, q) ≤ 2p∥P ∥ ∥ H∥
+
+λmin (Q) .
+
+Taking reciprocals proves (2.11), including H = 0 under the stated convention. Now let bP be any symmetric positive definite matrix. The symmetric normalized residual satisfies −δI N ⪯ Q−1/2RQ −1/2 ⪯ δI N . Thus w⊤Rw ≤ δw⊤Qw, and 
+
+˙bV (w) = w⊤(−Q + R)w + 2 w⊤ bP q(w)
+
+≤ − (1 − δ)w⊤Qw + γ
+
+qbV (w) w⊤Qw,
+
+which proves (2.13). On (2.14), γ
+
+p bV ≤ θ(1 − δ). With κ := λmin ( bP −1/2Q bP −1/2) > 0,it follows that (A.4) ˙bV ≤ − (1 − θ)(1 − δ)w⊤Qw ≤ − (1 − θ)(1 − δ)κ bV . 
+
+The derivative is strictly negative on the boundary, so a trajectory cannot leave the ellipsoid. The polynomial vector field is locally Lipschitz, and the invariant ellipsoid is compact; hence every trajectory starting there exists for all t ≥ 0. Integration of (A.4) gives bV (w(t)) ≤ bV (w(0)) e−(1 −θ)(1 −δ)κt and convergence to the origin. This also proves the exact-solution closed-ellipsoid claims: when β > 0, take bP = P , δ = 0 , γ = β,and θ = ρβ < 1. If γ = 0 , the bound ˙bV ≤ − (1 − δ)κ bV holds globally. Every finite sublevel set is compact and invariant, so the same argument gives global existence and exponential convergence. This covers the exact case β = 0 as well. Replacing δ and γ
+
+by upper bounds with the residual bound below one preserves all the inequalities. 
+
+Appendix B. Problem formulation: overview and proofs. B.1. Extension space. For the fixed polynomial embedding, substitution defines the linear map 
+
+TΦ : P2 −→ R[x], TΦr = r ◦ Φ, ker TΦ = I(M) ∩ P 2.
+
+Two degree-at-most-two vector fields agree on M if and only if their difference belongs componentwise to ker TΦ. Since F0 is exact, this gives EΦ(p) = F0 + (ker TΦ)N . To compute the kernel, write 
+
+r(w) = c0 +
+
+> N
+
+X
+
+> i=1
+
+ciwi + X
+
+> 1≤i≤j≤N
+
+cij wiwj .
+
+Substitution and coefficient matching in x give a finite homogeneous linear system in the 1 + N + N (N + 1) /2 coefficients. Its null space gives a basis r1, . . . , r s of ker TΦ,and {ekrℓ : 1 ≤ k ≤ N, 1 ≤ ℓ ≤ s} is a basis of VΦ; in particular, dim VΦ = N s .Each hi belongs to ker TΦ, so every direction en+ihi in (3.1) belongs to VΦ. Its linear part is en+iyi. These linear parts are linearly independent, which proves 
+
+dim Sh = m. Hence Λ 7 → FΛ parametrizes F0 + Sh injectively. The restriction can exclude both auxiliary and physical equation directions. For example, if m > 0,then e1h1 ∈ V Φ \ S h because h1 is nonzero and all fields in Sh have zero physical components. Thus the inclusion is strict whenever m > 0. Exactness also gives 
+
+F(0) = JxΦ( 0)p(0) = 0 for every admissible extension, so its constant term vanishes. 30 Y. CAI AND G. ZARDINI 
+
+Fixed data 
+
+Original system p; embedding Φ and manifold M; dimension N
+
+Reference F0; stabilizers {hi}; weight Q = IN ; Hurwitz gain box B
+
+All admissible quadratic extensions 
+
+EΦ(p) = F0 + VΦ, VΦ = I(M)N ∩ P N
+
+> 2
+
+Extension variable: Λ ∈ B
+
+FΛ = F0 −
+
+> m
+
+X
+
+> i=1
+
+λien+ihi = A(Λ) w + qΛ(w)
+
+Original dynamics on M are preserved 
+
+Metric determined by A(Λ) 
+
+A⊤P + P A = −IN , P = P (Λ) ≻ 0
+
+Independent of the gauge μ
+
+Representation variable: μ ∈ Rd
+
+H(Λ , μ ) = H(Λ) + K(μ)
+
+K(μ)( w ⊗ w) ≡ 0
+
+The quadratic map qΛ is unchanged 
+
+Spectral-norm Lyapunov bound 
+
+γ(Λ , μ ) := ∥J(Λ , μ )∥ ≥ β P (Λ) , I N , qΛ
+
+
+
+0 < ρ < 1/γ (Λ , μ ) certifies D(P (Λ) , ρ ) and its pullback under Φ
+
+Inner problem: fix Λ
+
+ϕ(Λ) = min  
+
+> μ∈Rd
+
+γ(Λ , μ )
+
+Convex semidefinite program 
+
+Outer problem: choose Λ
+
+ϕB = min  
+
+> Λ∈B
+
+ϕ(Λ) , ρB = ϕ−1
+
+> B
+
+Generally nonconvex 
+
+restrict to Sh = span {en+ihi} ⊆ V Φ
+
+Fig. 4 . Construction of Problem 3.8. The gains select the extension; the gauge changes only its matrix representation. The diagram states the optimization objective; certificates from numerical candidates require the verification in Corollary 3.12. 
+
+B.2. Transverse feasibility. 
+
+Proof of Lemma 3.1. Let Φ( x) = ( x, g(x)) and let FΛ denote the right-hand side of (3.2). Exactness of the lift gives 
+
+FΛ(Φ( x)) = Jx(Φ)( x) p(x).OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 31 Because p(0) = 0, g(0) = 0, and Jx(g)|0 = 0 , differentiation at the origin yields 
+
+A(Λ) 
+
+In
+
+0
+
+
+
+=
+
+In
+
+0
+
+
+
+Jp;
+
+the quadratic part of FΛ has zero derivative there. Hence the first n columns of A(Λ) 
+
+are [J⊤ 
+
+> p
+
+, 0] ⊤. Moreover, both factors ai and bi vanish at the origin, so 
+
+Jy (h)|(0,0) = Im, h := ( h1, . . . , h m).
+
+The remaining blocks are therefore the gain-independent matrix R and Jy (q2 −
+
+diag(Λ) h)|(0,0) = W − diag(Λ) , proving (3.4). Its characteristic polynomial factors over the two diagonal blocks, which gives (3.5). The Hurwitz equivalence and (3.6) follow by taking spectral abscissae and using αp > 0.
+
+Proof of Corollary 3.2. By (3.4), adding c1 to the gains subtracts cI m from the transverse matrix and shifts every transverse eigenvalue by −c. Taking negative spectral abscissae gives (3.7), and setting Λ = 0 gives (3.8). The full-margin claims follow from α(Λ) = min {αp, α aux (Λ) } in Lemma 3.1. Finally, (3.3) gives the affine formula for H, and continuity of the spectral norm gives its asymptotic behavior. 
+
+B.3. Representation space. For the representation freedom, reshape the r-th row of K ∈ RN ×N 2
+
+as Kr ∈ RN ×N . Its contribution to component r is w⊤Krw,which vanishes identically if and only if Kr is skew-symmetric: evaluation at ei
+
+gives (Kr)ii = 0 , and evaluation at ei + ej gives (Kr)ij + ( Kr)ji = 0 . There are 
+
+N (N − 1) /2 independent entries per component, so dim K = N 2(N − 1) /2. Finally, two matrices H1, H 2 represent the same homogeneous quadratic map if and only if 
+
+(H1 − H2)( w ⊗ w) ≡ 0. This proves that (3.10) parametrizes all representations of the fixed quadratic map. 
+
+B.4. Intrinsic growth and spectral-norm relaxation. 
+
+Proof of Proposition 3.5. Factor P = P⊤ 
+
+> f
+
+Pf and Q = Q⊤ 
+
+> f
+
+Qf . For any exact representation, write q(w) = P 
+
+> i
+
+wiMiw and G = col i(M⊤ 
+
+> i
+
+P + P M i). Then 
+
+2w⊤P q(w) = ( w ⊗ w)⊤Gw
+
+= ( Pf w ⊗ Qf w)⊤JQ(Qf w), JQ = ( P⊤ 
+
+> f
+
+⊗ Q⊤ 
+
+> f
+
+)−1GQ −1 
+
+> f
+
+.
+
+Taking absolute values and applying the spectral-norm inequality gives 
+
+2|w⊤P q(w)| ≤ ∥ JQ∥ ∥ Pf w∥ ∥ Qf w∥2 = ∥JQ∥pV (w) w⊤Qw.
+
+Division by the positive denominator for w̸ = 0 proves β ≤ ∥ JQ∥. The gauge identity leaves q, and hence β, unchanged. Since JQ is affine in μ, its image is a closed affine subspace of a finite-dimensional matrix space. Intersecting this image with the closed norm ball of radius ∥JQ(H)∥ gives a nonempty compact set on which the norm attains its minimum. This proves (3.14) and attainment. 
+
+B.5. Pullback connectedness. 
+
+Proof of Corollary 3.6. Fix x0 ∈ S(Λ , ρ ), set P = P (Λ) and w0 = Φ( x0), and let 
+
+μ⋆ attain the minimum in (3.15). Put j⋆ := ∥J(Λ , μ ⋆)∥ and δ := 1 − ρj ⋆ > 0. For 
+
+w ∈ D (P, ρ ), (3.13) gives ˙V (w) ≤ − δ∥w∥2 ≤ − cV (w), where c := δ/λ max (P ) > 0.A first-exit argument makes D(P, ρ ) positively invariant; its compactness and the 32 Y. CAI AND G. ZARDINI 
+
+polynomiality of the lifted field imply that the solution w(t) from w0 is global. Gronwall’s inequality gives V (w(t)) ≤ e−ct V (w0), hence w(t) → 0. Exactness, 
+
+FΛ(Φ( x)) = JxΦ( x)p(x), and uniqueness yield w(t) = Φ( x(t)) ; thus x(t) remains in 
+
+S(Λ , ρ ) and converges to 0. Consequently, s 7 → x(s/ (1 − s)) for 0 ≤ s < 1, extended by 
+
+0 at s = 1 , is a continuous path in S(Λ , ρ ) from x0 to the origin. Every point admits such a path, so any two points can be joined through the origin. 
+
+B.6. Derivation of the box-constrained formulation. Equation (3.15) al-ready establishes the fixed-gain identity ρ⋆(Λ) = ϕ(Λ) −1, and Proposition 3.10 gives attainment on B. Hence, if ϕB > 0, order reversal under inversion gives (B.1) max  
+
+> Λ∈B
+
+ρ⋆(Λ) = 
+
+
+
+min  
+
+> Λ∈B
+
+ϕ(Λ) 
+
+−1
+
+= ρB .
+
+If ϕB = 0 , the same proposition supplies an optimizing pair with J = 0 , so both sides of (B.1) are +∞ under the convention in (3.17). It remains to introduce the epigraph variable. For J ∈ RN 2×N ,(B.2) ∥J∥ ≤ t ⇐⇒ 
+
+tI N 2 JJ⊤ tI N
+
+
+
+⪰ 0.
+
+Indeed, the block inequality forces t ≥ 0. For t > 0, the Schur complement gives 
+
+tI N − t−1J⊤J ⪰ 0 ⇐⇒ J⊤J ⪯ t2IN ⇐⇒ ∥J∥ ≤ t. 
+
+For t = 0 , its 2 × 2 principal minors show that the block inequality holds if and only if 
+
+J = 0 , so (B.2) also covers the boundary case. Consequently, 
+
+ϕB = min 
+
+> Λ∈B, μ ∈Rd, t ∈R
+
+
+
+t :
+
+ tI N 2 J(Λ , μ )
+
+J(Λ , μ )⊤ tI N
+
+
+
+⪰ 0
+
+
+
+.
+
+Substituting (3.3), (3.10), (3.11), and (3.12) gives precisely (3.18). As noted in Remark 3.9, the Lyapunov equation uniquely fixes P = P (Λ) ≻ 0; Pf is its upper Cholesky factor with positive diagonal, not an independent decision variable. Thus the substitution introduces no additional freedom and preserves the optimal value 
+
+tB = ϕB .
+
+B.7. Well-posedness of the box value. 
+
+Proof of Proposition 3.10. Write a gauge direction as S = ( Si)Ni=1 , so K(w ⊗w) = 0 is equivalent to (Si)rj = −(Sj )ri . For P = P⊤ ≻ 0, let TP (S)i := S⊤ 
+
+> i
+
+P + P S i. The bijection Ui = P S i gives TP (S)i = U⊤ 
+
+> i
+
++ Ui. Define 
+
+C := (Bi)Ni=1 ∈ (SN )N : ( Bi)jk + ( Bj )ki + ( Bk)ij = 0 for all i, j, k ,
+
+which is independent of P . Gauge antisymmetry gives im TP ⊆ C , while ker TP
+
+corresponds under Ui = P S i to ∧3RN . Thus dim im TP = d −  N
+
+> 3
+
+ =: q = N (N 2 − 1) /3.The cyclic-sum map has rank  N +2 3
+
+ because its restriction to fully symmetric tensors is multiplication by 3; hence dim C = q and im TP = C.Fixing a basis of C gives a nonredundant parametrization J(Λ , ν ) = J0(Λ) + LΛν,
+
+ν ∈ Rq , with LΛ injective by (3.12). On F, the Lyapunov solution and its positive-diagonal Cholesky factor depend analytically on Λ; hence J0 and LΛ are locally Lipschitz. The case q = 0 is immediate. Otherwise, fix a closed ball K ⋐ F and set OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 33 
+
+cK := min Λ∈K, ∥ν∥=1 ∥L Λν∥ > 0 and MK := max Λ∈K ∥J0(Λ) ∥. The bound ∥J(Λ , ν )∥ ≥ 
+
+cK ∥ν∥ − MK makes every inner problem coercive, hence attained; comparison with 
+
+ν = 0 places every minimizer in the common ball ∥ν∥ ≤ RK := 2 MK /c K . Uniform Lipschitz continuity of J on this set now gives 
+
+|ϕ(Λ 1) − ϕ(Λ 2)| ≤ sup 
+
+> ∥ν∥≤ RK
+
+∥J(Λ 1, ν ) − J(Λ 2, ν )∥ ≤ LK ∥Λ1 − Λ2∥.
+
+Thus ϕ is locally Lipschitz and attains its minimum on the compact box B. If ϕB > 0,strict monotonicity of x 7 → 1/x gives the same optimizing gains; if ϕB = 0 , attainment gives an optimizing pair with J = 0 , and (3.13) makes the corresponding quadratic Lyapunov function global. 
+
+B.8. Gauge-defect correction. For a returned representation eH that has a nonzero coefficient defect, choose ∆H such that q(w) − eH(w ⊗ w) = ∆ H(w ⊗ w)
+
+identically. Applying (A.3) to the defect gives the valid bound (B.3) β( bP , Q, q) ≤ ∥ JQ( eH)∥ + 2
+
+q
+
+∥ bP ∥ ∥ ∆H∥
+
+λmin (Q) ,
+
+where JQ is assembled using bP . Thus a nonzero gauge residual requires a correction to the growth bound. If the gauge identity holds exactly, one may take ∆H = 0 . In numerical use, both terms in (B.3) and the normalized Lyapunov residual require upper bounds that include rounding errors. 
+
+B.9. Leading-order certified volume. 
+
+Proof of Proposition 3.14. Fix Λ and write P = P (Λ) . With the blocks in (3.20), set q(x) := x⊤Pxx x and 
+
+r(x) := eVΛ(x) − q(x) = 2 x⊤Pxy g(x) + g(x)⊤Pyy g(x).
+
+Since g(x) = O(∥x∥2), there is c > 0 such that |r(x)| ≤ c∥x∥3 near the origin. Let 
+
+λx := λmin (Pxx ) > 0. On Bδ := {∥ x∥ ≤ δ}, for all sufficiently small δ,(B.4) (1 − εδ )q(x) ≤ eVΛ(x) ≤ (1 + εδ )q(x), εδ := cδ λx
+
+< 1.
+
+Let E(s) := {x : q(x) ≤ s2}. Since P ≻ 0 and Φ contains x, eVΛ(x) ≥ λmin (P )∥x∥2;hence, for fixed δ and all sufficiently small ρ, both S(Λ , ρ ) and the inner ellipsoid below lie in Bδ . Equation (B.4) then gives 
+
+E
+
+ ρ
+
+√1 + εδ
+
+
+
+⊆ S(Λ , ρ ) ⊆ E
+
+ ρ
+
+√1 − εδ
+
+
+
+.
+
+Because vol E(s) = κnsn/√det Pxx , division by the proposed leading term yields bounds (1 + εδ )−n/ 2 and (1 − εδ )−n/ 2. Letting first ρ ↓ 0 and then δ ↓ 0 squeezes the ratio to one, proving (3.22). 
+
+B.10. Gain invariance of the quadratic germ. 
+
+Proof of Proposition 3.15. By Lemma 3.1, A(Λ) = 
+
+h Jp R 
+
+> 0D(Λ)
+
+i
+
+, and only D(Λ) 
+
+depends on Λ. The (1 , 1) block of the Lyapunov equation is J⊤ 
+
+> p
+
+PQ,xx +PQ,xx Jp = −Qxx .Since Jp is Hurwitz, this equation has a unique solution, independent of Λ.34 Y. CAI AND G. ZARDINI 
+
+Appendix C. Inner-oracle and outer-convergence details. C.1. The gauge-image distance and its dual. 
+
+Proof of Proposition 4.1. Fix Λ and abbreviate T = TΛ and W = WΛ. The attainable matrices are exactly J0 + W. Since W = −W , minimizing their spectral norm gives (4.1). The subspace W is closed and finite-dimensional. The intersection of J0 + W with any nonempty bounded norm sublevel set is compact, so a minimizing matrix J⋆ exists; any preimage of J⋆ − J0 under T is a minimizing gauge. Introduce a matrix variable M and impose M = J0 + T μ. The Lagrangian is 
+
+L(M, μ, Z ) = ∥M ∥ + ⟨Z, J 0 + T μ − M ⟩F .
+
+Its infimum over μ is finite exactly when ⟨Z, T μ⟩F = 0 for all μ, or Z ∈ W ⊥. Spectral– nuclear norm duality gives ⟨Z, M ⟩F ≤ ∥ Z∥∗∥M ∥, with sup ∥M ∥≤ 1⟨Z, M ⟩F = ∥Z∥∗:equality follows by taking M = U V ⊤ in a compact singular value decomposition 
+
+Z = U ΣV⊤. Consequently, 
+
+inf  
+
+> M
+
+{∥ M ∥ − ⟨ Z, M ⟩F } =
+
+(
+
+0, ∥Z∥∗ ≤ 1,
+
+−∞ , ∥Z∥∗ > 1.
+
+This yields the dual in (4.2). Its feasible set is nonempty and compact, so its maximum is attained. For completeness, strong duality follows directly from convex optimality. The spectral norm is continuous everywhere, so the convex Fermat rule on J0 + W gives 
+
+0 ∈ ∂∥·∥ (J⋆) + W⊥.
+
+Hence some Z⋆ ∈ ∂∥·∥ (J⋆) lies in W⊥. The subgradient inequality for a norm is equivalent to (C.1) Z ∈ ∂∥·∥ (J) ⇐⇒ ∥Z∥∗ ≤ 1, ⟨Z, J ⟩F = ∥J∥.
+
+Indeed, applying that inequality at 0 and 2J forces equality at J, after which the inequality for arbitrary matrices is precisely the dual-norm bound. Thus Z⋆ is dual feasible and 
+
+⟨Z⋆, J 0⟩F = ⟨Z⋆, J ⋆⟩F = ∥J⋆∥ = ϕ(Λ) .
+
+Conversely, such a Z⋆ bounds the norm of every matrix in J0 + W from below by 
+
+∥J⋆∥, proving the stated optimality criterion. Finally, weak duality gives ⟨Z, J 0⟩F ≤
+
+ϕ(Λ) ≤ ∥ J(Λ , μ )∥ for every primal–dual feasible pair, which proves (4.3). 
+
+C.2. The reduced oracle and its dual. 
+
+Proof of Proposition 4.2. Let X = P⊤ 
+
+> f
+
+⊗ IN . Since P = P⊤ 
+
+> f
+
+Pf , P ⊗ IN = XX ⊤.Congruence of FΛ(ν, τ ) by diag( X−1, I N ), or equivalently its Schur complement, gives (C.2) FΛ(ν, τ ) ⪰ 0 ⇐⇒ 
+
+ IN 2 Jr(Λ , ν )
+
+Jr(Λ , ν )⊤ τ I N
+
+
+
+⪰ 0 ⇐⇒ J⊤ 
+
+> r
+
+Jr ⪯ τ I N .
+
+Minimizing τ therefore gives τ ⋆ = min ν ∥Jr(Λ , ν )∥2 = ϕ(Λ) 2. Strict feasibility follows by fixing any ν and taking τ > ∥Jr(Λ , ν )∥2. For q > 0, linear independence of the 
+
+Bℓ and invertibility of X make ν 7 → X−1 P 
+
+> ℓ
+
+νℓBℓ injective, hence bounded below on the unit sphere. The objective is therefore coercive in ν; for q = 0 attainment is immediate. OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 35 For the reconstruction, Proposition 3.10 proves that the image of the raw gauge under S 7 → col r (S⊤ 
+
+> r
+
+P + P S r ) is exactly C. Thus the constraint in (4.6) is feasible. Its strictly convex quadratic objective selects a unique representative, and substitution in (3.12) adds precisely P 
+
+> ℓ
+
+ν⋆ℓ Bℓ to G(Λ , 0) . Hence it realizes the same J, value, and vector field. For later use, the dual of (4.5) is (C.3) 
+
+max   
+
+> Y⪰0
+
+− ⟨ Y11 , P ⊗ IN ⟩F − 2 ⟨Y12 , G (Λ , 0) ⟩F
+
+s.t. tr Y22 = 1 , ⟨Y12 , Bℓ⟩F = 0 , ℓ = 1 , . . . , q, 
+
+where Y is partitioned conformally with FΛ. This follows from the Lagrangian 
+
+τ − ⟨ Y, F Λ⟩F by stationarity in (τ, ν ). Strict feasibility gives strong duality; primal– dual optimality adds the complementarity condition in (4.12). 
+
+C.3. Proof of the sensitivity formula. The spectral subdifferential in (4.7) and the affine chain rule give (C.4) 0 ∈ ∂ν ∥Jr(Λ , ν ⋆)∥ ⇐⇒ ∃Z⋆ ∈ ∂∥·∥ (J⋆) : ⟨Z⋆, J ℓ(Λ) ⟩F = 0 (ℓ = 1 , . . . , q ),
+
+which proves (4.8) by the convex Fermat rule. We next make the Cholesky derivative in (4.9) explicit. Set Ci := P −⊤  
+
+> f
+
+˙PiP −1 
+
+> f
+
+and let up 1/2(Ci) retain the strict upper triangle of Ci, take half of its diagonal, and set its strict lower triangle to zero. Then (C.5) ˙Pf,i = up 1/2(Ci)Pf .
+
+Indeed, with Ri := ˙Pf,i P −1 
+
+> f
+
+, differentiation of P = P⊤ 
+
+> f
+
+Pf gives Ci = R⊤ 
+
+> i
+
++ Ri; the upper-triangularity of Ri determines it uniquely. Differentiating the block definition of G(Λ , 0) gives the first line of (4.10), and differentiating XJ r = Gr gives its second line. The sign in the Lyapunov sensitivity follows from ˙Ai = −Ei:
+
+˙A⊤ 
+
+> i
+
+P + A(Λ) ⊤ ˙Pi + ˙PiA(Λ) + P ˙Ai = 0 ⇐⇒ A(Λ) ⊤ ˙Pi + ˙PiA(Λ) = EiP + P E i.
+
+Proof of Proposition 4.3. For Λ ∈ U , define the Lyapunov operator on SN by 
+
+AΛ(S) := A(Λ) ⊤S + SA (Λ) .
+
+Since A(Λ) is Hurwitz, this operator is invertible, and 
+
+PQ(Λ) = −A −1Λ (Q) = 
+
+Z ∞
+
+> 0
+
+eA(Λ) ⊤tQe A(Λ) t dt ≻ 0.
+
+Indeed, the integral converges and solves the equation by integration of its time derivative. If AΛ(S) = 0 , then eA⊤tSe At is constant in t and tends to zero, so S = 0 ;in finite dimensions this proves invertibility. The coefficients of AΛ are affine in Λ, and matrix inversion is real analytic on the invertible matrices. Thus PQ is real analytic on U. Differentiating its defining equation, with Q fixed, gives 
+
+A⊤ 
+
+> i
+
+PQ + A⊤PQ,i + PQ,i A + PQAi = 0 ,
+
+which proves (4.11); the derivative is unique by the same invertibility argument. These are local assertions and require only that A(Λ) be Hurwitz at each point of U.36 Y. CAI AND G. ZARDINI 
+
+The positive-diagonal Cholesky factor is real analytic on the positive definite cone, as follows from its recursive formulas using positive square roots and division by positive pivots. Hence Pf , X−1, and Jr are real analytic for Q = IN . The fixed linearly independent matrices Bℓ make the reduced gauge map injective throughout U.For every closed ball K ⋐ U, the proof of Proposition 3.10 therefore supplies constants 
+
+cK > 0 and MK ≥ 0 such that 
+
+∥Jr(Λ , ν )∥ ≥ cK ∥ν∥ − MK , ∥ν⋆(Λ) ∥ ≤ 2MK /c K (Λ ∈ K)
+
+when q > 0. Minimization is consequently restricted to a common compact ball in ν,on which Jr is uniformly Lipschitz in the gain. Comparing the two objectives at each other’s minimizers proves local Lipschitz continuity of ϕ, as detailed in that proof. When q = 0 , there is no inner variable and the conclusion follows directly from the smoothness of Jr and the norm inequality. The conic KKT conditions follow from (C.3) and strong duality. Write ϕ = ϕ(Λ) >
+
+0 and choose paired orthonormal bases U1, V 1 of the leading singular subspaces of J⋆.Solving the block equations for the kernel of FΛ(ν⋆, ϕ 2) shows that it is spanned by the columns of 
+
+T := 
+
+−ϕX −⊤ U1
+
+V1
+
+
+
+.
+
+Indeed, the first block equation determines the upper block as −X−⊤ J⋆v, and the second becomes (( J⋆)⊤J⋆ − ϕ2IN )v = 0 . For two positive semidefinite matrices, zero Frobenius inner product implies zero product. Complementarity therefore places the range of Y ⋆ in this kernel, so (C.6) Y ⋆ = T ΘT⊤, Θ ⪰ 0, tr Θ = tr Y ⋆ 
+
+> 22
+
+= 1 .
+
+It follows that 
+
+−ϕ−1X⊤Y ⋆ 
+
+> 12
+
+= U1ΘV⊤ 
+
+> 1
+
+=: Z⋆, ∥Z⋆∥∗ = tr Θ = 1 .
+
+Equation (4.7) gives Z⋆ ∈ ∂∥·∥ (J⋆), and conic stationarity gives 
+
+⟨Z⋆, J ℓ(Λ) ⟩F = −ϕ−1⟨Y ⋆
+
+> 12
+
+, Bℓ⟩F = 0 .
+
+Proposition 4.1 now proves that Z⋆ is a distance-dual optimum. To relate the two sensitivity formulas, put ˙Xi = ˙P⊤ 
+
+> f,i
+
+⊗ IN . The blocks in (C.6) are 
+
+Y ⋆ 
+
+> 11
+
+= ϕ2X−⊤ U1ΘU⊤ 
+
+> 1
+
+X−1, Y ⋆ 
+
+> 12
+
+= −ϕX −⊤ Z⋆.
+
+Using ˙Pi ⊗ IN = ˙XiX⊤ + X ˙X⊤ 
+
+> i
+
+and J⋆V1 = ϕU 1 gives 
+
+⟨Y ⋆
+
+> 11
+
+, ˙Pi ⊗ IN ⟩F = 2 ϕ⟨Z⋆, X −1 ˙XiJ⋆⟩F , ⟨Y ⋆
+
+> 12
+
+, ˙G0 
+
+> i
+
+⟩F = −ϕ⟨Z⋆, X −1 ˙G0 
+
+> i
+
+⟩F .
+
+Together with (4.10), these identities prove (C.7) 2ϕ⟨Z⋆, ˙Ji⟩F = −⟨ Y ⋆
+
+> 11
+
+, ˙Pi ⊗ IN ⟩F − 2⟨Y ⋆
+
+> 12
+
+, ˙G0 
+
+> i
+
+⟩F .
+
+It remains to establish the outer subgradient claim. The dual feasible set 
+
+Y := {Y ⪰ 0 : tr Y22 = 1 , ⟨Y12 , Bℓ⟩F = 0 ( ℓ = 1 , . . . , q )}OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 37 is independent of the gain. Fix the optimum Y ⋆ at Λ and define 
+
+dY ⋆ (Λ ′) := −⟨ Y ⋆
+
+> 11
+
+, P (Λ ′) ⊗ IN ⟩F − 2⟨Y ⋆
+
+> 12
+
+, G (Λ ′, 0) ⟩F .
+
+Weak duality gives dY ⋆ (Λ ′) ≤ ϕ(Λ ′)2 for every Λ′ ∈ F , with equality at Λ. Since dY ⋆ is smooth and dY ⋆ (Λ) = ϕ2 > 0, it is positive in a neighborhood of Λ. There h := √dY ⋆
+
+is a smooth lower bound for ϕ, with h(Λ) = ϕ(Λ) and ∂λi h(Λ) = gi by (C.7). Taylor expansion gives 
+
+ϕ(Λ + ∆) ≥ ϕ(Λ) + g⊤∆ + o(∥∆∥).
+
+Thus g is a Fréchet subgradient and, by local Lipschitz continuity, belongs to ∂C ϕ(Λ) .If ϕ is differentiable at Λ, the same inequality applied in opposite directions gives 
+
+g = ∇ϕ(Λ) .Finally, suppose that ν⋆ is unique and the leading singular value of J⋆ is positive and simple. Set f (Λ ′, ν ) := ∥Jr(Λ ′, ν )∥. Then f is continuously differentiable near 
+
+(Λ , ν ⋆), and a := ∇Λf (Λ , ν ⋆) has components ai = ⟨uv ⊤, ˙Ji⟩F . For each sufficiently small ∆, choose a minimizer ν∆ at Λ + ∆ . Local uniform boundedness and continuity imply that every cluster point of ν∆ as ∆ → 0 minimizes f (Λ , ·); uniqueness therefore gives ν∆ → ν⋆. Optimality at the two gains yields 
+
+f (Λ + ∆ , ν ∆) − f (Λ , ν ∆) ≤ ϕ(Λ + ∆) − ϕ(Λ) 
+
+≤ f (Λ + ∆ , ν ⋆) − f (Λ , ν ⋆).
+
+Both bounds equal a⊤∆ + o(∥∆∥) by continuity of ∇Λf and ν∆ → ν⋆. Thus ϕ is differentiable and (C.8) ∂λi ϕ(Λ) = ⟨uv ⊤, ˙Ji⟩F = u⊤ ˙Jiv, 
+
+which proves (4.15). At a nonsmooth point with ϕ(Λ) > 0, different exact optimal multipliers can select different Clarke subgradients. An individual selection need not determine the nearby-gradient hull in (4.16). The outer convergence theorem therefore retains its assumption that the sampled hulls converge to the Clarke subdifferential [10]. Finally, the damping in (4.18) gives s⊤er ≥ κs ⊤M s > 0. Thus the BFGS update is positive definite whenever M ≻ 0 and s̸ = 0 ; rebuilding from finitely many such pairs and clipping its eigenvalues gives the metric safeguards assumed in Theorem 4.5. 
+
+C.4. Proof of conditional Clarke stationarity. Recall that ψ◦(x; d) := lim sup z→x, t ↓0[ψ(z + td ) − ψ(z)] /t denotes the Clarke directional derivative. 
+
+Proof of Theorem 4.5. The bounds in (4.19) give θk + dk ∈ C. Convexity of C
+
+then makes every backtracked point θk +ad k, a ∈ [0 , 1] , feasible. A serious step satisfies (4.22), whereas a null step leaves the iterate unchanged; hence ψ(θk) is nonincreasing. Compactness of C gives accumulation points. Fix a subsequence θkr → ¯θ and suppose that 0 /∈ ∂C ψ(¯θ) + NC (¯θ). We first show that the corresponding residuals are bounded away from zero. Otherwise, after passing to a subsequence, χkr → 0; the metric safeguards imply dkr → 0. By (4.25), the aggregates ¯gkr ∈ b∂kr in Lemma 4.4 are bounded, and a further subsequence converges to some ¯g ∈ ∂C ψ(¯θ). Equation (4.20) makes nkr = −Mkr dkr − ¯gkr bounded. Since the convex normal-cone mapping has a closed graph and nkr ∈ NC (θkr + dkr ), its limit satisfies n ∈ NC (¯θ) and ¯g + n = 0 , a contradiction. Consequently, for some δ > 0,(C.9) χ2 
+
+> kr
+
+= d⊤ 
+
+> kr
+
+Mkr dkr ≥ δ38 Y. CAI AND G. ZARDINI 
+
+for all sufficiently large r.The displacements lie in the compact set C − C, and the safeguarded metrics lie in a compact set. Along any further subsequence of the chosen indices, take dkr → ¯d̸ = 0 
+
+and Mkr → ¯M . Hausdorff convergence in (4.25) implies uniform convergence of the support functions on bounded sets. Lemma 4.4 therefore yields (C.10) ψ◦(¯θ; ¯d) = max  
+
+> g∈∂Cψ(¯θ)
+
+g⊤ ¯d = lim  
+
+> r→∞
+
+max  
+
+> g∈b∂kr
+
+g⊤dkr ≤ − ¯d⊤ ¯M ¯d < 0.
+
+Because c < 1, joint upper semicontinuity of the Clarke directional derivative and continuity of d⊤M d imply that sufficiently small steps satisfy (C.11) ψ(θ + ad ) − ψ(θ) ≤ − ca d ⊤M d. 
+
+The cluster set of (dkr , M kr ) is compact; a finite-cover argument makes the upper step bound a0 > 0 uniform for all sufficiently large r. Equation (C.9) and ωkr ↓ 0
+
+exclude the low-residual branch. Since Lkr → ∞ , the grid in (4.22) eventually accepts a step satisfying βℓkr ≥ β min {1, a 0}. Hence every sufficiently large r decreases ψ by at least cβ min {1, a 0}δ > 0, contradicting nonnegativity and monotone convergence of the values. Thus every accumulation point satisfies (4.26). The affine change of variables gives ∂C ψ(θ) = D⊤ 
+
+> B
+
+∂C ϕ(Λ) and NC (θ) = D⊤ 
+
+> B
+
+NB (Λ) ,so stationarity is equivalent in the two coordinates. If ϕB > 0, the gradient-limit characterization applied to the C1 map s 7 → − 1/s gives ∂C (−1/ϕ ) = ϕ−2∂C ϕ on B.Since NB is a cone, this is precisely the Clarke condition for maximizing ρ⋆ = 1 /ϕ .
+
+Appendix D. Benchmark definitions and supplementary results. D.1. Heterogeneous suite. The suite was assembled to vary polynomial degree, state and lift dimension, and nonlinear coupling, rather than sampled from a statistical population. It contains standard models and examples used in the stability literature (reversed Van der Pol, Duffing, a Chafee–Infante semidiscretization, and systems drawn or adapted from [7, 21, 22]); scalar degree probes and synthetic cascades, chains, and rings; and the already-quadratic controls quad-cross , quad-2d , and liu-10d .The networked Van der Pol system is the deterministic local variant motivated by the interconnected model in [21]. Table 2 records the exact executed vector fields, dimensions, and construction or literature source. The retained geometry test, shear-cubic-a1 , is obtained by pushing forward the base field (D.1) g(z) = 
+
+−z1 − z2 + z1∥z∥2
+
+z1 − z2 + z2∥z∥2
+
+
+
+under T1(z) = ( z1, z 2 + z21 ). Since ddt ∥z∥2 = 2 ∥z∥2(∥z∥2 − 1) , the base field has the open unit disk as its basin. The identity det  DT 1(z) = 1 shows that T1 preserves area. Its basin is the sheared unit disk (D.2) T1
+
+ {z : ∥z∥ < 1} = x : x21 + ( x2 − x21)2 < 1 ,
+
+which has area π and a quartic boundary. This gives a coordinate-shape benchmark with known basin area. OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 39 
+
+Table 2: Executed vector fields in the heterogeneous suite. The dimension tuple is 
+
+(n, deg f, N, m ).System (n, deg f, N, m ) Dynamics Provenance 
+
+Reference systems and scalar degree probes 
+
+vanderpol (2 , 3, 3, 1) ˙x1 = −x2; ˙x2 = x1 + x2
+
+ x21 − 1 reversed Van der Pol [22, Ex. 6] 
+
+planar-quintic (2 , 5, 4, 2) ˙x1 = −x1 + x2; ˙x2 = −x51 − 2x2 Section 5.1 
+
+cubic (1 , 3, 2, 1) ˙x1 = x31 − x1 [7, Ex. 2] 
+
+quintic (1 , 5, 3, 2) ˙x1 = x51 − x1 scalar degree probe 
+
+bistable (1 , 3, 2, 1) ˙x1 = −x31 + 0 .4x21 − 0.03 x1 bistable reaction [7, §5.2] 
+
+duffing (2 , 3, 3, 1) ˙x1 = x2; ˙x2 = x31 − x1 − x2 Duffing oscillator [7, §5.1] 
+
+Quadratic controls ( m = 0 )
+
+quad-cross (2 , 2, 2, 0) ˙x1 = x1x2 − x1; ˙x2 = x21 − 2x2 synthetic quadratic control 
+
+quad-2d (2 , 2, 2, 0) ˙x1 = −x1 + x22; ˙x2 = x1x2 − x2 synthetic quadratic control 
+
+Synthetic degree and cascade probes 
+
+cubic-3d (3 , 3, 7, 4) ˙x1 = −x1 + x32; ˙x2 = −2x2 + x23; ˙x3 = x21 − 3x3 mixed-degree coupling probe 
+
+cascade-3d (3 , 3, 6, 3) ˙x1 = −x1 + x32; ˙x2 = −x2 + x33; ˙x3 = −x3 triangular cascade 
+
+septic (1 , 7, 4, 3) ˙x1 = x71 − x1 scalar degree probe 
+
+septic-2d (2 , 7, 5, 3) ˙x1 = −x1 + x2; ˙x2 = −x71 − 2x2 degree-seven cascade 
+
+Semidiscrete, chain, and ring models 
+
+chafee-3 (3 , 3, 6, 3) ˙x1 = x31 − 1.4x1 + 0 .2x2; ˙x2 = 0 .2x1 + x32 −
+
+1.4x2 + 0 .2x3; ˙x3 = 0 .2x2 + x33 − 1.4x3
+
+Chafee–Infante-type semidiscretization, 
+
+ut = νu xx − u + u3
+
+(three nodes) 
+
+duffing-chain-2 (4 , 3, 6, 2) ˙q1 = v1; ˙v1 = q31 − 2.0q1 + 0 .5q2 − 1.0v1; ˙q2 = v2;
+
+˙v2 = 0 .5q1 + q32 − 2.0q2 − 1.0v2
+
+Duffing-chain variant; cf. [7, §5.3] 
+
+duffing-chain-3 (6 , 3, 9, 3) ˙q1 = v1; ˙v1 = q31 − 2.0q1 + 0 .5q2 − 1.0v1; ˙q2 = v2;
+
+˙v2 = 0 .5q1 + q32 − 2.0q2 + 0 .5q3 − 1.0v2; ˙q3 = v3;
+
+˙v3 = 0 .5q2 + q33 − 2.0q3 − 1.0v3
+
+Duffing-chain variant; cf. [7, §5.3] 
+
+cubic-ring-3 (3 , 3, 9, 6) ˙x1 = −x1 + x32; ˙x2 = −2x2 + x33; ˙x3 = x31 − 3x3 directed cubic ring 
+
+Literature-derived network models 
+
+networked-vdp-2 (4 , 3, 6, 2) ˙x1 = −x2; ˙x2 = − x1x410 + x1 + x2
+
+ 4x215 − 45
+
+
+
+;
+
+˙x3 = −x4; ˙x4 = − x2x310 + x3 + x4
+
+ 11 x235 − 11 5
+
+
+
+deterministic network variant [21] 
+
+liu-10d (10 , 2, 10 , 0) ˙x1 = −x1 + 0 .5x2 − 0.1x29; ˙x2 = −0.5x1 − x2;
+
+˙x3 = −0.1x21 − x3 + 0 .5x4; ˙x4 = −0.5x3 − x4;
+
+˙x5 = −x5 + 0 .5x6 + 0 .1x27; ˙x6 = −0.5x5 − x6;
+
+˙x7 = −x7 + 0 .5x8; ˙x8 = −0.5x7 − x8;
+
+˙x9 = 0 .5x10 − x9; ˙x10 = −x10 + 0 .1x22 − 0.5x9
+
+[22, Ex. 8] 
+
+Prescribed-basin geometry test 
+
+shear-cubic-a1 (2 , 6, 6, 4) ˙x1 = x51 − 2x31x2 + x31 + x21 + x1x22 − x1 − x2;
+
+˙x2 = x61 − x41x2 + x41 + 2 x31 − x21x22 + x21x2 − x21 −
+
+2x1x2 + x1 + x32 − x2
+
+area-preserving shear of (D.1) 
+
+D.2. Single-link relay family. For odd p ≥ 3 and n ≥ 2, the relay family is (D.3) 
+
+˙xi = ai(−xi + xi+1 ), i = 1 , . . . , n − 1,
+
+˙xn = an(−xn + xp
+
+1), ai = 2 + (( i − 1) mod 3) 2 .
+
+The executed grid is (p, n ) ∈ { 3, 5, 7} × { 2, 4, 6, 8}. Its origin Jacobian is upper triangular with diagonal entries −ai, and hence is Hurwitz. Writing q = ( p − 1) /2,exact symbolic reconstruction verifies the DQbee auxiliaries x21, . . . , x q+1 1 , so m = q
+
+and N = n + q in every cell. The two nonzero equilibria ±1 motivate retaining the directions ±1/√n in the common geometry set. The grid, arm definitions, execution order, and retirement rule were frozen before 40 Y. CAI AND G. ZARDINI 
+
+Table 3 
+
+Absolute results corresponding to Table 1. Each complete cell gives the three-repeat median 
+
+(M/T ) to two significant digits, with T in seconds and M ∈ { L, A, V, R }. Bold and the −− R, −− Ak/ 3,and TO conventions follow Table 1. 
+
+Proposed Lifted baselines Direct SOS System or (p, n ) n/N/m M ODQ Base Gauge SOS–2 SOS–4(2) SOS–4(8) 
+
+Reference systems and scalar degree probes 
+
+vanderpol 2/3/1 A (2 .7/0.3) (0 .9/0.11) (2 /0.12) (6 .5/0.55) (6 .6/5.6) (6 .6/15) 
+
+planar-quintic 2/4/2 A (35 /0.72) (7 .3/0.13) (16 /0.14) (10 /1.2) (14 /15) (30 /47) 
+
+cubic 1/2/1 L (1 .9/0.2) (1 .3/0.12) (1 .3/0.12) (2 /0.24) (2 /1.6) (2 /4.1) 
+
+quintic 1/3/2 L (1 .3/0.74) (0 .92 /0.13) (0 .94 /0.14) (2 /0.34) (2 /2.8) (2 /3) 
+
+bistable 1/2/1 R (0 .051 /0.4) (0 .00089 /0.11) (0 .0026 /0.12) (0 .1/0.27) (0 .1/1.4) (0 .1/1.7) 
+
+duffing 2/3/1 A (3 .2/0.19) (1 .2/0.095) (2 .1/0.1) (3 .6/0.53) (4 /5.9) (4 /6.7) 
+
+Quadratic controls ( m = 0 )
+
+quad-cross 2/2/0 A (8 .9/0.0098) (5 .9/0.0034) (8 .9/0.0093) (11 /0.48) (18 /5.5) (16 /14) 
+
+quad-2d 2/2/0 A (3 .9/0.0096) (3 .9/0.0039) (3 .9/0.0096) (5 .3/0.47) (9 .6/5.6) (8 .1/10) 
+
+Synthetic degree and cascade probes 
+
+cubic-3d 3/7/4 V (36 /4.3) (8 .5/0.15) (19 /0.21) (26 /0.9) (33 /24) (29 /79) 
+
+cascade-3d 3/6/3 V (32 /2.3) (9 .6/0.13) (17 /0.16) (22 /0.9) (24 /23) (30 /74) 
+
+septic 1/4/3 L (1 .1/1.1) (0 .76 /0.13) (0 .78 /0.14) (2 /0.42) (2 /3.3) (2 /3.7) 
+
+septic-2d 2/5/3 A (18 /1.6) (5 .7/0.15) (10 /0.17) (7 .5/2.9) (10 /29) (16 /96) 
+
+Semidiscrete, chain, and ring models 
+
+chafee-3 3/6/3 V (6 .4/1.8) (2 .8/0.19) (2 .9/0.22) (6 .7/1.2) (5 .9/23) (5 .9/81) 
+
+duffing-chain-2 4/6/2 R (0 .98 /1.1) (0 .58 /0.15) (0 .71 /0.19) (1 /3.6) (1 .2/79) (1 .2/280) 
+
+duffing-chain-3 6/9/3 R (0 .95 /6.4) (0 .55 /0.15) (0 .7/0.28) (1 /13) TO TO 
+
+cubic-ring-3 3/9/6 V (33 /11) (7 .8/0.22) (19 /0.35) (26 /0.94) (47 /22) −− A
+
+> 1/3
+
+Literature-derived network models 
+
+networked-vdp-2 4/6/2 R (0 .48 /1.1) (0 .3/0.13) (0 .45 /0.16) (0 .84 /1.9) (0 .95 /78) (0 .95 /120) 
+
+liu-10d 10 /10 /0 R (19 /0.29) (14 /0.074) (19 /0.32) (10 /45) TO TO 
+
+Prescribed-basin geometry test 
+
+shear-cubic-a1 2/6/4 A (0 .63 /3.4) (0 .072 /0.4) (0 .16 /0.43) (1 /3) (1 .9/31) −− A
+
+> 2/3
+
+Single-link relay family (D.3) ; instances are indexed by (p, n )(3 , 2) 2/3/1 R (1 .2/1.7) (0 .87 /1.7) (1 .1/1.6) (1 /1.8) −− A 
+
+> 2/3
+
+(1 .2/17) (3 , 4) 4/5/1 R (0 .89 /2.3) (0 .45 /1.6) (0 .88 /1.8) (0 .68 /4.5) −− A 
+
+> 0/3
+
+−− A
+
+> 0/3
+
+(3 , 6) 6/7/1 R (0 .7/3.5) (0 .35 /1.5) (0 .7/1.6) (0 .56 /13) −− A 
+
+> 0/3
+
+−− A
+
+> 0/3
+
+(3 , 8) 8/9/1 R (0 .53 /5.7) (0 .22 /1.7) (0 .53 /1.6) (0 .45 /31) TO −− A
+
+> 0/3
+
+(5 , 2) 2/4/2 R (1 /1.9) (0 .72 /1.7) (0 .94 /1.8) (0 .96 /2.5) (1 .2/14) −− A
+
+> 0/3
+
+(5 , 4) 4/6/2 R (0 .8/2.8) (0 .36 /1.8) (0 .77 /1.9) (0 .65 /17) (1 .3/310) TO 
+
+(5 , 6) 6/8/2 R (0 .62 /2.9) (0 .28 /1.8) (0 .61 /1.7) (0 .55 /150) TO −− R
+
+(5 , 8) 8/10 /2 R (0 .48 /7.7) (0 .18 /1.6) (0 .47 /1.8) TO −− R −− R
+
+(7 , 2) 2/5/3 R (0 .94 /2.2) (0 .6/1.6) (0 .85 /1.4) (0 .93 /3.6) (1 .2/25) (1 .2/57) (7 , 4) 4/7/3 R (0 .74 /3.8) (0 .3/1.9) (0 .71 /1.6) (0 .63 /77) TO TO 
+
+(7 , 6) 6/9/3 R (0 .57 /5.6) (0 .23 /1.6) (0 .56 /1.8) TO −− R −− R
+
+(7 , 8) 8/11 /3 R (0 .45 /13) (0 .15 /1.7) (0 .44 /2) −− R −− R −− R
+
+this relay cohort was run. Each arm has three isolated repeats and an independent 600-second deadline; a timeout or completed budget crossing retires only the same method at larger n within the same degree and repeat. Geometry has a separate 120-second budget and uses 4096 seeded random directions, the 2n signed coordinate directions, and the two equilibrium directions, with the same radial scan and bisection resolution as above. Table 1 gives the normalized comparison used in the main text, while Table 3 reports the absolute score and construction-time medians for all six methods and both cohorts. 
+
+D.3. Supplementary geometry. For the planar quintic, write x = x1, y = x2,let z(x) = ( x, x 2, x 3)⊤, and partition the metric with respect to (z, y ) as  C bb⊤ a
+
+. Since 
+
+a > 0, completing the square gives 
+
+V (x, y ) = a y + a−1b⊤z(x)2 + z(x)⊤(C − a−1bb ⊤)z(x).OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 41                       
+
+> Table 4
+> Maximum stored numerical diagnostics at the historical ODQ returns. Columns include every returned certificate in the corresponding cohort; no new optimization was run to produce this table.
+> Diagnostic Heterogeneous ( 57 )Relay ( 36 )Stored normalized Lyapunov residual bound 8.02 ×10 −15 4.81 ×10 −16
+> Certificate-map reconstruction residual ( ∥ · ∥ F)8.15 ×10 −14 2.92 ×10 −14
+> Epigraph discrepancy |√τ− ∥ J∥2|2.45 ×10 −77.75 ×10 −9
+> Epigraph discrepancy /max {1,∥J∥2}9.87 ×10 −87.54 ×10 −9
+> Gauge KKT residual max k|⟨ Z, J k⟩| 4.45 ×10 −12 2.25 ×10 −11
+> Generalized-Schur dual normalization residual 1.99 ×10 −89.64 ×10 −9
+
+Writing f (x) = ρ2safe − z(x)⊤(C − a−1bb ⊤)z(x), the vertical slice has width 2pf (x)/a 
+
+wherever f (x) > 0. We isolate all real roots of this degree-six polynomial and integrate over every positive interval. This does not assume a star-shaped set; all sampled quintic sets have one component. Symbolic checks verify the square completion, including examples with disconnected sets and repeated roots. At the saved Gauge and ODQ points, the area agrees with the original 8001-slice estimates to relative errors 
+
+1.73 × 10 −6 and 1.05 × 10 −7. Root isolation interprets the input floats as rational numbers; the subsequent quadrature and its error estimates remain floating-point. The new grid comprises 145 fixed-gain SDP solves. 
+
+D.4. Numerical diagnostics, failures, and timing. We read the source-locked raw artifacts for all 57 heterogeneous and 36 relay ODQ returns, including the nine heterogeneous m = 0 controls. Table 4 summarizes the diagnostics stored at those returned certificates. These are floating-point residual screens, not interval or rational proofs. The epigraph and dual residuals measure optimization accuracy; they do not replace the independent residual-aware certificate condition. Raw residuals have different scales across systems and dimensions. The additional normalized epigraph diagnostic uses max {1, ∥J∥2} only as a descriptive scale. The heterogeneous outer exits comprise 30 finite-bundle tolerance exits, 18 oracle-budget exits, and nine vacuous exits with no gain variables; all 36 relay runs reach the finite-bundle tolerance. These are not exact Clarke-stationarity certificates. The stored outer residual is evaluated at a point different from the best returned certificate gain in 33 /57 heterogeneous and 9/36 relay runs. Every returned ODQ certificate passes its separate numerical certificate screen, and no reported inner solve changes the requested Mosek /generalized-Schur backend. The historical files do not retain all oracle evaluations, so they do not support a count of every filtered inner candidate. The six heterogeneous timeouts of each quartic arm occur on duffing-chain-3 
+
+and liu-10d , in all three repeats. The three additional SOS–4(8) failures comprise two returns on cubic-ring-3 and one on shear-cubic-a1 ; one explicitly fails the pre-scribed radius-shrink screen and two return no valid certificate. A solver-indeterminate outcome in the relay cohort is not interpreted as mathematical infeasibility. For each heterogeneous ODQ run, the saved construction time is the sum of lift construction, stable-box screening, the complete inner-oracle calls, gradient sensitivity, and remaining outer logic. The numerical bookkeeping agrees with this partition in all 
+
+57 records. Lyapunov solves, matrix assembly, modeling-interface work, SDP solution, and certificate auditing are included within the inner-oracle component. In particular, 
+
+t_inner_sdp_total is not solver-only time. Saved Lyapunov and inner audit counters are nested diagnostics and are not added again. Table 6 reports arithmetic means over the three repeats so the partition remains additive before rounding. 42 Y. CAI AND G. ZARDINI 
+
+Table 5 
+
+Outcomes of all predeclared method–case–repeat cells: 57 per heterogeneous method and 36 per relay method. Indet. denotes a solver-indeterminate return; failed denotes another unsuccessful certificate return. Retired relay cells were not executed after an earlier resource-limit event and are counted separately from observed failures. 
+
+Cohort Method Success Timeout Indet. Failed Retired Heterogeneous Base 57 0 0 0 0Heterogeneous Gauge 57 0 0 0 0Heterogeneous ODQ 57 0 0 0 0Heterogeneous SOS–2 57 0 0 0 0Heterogeneous SOS–4(2) 51 6 0 0 0Heterogeneous SOS–4(8) 48 6 0 3 0Relay Base 36 0 0 0 0Relay Gauge 36 0 0 0 0Relay ODQ 36 0 0 0 0Relay SOS–2 27 6 0 0 3Relay SOS–4(2) 11 9 7 0 9Relay SOS–4(8) 6 9 8 0 13 
+
+Table 6 
+
+Mean heterogeneous ODQ construction-time partition over three repeats, in seconds. Lift: quadratization; box: stability screen; inner: complete inner oracle; grad.: gradient sensitivity; outer: remaining logic. Geometry, startup, warm-up, and serialization are excluded. Displayed components may differ from the displayed total by rounding. 
+
+System Lift Box Inner Grad. Outer Total 
+
+bistable 0.113 0.0116 0.229 0.0127 0.0439 0.411 
+
+cascade-3d 0.133 7.29 ×10 −4 2.22 0.0927 0.0846 2.53 
+
+chafee-3 0.215 7.47 ×10 −4 1.5 0.0695 0.0633 1.85 
+
+cubic 0.115 3.14 ×10 −4 0.0475 6.69 ×10 −3 0.0268 0.196 
+
+cubic-3d 0.165 1.18 ×10 −3 4.16 0.151 0.0793 4.56 
+
+cubic-ring-3 0.245 5.19 ×10 −3 10 .2 0.237 0.0666 10 .8
+
+duffing 0.0955 3.65 ×10 −4 0.0643 7.3×10 −3 0.0244 0.192 
+
+duffing-chain-2 0.145 5.07 ×10 −4 0.93 0.039 0.053 1.17 
+
+duffing-chain-3 0.178 1.06 ×10 −3 6.52 0.101 0.0733 6.87 
+
+liu-10d 0.0806 0 0.211 0 1.5×10 −4 0.292 
+
+networked-vdp-2 0.158 6.85 ×10 −4 0.985 0.0354 0.0504 1.23 
+
+planar-quintic 0.126 4.78 ×10 −4 0.523 0.0285 0.0483 0.727 
+
+quad-2d 4.93 ×10 −3 0 6×10 −3 0 1.07 ×10 −4 0.011 
+
+quad-cross 3.24 ×10 −3 0 6.81 ×10 −3 0 1.23 ×10 −4 0.0102 
+
+quintic 0.128 4.13 ×10 −4 0.549 0.0266 0.051 0.755 
+
+septic 0.153 6.07 ×10 −4 0.966 0.0668 0.0705 1.26 
+
+septic-2d 0.161 6.16 ×10 −4 1.47 0.0855 0.0818 1.8
+
+shear-cubic-a1 0.396 0.0803 2.71 0.138 0.0812 3.4
+
+vanderpol 0.112 3.87 ×10 −4 0.142 0.0129 0.0415 0.308 
+
+The relay artifacts instead retain launch-to-serialization wall time and separately timed geometry extraction, without an inner-stage partition. We do not infer a missing solver-only time by subtracting available counters, and we retain the two cohorts’ different timing conventions. To inspect matrix-level quantities absent from the historical artifacts, we perform one new fixed-gain inner SDP at each saved ODQ gain across all 19 + 12 cases. The lifting map, stabilizer factorization, and Q = I remain fixed, and no outer optimization is repeated. Table 7 concerns these newly computed matrices; it does not reconstruct the historical solver matrices or replace their reported certificates and timings. For K = Hreturned − Hnative , the gauge check evaluates every coefficient Kjii and 
+
+Kjik + Kjki for i < k , rather than testing sampled vectors. The certificate matrix is independently reassembled from the returned P, H . For L =
+
+h P ⊗I GGT τ I 
+
+i
+
+, the scaled OPTIMIZING LYAPUNOV CERTIFICATES VIA DISSIPATIVE QUADRATIZATION 43 
+
+Table 7 
+
+Fixed-gain audit of newly computed certificates, one per case. The first row gives the minimum positive eigenvalue; all other rows give maximum defects. These floating-point checks are distinct from the historical summaries above. 
+
+Diagnostic Heterogeneous ( 19 ) Relay ( 12 )
+
+λmin (P ) 0.0306 0.0479 
+
+∥AT P + P A + I∥2 5.54 ×10 −15 3.26 ×10 −16 
+
+Coefficientwise gauge identity defect 4.44 ×10 −16 2.22 ×10 −16 
+
+Reassembled J discrepancy / max {1, ∥J∥2} 2.15 ×10 −16 2.42 ×10 −16 
+
+Model-LMI negative eigenvalue part (scaled) 2.17 ×10 −9 2.07 ×10 −9
+
+Returned-H LMI negative eigenvalue part (scaled) 2.17 ×10 −9 2.07 ×10 −9
+
+Epigraph discrepancy / max {1, ∥J∥2} 9.87 ×10 −8 7.54 ×10 −9
+
+Independently assembled gauge KKT residual 4.45 ×10 −12 2.25 ×10 −11 
+
+semidefiniteness defect is max {0, −λmin (L)}/ max {1, ∥L∥2}; we check both the solver’s model G and the G reconstructed from the returned H. Small negative eigenvalues are recorded as numerical defects, not silently rounded to feasibility. These call times may overlap across workers and are diagnostic only.

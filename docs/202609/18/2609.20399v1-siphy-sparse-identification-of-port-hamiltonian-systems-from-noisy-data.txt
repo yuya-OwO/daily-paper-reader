@@ -1,0 +1,1184 @@
+Title: SIPHy: Sparse identification of port-Hamiltonian systems from noisy data
+
+URL Source: https://arxiv.org/pdf/2609.20399v1
+
+Published Time: Fri, 18 Sep 2026 01:45:39 GMT
+
+Number of Pages: 25
+
+Markdown Content:
+# SIPHy: Sparse identification of port-Hamiltonian systems from noisy data 
+
+H˚ akon Noren Myhr 1 Sølve Eidnes 2 J. Nathan Kutz 3
+
+September 18, 2026 
+
+Abstract 
+
+We propose sparse identification of port-Hamiltonian systems (SIPHy), enabling structure-preserving symbolic regression from noisy trajectory observations. The method applies to port-Hamiltonian systems, which provide a general framework for describing dynamical systems in terms of energy exchange, dissipation and con-trol. Our algorithm can jointly identify the Hamiltonian as well as the dissipation and input matrices. Furthermore, we introduce Hamiltonian flow splines to better approximate derivatives of trajectory data corrupted by noise or with missing time points, a major challenge of system identification for differential equations. This method assembles flows of piecewise polynomial Hamiltonians to produce a smooth, differentiable trajectory necessary for sparse regression. Combining flow splines with SIPHy yields interpretable, physically grounded models from noisy and incomplete trajectory data. Because the Hamiltonian, dissipation, and input matrices are iden-tified as separate components, the resulting models can be simulated under control inputs and dissipation regimes never observed during training, thus improving the robustness and generalization capabilities of model discovery methods. 
+
+## 1 Introduction 
+
+Physics-informed machine learning aims to combine data-driven methods with prior physical knowledge about the underlying dynamics to be modelled. A class of methods within this framework allows models to be hard-constrained to inherit physical principles or geometric properties such as energy preservation, symmetries or conservation laws of the dynamical system [15, 25, 4]. Even though these approaches enable accurate fore-casts of dynamical systems, many rely on neural networks, which often provide little or no interpretability of the discovered systems. Symbolic regression [3, 28, 8], on the other hand, identifies a parsimonious mathematical expression of the dynamical system from data [21]. Such algorithms provide forecasts as well as an interpretable representation, fa-cilitating scientific discovery. However, few symbolic regression algorithms allow physics 
+
+> 2SINTEF Digital, Oslo, Norway.
+> 3Autodesk Research, 6 Agar Street, London, United Kingdom.
+> 1Norwegian University of Science and Technology, Trondheim, Norway (hakon.noren@ntnu.no).
+
+1arXiv:2609.20399v1 [math.DS] 17 Sep 2026 Observed ˜y           
+
+> Flow spline z
+> Train yw
+> Test yw
+> True
+> Identified pH system
+> ([ 01
+> −10
+> ]
+> −
+> [0000.095
+> ])
+> ∇(0.488 p20−1.017 cos ( q0)).
+
+Figure 1: System identification with Hamiltonian flow splines and SIPHy. (a) Fit a Hamiltonian flow spline z(t) (lower, middle) to corrupted trajectory data ˜ y(ti) from the damped pendulum (lower left). (b) Build a nonlinear feature library Θ from the preprocessed trajectory and control u(t). (c) Solve sparse regression to identify the port-Hamiltonian (pH) parameters w. (d) Integrate the identified pH system (lower right) from the initial value corresponding to the observed trajectory ( yw train) and a new initial value ( yw test). The level sets show energy levels for the true and learned Hamiltonians. 
+
+constraints to be enforced. While the Hamiltonian formalism describes dynamical sys-tems in terms of energy conservation, port-Hamiltonian systems [32] are a generalized framework for describing multi-physical systems through energy exchange, dissipation and interconnection. Port-Hamiltonian systems are thus naturally suited for data-driven modeling when working with a priori assumptions on the energy of the system [12, 31]. Beyond a convenient modeling formalism, identifying a system in port-Hamiltonian form provides three concrete benefits over identifying an unstructured vector field. First, the energy function, dissipation, and input map are recovered as separate components with direct physical meaning, rather than entangled in a single regression target. Second, be-cause these components are identified independently, the model can be simulated under control inputs and dissipation regimes that differ from those used for training — enabling counterfactual analysis that is not possible with black-box surrogates or unstructured sparse regression. In this work, we consider structure-preserving symbolic regression for dynamical 2Hamiltonian flow splines SIPHy Purpose Differentiation of noisy data System identification 
+
+Structure Piecewise Hamiltonian Port-Hamiltonian 
+
+Optimization Constrained nonlinear Sequentially thresholded least squares 
+
+Notation Trajectory: z(t)Coefficients: a(k)
+
+Hamiltonian: H(z; a) = Λ(z)⊤a
+
+Trajectory: yw(t)Coefficients: w = [ c r g ]Hamiltonian: H(y) = Ξ(y)⊤cCoefficients Satisfy continuity and coercivity Sparse 
+
+Time domain 
+
+Local: a(t) = a(k) for t ∈ [Tk, T k+1 ) Global: w(t) = w for t ∈ [0 , T ]
+
+Basis for 
+
+H(·)
+
+Λ(z) = [ z1, z 1z2, . . . , z 41 , z 42 ] Ξ(y) = [ y1, y 1y2, . . . , sin( y1)] 
+
+Dynamics 
+
+ñ ˙q
+
+˙p
+
+ô
+
+=
+
+ñ ∇pΛ(z)
+
+−∇ q Λ(z)
+
+ô
+
+a(k), t ∈ [Tk, T k+1 )
+
+ñ ˙q
+
+˙p
+
+ô
+
+=
+
+ñ ∇pΞ(q, p) 0 0
+
+−∇ q Ξ(q, p) − ˙Q U
+
+ô 
+
+crg
+
+
+
+Table 1: Comparison of Hamiltonian flow splines and SIPHy. ˙Q := diag( ˙ q) and 
+
+U := diag( u). systems. In particular, we assume the observed trajectories originate from a port-Hamiltonian system and aim to discover a symbolic vector field hard-constrained to satisfy a port-Hamiltonian structure. Additionally, we investigate how to exploit the un-derlying structure of the system when the observed trajectories are corrupted by noise. In the first part of this paper, we introduce the SIPHy algorithm and detail how as-sumptions about the port-Hamiltonian systems allow the system identification problem to be formulated as a linear regression, unlike previous approaches [22]. Hamiltonian flow splines are then introduced by showing how to construct piecewise Hamiltonian polynomials with continuity and coercivity. Finally, we provide extensive numerical ex-periments demonstrating the robustness of the proposed algorithms. An illustration of the proposed framework is presented in Figure 1, and Table 1 provides an overview of the two proposed algorithms: Hamiltonian flow splines and SIPHy. 
+
+## 2 Related work 
+
+Recent algorithms for system identification embed geometric priors into regression. In [22], SINDy is unified with neural ODEs to learn Poisson and metriplectic brackets; [6] and [24] enforce Hamiltonian structure via weak-form identification, and [27] provides a framework for enforcing symmetry or learning symmetry in dynamic models. The work in [17] uses gradient-based optimization to identify analytic pseudo-Hamiltonian models whose internal dynamics are separated from damping and external forces, while [10] assumes separability of the Hamiltonian and leverages explicit symplectic integrators. 3Noise-robust approaches integrate denoising into system identification. In [7], the authors compare local and global smoothing algorithms as well as different methods for hyperparameter search. Denoising and sparse recovery via constrained inverse problems are considered in [16], [34] leverages physics-informed spline interpolation, whereas [19] simultaneously identifies the dynamical system while modeling the noise distribution. Port-Hamiltonian (PH) systems provide a geometric, energy-based representation of multi-physical dynamics in which storage, dissipation, and exchange with the environ-ment are expressed through power-conjugate port variables. By encoding the total stored energy in a Hamiltonian and enforcing power balance via an interconnection matrix, the PH formalism guarantees passivity and therefore facilitates robust, globally stabilizing control design through interconnection-and-damping-assignment schemes [32, 26]. This structure generalizes classical Euler–Lagrange mechanics, extends naturally to electro-mechanical and fluid networks, and has been exploited in applications ranging from rigid-body attitude regulation [11, 13, 29, 14] to modern data-driven modeling, where recent algorithms learn sparse or adaptive PH descriptions directly from measured tra-jectories while preserving the underlying energetic constraints [30, 18]. 
+
+## 3 Sparse identification of port-Hamiltonian systems (SIPHy) 
+
+The central observation enabling SIPHy is that, under structural assumptions on the port-Hamiltonian system — namely that dissipation and control only act on the momen-tum coordinates, and therefore enter only in the equation for ˙ p — the joint identification of the Hamiltonian function, the dissipation matrix, and the input map reduces to a sin-gle linear regression problem in the unknown coefficients. This is in contrast to prior structure-preserving identification approaches [22, 17], which require nonlinear optimiza-tion. The linearity makes sequentially thresholded least squares directly applicable and yields sparse, interpretable models without iterative gradient methods. 
+
+3.1 Port-Hamiltonian systems 
+
+We consider port-Hamiltonian systems of the form ˙y(t) = 
+
+Åï 0 I
+
+−I 0
+
+ò
+
+−
+
+ï0 00 R
+
+òã 
+
+∇H(y(t)) + 
+
+ï 0
+
+G
+
+ò
+
+u(t), (1) where y ∈ Rn is the system state, u(t) ∈ Rd is a control input, and n = 2 d. For simplicity, assume that R = diag {r1, r 2, . . . , r d} and G = diag {g1, g 2, . . . , g d} are diagonal matrices where ri ≥ 0. The system is conservative for ri = 0 and dissipative for ri > 0 with 
+
+i = 1 , 2, . . . , d . Let y(t) be the solution and ˜ yi = y(ti) + δi be noisy measurements, where δi ∼ N (0 , σ 2I). System identification in this setting aims at identifying the Hamiltonian function H(y) and the matrices R and G from the noisy measurements ˜ yi.43.2 System identification by least squares 
+
+Let Ξ : Rn → Rp be a vector containing p functions of y, for instance a combination of polynomials and trigonometric terms 
+
+Ξ(y) = y1 y2 . . . yn y21 . . . sin( y1) cos( y2) . . . ⊤ ∈ Rp. (2) We aim to find a linear combination of these functions with weights c ∈ Rp, that can be used to approximate the Hamiltonian as Hc(y) = Ξ(y)⊤c. Letting ∇Ξ(y) ∈ Rn×p be the Jacobian, the corresponding conservative Hamiltonian system is ˙ y = J∇Ξ(y)c.Let y = [ q, p]⊤ be a splitting of the system state, where q, p ∈ Rd are the generalized position and momentum, assuming that n = 2 d. Since the dissipation and control terms only act on ˙ p, we can write the system dynamics as 
+
+ï ˙q
+
+˙p
+
+ò
+
+=
+
+Åï 0 I
+
+−I 0
+
+ò
+
+−
+
+ï0 00 R
+
+òã ï ∇qH(q, p)
+
+∇pH(q, p)
+
+ò
+
++
+
+ï 0
+
+G
+
+ò
+
+u
+
+=
+
+ï ∇pH(q, p)
+
+−∇ qH(q, p)
+
+ò
+
++
+
+ï 0
+
+−R ˙q + Gu 
+
+ò
+
+.
+
+Introducing the coefficients r, g ∈ Rd, we can express system identification of equa-tions of the form (1) as solving a linear system of equations. For a given point in time, we aim to find a coefficient vector w = c⊤ r⊤ g⊤⊤ ∈ Rp+n such that 
+
+ï ˙q
+
+˙p
+
+ò
+
+=
+
+ï ∇pΞ(q, p) 0 0
+
+−∇ qΞ(q, p) −diag( ˙ q) diag( u)
+
+ò
+
+| {z } 
+
+> Θ( q,p, ˙q,u )
+
+
+
+crg
+
+
+
+= Θ(q, p, ˙q, u)w,
+
+with Θ(q, p, ˙q, u) ∈ Rn×(p+n). In terms of y we write ˙y = Θ(y, ˙y, u)w and for m
+
+observations in time {yi, ˙yi, ui}mi=1 , by concatenation we obtain 
+
+
+
+˙y1
+
+˙y2
+
+...
+
+˙ym
+
+ =
+
+
+
+Θ(y1, ˙y1, u1)
+
+Θ(y2, ˙y2, u2)
+
+...
+
+Θ(ym, ˙ym, um)
+
+ w,
+
+which leads to the least squares problem min  
+
+> w∈Rp+n
+
+∥ ˙Y − Θ(Y, ˙Y, U)w∥22, (3) where Y, ˙Y ∈ Rmn is the concatenated state and its derivative and the evaluations of the basis functions are given by Θ(Y, ˙Y, U) ∈ Rmn ×(p+n).5Remark 3.1 (Extending R and G beyond constant diagonal) . The same linear-regression principle extends from constant diagonal R to matrix-valued dissipation R(z), provided it is parametrized linearly in a known feature library {ψl},
+
+R(x) = 
+
+> M
+
+X
+
+> ℓ=1
+
+ψℓ(x) R(ℓ), x = ( q, p, ˙q, ˙p),
+
+where each R(ℓ) ∈ Rd×d is an unknown constant-coefficient matrix. If we stack the entries of these matrices into a vector 
+
+r := vec( R(1) )⊤ vec( R(2) )⊤ . . . vec( R(M ))⊤⊤ ∈ RM d 2
+
+,
+
+then 
+
+R(z) ˙ q =
+
+> M
+
+X
+
+> ℓ=1
+
+ψℓ(x) R(ℓ) ˙q =
+
+h
+
+ψ1(x)( ˙ q⊤ ⊗ Id) ψ2(x)( ˙ q⊤ ⊗ Id) · · · ψM (x)( ˙ q⊤ ⊗ Id)
+
+i
+
+r.
+
+Hence, the dissipation term is still linear in the unknown coefficients, and the same generalization could be made for the input matrix G.
+
+3.3 Sparse regression via Sequential Thresholded Least Squares 
+
+We solve (3) via Sequential Thresholded Least Squares (STLSQ) [3, 9, 37], which al-ternates ridge regression with hard-thresholding to produce a sparse coefficient vector. STLSQ requires a regularization parameter α ≥ 0 and a coefficient threshold τ > 0, both selected via the procedure in Appendix A. We choose a Hamiltonian basis Ξ with all unique monomials up to degree 5 in y ∈ Rn, optionally augmented with the 2 n
+
+trigonometric terms {sin( yi), cos( yi)}ni=1 .The following notation is used to describe the STLSQ algorithm. We define the index set [ P ] := {1, 2, . . . , P }, for P = p + n, the number of library terms. For any matrix 
+
+Θ ∈ RM ×P and any index set IS ⊆ [P ], we denote by ΘS ∈ RM ×S the submatrix formed by the columns of Θ indexed by IS . Similarly, for a vector w ∈ RP , wS ∈ RS denotes the subvector restricted to the indices in IS . STLSQ as implemented in [9] is given by Algorithm 1 with the following additional step to guarantee nonnegative dissipation. Neither the least-squares problem (3) nor STLSQ constrains the sign of the dissipa-tion coefficients, so the identified R may fail to be positive semi-definite under noise, in which case the identified model is not passive. Since R = diag( r), we need to enforce d
+
+bound constraints r ≥ 0. Writing IR := {P + 1 , . . . , P + d} for the indices of r in w,we keep the coefficients returned by Algorithm 1 whenever they satisfy r ≥ 0. If instead 
+
+ri < 0 for some i, we recompute the coefficients on the converged support IS by solving the bound-constrained problem 
+
+w⋆S = arg min     
+
+> wS:wi≥0∀i∈I S∩I R
+
+˙Y − ΘS wS 22 + α ∥wS ∥22, (4) a convex quadratic program in |I S | variables with at most d active bounds. This guar-antees R ⪰ 0 for the returned model. The refit is applied only to the converged support 6and only when the unconstrained solution is negative, so it leaves both the support selection of Algorithm 1 and any nonnegative solution unchanged. 
+
+Algorithm 1 Sequential Thresholded Least Squares (STLSQ) with nonnegative refit 
+
+Require: Feature matrix Θ ∈ RM ×P , derivative data ˙Y ∈ RM , regularization parame-ter α ≥ 0, threshold τ > 0, maximum iterations Kmax . 
+
+> 1:
+
+Initialization: Compute w(0) ← arg min w
+
+¶∥ ˙Y − Θ w ∥22 + α ∥w∥22
+
+© . 
+
+> 2:
+
+for k = 0 , 1, . . . , K max do  
+
+> 3:
+
+IS ← { i s.t. |w(k) 
+
+> i
+
+| ≥ τ }. ▷ Update support set.  
+
+> 4:
+
+w(k+1) ← arg min wS ∥ ˙Y − ΘS wS ∥22 + α ∥wS ∥22, ▷ Ridge regression.  
+
+> 5:
+
+I(k+1)  
+
+> S
+
+← I S . 
+
+> 6:
+
+if I(k+1)  
+
+> S
+
+= I(k) 
+
+> S
+
+then  
+
+> 7:
+
+break  
+
+> 8:
+
+end if  
+
+> 9:
+
+end for  
+
+> 10:
+
+if w(k+1)  
+
+> i
+
+< 0 for some i ∈ I (k+1)  
+
+> S
+
+∩ I R then  
+
+> 11:
+
+w(k+1) ← arg min wS : wi≥0 ∀i∈I S ∩I R ∥ ˙Y − ΘS wS ∥22 + α ∥wS ∥22, ▷ Refit.  
+
+> 12:
+
+end if  
+
+> 13:
+
+return w (k+1) 
+
+## 4 Hamiltonian flow splines 
+
+We now introduce Hamiltonian flow splines: a structure-preserving smoother for trajec-tory data from port-Hamiltonian systems. While used as a preprocessing step for SIPHy in this paper, flow splines are an independent contribution that can be paired with any downstream identification method requiring smooth derivatives. A Hamiltonian flow spline is a trajectory z(t) : [0 , T ] → Rn obtained from solving a piecewise polynomial Hamiltonian system. Here, we derive linear conditions on the polynomial coefficients en-suring C3 continuity and bounded trajectories through coercive Hamiltonians. We first define the piecewise polynomial Hamiltonians, and then linear conditions for continuity and coercivity. The optimization problem to fit the flow splines to data is described in Section 4.4. 
+
+4.1 Piecewise polynomial Hamiltonians 
+
+The Hamiltonians used for the flow splines are constructed by taking linear combinations of monomials of z ∈ Rn with coefficients ai ∈ R:
+
+H(z) = a1z1 + a2z1z2 + a3z21 + · · · 
+
+To enforce bounded trajectories (described in detail in Section 4.3), we restrict the set of highest-order monomials to be even and contain only non-mixed powers {zp 
+
+> 1
+
+, z p 
+
+> 2
+
+, . . . , z pn}
+
+7with order p = 2 l for any integer l ≥ 1. Define the multi-index sets 
+
+Ap−1 := {α ∈ Nn : 0 < |α| ≤ p − 1}, Ep := {pe1, . . . , p en},
+
+where ei ∈ Rn denotes the i-th canonical basis vector and |α| = P 
+
+> i
+
+αi. For example 
+
+α = ( i, j ) gives zα = zi
+
+> 1
+
+zj
+
+> 2
+
+. We then use the restricted index set 
+
+Rp := Ap−1 ∪ E p, (5) and define the monomial basis as 
+
+Λ(z) := zα 
+
+> α∈R p
+
+: Rn → RNΛ , NΛ =
+
+Çn + p − 1
+
+p − 1
+
+å
+
++ n − 1.
+
+For a coefficient vector a ∈ RNΛ , we define the parametrized Hamiltonian 
+
+H(z; a) := Λ(z)⊤a.
+
+Consider now a piecewise-constant coefficient function a(t) over K segments in time of the form 
+
+a(t) = a(k), for t ∈ [Tk, T k+1 ), k = 0 , . . . , K − 1,
+
+with a(k) ∈ RNΛ and where 0 < T 1 < · · · < T K = T are knots defining the length of the segments. The Hamiltonian flow spline z(t) is then defined as the solution of the time-varying Hamiltonian system ˙z(t) = J ∇z H(z(t); a(t)) , z(0) = z0. (6) Global C3 regularity across knots is enforced by the continuity conditions in the following section, while coercivity guaranteeing bounded trajectories is discussed in Section 4.3. 
+
+4.2 Continuity 
+
+Because H(z; a) is linear in a, the derivatives of the basis that determine the regularity of z(t) across a knot are linear in a as well. Fix a knot Tk, write zk := z(Tk), and denote by ˙z− 
+
+> k
+
+:= lim 
+
+> h→0
+
+z(Tk) − z(Tk − h)
+
+h , ˙z+ 
+
+> k
+
+:= lim 
+
+> h→0
+
+z(Tk + h) − z(Tk)
+
+h
+
+the one-sided first derivatives at Tk and similarly for the second derivatives, replacing z
+
+by ˙ z on the right-hand sides. Define the n × NΛ matrices 
+
+Λ1 
+
+> k
+
+:= ∇z Λ(zk),
+
+Λ2 
+
+> k
+
+:= ∇2 
+
+> z
+
+Λ(zk)  ˙z− 
+
+> k
+
+, ·  ,
+
+Λ3 
+
+> k
+
+:= ∇3 
+
+> z
+
+Λ(zk)  ˙z− 
+
+> k
+
+, ˙z− 
+
+> k
+
+, ·  + ∇2 
+
+> z
+
+Λ(zk) ¨z− 
+
+> k
+
+, ·  ,
+
+where ∇kz Λ : Rn × · · · × Rn → RNΛ are multilinear forms, contracted to matrices in the equations above. The continuity-constraint matrix is defined as 
+
+Ck := 
+
+
+
+Λ1
+
+> k
+
+Λ2
+
+> k
+
+Λ3
+
+> k
+
+ ∈ R3n×NΛ . (7) 8Theorem 4.1 (Linear continuity condition) . Let a(t) be piecewise constant such that 
+
+a(t) = a(k) on [Tk, T k+1 ), and let z : [0 , T ] → Rn be continuous and satisfying (6) on each subinterval (Tk, T k+1 ). Let Ck be given by (7) . If, for every knot Tk,
+
+Ck
+
+ a(k+1) − a(k) = 0 , (8) 
+
+then z ∈ C 3([0 , T ]) .Proof. On each open interval ( Tk, T k+1 ), a(t) is constant, so ∇z H(z ; a(k)) is C2 and the solution z(t) is thus C3 on ( Tk, T k+1 ). Define a− := a(k) and a+ := a(k+1) . The one-sided first derivatives are ˙z± 
+
+> k
+
+= J∇z Λ(zk) a±.
+
+From (8) we have that 
+
+∇z Λ(zk)( a+ − a−) = 0 ,
+
+and thus ˙ z− 
+
+> k
+
+= ˙ z+ 
+
+> k
+
+, which we denote by ˙ zk. Similarly, since ¨ z± 
+
+> k
+
+= J∇2 
+
+> z
+
+Λ(zk)( ˙ zk, a±) then 
+
+∇2 
+
+> z
+
+Λ(zk)  ˙zk, a+ − a− = 0 ,
+
+which implies ¨ z− 
+
+> k
+
+= ¨ z+ 
+
+> k
+
+denoted by ¨ zk. Finally, ˙˙˙ z± 
+
+> k
+
+= J∇3 
+
+> z
+
+Λ(zk)  ˙zk, ˙zk, a± + J∇2 
+
+> z
+
+Λ(zk) ¨zk, a± ,
+
+and the last n elements of (8) means that ˙˙˙ z− 
+
+> k
+
+= ˙˙˙ z+ 
+
+> k
+
+.
+
+Remark 4.2 (Parameterization of admissible coefficient updates) . If Ck has full row rank 3 n and NΛ > 3n, then the admissible differences a(k+1) − a(k) lie in null( Ck). Let 
+
+UΣV ⊤ = Ck be a singular value decomposition and let ˜Vk ∈ RNΛ×(NΛ−3n) collect the last NΛ − 3n columns of V. Then any coefficient update preserving C3 can be written as 
+
+a(k+1) = a(k) + ˜Vk ˜a(k), ˜a(k) ∈ RNΛ−3n.
+
+4.3 Coercivity of the Hamiltonian 
+
+A practical pitfall of polynomial-based smoothers is unbounded extrapolation: small fitting errors can lead to trajectories that diverge, particularly under noise. We address this directly through coercivity, i.e. the property that lim  
+
+> ∥z∥→∞
+
+H(z) = + ∞.
+
+By [2, Prop. 11.11], coercivity is equivalent to the boundedness of all sublevel sets. Along a Hamiltonian trajectory, the value of H(z) is conserved, so the trajectory remains in a level set of H. Thus, a coercive Hamiltonian implies bounded trajectories. For the restricted polynomial family used here, we show that coercivity reduces to a linear inequality on the leading coefficients, making it simple to enforce during optimization: 9Theorem 4.3 (Linear coercivity condition) . Let p = 2 l and let H(z; a) = Λ(z)⊤a be built from the restricted monomial basis given by Rp in (5) . Assume that L < N Λ is the index such that aL+j are the weights for the degree p monomials, i.e. 
+
+H(z; a) = 
+
+> L
+
+X
+
+> i=1
+
+aizαi +
+
+> n
+
+X
+
+> j=1
+
+aL+j zpj .
+
+If 
+
+aL+j ≥ ϵ > 0, j = 1 , . . . , n, (9) 
+
+then H(z; a) is coercive, i.e. 
+
+lim  
+
+> ∥z∥→∞
+
+H(z; a) = + ∞.
+
+Proof. Since p is even, nX
+
+> j=1
+
+aL+j zpj ≥ ϵ
+
+> n
+
+X
+
+> j=1
+
+|zj |p = ϵ∥z∥pp.
+
+For the remaining polynomial PLi=1 aizαi , we have |αi| ≤ p − 1, and thus 
+
+|zα| =
+
+> n
+
+Y
+
+> j=1
+
+|zj |[α]j ≤ C(1 + ∥z∥p−1),
+
+for a constant C > 0. Therefore 
+
+H(z; a) ≥ ϵ∥z∥pp − C 1 + ∥z∥p−1
+
+≥ ϵc p∥z∥p − C 1 + ∥z∥p−1,
+
+with cp > 0 being the constant such that ∥z∥pp ≥ cp∥z∥p by the equivalence of norms on 
+
+Rn. Hence, H(z; a) → +∞ as ∥z∥ → ∞ .
+
+4.4 Applying Hamiltonian flow splines to data 
+
+Consider noisy measurements ˜ yn = y(tn) + δn, for n = 1 , 2, . . . , N , and let η ∈ [0 , 1) be the rate of missing data, meaning ηN points in time are missing. We fit a smooth trajectory z(t) to noisy data, from which the derivative can be evaluated. That is, we want to find coefficients a(t) that minimize min 
+
+> a(t)
+> N
+
+X
+
+> n=1
+
+∥z(tn) − ˜yn∥22 subject to z(t) solving (6) . (10) We solve the optimization problem (10) by dividing the time interval [0 , T ] into K
+
+intervals [ Tk, T k+1 ) with M points in time within each and solve for a(k) on each interval. This is a greedy algorithm, meaning we approximate the local optimal solution for each interval, which may not be the global optimal solution. A heuristic that mitigates 10 overfitting an individual interval is to optimize a(k) over an extended window [ Tk, T k+r)with r ∈ { 1, . . . , K − k}, but only use the solution a(k) in the time-interval [ Tk, T k+1 ). The final window may contain fewer points because they are truncated at T . The hyperparameters of this algorithm are M , r, as well as λ, which is the weight for the l2
+
+regularization on a(k).For the first interval [0 , T 1+ r), we optimize over the initial value z0 [5] as well as a(0) :min 
+
+> z0,a(0)
+
+X 
+
+> tn∈[0 ,T 1+ r)
+
+∥zn − ˜yn∥22 + λ∥a(0) ∥22 subject to 
+
+zn solving (6) with H = H(z; a(0) ) and z(0) = z0 (ODE) 
+
+a(k) 
+
+> L+j
+
+≥ ϵ, j = 1 , . . . , n (Coercivity) (11) For the remaining intervals k > 1, we take z(Tk), the end point from the previous time segment, as initial value, and ensure C3 continuity by requiring a(k) to satisfy the constraints in (8): min 
+
+> a(k)
+
+X  
+
+> tn∈[Tk,T k+r)
+
+∥zn − ˜yn∥22 + λ∥a(k)∥22 subject to 
+
+zn solving (6) with H = H(z; a(k)), (ODE) 
+
+a(k) 
+
+> L+j
+
+≥ ϵ, j = 1 , . . . , n, (Coercivity) 
+
+Ck(a(k) − a(k−1) ) = 0 . (Continuity) (12) If observations are missing ( η > 0), the time indices tj where ˜ yj is missing are excluded from the sum in the optimization objectives in (11) and (12). 
+
+## 5 Numerical experiments 
+
+We perform numerical experiments on several port-Hamiltonian systems, with and with-out dissipation, with varying levels of noise γ ∈ [0 , 0.2] and rates of missing data 
+
+η ∈ [0 , 0.8]. We define the perturbations such that γ is a noise-to-signal ratio, as de-scribed in Appendix C. The dissipation matrix is chosen to be R = cI with c ∈ { 0, 0.1},where I is the identity matrix. Trajectories are obtained by integrating the port-Hamiltonian systems with step size h = 0 .01 for ti ∈ [0 , 20]. All experiments identify port-Hamiltonian systems on a single (training) trajectory, as well as testing on one trajectory arising from a new initial value. 11 System Noise Coefficient Error Term Match                                                                                                              
+
+> c= 0 SIPHy SINDy SIPHy SINDy
+> Pendulum
+> 0.0 1.1e-15 5.8e-01 ✓×
+> 0.1 6.4e-03 6.4e-01 ✓×
+> 0.2 1.7e-02 6.0e-02 ✓✓
+> Cubic
+> 0.0 2.2e-16 1.4e-12 ✓✓
+> 0.1 5.5e-04 2.2e+00 ✓×
+> 0.2 6.2e-04 1.4e+00 ✓×
+> H´ enon
+> 0.0 1.2e-15 2.3e-15 ✓✓
+> 0.1 2.9e-02 2.7e-01 ✓✓
+> 0.2 3.4e-02 3.2e-01 ✓✓
+> FPUT
+> 0.0 1.7e-14 1.3e-12 ✓✓
+> 0.1 2.5e-01 7.5e+00 ✓×
+> 0.2 1.3e+00 1.7e+01 ××
+> System Noise Coefficient Error Term Match
+> c= 0 .1SIPHy SINDy SIPHy SINDy
+> Pendulum
+> 0.0 6.8e-16 9.9e-01 ✓×
+> 0.1 5.9e-03 9.7e-01 ✓×
+> 0.2 2.4e-01 2.0e-01 ××
+> Cubic
+> 0.0 2.6e-16 8.3e-16 ✓✓
+> 0.1 7.6e-03 4.3e-01 ✓×
+> 0.2 1.7e-02 1.5e-01 ✓×
+> H´ enon
+> 0.0 3.9e-14 2.6e+00 ✓×
+> 0.1 3.8e-02 1.6e+00 ✓×
+> 0.2 1.1e+00 2.6e+00 ××
+> FPUT
+> 0.0 1.5e-11 2.2e+00 ✓×
+> 0.1 7.9e+00 4.7e+00 ××
+> 0.2 1.6e+00 5.0e+00 ××
+
+Table 2: System-wise comparison of identification errors. Bold indicates the smaller numeric error in each row (SIPHy vs SINDy). Conservative trajectories to the left and trajectories with dissipation to the right. The following Hamiltonians are used in the experiments: 
+
+H(y) = 12 y22 − cos( y1), (Pendulum) 
+
+H(y) = 14 (y41 + y42 ), (Cubic) 
+
+H(y) = 12 (y21 + y22 + y23 + y24 ) + y21 y2 − 13 y32 , (H´ enon–Heiles) 
+
+H(y) = 14 (y1 − y2)4 + 14 (y1 + y2)4 + 12 (y23 + y24 + y22 ), (FPUT) in addition to a mass–spring chain described below. The experiments use four protocols: varying noise and missing data (Figure 2), varying noise and damping (Table 2), while the mass–spring chain has a fixed damping of R = 0 .15 · Id and varying noise level with results in Figure 4 and Table 3. Finally, we use the proposed framework on experimental measurements from [33]. For the experiments with zero noise presented in Table 2, we used SIPHy and SINDy directly on the trajectory and its numerical derivative. The trajectories generated from this experiment are found in figures 4 and 6 in Appendix D. Figure 2 shows training and testing NMSE for three benchmark systems across a grid of noise levels and missing-data rates. Each cell reports two values: the lower-left triangle shows training error and the upper-right triangle shows test error. In two cases with high rates of missing data and noise, the identified system diverges when integrated numerically, as seen in Figure 2. We measure the error of the approximation xi ≈ yi as the normalized mean squared error (NMSE) 
+
+e(x, y) := 1
+
+N σ 2
+
+> yN
+
+X
+
+> i=1
+
+∥xi − yi∥22,
+
+12 0.00 0.05 0.10 0.15 0.20 0.00 0.20 0.40 0.60 0.80    
+
+> Missing rate
+> Pendulum
+> Term match X
+> Term match ×
+> Trajectory diverged
+> 0.00 0.05 0.10 0.15 0.20
+> Cubic
+> 0.00 0.05 0.10 0.15 0.20
+> Henon-Heiles
+> 10 −7
+> 10 −5
+> 10 −3
+> 10 −1
+> Error
+> Noise level γ
+
+Figure 2: SIPHy results showing training/testing NMSE in the lower left / upper right triangular color panels. White lines indicate that the incorrect basis was identified, and black lines indicate that the identified system diverged when integrated. where σ2 
+
+> y
+
+is the total variance defined in (13) in Appendix C. The training NMSE mea-sures the discrepancy of the numerical flow of the true and learned system from the initial value generating the training data. Test NMSE considers an unseen trajectory. The initial values used are found in Table 6 in Appendix B, together with additional details of the experiments. If the terms in the identified port-Hamiltonian system match the terms of the true system, we denote this by term match , which simply means that the basis weights wid from STLSQ satisfy supp( wtrue ) = supp( wid ). The coefficient error is defined as ∥wid − wtrue ∥2.
+
+5.1 Mass–spring chain with boundary actuation 
+
+k1 k2 k3
+
+m1 m2 m3
+
+u(t)Figure 3: Mass-spring chain with 
+
+d = 3 masses. We consider a d-mass–spring chain where q ∈ Rd
+
+denotes the displacements of the masses and p ∈
+
+Rd the corresponding momenta. The Hamiltonian is given by 
+
+H(q, p) = 12 p⊤M−1p + 12 q⊤Kq ,
+
+with diagonal mass matrix M ≻ 0 and a tri-diagonal stiffness matrix K = K⊤ ⪰ 0 encoding neighbour coupling, where we assume that the first mass to the left is connected to a wall by a spring with stiffness k1. This results in a tri-diagonal stiffness matrix with diagonal Ki,i = ki + ki+1 , off-diagonal Ki,i +1 = Ki+1 ,i = −ki+1 for i = 1 , . . . , d − 1, and 
+
+Kdd = kd.The system is illustrated in Figure 3 and its dynamics are given by a port-Hamiltonian system of the form (1) with R = diag( r1, . . . , r d) ⪰ 0, corresponding to ground friction. Setting G = ed = [0 , . . . , 0, 1] ⊤ ∈ Rd, we allow for actuation of the final mass with a 13 Pendulum Observed trajectory Train Test Cubic H´ enon-Heiles FPUT Observed trajectory True SIPHy SINDy -0.4 0.0 0.4       
+
+> q1
+> -0.4 0.0 0.4
+> q2
+> 0.0 0.5
+> q3
+> 0.0 0.6
+> q4
+> 0.0 0.6 1.2
+> q5
+> -0.4 0.0 0.4
+> p1
+> -0.2 0.0 0.2
+> p2
+> -0.2 0.0 0.2
+> p3
+> -0.4 0.0 0.4
+> p4
+> 010 20 30 40 50 60 Time
+> -0.4 0.0 0.4
+> p5
+> Mass-spring chain
+> Observed trajectory True trajectory Learned train config. Learned test config.
+
+Figure 4: Left : Observed and learned trajectories from training and test initial values 
+
+y0 for the proposed SIPHy algorithm and SINDy. All the true port-Hamiltonian systems are dissipative with noise level γ = 0 .1. Right : Learned trajectories from training and test configurations. The noisy trajectory ( γ = 0 .2) is observed in a time interval t ∈ [0 , 30] as indicated by the gray background color. scalar control input u(t). For the numerical experiments, we consider d = 5 masses with 
+
+ki = 0 .4 for i = 1 , . . . , d , M−1 = Id.We apply flow splines and SIPHy on a single trajectory in a time interval up to 
+
+T = 30 with step size h = 0 .01 and noise levels γ ∈ { 0.0, 0.1, 0.2}. The identified system is simulated with the known control (orange trajectory) before we test the identified Hamiltonian with zero dissipation and a sine control term (green trajectory) in Figure 4. Both configurations are described in Table 7 in Appendix B. 
+
+γ Train Error Test Error Coefficient Error Term Match 0.0 1.2e-04 1.3e-04 8.0e-03 ✓
+
+0.1 3.3e-04 4.8e-04 2.6e-02 ✓
+
+0.2 8.0e-03 1.1e-02 1.7e-01 ×
+
+Table 3: Mass–spring identification errors across noise levels γ using SIPHy. 14 2 1 0 1 2                   
+
+> q1
+> 1.5
+> 1.0
+> 0.5
+> 0.0 0.5 1.0 1.5
+> p1 Exp data (finite diff.) Flow spline
+> Experimental pendulum: derivatives 21012
+> q1
+> 4
+> 2
+> 024
+> p1 Exp data (finite diff.) Flow spline
+> Experimental oscillator: derivatives 2
+> 0
+> q1
+> Pendulum
+> 25 50 75 100 125 150 175 2
+> 02
+> p1
+> 0.5
+> 0.0 0.5
+> q1
+> Oscillator
+> 10 20 30 40 50 2
+> 02
+> p1
+> 01
+> q1
+> Mass-spring
+> Empirical trajectory Learned trajectory (SIPHy) 510 15 20 25 30
+> t
+> 2
+> 02
+> p1
+
+Figure 5: Left: derivative phase portraits for the pendulum and oscillator, comparing finite-difference estimates (dashed gray) with Hamiltonian flow splines (orange). Right: empirical trajectories (dashed black) and SIPHy rollouts (orange) for all three systems. Only ( q1, p 1) displayed for the mass-spring system. The gray region marks the identification window; the unshaded region shows extrapolation. System H(y) R NMSE Pendulum 0.269 y20 + 0 .519 y21 − 0.716 cos ( y0) î
+
+0.017 
+
+ó 0.0121 Oscillator 3.056 y20 + 0 .508 y21
+
+î
+
+0.014 
+
+ó 0.0027 Mass-spring 18 .31 y20 − 30 .437 y0y1 − 0.279 y0y2 − 42 .157 y0 + 16 .633 y21 + 0 .184 y1y2
+
++ 39 .994 y1 + 0 .61 y22 − 0.172 y2y3 + 0 .29 y2 + 0 .566 y23
+
+"0.156 00 0
+
+#
+
+0.2754 Table 4: Port-Hamiltonian systems identified from experimental measurements [33]. Identified Hamiltonian H(y) dissipation matrix R, expressed in scaled coordinates, together with the rollout error. 
+
+5.2 Identification from experimental data 
+
+We finally apply SIPHy to physical measurements from [33], comprising a pendulum, a linear oscillator and a two-mass spring system. Unlike the synthetic experiments, the true Hamiltonian and dissipation are unknown, the data are slightly noisy and the sampling is mildly irregular. We adapt the pipeline in three minor ways, while keeping SIPHy 15 and the flow splines otherwise unchanged. We apply a single scaling factor y 7 → y/s 
+
+with s being the empirical standard deviation of the observed states. A uniform scalar preserves the canonical ( q, p) pairing, so the identified system remains a valid port-Hamiltonian system, expressed in scaled coordinates. We use fixed hyperparameters in the flow splines and SIPHy algorithm and these are reported in Appendix B). Physical damping in these systems is small, and it becomes challenging to balance Hamiltonian sparsity against the identification of weak dissipation. We therefore thresh-old the coefficient vector w = [ c r ] block-wise, using τ on the Hamiltonian weights c
+
+and a smaller threshold τR = 10 −4 on the dissipation weights r. Additionally, we refine the identified dissipation R = diag( r) by minimizing the trajectory-rollout error against the smoothed flow spline z(t), that is, by solving min   
+
+> R=diag( r),r≥0
+
+e yw(t), z(t).
+
+Here, yw is the trajectory obtained by integrating the identified system from z(0). The non-negativity constraint guarantees an identified model that satisfies the port-Hamiltonian power-balance. Derivative phase portraits as well as empirical and learned trajectories are shown in Figure 5. The identified systems are found in Table 4. 
+
+5.3 Implementation 
+
+The implementation of SIPHy leverages PySINDy [9] with a port-Hamiltonian feature library. The bound-constrained refit (4) is solved with scipy.optimize.lsq linear 
+
+applied to the Cholesky factor of the regularized normal equations Θ⊤ 
+
+> S
+
+ΘS + αI, which reduces the problem to |S| rows. The optimization problems in (10) and (12) are solved with Sequential Least Squares Programming (SLSQP) implemented in SciPy [36], where gradients are computed using ODE adjoints from Diffrax [20]. Optuna [1] is used for hyperparameter optimization, as described in greater detail in Appendix A. As a benchmark, we apply SINDy [3] using the STLSQ optimizer implemented in PySINDy [9] with the same feature library and setup for hyperparameter search as SIPHy, enabling a direct comparison. Derivatives are estimated by preprocessing the noisy trajectory with polydiff from PyNumDiff [35]. 
+
+## 6 Conclusion 
+
+We have introduced Hamiltonian flow splines and demonstrated how this algorithm allows us to approximate smooth trajectories and derivatives from noisy observations of port-Hamiltonian systems. The SIPHy algorithm is derived under the assumption that that the dissipation and control only act on the conjugate momentum p. Thus, we are able to write a subclass of port-Hamiltonian systems as a linear combination of a gradient basis, the derivative of the position ˙ q and the control u. The numerical experiments demonstrate how this framework often identifies the correct basis terms, even with high levels of noise and missing data from a single trajectory. This is even true for the mass– spring chain with d = 5 masses and thus n = 10 degrees of freedom, which includes 16 friction and control. Identifying the port-Hamiltonian structure provides a principled approach for simulating the system in other scenarios, such as zero dissipation or different control inputs. One limitation of the flow splines is the combinatorial growth of basis terms NΛ
+
+with increasing degrees of freedom n. The current algorithm uses uniformly distributed knots Tk, i.e. points in time where the flow z(t) switches from one monomial coefficient vector a(k) to the next a(k+1) . Choosing the location of the knots in an adaptive manner could potentially offer improved accuracy. Moreover, the presented SIPHy algorithm is only tractable for systems with the canonical skew-symmetric structure matrix J.Many port-Hamiltonian systems, such as PH-systems on graphs, have a formulation determined by the connectivity structure of the physical system, which offers a natural venue for generalizing the current approach. More broadly, SIPHy occupies a middle ground between black-box machine learning approaches to dynamics, which provide accurate predictions but limited interpretability, and classical system identification, which requires extensive prior modeling effort. By recovering interpretable, physically grounded models directly from noisy data, identi-fied SIPHy models can serve as inputs to downstream tasks that fundamentally require structural guarantees: passivity-based control design, model order reduction with energy preservation, and uncertainty quantification on physically meaningful parameters. We see this as the principal value of structure-preserving identification: not just accurate trajectory estimates, but models suitable for tasks that black-box surrogates cannot serve. 
+
+## References 
+
+[1] T. Akiba, S. Sano, T. Yanase, T. Ohta, and M. Koyama. Optuna: A next-generation hyperparameter optimization framework, 2019. URL https://arxiv.org/abs/ 1907.10902 .[2] H. H. Bauschke and P. L. Combettes. Convex analysis and monotone operator theory in Hilbert spaces . Springer, 2017. [3] S. L. Brunton, J. L. Proctor, and J. N. Kutz. Discovering governing equations from data by sparse identification of nonlinear dynamical systems. Proceedings of the National Academy of Sciences , 113(15):3932–3937, Apr. 2016. doi: 10.1073/pnas. 1517384113. URL https://www.pnas.org/doi/abs/10.1073/pnas.1517384113 .Publisher: Proceedings of the National Academy of Sciences. [4] Y. Chen, T. Matsubara, and T. Yaguchi. Neural symplectic form: Learning hamil-tonian equations on general coordinate systems. In M. Ranzato, A. Beygelzimer, Y. Dauphin, P. Liang, and J. W. Vaughan, editors, Advances in neural informa-tion processing systems , volume 34, pages 16659–16670. Curran Associates, Inc., 2021. URL https://proceedings.neurips.cc/paper_files/paper/2021/file/ 8b519f198dd26772e3e82874826b04aa-Paper.pdf .17 [5] Z. Chen, J. Zhang, M. Arjovsky, and L. Bottou. Symplectic recurrent neural net-works. arXiv preprint arXiv:1909.13334 , 2019. [6] H. K. Chu and M. Hayashibe. Discovering Interpretable Dynamics by Sparsity Promotion on Energy and the Lagrangian. IEEE Robotics and Automation Letters ,5(2):2154–2160, Apr. 2020. ISSN 2377-3766, 2377-3774. doi: 10.1109/LRA.2020. 2970626. URL https://ieeexplore.ieee.org/document/8977323/ .[7] A. Cortiella, K.-C. Park, and A. Doostan. A Priori Denoising Strategies for Sparse Identification of Nonlinear Dynamical Systems: A Comparative Study, Mar. 2022. URL http://arxiv.org/abs/2201.12683 . arXiv:2201.12683 [stat]. [8] M. Cranmer. Interpretable machine learning for science with pysr and symbolicre-gression. jl. arXiv preprint arXiv:2305.01582 , 2023. [9] B. M. de Silva, K. Champion, M. Quade, J.-C. Loiseau, J. N. Kutz, and S. L. Brunton. Pysindy: a python package for the sparse identification of nonlinear dynamics from data. arXiv preprint arXiv:2004.08424 , 2020. [10] D. DiPietro, S. Xiong, and B. Zhu. Sparse Symplectically Integrated Neural Networks. In Advances in Neural Information Processing Sys-tems , volume 33, pages 6074–6085. Curran Associates, Inc., 2020. URL https://proceedings.neurips.cc/paper_files/paper/2020/hash/ 439fca360bc99c315c5882c4432ae7a4-Abstract.html .[11] T. Duong, A. Altawaitan, J. Stanley, and N. Atanasov. Port-Hamiltonian Neural ODE Networks on Lie Groups For Robot Dynamics Learning and Control, Jan. 2024. URL http://arxiv.org/abs/2401.09520 . arXiv:2401.09520 [cs] version: 1. [12] S. Eidnes, A. J. Stasik, C. Sterud, E. Bøhn, and S. Riemer-Sørensen. Pseudo-Hamiltonian neural networks with state-dependent external forces. Physica D: Nonlinear Phenomena , 446:133673, Apr. 2023. ISSN 0167-2789. doi: 10.1016/ j.physd.2023.133673. URL https://www.sciencedirect.com/science/article/ pii/S0167278923000271 .[13] G. Escobar, A. J. van der Schaft, and R. Ortega. A Hamiltonian viewpoint in the modeling of switching power converters. Automatica , 35(3):445–452, Mar. 1999. ISSN 0005-1098. doi: 10.1016/S0005-1098(98)00196-4. URL https: //www.sciencedirect.com/science/article/pii/S0005109898001964 .[14] P. Forni, D. Jeltsema, and G. A. Lopes. Port-Hamiltonian Formulation of Rigid-Body Attitude Control. IFAC-PapersOnLine , 48(13):164–169, 2015. ISSN 24058963. doi: 10.1016/j.ifacol.2015.10.233. URL https://linkinghub.elsevier. com/retrieve/pii/S2405896315021242 .[15] S. Greydanus, M. Dzamba, and J. Yosinski. Hamiltonian Neural Networks. 
+
+CoRR , abs/1906.01563, 2019. URL http://arxiv.org/abs/1906.01563 . arXiv: 1906.01563. 18 [16] J. M. Hokanson, G. Iaccarino, and A. Doostan. Simultaneous Identification and Denoising of Dynamical Systems, Jan. 2023. URL http://arxiv.org/abs/2203. 13837 . arXiv:2203.13837 [math]. [17] S. Holmsen, S. Eidnes, and S. Riemer-Sørensen. Pseudo-Hamiltonian system iden-tification. Journal of Computational Dynamics , 11(1):59–91, Jan. 2024. ISSN 2158-2491. doi: 10.3934/jcd.2024001. URL https://www.aimsciences.org/en/ article/doi/10.3934/jcd.2024001 . Publisher: Journal of Computational Dy-namics. [18] A. Junker, J. Timmermann, and A. Tr¨ achtler. Adaptive Data-Driven Models in Port-Hamiltonian Form for Control Design. PAMM , 25(1): e202400154, 2025. ISSN 1617-7061. doi: 10.1002/pamm.202400154. URL 
+
+https://onlinelibrary.wiley.com/doi/abs/10.1002/pamm.202400154 .eprint: https://onlinelibrary.wiley.com/doi/pdf/10.1002/pamm.202400154. [19] K. Kaheman, S. L. Brunton, and J. Nathan Kutz. Automatic differentiation to simultaneously identify nonlinear dynamics and extract noise probability dis-tributions from data. Machine Learning: Science and Technology , 3(1):015031, Mar. 2022. ISSN 2632-2153. doi: 10.1088/2632-2153/ac567a. URL https: //iopscience.iop.org/article/10.1088/2632-2153/ac567a .[20] P. Kidger. On neural differential equations. arXiv preprint arXiv:2202.02435 , 2022. [21] J. N. Kutz and S. L. Brunton. Parsimony as the ultimate regularizer for physics-informed machine learning. Nonlinear Dynamics , 107(3):1801–1817, 2022. [22] K. Lee, N. Trask, and P. Stinis. Structure-preserving Sparse Identification of Nonlinear Dynamics for Data-driven Modeling. In Proceedings of Mathemati-cal and Scientific Machine Learning , pages 65–80. PMLR, Sept. 2022. URL 
+
+https://proceedings.mlr.press/v190/lee22a.html . ISSN: 2640-3498. [23] N. M. Mangan, J. N. Kutz, S. L. Brunton, and J. L. Proctor. Model selection for dynamical systems via sparse regression and information criteria. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences , 473(2204), 2017. [24] D. A. Messenger, J. W. Burby, and D. M. Bortz. Coarse-Graining Hamiltonian Systems Using WSINDy, Nov. 2023. URL http://arxiv.org/abs/2310.05879 .arXiv:2310.05879 [physics, stat]. [25] C. Offen and S. Ober-Bl¨ obaum. Learning of discrete models of variational pdes from data. Chaos: An Interdisciplinary Journal of Nonlinear Science , 34(1), 2024. [26] R. Ortega. Interconnection and damping assignment passivity-based control of port-controlled Hamiltonian systems. 2002. 19 [27] S. E. Otto, N. Zolman, J. N. Kutz, and S. L. Brunton. A unified framework to enforce, discover, and promote symmetry in machine learning. Journal of Machine Learning Research , 26(248):1–83, 2025. [28] B. K. Petersen, M. Landajuela, T. N. Mundhenk, C. P. Santiago, S. K. Kim, and J. T. Kim. Deep symbolic regression: Recovering mathematical expressions from data via risk-seeking policy gradients. arXiv preprint arXiv:1912.04871 , 2019. [29] R. Rashad, F. Califano, F. P. Schuller, and S. Stramigioli. Port-Hamiltonian modeling of ideal fluid flow: Part I. Foundations and kinetic energy. Journal of Geometry and Physics , 164:104201, June 2021. ISSN 0393-0440. doi: 10. 1016/j.geomphys.2021.104201. URL https://www.sciencedirect.com/science/ article/pii/S0393044021000620 .[30] J. Rettberg, J. Kneifl, J. Herb, P. Buchfink, J. Fehr, and B. Haasdonk. Data-driven identification of latent port-Hamiltonian systems, Aug. 2024. URL http: //arxiv.org/abs/2408.08185 . arXiv:2408.08185 [math]. [31] F. J. Roth, D. K. Klein, M. Kannapinn, J. Peters, and O. Weeger. Stable Port-Hamiltonian Neural Networks, Feb. 2025. URL http://arxiv.org/abs/2502. 02480 . arXiv:2502.02480 [cs]. [32] A. J. v. d. Schaft and D. Jeltsema. Port-Hamiltonian systems theory: an introduc-tory overview . Number 1, 2/3 (2014) in Foundations and trends in systems and control. Now, Boston Delft, 2014. ISBN 978-1-60198-786-0. [33] M. Schmidt and H. Lipson. Distilling free-form natural laws from experimental data. science , 324(5923):81–85, 2009. [34] F. Sun, Y. Liu, and H. Sun. Physics-informed Spline Learning for Nonlin-ear Dynamics Discovery, May 2021. URL http://arxiv.org/abs/2105.02368 .arXiv:2105.02368 [cs]. [35] F. V. Van Breugel, J. N. Kutz, and B. W. Brunton. Numerical Differentiation of Noisy Data: A Unifying Multi-Objective Optimization Framework. IEEE Access , 8: 196865–196877, 2020. ISSN 2169-3536. doi: 10.1109/ACCESS.2020.3034077. URL 
+
+https://ieeexplore.ieee.org/document/9241009/ .[36] P. Virtanen, R. Gommers, T. E. Oliphant, M. Haberland, T. Reddy, D. Cournapeau, E. Burovski, P. Peterson, W. Weckesser, J. Bright, et al. Scipy 1.0: fundamental algorithms for scientific computing in python. Nature methods , 17(3):261–272, 2020. [37] L. Zhang and H. Schaeffer. On the convergence of the sindy algorithm. Multiscale Modeling & Simulation , 17(3):948–972, 2019. 20 A Hyperparameter selection 
+
+For the Hamiltonian flow splines introduced in Section 4, we use the restricted polynomial basis with maximum degree p = 6 for all experiments except the mass-spring chain where 
+
+p = 4 is used to reduce the computational complexity. Additionally, we need to select hyperparameters θ = {M, r, λ }. The smoothing algorithm optimizes the flow over M · r
+
+points in time, but only keeps the first M points in the trajectory where r is a window-length multiplier. λ is the l2-regularization parameter. We find that, for data with step size h = 0 .01 in a time interval t ∈ [0 , 20], the following parameter ranges work well 
+
+40 ≤ M ≤ 60 , r = 3 , 10 −5 ≤ λ ≤ 10 −4 .
+
+For SIPHy, we use a monomial feature library of degree p = 5 for all systems ex-cept the mass-spring chain, where p = 3 is used. SIPHy has hyperparameters ϕ =
+
+{α, τ, β, TRIG }. α is the l2-regularization parameter, τ is a threshold for sparsity, β ∈
+
+[0 , 0.1] is the fraction of time points at the beginning and end of the time interval [0 , T ]held out during STLSQ to avoid boundary effects of the preprocessing algorithm, and 
+
+TRIG ∈ { True , False } is a boolean variable to select whether to include trigonometric functions in the Hamiltonian basis Ξ. We perform hyperparameter optimization over the set 
+
+{0.1 ≤ α ≤ 0.4, 0.05 ≤ τ ≤ 0.2, 0 ≤ β ≤ 0.1} .
+
+We write 
+
+w = SIPHy (z, ˙z, ϕ )for the identified port-Hamiltonian system with coefficients w from the preprocessed trajectory z, ˙z with hyperparameters ϕ by solving the optimization problem in (3). In-tegrating the identified system ˙y = Θ(y)w gives the trajectory yw(t) for the given hyperparameter set ϕ. For a given choice of SIPHy hyperparameters ϕ, we evaluate the identified model w with the residual sum of squares including a l0 (number of non-zero coefficients) complexity penalty with decreasing weight for increasing system dimension-ality nS(w) = log 
+
+> N
+
+X
+
+> i=1
+
+yw(ti) − ˜y(ti) 22
+
+!
+
++ 1
+
+n ∥w∥0
+
+which is inspired by the Akaike information criterion (AIC) applied for sparse regression in [23]. 
+
+## B Details of numerical experiments 
+
+• Train/validation split. After edge-cropping by β ∈ [0 , 0.1], the first 80% of the remaining time points are used for STLSQ fitting. The selection metric S(w) is computed over the full trajectory, excluding the cropped initial and last points in time. 21 • Optuna budget and warm-up. Each hyperparameter search runs 50 TPE trials, of which the first ⌊50 /4⌋ = 12 are drawn uniformly at random before the surrogate model is engaged. 
+
+• Fixed smoother parameters. The smoother parameters used are found in Table 5. 
+
+M r λ
+
+Mass-spring 50 3 10 −4
+
+Dissipative c = 0 .1 60 3 10 −4
+
+Conservative c = 0 40 3 10 −5
+
+Table 5: Flow spline parameter settings for the three experiments. 
+
+• Continuity order. The spline continuity constraint at knot points is set to C2
+
+for 2-dimensional systems (Pendulum, Cubic) and C3 for systems with dimension greater than 4 (H´ enon–Heiles, FPUT, mass-spring chain). 
+
+• Initial conditions. Training and test initial conditions for the different systems are found in Table 6 and 7. System y0 (train) y0 (test) Pendulum [0 .9, 1.3] [−0.1, 0.2] Cubic [1 .2, −0.3] [0 .8, −0.7] H´ enon–Heiles [−0.2, 0.15 , −0.15 , 0.2] [−0.1, 0.2, −0.3, 0.25] FPUT [−0.2, 0.15 , 0.1, 0.25] [0 .3, 0.3, 0.2, 0.2] Table 6: Initial values used in the numerical experiments Training Test 
+
+u(t) exp( −0.5t) cos( t) 0.1 sin( t)
+
+R 0.15 · Id 0 · Id
+
+q0 [0 .20 , 0.35 , 0.40 , 0.35 , 0.20] [0 .17 , 0.17 , 0.0, −0.17 , −0.17] 
+
+p0 [0 .10 , 0.05 , −0.01 , −0.06 , −0.11] 0
+
+Table 7: Configurations for the mass–spring chain experiment. 22 Flow splines SIPHy 
+
+System p M r λ cont. deg. TRIG α τ τR
+
+Pendulum 5 10 2 10 −3 C3 2 ✓ 0.1 0.05 10 −4
+
+Oscillator 5 10 2 10 −3 C3 2 × 0.1 0.05 10 −4
+
+Mass–spring 5 10 2 10 −3 C3 2 × 0.1 0.05 10 −4
+
+Table 8: Fixed hyperparameters for the experimental-data identification. The flow-spline parameters p (degree), M (window points kept), r (window-length multiplier), λ (ℓ2 regularization) and continuity order, and the SIPHy parameters (Hamiltonian degree, TRIG , ℓ2 regularization α, Hamiltonian-block threshold τ and dissipation/input-block threshold τR) follow the notation of Section A. 
+
+## C Noise levels and error metric 
+
+Let y(tn) = φt,f (y0) be the flow of a port-Hamiltonian system with vector field f as in (1) from an initial condition y0 ∈ Rn. The observed trajectory with noise-to-signal ratio 
+
+γ ∈ [0 , 1] is given by ˜yi = y(ti) + δi, δi ∼ N 
+
+Ç
+
+0, γ2σ2
+
+> y
+
+n I
+
+å
+
+.
+
+where σ2 
+
+> y
+
+is the total variance, or the trace of the empirical covariance matrix, given by 
+
+σ2 
+
+> y
+
+= tr( Σy) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+∥yi − y∥22, y = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+yi. (13) This definition of relative noise is invariant to rotations and translations of yi and ensures that γ is a noise-to-signal ratio in the sense of the square root of the total variance, since we have that γ = σδ 
+
+> σy
+
+.23 D Additional experimental results 
+
+γ c Identified Hamiltonian diag( R)
+
+Pendulum : H(y) = 0 .5y21 − cos ( y0)0.0 0.1 0 .5y21 − 1.0 cos ( y0) [0 .1] 0.1 0.1 0 .495 y21 − 1.008 cos ( y0) [0 .098] 0.2 0.1 0 .486 y21 − 1.017 cos ( y0) [0 .102] 0.0 0.0 0 .5y21 − 1.0 cos ( y0) [0 .0] 0.1 0.0 0 .494 y21 − 1.003 cos ( y0) [0 .0] 0.2 0.0 0 .486 y21 − 1.009 cos ( y0) [0 .0] 
+
+Cubic oscillator : H(y) = 0 .25 y40 + 0 .25 y41
+
+0.0 0.1 0 .25 y40 + 0 .25 y41 [0 .1] 0.1 0.1 0 .245 y40 + 0 .251 y41 [0 .097] 0.2 0.1 0 .239 y40 + 0 .248 y41 [0 .093] 0.0 0.0 0 .25 y40 + 0 .25 y41 [0 .0] 0.1 0.0 0 .25 y40 + 0 .251 y41 [0 .0] 0.2 0.0 0 .25 y40 + 0 .25 y41 [0 .0] 
+
+H´ enon–Heiles : H(y) = y20 y1 + 0 .5y20 − 0.333 y31 + 0 .5y21 + 0 .5y22 + 0 .5y23
+
+0.0 0.1 1 .0y20 y1 + 0 .5y20 − 0.333 y31 + 0 .5y21 + 0 .5y22 + 0 .5y23 [0 .1, 0.1] 0.1 0.1 0 .064 y30 + 1 .116 y20 y1 + 0 .494 y20 − 0.346 y31 + 0 .501 y21 + 0 .504 y22 + 0 .5y23 [0 .09 , 0.105] 0.2 0.1 1 .217 y20 y1 + 0 .498 y20 + 0 .336 y0y21 − 0.251 y31 + 0 .494 y21 + 0 .504 y22 + 0 .501 y23 [0 .0, 0.114] 0.0 0.0 1 .0y20 y1 + 0 .5y20 − 0.333 y31 + 0 .5y21 + 0 .5y22 + 0 .5y23 [0 .0, 0.0] 0.1 0.0 0 .974 y20 y1 + 0 .494 y20 − 0.337 y31 + 0 .504 y21 + 0 .505 y22 + 0 .493 y23 [0 .0, 0.0] 0.2 0.0 0 .97 y20 y1 + 0 .491 y20 − 0.346 y31 + 0 .502 y21 + 0 .507 y22 + 0 .497 y23 [0 .0, 0.0] 
+
+FPUT : H(y) = 0 .5y40 + 3 .0y20 y21 + 0 .5y41 + 0 .5y21 + 0 .5y22 + 0 .5y23
+
+0.0 0.1 0 .5y40 + 3 .0y20 y21 + 0 .5y41 + 0 .5y21 + 0 .5y22 + 0 .5y23 [0 .1, 0.1] 0.1 0.1 0 .45 y40 + 3 .439 y20 y21 − 0.094 y20 y23 + 0 .12 y0y31 + 0 .609 y41 + 0 .483 y21 + 0 .498 y22 + 0 .499 y23 [0 .098 , 0.1] 0.2 0.1 4 .382 y20 y21 + 0 .482 y21 + 0 .494 y22 + 0 .499 y23 [0 .0, 0.0] 0.0 0.0 0 .5y40 + 3 .0y20 y21 + 0 .5y41 + 0 .5y21 + 0 .5y22 + 0 .5y23 [0 .0, 0.0] 0.1 0.0 0 .5y40 + 2 .958 y20 y21 + 0 .746 y41 + 0 .476 y21 + 0 .5y22 + 0 .502 y23 [0 .0, 0.0] 0.2 0.0 3 .517 y20 y21 − 0.289 y20 y1y3 + 0 .893 y20 y23 + 0 .521 y21 + 0 .497 y22 + 0 .454 y23 [0 .0, 0.0] Table 9: Identified port-Hamiltonian systems with varying levels of noise γ and dissipation rates c where the dissipation matrix is given by R = c · Id.24 True Mass-Spring-Damper 
+
+H(y) = 0 .4y20 − 0.4y0y1 + 0 .4y21 − 0.4y1y2 + 0 .4y22 − 0.4y2y3 + 0 .4y23 − 0.4y3y4 + 0 .2y24 + 0 .5y25 + 0 .5y26 + 0 .5y27 + 0 .5y28 + 0 .5y29
+
+diag( R) = [0 .15 , 0.15 , 0.15 , 0.15 , 0.15] diag( G) = [0 .0, 0.0, 0.0, 0.0, 1.0] 
+
+γ Identified port-Hamiltonian system 
+
+0.0 H(y) = 0 .3997 y20 − 0.3998 y0y1 + 0 .3997 y21 − 0.3998 y1y2 + 0 .3996 y22 − 0.3996 y2y3 + 0 .3999 y23 − 0.4003 y3y4 + 0 .2004 y24 + 0 .5y25 + 0 .5y26 + 0 .5y27 + 0 .5y28 + 0 .5005 y29
+
+diag( R) = [0 .1462 , 0.1459 , 0.1459 , 0.1465 , 0.1511] diag( G) = [0 .0, 0.0, 0.0, 0.0, 0.9987] 0.1 H(y) = 0 .4033 y20 − 0.4033 y0y1 + 0 .4016 y21 − 0.4027 y1y2 + 0 .3982 y22 − 0.3966 y2y3 + 0 .4019 y23 − 0.4037 y3y4 + 0 .2014 y24 + 0 .4952 y25 + 0 .4992 y26 + 0 .5017 y27 + 0 .4974 y28 + 0 .4984 y29
+
+diag( R) = [0 .1335 , 0.1556 , 0.1496 , 0.1563 , 0.1371] diag( G) = [0 .0, 0.0, 0.0, 0.0, 0.9914] 0.2 H(y) = 0 .4045 y20 − 0.4002 y0y1 + 0 .1217 y0y25 − 0.097 y0y27 + 0 .4005 y21 − 0.4018 y1y2 + 0 .3982 y22 − 0.3947 y2y3 + 0 .3962 y23 − 0.3957 y3y4 + 0 .1961 y24 + 0 .4842 y25 + 0 .4967 y26 + 0 .5134 y27
+
++0 .5025 y28 + 0 .489 y29
+
+diag( R) = [0 .1345 , 0.1659 , 0.1557 , 0.1417 , 0.1457] diag( G) = [0 .0, 0.0, 0.0, 0.0, 1.0625] Table 10: Identified port-Hamiltonian systems with varying levels of noise γ for the mass-spring system. Pendulum Observed trajectory Train Test Observed trajectory Train Test Observed trajectory Train Test Qubic H´ enon-Heiles FPUT 
+
+γ = 0 .0, c = 0 .0 γ = 0 .1, c = 0 .0 γ = 0 .2, c = 0 .0
+
+Observed trajectory True SIPHy SINDy Pendulum Observed trajectory Train Test Observed trajectory Train Test Observed trajectory Train Test Cubic H´ enon-Heiles FPUT 
+
+γ = 0 .0, c = 0 .1 γ = 0 .1, c = 0 .1 γ = 0 .2, c = 0 .1
+
+Observed trajectory True SIPHy SINDy 
+
+Figure 6: Observed and learned trajectories from training and test initial values y0 for the proposed SIPHy algorithm and SINDy. Increasing noise levels from left to right. Trajectories in the top block are conservative while the lower block the dissipation rate is given by c = 0 .1. 25

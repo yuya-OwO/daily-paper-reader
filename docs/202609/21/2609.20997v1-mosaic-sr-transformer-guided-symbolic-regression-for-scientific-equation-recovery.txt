@@ -1,0 +1,1573 @@
+Title: MOSAIC-SR: Transformer-Guided Symbolic Regression for Scientific Equation Recovery
+
+URL Source: https://arxiv.org/pdf/2609.20997v1
+
+Published Time: Mon, 21 Sep 2026 00:08:33 GMT
+
+Number of Pages: 35
+
+Markdown Content:
+# MOSAIC-SR: Transformer-Guided Symbolic Regression for Scientific Equation Recovery 
+
+Peiyi Zheng ∗ Yanming Kang ∗ Hans De Sterck Giang Tran University of Waterloo 
+
+> ∗
+
+Co-first authors with equal contribution 
+
+Abstract 
+
+Symbolic regression aims to recover closed-form equations from observations, providing interpretable models for scientific discovery. Existing approaches struggle to combine flexible structural search with efficient inference. Search-based methods can refine expression structure, but often rely on costly combinatorial optimization with random initialization. Pretrained neural models generate formulas almost instantly, but their predictions often contain symbolic errors. We introduce MOSAIC-SR, which uses a pretrained Transformer to propose multiple initial sketches. These sketches initialize searches in several promising regions, avoiding random starts in the vast expression space. Each search jointly recovers structure and constants through scale-aware constant optimization and local symbolic repair. We evaluate MOSAIC-SR on the SRSD-Feynman dataset with and without dummy variables and on six additional benchmarks. MOSAIC-SR obtains the highest symbolic solution rate on every dataset while ranking among the top two methods in predictive accuracy. This advantage persists in the presence of irrelevant dummy inputs. The results show that learned priors can focus search on promising equation structures, and that numerical optimization and symbolic repair are important for recovery. 
+
+## 1 Introduction 
+
+Symbolic regression is a form of model discovery that seeks to infer a closed form expression from observed data. Given observations D = {(xi, y i)}ni=1 ⊂ Rd × R, the goal is to find an expression 
+
+e ∈ E , with induced function fe, such that yi ≈ fe(xi). Unlike standard regression, the model structure is not fixed in advance. The algorithm must jointly infer a symbolic structure and fit its numerical constants. A common formulation is 
+
+e⋆ = arg min 
+
+> e∈E
+
+" nX
+
+> i=1
+
+ℓ(fe(xi), y i) + λ Ω( e)
+
+#
+
+, (1) where Ω( e) penalizes expression complexity. This objective combines discrete structure search with continuous parameter optimization. The resulting space is large and irregular, and exact symbolic regression is computationally hard in general [34]. Some systems use heuristic search [4], whereas others exploit domain-specific structure [28] or learned equation priors [1]. Search-based systems treat each dataset as a new combinatorial problem. Classical methods such as Eureqa and age fitness Pareto optimization evolve expression trees from data [24, 25]. Modern variants improve different parts of this pipeline. PySR uses a multi-population evolutionary algorithm with an evolve-simplify-optimize loop [4]. Operon emphasizes efficient tree representation and high performance implementation [2]. GP-GOMEA learns dependencies between tree positions to guide variation [33]. AI Feynman reduces search through recursive decomposition based on 1arXiv:2609.20997v1 [cs.LG] 17 Sep 2026 mathematical and physical structure [28]. These methods are flexible because they can modify both structure and constants after seeing data. However, they do not amortize structure discovery across problems as useful subexpressions must be rediscovered for every new input table. Therefore, the main bottleneck is not only fitting coefficients but also locating a small region of the expression space that contains a recoverable equation. This cost becomes especially visible in scientific formulas, where constants may encode physical scales and small structural errors can be hidden by local numerical fit. Recent neural methods change this cost profile by learning priors over equations from many training tasks. NeSymReS and end-to-end Transformer symbolic regression train sequence models on synthetic functions and query them on new input-output observations at inference time [1, 9]. Other work studies links between symbolic formulas and numeric observations through unified or contrastive pretraining [19]. These approaches can propose candidate expressions much faster than a search method initialized from random trees. However, fast proposal is not the same as equation recovery. Many models are trained or selected by pointwise prediction error on sampled domains, but an expression with high test R2 may still use the wrong variables, constants, or algebraic form. For example, a polynomial approximation may achieve near perfect R2 over a narrow domain but fail to recover the underlying exponential law. This distinction is central for scientific discovery, where the output is not merely a predictor but an equation. This paper focuses on the gap between numerical fit and symbolic recovery. For a target expression 
+
+f ⋆ and a prediction ˆf , high predictive accuracy does not imply algebraic equivalence. We therefore report both predictive accuracy, defined by test R2 > 1 − ε for some small ε, and symbolic solution rate under a fixed symbolic verification protocol. We use the same symbolic verification protocol as SRBench to determine whether a predicted expression is equivalent to the known ground-truth equation [3]. Accordingly, our experiments emphasize methods that can move from a good numerical fit to an algebraically correct formula. We introduce MOSAIC-SR, a hybrid framework that uses neural generation to guide symbolic search. A pretrained Transformer maps a small subsample of observations to multiple symbolic sketches, concentrating search in promising regions of expression space. Monte Carlo tree search (MCTS) maps the decoded variable tokens to observed inputs and produces several complete equations. These equations initialize independent local search paths. Within each path, structural edits alternate with constant refitting to correct errors in variables, operators, subexpressions, and numerical scales after decoding. Together, the pretrained Transformer provides fast neural proposals, while explicit search retains the flexibility needed for exact equation recovery. We use log-spaced initializations for constant fitting to cover scientific constants that may span many orders of magnitude. 
+
+Contributions. Our main contributions are summarized as follows. First, we introduce a recovery-oriented pretraining scheme that learns normalized structural skeletons while deliberately deferring dataset-specific variable assignment and constant estimation to inference, where the observed data support more accurate choices. We sample equations under varied input distributions, domains, and point clouds. We also omit affine transformations from the pretrained skeletons. Although such transformations can improve numerical fit, their additional scales and offsets may introduce terms absent from the ground-truth expression and thereby hinder exact symbolic matching. Our pretraining objective instead encourages sketches that preserve the target algebraic structure. Second, we introduce a Transformer-guided inference framework that assigns decoded variable tokens to observed inputs and transforms structural sketches into complete equations through parallel local search, tree-based repair, and scale-aware constant fitting. Performing variable assignment 2and constant estimation at inference allows these choices to be guided directly by the observed data. Structural repair and constant fitting recover high predictive accuracy, while the cleaner initial structures remain compatible with exact symbolic equivalence. The resulting framework therefore targets both strong R2 and accurate symbolic recovery rather than predictive fit alone. Like constructing a mosaic from selected pieces, MOSAIC-SR identifies and assembles symbolic components that explain the observed numerical data. Third, we compare MOSAIC-SR with search-based symbolic regression methods, direct neural generation methods, and neural-guided search methods. Across SRSD-Feynman with and without dummy variables and six additional benchmarks, MOSAIC-SR achieves the highest symbolic solution rate on every dataset while ranking among the top two methods in predictive accuracy. 
+
+## 2 Related Work 
+
+2.1 Symbolic Regression as Equation Recovery 
+
+Symbolic regression has been used as a tool for scientific discovery because its output is an explicit equation rather than a black box predictor. Early work showed that evolutionary search can recover compact analytic relations from data and can produce models that are interpretable to scientists [24]. Unlike ordinary regression, symbolic regression aims not only to predict unseen observations well but also to recover the underlying generating mechanism. However, predictive accuracy alone does not guarantee recovery of the target equation. Indeed, many algebraically different expressions can agree on a finite set of sampled points. Recent SR benchmarks therefore evaluate symbolic recovery separately from predictive accuracy. SRBench evaluates contemporary SR methods under a shared protocol and reports symbolic solution rate in addition to predictive accuracy [3]. SRSD-Feynman extends this view for scientific discovery. The original Feynman benchmark samples variables from predefined narrow ranges [28]. SRSD-Feynman uses equation specific value ranges based on the physical meaning and SI unit of each variable. It also samples variables on a logarithmic scale to cover various orders of magnitude [17]. This sampling strategy aims to mitigate a known limitation. An incorrect expression may fit finite observations well over a narrow domain. Evaluation across physically meaningful scales can help distinguish such local approximations from the true underlying equation. We therefore report 
+
+R2 based accuracy and symbolic solution rate separately. Predictive accuracy measures numerical fit and the symbolic solution verifier tests whether the output expression is symbolically equivalent to the ground truth. 
+
+2.2 Search-Based Symbolic Regression 
+
+Search-based symbolic regression represents candidate equations as expression trees and optimizes their structure directly. Genetic programming maintains a population of trees and generates new candidates through selection, crossover, mutation and constant fitting [24, 25]. Without imposing a fixed parametric form, these methods can revise operators and subtrees in response to the observed data. Modern systems improve different components of this search. Operon uses a compact tree representation to evaluate expressions efficiently [2]. GP-GOMEA learns dependencies between tree positions to guide structural variation [33]. PySR uses a multi-population evolutionary algorithm with an evolve-simplify-optimize loop [4]. AI Feynman takes a more scientific route. It recursively reduces a problem by exploiting structure such as separability, symmetry, and dimensional analysis 3[28]. The main strength of search-based SR is adaptive refinement after observing the data. Con-stants can be optimized again after each structural revision. Explicit mathematical and physical constraints can further guide the search. The limitation is that most search-based methods solve each new problem from scratch. Locating the true underlying equation in the vast search space from random initialization is often difficult. Repeated candidate generation and evaluation therefore incur substantial computational cost. 
+
+2.3 Neural Symbolic Regression and Guided Search 
+
+Neural symbolic regression methods differ in how the learned model interacts with the discrete equation space. Direct generation methods use a neural model to define a distribution over candidate expressions. Candidate selection may occur through sequence decoding or optimization in a learned latent space. These procedures operate within a learned output space rather than explicitly editing symbolic trees. Neural-guided methods use learned models to guide a separate search process that explores and revises symbolic structures. The distinction is whether the neural model is treated as the primary solver or as a prior for structural search. 
+
+Direct Neural Generation. Early neural generators formulate expression construction as a sequential decision process. DSR trains an RNN policy with a risk-seeking policy gradient that concentrates probability on high-reward expressions [22]. Pretrained Transformer models transfer expression patterns learned from large synthetic data to new problems. NeSymReS decodes symbolic skeletons with beam search and fits placeholder constants with BFGS [1]. End-to-end Transformer SR predicts complete expressions with numerical constants. An optional optimization step refines these constants after decoding [9]. SNIP-SR learns a shared symbolic-numeric representation and searches its continuous latent space. SNIP-SR refines decoded constants with BFGS [19]. GenSR constructs a continuous equation-generative space with a conditional variational autoencoder. CMA-ES then searches this space for candidate equations [15]. In SNIP-SR and GenSR, optimization occurs in a learned continuous space rather than through direct edits to expression trees. Pretrained generators can reduce per-problem inference cost, but direct generation remains structurally fragile. An early token error can alter the remaining expression. Finite observations over a compact domain also do not uniquely determine the underlying symbolic structure. Constant fitting and other numerical optimization can make an expression with incorrect structure closely approximate the target on that domain. The resulting model may achieve a high R2 score without symbolic recovery. 
+
+Neural-Guided Search. Neural-guided search combines learned proposals with explicit structural exploration. NGGP uses a recurrent policy to seed genetic programming populations [21]. uDSR combines recurrent generation with pretraining and evolutionary search [13]. TPSR integrates MCTS into Transformer decoding so that prediction error and expression complexity can guide token selection [26]. RSRM uses Double Q-learning to restrict the actions explored by MCTS during expression tree construction [36]. SR4MDL uses a description length estimate from MDLformer as the objective for symbolic search [37]. In these methods, explicit structural search remains responsible for constructing the final equation. The learned model can narrow the candidate space or define the search objective. Unlike methods that use the learned model to generate the final expression or guide individual search decisions, MOSAIC-SR uses the Transformer to propose diverse initial sketches. Local search then completes and revises these sketches while refitting constants. Our objective is not predictive fit alone, but recovery of an expression that is symbolically equivalent to the target equation. 4Stage 1: Numeric-Symbolic Alignment 
+
+> Numeric
+> Points
+
+Stage 2: Sketch Generation Pretraining 
+
+𝑳  = sketch loss + auxiliary losses 
+
+Pretrained Transformer 
+
+𝒁 𝑵𝒖𝒎𝒆𝒓𝒊𝒄 
+
+𝒁 𝑺𝒚𝒎𝒃𝒐𝒍𝒊𝒄 
+
+> Symbolic Expression
+
+Numeric 
+
+Encoder 
+
+Symbolic 
+
+Encoder        
+
+> Maximize agreement
+> 𝒚 = 𝟐 ∗ 𝑭 ∗ 𝒔𝒊𝒏(𝜽)
+> 𝑳 𝐈𝐧𝐟𝐨𝐍𝐂𝐄
+> Numeric Encoder
+> Symbolic Decoder
+> Symbolic Sketches
+> 𝐜 𝟏 ∗ 𝒙 𝟎 + 𝒄 𝟐 ∗𝒙 𝟏 𝟐
+> 𝐜 𝟏 ∗ 𝒔𝒊𝒏(𝒙 𝟎 ) ∗ 𝒙 𝟏 𝟐
+> 𝒔𝒊𝒏(𝒙 𝟎 ) ∗ 𝒙 𝟏 𝟐 + 𝐱 𝟐
+> …
+> Parallel Local Expression Recovery
+
+Numeric Encoder 
+
+> from Stage 1
+
+Symbolic Decoder  
+
+> Constant Fitting Structural Repair
+> Winning Prediction
+> Pretrained Transformer Numeric Data
+
+Inference    
+
+> 𝒔𝒊𝒏(𝒙 𝟎 ) ∗ (𝒙 𝟎 +𝒙 𝟏 )𝟐
+> Symbolic
+> Sketch
+> 𝑥 1𝑥 2𝑥 0𝐶 0
+> +
+> ××
+
+Figure 1: Overview of MOSAIC-SR. Stage 1 aligns numerical observations with symbolic expressions through contrastive pretraining, and Stage 2 trains the decoder to predict operator structures with variable and constant placeholders. At inference time, MCTS maps these variable tokens to observed inputs, and the resulting equations initialize parallel search trajectories that alternate constant fitting with structural repair. The final expression is selected according to validation NMSE and complexity. 
+
+## 3 Method 
+
+MOSAIC-SR is motivated by the observation that a pretrained model can often identify the broad form of an equation, while a nearly correct prediction may still contain the wrong variable, operator, or constant. To address this limitation, we use the pretrained Transformer to propose equation sketches and then apply search-based refinement to correct structural errors. Figure 1 summarizes the three phases of MOSAIC-SR. First, the numeric and symbolic encoders are jointly pretrained with a contrastive objective that aligns numerical observations with their corresponding expressions. The pretrained numeric encoder is then connected to an autoregressive decoder and further trained to generate symbolic sketches. Second, MCTS uses the decoded sketches and learned structural priors to assign variables and fit constants. This produces a diverse set of promising initial equations. Third, parallel local searches refine these equations through structural edits and constant optimization. The final expression is selected according to validation NMSE and complexity. 
+
+3.1 Pretraining: Learning the Symbolic Sketch Prior 
+
+Synthetic Numeric-Symbolic pairs. The sketch prior is trained entirely with synthetic equa-tions, following the pretraining strategy used by E2E-SR [9]. We sample expressions with one to 5ten variables from a predefined symbolic vocabulary comprising binary operators {+, −, ×, ÷} and unary operators {(·)2, (·)3, sin , cos , exp , log , √·, tan , tanh , arctan }. Each expression is represented in prefix Polish notation, where every operator appears before its operands. For example, x1 + sin( x2)is written as (ADD X 1 SIN X 2) . In contrast to the data pipelines described for E2E-SR, we use SymPy [20] to normalize each sampled expression under a fixed set of simplification rules. For example, 3 + x + 2 x + sin( y · x) − 1 7 → 2 + 3 x + sin( xy ). (2) This step reduces the number of algebraically equivalent forms treated as distinct symbolic targets. We use the normalized expression to create two symbolic sequences: the full sequence and the sketch sequence. The full sequence contains the exact operators, variable identities, and constants and is used by the symbolic encoder during contrastive pretraining. The sketch sequence preserves the operator tree and leaf positions while replacing each variable and constant leaf with a corresponding special token. This sequence serves as the decoder target. We then randomly choose an input distribution and domain from predefined sets, sample 200 input points, and evaluate the expression to generate the corresponding output values. Consequently, the same symbolic expression can be observed through different input ranges rather than a single fixed set of observations. 
+
+Numeric encoder. Let D = {(xi, y i)}ni=1 denote the numeric observations, with n = 200 during pretraining. We pad all inputs to the maximum variable dimension to maintain a consistent input width across tasks. We then concatenate each padded input with its output and apply the following signed logarithmic transform elementwise: 
+
+ϕ(a) = sign( a) log(1 + |a|). (3) Since the order of observations is arbitrary, the transformed rows are encoded as a set rather than a sequence. A Set Transformer [14] contextualizes each row using information from the other observations, and attention pooling summarizes the resulting features: 
+
+MD = SetEnc( {ϕ(ri)}ni=1 ) , zD = Pool( MD). (4) The set representation MD is retained for decoder cross-attention, while the pooled representation 
+
+zD is used only for numeric-symbolic contrastive learning [19]. 
+
+Symbolic encoder. The symbolic encoder processes the normalized prefix sequence of an expres-sion. In prefix notation, each operator appears before its operands, and its fixed arity determines how many subsequent subexpressions belong to it. The expression tree can therefore be parsed unambiguously without parentheses. Each token in the prefix sequence is mapped to an embedding. The resulting sequence is passed through a Transformer encoder with learned positional embeddings [31]. Masked mean pooling over the output tokens produces a symbolic embedding ze for the complete expression. This encoder is used during the contrastive learning stage to teach the numeric encoder which equation generated the observations. 
+
+Stage 1: Numeric-Symbolic alignment. We train the numeric and symbolic encoders with the bidirectional InfoNCE objective used by CLIP [23, 30]. Following SNIP, we apply this objective to align each set of numerical observations with its corresponding symbolic expression [19]. For a minibatch of B matched observation sets and expressions, define the temperature scaled similarity 
+
+sij = cos( zDi , zej )
+
+τ . (5) 6Here zDi is the pooled numeric embedding of the i-th observation set, zej is the symbolic embedding of the j-th expression, and τ > 0 is the temperature parameter that controls the sharpness of the similarity distribution. A smaller τ places greater emphasis on the most similar pairs. The bidirectional InfoNCE loss is 
+
+Lcon = − 12B
+
+> B
+
+X
+
+> i=1
+
+"
+
+log esii 
+
+PBj=1 esij 
+
++ log esii 
+
+PBj=1 esji 
+
+#
+
+. (6) This loss increases the similarity of each matched pair relative to all mismatched pairs in both directions, aligning the observations with their corresponding symbolic expressions in a shared embedding space. 
+
+Stage 2: sketch generation. After contrastive pretraining, an autoregressive Transformer decoder is attached to the numeric encoder. Training uses teacher forcing against the ground-truth sketch sequence of operators, variable tokens, and constant placeholders. Let ui,t denote the target token at position t in the i-th sketch, let Ti be the number of non-padding target tokens, and let 
+
+Ntok = PBi=1 Ti. The token-level cross-entropy is 
+
+LCE = − 1
+
+Ntok 
+
+> B
+
+X
+
+> i=1
+> Ti
+
+X
+
+> t=1
+
+log pθ(ui,t | ui,<t , MDi ) ,
+
+where pθ is the decoder distribution conditioned on the preceding ground-truth tokens and numeric representation MDi . Several lightweight prediction heads are trained jointly to estimate coarse structural properties such as the root arity and root operator class. The second-stage sketch-generation objective is summarized as 
+
+Lsketch = LCE + λaux Laux , (7) where Laux collects the structural prediction losses and λaux controls their contribution. These auxiliary objectives encode structural information in the numeric representation, which then guides the construction of initial equations. 
+
+3.2 Inference 
+
+From Sketches to Initial Equations 
+
+The numeric encoder maps the numerical observations to latent representations. Stochastic decoding then samples diverse high probability sketches from these representations [7]. We discard duplicate sketches and those that violate the prefix grammar. Each retained sketch defines an expression skeleton with unresolved variable and constant tokens. MCTS assigns observed inputs to the variable tokens, and numerical optimization fits the constant values on the training set [26]. We rank the resulting complete expressions by training NMSE and use the top 24 to initialize 24 independent local search trajectories. 
+
+Parallel Local Equation Recovery 
+
+Each search path maintains one current expression and attempts to improve it through a sequence of small tree edits. Different decoded sketches and MCTS assignments seed the search paths in distinct regions. 7Scale-aware constant fitting. Every candidate tree may contain several free constants. For a fixed structure e(x; c), constants are estimated by minimizing squared error on the training set, ˆc = arg min 
+
+> c
+
+X
+
+> (xi,y i)∈Dtrain
+
+(e(xi; c) − yi)2 . (8) The objective is solved with Levenberg-Marquardt optimization from logarithmically spaced ini-tializations that span multiple orders of magnitude. During local search, constants are refitted periodically after several structural edits. 
+
+Structural repair. The search paths run in parallel, each maintaining an independent current expression. A path iteratively modifies its expression by replacing an operator, variable, or small subtree. After several mutations, the constants are refitted and the candidate is evaluated on Dtrain 
+
+using NMSE normalized by the target variance. The candidate replaces the current expression only if it achieves a lower NMSE. Each path performs 300 mutation attempts. 
+
+Selection and Simplification 
+
+Throughout local search, a shared Hall of Fame stores the best candidates found across all search paths. Once all paths have completed 300 mutation attempts, MOSAIC-SR selects the final expression from this candidate pool using Dval . Candidates with validation NMSE below 10 −15 are classified as near exact fits. When one or more candidates satisfy this threshold, the selector chooses the expression with the fewest operators. Otherwise, it selects the candidate with the lowest validation NMSE. This criterion favors structurally simpler expressions once the validation error is near zero. The selected expression is then simplified by replacing small constants with zero, and fitted values close to common physical constants are snapped to their symbolic forms. A physical constant snapping is retained only when its validation error remains within a small tolerance of the original expression. 
+
+## 4 Experiments 
+
+We conduct two evaluations. The first focuses on scientific equation recovery using SRSD-Feynman, including its dummy variable variant. The second tests whether the same method transfers to six established symbolic regression benchmarks. We also conduct ablation studies on the SRSD-Feynman Easy split to examine conditional MCTS, local mutation search, and search breadth and depth. The ablation results, detailed training parameters, and experimental settings are provided in the supplementary material. 
+
+4.1 Evaluation Protocol 
+
+We evaluate numerical accuracy and symbolic solution rate following the SRBench protocol. For every run conducted in this work, the test set is used only for final scoring and the returned expression is independently parsed and reevaluated outside the method. Invalid expressions, non-finite predictions and timeouts remain failures in the full benchmark denominator. Each evaluation reports a numerical recovery rate and a symbolic solution rate. For a set of problems P, symbolic solution rate is Sym = 1
+
+|P| 
+
+X
+
+> p∈P
+
+1 SymVerify(ˆ ep, e ⋆p) = 1  , (9) 8Table 1: Results on SRSD-Feynman. Easy, Medium, and Hard contain 30, 40, and 50 equations. Results cited from SRSD-Feynman are taken directly from the original paper. Results evaluated in this work are means over five seeds. Sym is the symbolic solution rate in percent, and Acc is the percentage of equations with R2 > 0.999. The top three values per column, including ties, are bolded. The best value in each column is also italicized.                                                                                                                                                                           
+
+> Easy (30) Medium (40) Hard (50) Method Type Sym Acc Sym Acc Sym Acc
+> Cited from SRSD-Feynman
+> uDSR RL 50.0 100.0 17.5 75.0 4.0 20.0 PySR GP 60.0 66.7 30.0 45.0 4.0 38.0 DSR RL 46.7 63.3 10.0 45.0 2.0 28.0 AI Feynman Rules 30.0 33.3 2.5 5.0 2.0 6.0 E2E Neural 0.0 26.7 0.0 17.5 0.0 14.0 AFP-FE GP 23.3 26.7 2.5 2.5 0.0 4.0 AFP GP 20.0 20.0 2.5 2.5 0.0 4.0 gplearn GP 6.7 6.7 0.0 7.5 0.0 2.0
+> Evaluated in this work
+> SBP-GP GP 8.0 87.3 4.0 82.0 0.0 56.0
+> SR4MDL Hybrid 63.3 86.7 43.0 66.0 21.2 48.4 TPSR Hybrid 47.3 86.0 44.0 81.0 20.0 52.0
+> NGGP Hybrid 36.7 65.3 9.0 52.0 0.4 34.8 RSRM Hybrid 0.0 64.0 0.0 47.0 0.0 22.8 GP-GOMEA GP 24.7 63.3 19.5 65.0 10.0 44.0 EPLEX GP 6.7 62.0 10.0 55.0 4.4 28.0 DGSR Neural 36.7 58.7 11.5 49.0 0.0 22.4 TaylorGP GP 23.3 35.3 18.5 24.0 6.4 10.4 DySymNet Neural 7.3 29.3 0.0 17.5 0.0 4.8 FFX Linear 14.0 26.7 17.5 31.0 11.6 16.0 Operon GP 2.0 23.3 7.0 32.0 6.0 14.0 NeSymReS Neural 16.7 21.3 2.5 14.0 3.6 4.8 BSR Bayes 0.0 0.7 0.0 0.0 0.0 0.0 MOSAIC-SR Hybrid 84.7 96.7 55.0 90.0 34.8 53.2
+
+where ˆ ep is the returned expression, e⋆p is the ground truth expression, and SymVerify is the fixed symbolic verifier. We use the SRBench symbolic solution verifier [3]. The numerical criterion is specified below in each experiment. 
+
+4.2 SRSD-Feynman Evaluation 
+
+Benchmark. SRSD-Feynman contains 120 physics inspired equations with known ground truth and physically motivated sampling ranges [17]. The benchmark is divided into Easy, Medium, and Hard splits with 30, 40, and 50 problems, respectively. Each problem provides 8000 training, 1000 validation, and 1000 test samples. We also evaluate the dummy variable variant, which adds between one and three irrelevant input columns at random positions. Results for both the original and dummy variable variants are reported below. We additionally include EPLEX [12], DGSR [6], TaylorGP [5], DySymNet [16], FFX [18], and BSR [8] in the SRSD-Feynman comparison. For this evaluation, predictive quality is measured by 
+
+R2 
+
+> p
+
+= 1 −
+
+P
+
+> i
+
+ yi − fˆep (xi)2
+
+P 
+
+> i
+
+(yi − ¯y)2 , (10) and Acc is the percentage of test problems with R2 > 0.999. 9Table 2: Results on SRSD-Feynman with dummy variables. Results cited from SRSD-Feynman are taken directly from the original paper. Results evaluated in this work are means over five seeds. Sym is the symbolic solution rate in percent, and Acc is the percentage of problems with test R2 > 0.999. The top three values in each column, including ties, are bolded. The best value in each column is also italicized.                                                                                                                                                                           
+
+> Easy (30) Medium (40) Hard (50) Method Type Sym Acc Sym Acc Sym Acc
+> Cited from SRSD-Feynman
+> uDSR RL 10.0 53.3 7.5 37.5 0.0 12.0 PySR GP 20.0 20.0 5.0 10.0 0.0 2.0 DSR RL 10.0 76.7 0.0 45.0 2.0 22.0 AI Feynman Rules 0.0 6.7 0.0 0.0 0.0 0.0 E2E Neural 0.0 16.7 0.0 12.5 0.0 10.0 AFP-FE GP 16.7 16.7 0.0 0.0 0.0 4.0 AFP GP 16.7 20.0 0.0 5.0 0.0 4.0 gplearn GP 0.0 0.0 0.0 0.0 0.0 0.0
+> Evaluated in this work
+> SBP-GP GP 0.0 86.7 0.0 82.5 0.0 53.2
+> SR4MDL Hybrid 40.0 80.0 14.0 28.5 4.8 24.8 TPSR Hybrid 32.0 84.0 36.0 82.0 17.2 48.0
+> NGGP Hybrid 8.7 60.0 6.0 50.5 0.0 33.2 RSRM Hybrid 0.0 60.7 0.0 45.0 0.0 22.0 GP-GOMEA GP 4.7 60.0 9.5 62.5 8.8 42.0 EPLEX GP 2.7 61.3 7.0 54.5 2.8 24.4 DGSR Neural 3.3 30.7 1.5 31.5 0.0 14.0 TaylorGP GP 6.7 26.0 10.5 33.0 6.8 14.0 DySymNet Neural 4.7 5.3 0.0 4.5 0.0 2.0 FFX Linear 11.3 26.7 12.5 31.5 8.8 16.0 Operon GP 2.7 23.3 6.0 32.0 6.4 14.0 NeSymReS Neural 4.0 8.0 0.0 6.0 0.8 2.0 BSR Bayes 0.0 0.0 0.0 0.0 0.0 0.0 MOSAIC-SR Hybrid 74.0 94.0 54.5 82.5 31.2 52.4
+
+Compared methods. We compare MOSAIC-SR with search-based, neural, and hybrid symbolic regression methods. For methods reported in the original SRSD-Feynman study, we show the published values from Matsubara et al. [17]. The remaining methods are evaluated under our pipeline and are shown separately in the table. These evaluations include the GP methods SBP-GP and GP-GOMEA [32, 33], the Transformer-MCTS hybrid TPSR [26], the reinforcement-learning and MCTS method RSRM [36], and the pretrained Transformer model NeSymReS [1]. 
+
+Implementation. MOSAIC-SR uses 200 sampled input-output pairs to generate 48 candidate sketches over three nucleus sampling passes. MCTS explores variable assignments for these sketches, and its top 24 complete expressions initialize 24 local search trajectories with 300 mutation steps each. Constants and local edits are optimized on the training data. Final selection uses validation error and expression complexity. All methods used a budget of 3,600 seconds per problem and the settings recommended by their original implementations. Results for MOSAIC-SR and all baselines evaluated in this work are reported as means over five seeds. Cited results are taken directly from the original SRSD-Feynman paper. Runtime was not reported in the original paper, so we do not compare runtime on the SRSD-Feynman dataset. We record and analyze mean wall-clock runtime in the six cross-benchmark evaluations presented later. Experiments were run on a cluster with four 80 GB H100 GPUs, four 80 GB A100 GPUs, and CPU nodes. Each training run used a single GPU without distributed training. 10 Table 3: Results and runtime on six symbolic regression benchmarks. Sym and Acc are percentages. Time is the average runtime in seconds per equation. Acc denotes test NMSE below 10 −6. For each dataset, the top three Sym and Acc values are bolded.                                                                                                                                                                           
+
+> Method Nguyen Korns Keijzer Vladislavleva Strogatz Livermore Sym Acc Time Sym Acc Time Sym Acc Time Sym Acc Time Sym Acc Time Sym Acc Time PySR 8.3 91.7 99.6 20.0 60.0 619.6 26.7 73.3 100.8 12.5 25.0 126.9 42.9 71.4 150.6 31.8 72.7 146.2 Operon 0.0 0.0 4.6 6.7 53.3 20.4 0.0 20.0 6.5 0.0 12.5 11.7 7.1 21.4 9.7 0.0 0.0 6.5 GP-GOMEA 8.3 16.7 29.2 0.0 26.7 88.9 6.7 13.3 33.3 12.5 12.5 53.2 14.3 64.3 45.9 18.2 18.2 31.4 E2E-SR 0.0 0.0 9.0 0.0 6.7 21.9 0.0 0.0 13.4 0.0 0.0 18.2 0.0 0.0 13.6 0.0 0.0 12.4 SNIP-SR 0.0 0.0 26.3 6.7 6.7 171.9 0.0 0.0 25.1 0.0 0.0 101.9 0.0 7.1 25.4 0.0 0.0 24.6 GenSR 0.0 0.0 16.0 0.0 40.0 234.4 0.0 6.7 53.7 0.0 12.5 357.3 0.0 21.4 82.6 0.0 4.5 23.8 TPSR 0.0 33.3 60.3 0.0 20.0 78.3 0.0 33.3 85.5 0.0 25.0 170.9 0.0 28.6 124.4 0.0 18.2 46.9 SR4MDL 41.7 41.7 873.5 20.0 26.7 1,966.4 20.0 26.7 1,198.3 12.5 12.5 2,218.6 50.0 64.3 874.9 22.7 27.3 1,181.8 MOSAIC-SR 75.0 91.7 75.6 40.0 53.3 288.1 53.3 66.7 71.3 25.0 37.5 91.3 64.3 71.4 99.1 45.5 90.9 83.8
+
+Results. Table 1 reports the SRSD-Feynman results. Numerical accuracy and symbolic recovery can differ substantially. Some baselines obtain high R2 based accuracy but low symbolic solution rates. For example, SBP-GP reaches 87 .3% accuracy on the Easy split but has an 8 .0% symbolic solution rate. MOSAIC-SR reduces this gap, achieving the highest symbolic solution rate on every difficulty split and ranking among the top two methods in predictive accuracy. We next evaluate robustness to irrelevant dummy variables. Table 2 shows that dummy variables make symbolic recovery substantially harder for many baselines. For example, the Easy symbolic solution rate of PySR falls from 60 .0% in the clean setting to 20 .0%, and that of DGSR falls from 36 .7% to 3 .3%. MOSAIC-SR retains symbolic solution rates of 74 .0%, 54 .5%, and 31 .2% on the Easy, Medium, and Hard splits, respectively. These rates exceed the strongest baseline by 34 .0, 18 .5, and 14 .0 percentage points. Compared with the clean setting, they decrease by only 10 .7, 0 .5, and 3 .6 percentage points. Predictive accuracy is also best on Easy, tied for best on Medium, and within 0 .8 percentage points of the best result on Hard. These results indicate that multi-sketch initialization and structural repair preserve recovery performance when the observations contain irrelevant inputs. Appendix A provides additional error bar plots showing mean performance and variation across random seeds, together with rank comparisons for both SRSD-Feynman variants. 
+
+4.3 Cross-Benchmark Evaluation 
+
+We further evaluate MOSAIC-SR on six widely used symbolic regression datasets: Nguyen-12 [29], Korns-15 [11], Keijzer-15 [10], Vladislavleva-8 [35], Strogatz-14 [3, 27], and Livermore-22 [21]. We compare against three groups of baselines. The search-based baselines are PySR, Operon, and GP-GOMEA [2, 4, 33]. The neural baselines are E2E-SR, SNIP-SR, and GenSR [9, 15, 19]. The hybrid baselines are TPSR and SR4MDL [26, 37]. 
+
+Settings. Numerical recovery requires test NMSE below 10 −6. We follow the standard setting for each dataset. Nguyen uses independent uniform samples from the equation domains. Korns uses independent fit and test samples of 10,000 points each over five inputs in [ −50 , 50]. Keijzer and Vladislavleva use their equation specific sampling methods and sample sizes. Livermore follows the equation specific domains and sample counts distributed with DSO [22]. Strogatz uses the fixed 75/25 SRBench split of the PMLB ODE datasets [3]. For benchmarks without a predefined validation set, we select the final candidate using the training data. MOSAIC-SR uses the same 24-by-300 search configuration on every dataset. All baselines use their default budgets. 11 Results. Table 3 summarizes the multi-benchmark results. It reports symbolic solution rate, predictive accuracy, and mean wall-clock time per equation. MOSAIC-SR obtains the highest symbolic solution rate on every dataset. Improvements over the strongest baseline range from 12 .5 to 33 .3 percentage points. These gains cannot be explained by predictive accuracy alone. MOSAIC-SR and PySR have identical numerical recovery on Nguyen and Strogatz, but MOSAIC-SR increases symbolic solution rates from 8.3% to 75.0% and from 42.9% to 64.3%. Although PySR has slightly higher numerical recovery on Korns and Keijzer, MOSAIC-SR approximately doubles symbolic recovery on both datasets. Moreover, the neural baselines reach at most 6.7% symbolic recovery. Operon, GP-GOMEA, and direct neural generators are generally faster, but their symbolic recovery is substantially lower. In contrast, MOSAIC-SR transfers across benchmarks and more effectively converts accurate predictions into exact equations. Among competitive recovery baselines, MOSAIC-SR is 1.3-2.2 × faster than PySR and 6.8-24.3 × faster than SR4MDL across all six datasets. This highlights the importance of search and repair after neural generation. 
+
+## 5 Conclusion 
+
+We presented MOSAIC-SR, a hybrid symbolic regression method that combines learned equation priors with explicit recovery search. A pretrained Transformer identifies promising expression structures instead of relying on random initialization. Conditional MCTS completes partially specified sketches. Within each search path, local tree edits alternate with constant refitting throughout the search budget. This repeated interaction corrects errors in both symbolic structure and numerical scale. Across various benchmarks, MOSAIC-SR achieves the highest symbolic solution rate in every reported dataset while retaining competitive predictive accuracy. Its advantage persists when irrelevant variables are introduced. This supports the use of learned sketches as search priors rather than one-shot predictions. The runtime results further suggest that a learned sketch prior can reduce search time while supporting higher symbolic solution rates. Despite these gains, recovery becomes more difficult for high dimensional equations because the corresponding search space grows rapidly. Targets far outside the pretraining distribution may also require a larger search budget. Future work will use broader pretraining distributions to improve recovery for high-dimensional equations with complex symbolic structure. We will also study recovery from sparse observations, which better reflect data availability in real world physical systems. 12 References 
+
+[1] Biggio, L.; Bendinelli, T.; Neitz, A.; Lucchi, A.; and Parascandolo, G. 2021. Neural Symbolic Regression that Scales. In Proceedings of the 38th International Conference on Machine Learning .[2] Burlacu, B.; Kronberger, G.; and Kommenda, M. 2020. Operon C++: an efficient genetic programming framework for symbolic regression. In Proceedings of the 2020 Genetic and Evolutionary Computation Conference Companion , GECCO ’20, 1562–1570. Association for Computing Machinery. [3] Cava, W. G. L.; Orzechowski, P.; Burlacu, B.; de Fran¸ ca, F. O.; Virgolin, M.; Jin, Y.; Kommenda, M.; and Moore, J. H. 2021. Contemporary Symbolic Regression Methods and their Relative Performance. In NeurIPS Datasets and Benchmarks .[4] Cranmer, M. 2023. Interpretable Machine Learning for Science with PySR and SymbolicRe-gression.jl. arXiv:2305.01582. [5] He, B.; Lu, Q.; Yang, Q.; Luo, J.; and Wang, Z. 2022. Taylor Genetic Programming for Symbolic Regression. arXiv:2205.09751. [6] Holt, S.; Qian, Z.; and van der Schaar, M. 2023. Deep Generative Symbolic Regression. arXiv:2401.00282. [7] Holtzman, A.; Buys, J.; Du, L.; Forbes, M.; and Choi, Y. 2020. The Curious Case of Neural Text Degeneration. In International Conference on Learning Representations .[8] Jin, Y.; Fu, W.; Kang, J.; Guo, J.; and Guo, J. 2020. Bayesian Symbolic Regression. arXiv:1910.08892. [9] Kamienny, P.-A.; d’Ascoli, S.; Lample, G.; and Charton, F. 2022. End-to-end symbolic regression with transformers. In Proceedings of the 36th International Conference on Neural Information Processing Systems .[10] Keijzer, M. 2003. Improving Symbolic Regression with Interval Arithmetic and Linear Scaling. In Ryan, C.; Soule, T.; Keijzer, M.; Tsang, E.; Poli, R.; and Costa, E., eds., Genetic Programming ,70–82. Springer Berlin Heidelberg. [11] Korns, M. F. 2011. Accuracy in Symbolic Regression , 129–151. Springer New York. [12] La Cava, W.; Spector, L.; and Danai, K. 2016. Epsilon-Lexicase Selection for Regression. In Proceedings of the Genetic and Evolutionary Computation Conference 2016 , GECCO ’16, 741–748. ACM. [13] Landajuela, M.; Lee, C. S.; Yang, J.; Glatt, R.; Santiago, C. P.; Aravena, I.; Mundhenk, T.; Mulcahy, G.; and Petersen, B. K. 2022. A unified framework for deep symbolic regression. 
+
+Advances in Neural Information Processing Systems , 35: 33985–33998. [14] Lee, J.; Lee, Y.; Kim, J.; Kosiorek, A. R.; Choi, S.; and Teh, Y. W. 2019. Set Transformer: A Framework for Attention-based Permutation-Invariant Neural Networks. arXiv:1810.00825. [15] Li, Q.; Hu, Y.; Liu, J.; and Chen, Y. 2026. GenSR: Symbolic regression based on equation generative space. In The Fourteenth International Conference on Learning Representations .13 [16] Li, W.; Li, W.; Yu, L.; Wu, M.; Sun, L.; Liu, J.; Li, Y.; Wei, S.; Deng, Y.; and Hao, M. 2024. A Neural-Guided Dynamic Symbolic Network for Exploring Mathematical Expressions from Data. arXiv:2309.13705. [17] Matsubara, Y.; Chiba, N.; Igarashi, R.; and Ushiku, Y. 2024. Rethinking Symbolic Regression Datasets and Benchmarks for Scientific Discovery. Journal of Data-centric Machine Learning Research .[18] McConaghy, T. 2011. FFX: Fast, scalable, deterministic symbolic regression technology. In 
+
+Genetic Programming Theory and Practice IX , 235–260. Springer. [19] Meidani, K.; Shojaee, P.; Reddy, C. K.; and Farimani, A. B. 2024. SNIP: Bridging Mathematical Symbolic and Numeric Realms with Unified Pre-training. In The Twelfth International Conference on Learning Representations .[20] Meurer, A.; Smith, C. P.; Paprocki, M.; ˇCert´ ık, O.; Kirpichev, S. B.; Rocklin, M.; Kumar, A.; Ivanov, S.; Moore, J. K.; Singh, S.; Rathnayake, T.; Vig, S.; Granger, B. E.; Muller, R. P.; Bonazzi, F.; Gupta, H.; Vats, S.; Johansson, F.; Pedregosa, F.; Curry, M. J.; Terrel, A. R.; Rouˇ cka, v.; Saboo, A.; Fernando, I.; Kulal, S.; Cimrman, R.; and Scopatz, A. 2017. SymPy: symbolic computing in Python. PeerJ Computer Science , 3: e103. [21] Mundhenk, T. N.; Landajuela, M.; Glatt, R.; Santiago, C. P.; faissol, D.; and Petersen, B. K. 2021. Symbolic Regression via Deep Reinforcement Learning Enhanced Genetic Programming Seeding. In Beygelzimer, A.; Dauphin, Y.; Liang, P.; and Vaughan, J. W., eds., Advances in Neural Information Processing Systems .[22] Petersen, B. K.; Larma, M. L.; Mundhenk, T. N.; Santiago, C. P.; Kim, S. K.; and Kim, J. T. 2021. Deep symbolic regression: Recovering mathematical expressions from data via risk-seeking policy gradients. In International Conference on Learning Representations .[23] Radford, A.; Kim, J. W.; Hallacy, C.; Ramesh, A.; Goh, G.; Agarwal, S.; Sastry, G.; Askell, A.; Mishkin, P.; Clark, J.; et al. 2021. Learning transferable visual models from natural language supervision. In International conference on machine learning , 8748–8763. PmLR. [24] Schmidt, M.; and Lipson, H. 2009. Distilling Free-Form Natural Laws from Experimental Data. 
+
+Science , 324(5923): 81–85. [25] Schmidt, M. D.; and Lipson, H. 2010. Age-fitness Pareto optimization. In Proceedings of the 12th Annual Conference on Genetic and Evolutionary Computation , GECCO ’10, 543–544. Association for Computing Machinery. [26] Shojaee, P.; Meidani, K.; Farimani, A. B.; and Reddy, C. K. 2023. Transformer-based Planning for Symbolic Regression. In Thirty-seventh Conference on Neural Information Processing Systems .[27] Strogatz, S. H. 2015. Nonlinear Dynamics and Chaos : With Applications to Physics, Biology, Chemistry, and Engineering . Westview Press, 2nd edition. [28] Udrescu, S.-M.; and Tegmark, M. 2020. AI Feynman: A physics-inspired method for symbolic regression. Science Advances , 6(16): eaay2631. 14 [29] Uy, N. Q.; Hoai, N. X.; O’Neill, M.; Mckay, R. I.; and Galv´ an-L´ opez, E. 2011. Semantically-based crossover in genetic programming: application to real-valued symbolic regression. Genetic Programming and Evolvable Machines , 12(2): 91–119. [30] van den Oord, A.; Li, Y.; and Vinyals, O. 2019. Representation Learning with Contrastive Predictive Coding. arXiv:1807.03748. [31] Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones, L.; Gomez, A. N.; Kaiser, L.; and Polosukhin, I. 2017. Attention is all you need. Advances in neural information processing systems , 30. [32] Virgolin, M.; Alderliesten, T.; and Bosman, P. A. N. 2019. Linear scaling with and within semantic backpropagation-based genetic programming for symbolic regression. In Proceedings of the Genetic and Evolutionary Computation Conference , GECCO ’19, 1084–1092. Association for Computing Machinery. [33] Virgolin, M.; Alderliesten, T.; Witteveen, C.; and Bosman, P. A. N. 2021. Improving Model-Based Genetic Programming for Symbolic Regression of Small Expressions. Evolutionary Computation , 29(2): 211–237. [34] Virgolin, M.; and Pissis, S. P. 2022. Symbolic Regression is NP-hard. Transactions on Machine Learning Research .[35] Vladislavleva, E. J.; Smits, G. F.; and den Hertog, D. 2009. Order of Nonlinearity as a Complexity Measure for Models Generated by Symbolic Regression via Pareto Genetic Programming. IEEE Transactions on Evolutionary Computation , 13(2): 333–349. [36] Xu, Y.; Liu, Y.; and Sun, H. 2024. Reinforcement Symbolic Regression Machine. In The Twelfth International Conference on Learning Representations .[37] Yu, Z.; Ding, J.; Li, Y.; and Jin, D. 2025. Symbolic regression via MDLformer-guided search: from minimizing prediction error to minimizing description length. In The Thirteenth International Conference on Learning Representations .15 A Visualization of SRSD-Feynman Results 
+
+We provide predictive accuracy and symbolic recovery visualizations for SRSD-Feynman [17], together with rank comparisons involving expression complexity. The quantitative results are reported in the paper. 
+
+A.1 Results without Dummy Variables 
+
+Figure 2 compares predictive accuracy and symbolic solution rate across the Easy, Medium, and Hard splits without dummy variables. 0 20 40 60 80 100      
+
+> Symbolic Solution (%)
+> E2E BSR RSRM Operon gplearn EPLEX DySymNet SBP-GP FFX NeSymRes AFP AFP-FE TaylorGP GP-GOMEA AI Feynman DGSR NGGP DSR TPSR uDSR PySR SR4MDL
+> MOSAIC (ours)
+> Split Easy Medium Hard 020 40 60 80 100
+> Accuracy Solution (%)
+> BSR gplearn AFP NeSymRes Operon AFP-FE E2E FFX DySymNet AI Feynman TaylorGP DGSR EPLEX DSR GP-GOMEA RSRM NGGP PySR TPSR SR4MDL SBP-GP
+> MOSAIC (ours)
+> uDSR
+> Split Easy Medium Hard
+
+SRSD-Feynman 0 20 40 60 80 100      
+
+> Symbolic Solution (%)
+> E2E BSR RSRM Operon gplearn EPLEX DySymNet SBP-GP FFX NeSymRes AFP AFP-FE TaylorGP GP-GOMEA AI Feynman DGSR NGGP DSR TPSR uDSR PySR SR4MDL
+> MOSAIC (ours)
+> Split Easy Medium Hard 020 40 60 80 100
+> Accuracy Solution (%)
+> BSR gplearn AFP NeSymRes Operon AFP-FE E2E FFX DySymNet AI Feynman TaylorGP DGSR EPLEX DSR GP-GOMEA RSRM NGGP PySR TPSR SR4MDL SBP-GP
+> MOSAIC (ours)
+> uDSR
+> Split Easy Medium Hard
+
+SRSD-Feynman 
+
+Figure 2: Predictive accuracy and symbolic solution rate on SRSD-Feynman without dummy variables. Points show mean performance on the Easy, Medium, and Hard splits. Horizontal bars show the reported variation across seeds. MOSAIC-SR achieves the highest symbolic solution rate on all three splits while remaining among the most accurate methods. Its symbolic advantage is especially clear on the Easy split and remains substantial as equation difficulty increases. Figure 3 summarizes the rank based tradeoffs without dummy variables. Lower ranks are better in both panels. MOSAIC-SR ranks first in both predictive accuracy and symbolic recovery, giving the strongest joint result in Figure 3(a). It also achieves top four complexity rank in Figure 3(b). Methods with slightly simpler expressions have lower accuracy ranks. 
+
+A.2 Results with Dummy Variables 
+
+The dummy-variable setting adds irrelevant input columns and therefore tests robustness to variable selection. Figure 4 compares predictive and symbolic performance under this perturbation. MOSAIC-SR continues to achieve the highest symbolic solution rate across Easy, Medium, and Hard. Although irrelevant variables reduce absolute recovery on some splits, the ordering of the leading methods is preserved. Predictive accuracy also remains highest or close to highest across the three difficulty levels. Figure 5 presents the corresponding rank based comparisons. 16 0 2 4 6 8 10 12 14 16 18 20 22 24 
+
+Mean Accuracy ( R2 > 0.999) Rank 
+
+> 0246810 12 14 16 18 20 22 24
+> Symbolic Solution Rank
+
+SRSD-Feynman 
+
+> SBP-GP SR4MDL TPSR NGGP RSRM GP-GOMEA EPLEX DGSR TaylorGP DySymNet FFX Operon NeSymRes BSR
+> MOSAIC (ours)
+> uDSR PySR DSR AI Feynman E2E AFP-FE AFP gplearn
+
+(a) Accuracy versus symbolic recovery 0 2 4 6 8 10 12 14 16 18 
+
+Mean Accuracy ( R2 > 0.999) Rank 
+
+> 0246810 12 14 16 18
+> Complexity Rank
+
+SRSD-Feynman  
+
+> MOSAIC (ours)
+> SBP-GP SR4MDL TPSR RSRM GP-GOMEA EPLEX DGSR E2E TaylorGP DySymNet FFX Operon NeSymRes BSR gplearn NGGP
+
+(b) Accuracy versus complexity 
+
+Figure 3: Rank-based comparisons on SRSD-Feynman without dummy variables. The panels compare mean predictive accuracy rank with symbolic solution rank and expression complexity rank, respectively. Methods closer to the lower left corner achieve better tradeoffs. 0 20 40 60 80 
+
+Symbolic Solution (%) 
+
+gplearn E2E AI Feynman BSR TaylorGP RSRM SBP-GP Operon EPLEX DGSR NeSymRes DySymNet GP-GOMEA NGGP DSR uDSR FFX AFP AFP-FE PySR TPSR SR4MDL 
+
+MOSAIC (ours) 
+
+Split Easy Medium Hard 0 20 40 60 80 100 
+
+Accuracy Solution (%) 
+
+gplearn BSR DySymNet AI Feynman NeSymRes AFP-FE E2E AFP PySR Operon TaylorGP FFX DGSR uDSR GP-GOMEA NGGP RSRM EPLEX DSR SR4MDL TPSR SBP-GP 
+
+MOSAIC (ours) 
+
+Split Easy Medium Hard 
+
+SRSD-Feynman with dummy variables 0 20 40 60 80 
+
+Symbolic Solution (%) 
+
+gplearn E2E AI Feynman BSR TaylorGP RSRM SBP-GP Operon EPLEX DGSR NeSymRes DySymNet GP-GOMEA NGGP DSR uDSR FFX AFP AFP-FE PySR TPSR SR4MDL 
+
+MOSAIC (ours) 
+
+Split Easy Medium Hard 0 20 40 60 80 100 
+
+Accuracy Solution (%) 
+
+gplearn BSR DySymNet AI Feynman NeSymRes AFP-FE E2E AFP PySR Operon TaylorGP FFX DGSR uDSR GP-GOMEA NGGP RSRM EPLEX DSR SR4MDL TPSR SBP-GP 
+
+MOSAIC (ours) 
+
+Split Easy Medium Hard 
+
+SRSD-Feynman with dummy variables 
+
+Figure 4: Predictive accuracy and symbolic solution rate on SRSD-Feynman with dummy variables. Points show mean performance on the Easy, Medium, and Hard splits. Horizontal bars show the reported variation across seeds. 17 0 2 4 6 8 10 12 14 16 18 20 22 24  
+
+> Mean Accuracy ( R2> 0.999) Rank
+> 0246810 12 14 16 18 20 22 24
+> Symbolic Solution Rank
+> SRSD-Feynman with dummy variables
+> SBP-GP SR4MDL TPSR NGGP RSRM GP-GOMEA EPLEX DGSR TaylorGP DySymNet FFX Operon NeSymRes BSR
+> MOSAIC (ours)
+> uDSR PySR DSR AI Feynman E2E AFP-FE AFP gplearn
+
+(a) Accuracy versus symbolic recovery 0 2 4 6 8 10 12 14 16 18   
+
+> Mean Accuracy ( R2> 0.999) Rank
+> 0246810 12 14 16 18
+> Complexity Rank
+> SRSD-Feynman with dummy variables
+> MOSAIC (ours)
+> SBP-GP SR4MDL TPSR RSRM GP-GOMEA EPLEX DGSR E2E TaylorGP DySymNet FFX Operon NeSymRes BSR gplearn NGGP
+
+(b) Accuracy versus complexity 
+
+Figure 5: Rank based comparisons on SRSD-Feynman with dummy variables. The panels compare mean predictive accuracy rank with symbolic solution rank and expression complexity rank, respec-tively. Methods closer to the lower left corner achieve better tradeoffs. With dummy variables, MOSAIC-SR remains first in the joint accuracy-symbolic comparison. Its complexity rank is fifth while its accuracy rank remains near the top. This shows that robustness to irrelevant inputs does not require a large increase in recovered expression complexity. 
+
+## B Validation-NMSE Trajectories during Local Search 
+
+Figures 6–11 track the best validation NMSE achieved so far throughout each MOSAIC-SR local-search run. Lower values are better and the vertical axis is logarithmic. Thin gray step curves show individual runs, the colored curve is the median, and the shaded region is the interquartile range. The dashed horizontal line marks NMSE = 10 −3, equivalent to R2 > 0.999, which is the accuracy threshold used for SRSD-Feynman. To distinguish target difficulty from proposal quality, each split is analyzed first by ground-truth operator count and then by the operator count of the top-1 decoded sketch. Operator count is used as a proxy for structural size. It is positively related to expression length and complexity but is not identical to either. Easy and Medium trajectories are shown for 50 seconds, while Hard trajectories are shown for 100 seconds. All three splits use five seeds. 
+
+B.1 SRSD-Feynman Easy 
+
+Ground-truth operator count. Figure 6 first groups runs by the number of operators in the true equation. Equations with fewer operators reach low NMSE earlier. The three and four operator groups nevertheless cross the accuracy threshold soon afterward and converge to the same low error regime. 
+
+Decoded sketch operator count. Figure 7 shows a much stronger separation by decoded sketch operator count. Sketches with fewer than 10 operators cross the threshold within a few seconds, while those with 10-15 operators converge more slowly and some runs with more than 15 operators remain above it. Because Easy targets contain at most four operators, high decoded operator counts appear to constrain local search more than ground truth operator count. 18 0 10 20 30 40 50                    
+
+> Wall-clock time (s)
+> 10 32
+> 10 28
+> 10 24
+> 10 20
+> 10 16
+> 10 12
+> 10 8
+> 10 4
+> 10 0
+> Validation NMSE
+> # of true equation ops 2
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of true equation ops = 3
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of true equation ops = 4
+> median
+
+Figure 6: Best validation NMSE versus wall-clock time on SRSD-Feynman Easy, grouped by ground-truth operator count. The 150 runs comprise 30 equations evaluated over five seeds. The groups contain one or two, three, and four true operators, with 40, 55, and 55. 0 10 20 30 40 50                     
+
+> Wall-clock time (s)
+> 10 32
+> 10 28
+> 10 24
+> 10 20
+> 10 16
+> 10 12
+> 10 8
+> 10 4
+> 10 0
+> Validation NMSE
+> # of Top-1 Decoded Sketch ops 9
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of Top-1 Decoded Sketch ops = 10 15
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of Top-1 Decoded Sketch ops 16
+> median
+
+Figure 7: Best validation NMSE versus wall-clock time on SRSD-Feynman Easy, grouped by top-1 decoded sketch operator count. The runs are divided into sketches with fewer than 10, between 10 and 15, and more than 15 operators, with 57, 44, and 49 runs respectively. 
+
+B.2 SRSD-Feynman Medium 
+
+Figure 8 groups runs by the number of operators in the true equation. Equations with fewer than five operators reach low NMSE earlier, while the two higher-count groups improve more slowly and show wider variation. Their medians are not strictly ordered by operator count, indicating that operator count captures only one component of target difficulty. The remaining variation depends on the specific algebraic structure of each equation. 
+
+Decoded sketch operator count. Figure 9 shows a clearer separation by decoded sketch operator count. Sketches with fewer than 13 operators cross the accuracy threshold in about 10 seconds, those with 13–17 operators require closer to 30 seconds, and the median for sketches with more than 17 operators remains above it. Decoded sketch operator count therefore provides a stronger 19 0 10 20 30 40 50                    
+
+> Wall-clock time (s)
+> 10 32
+> 10 28
+> 10 24
+> 10 20
+> 10 16
+> 10 12
+> 10 8
+> 10 4
+> 10 0
+> Validation NMSE
+> # of true equation ops 4
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of true equation ops = 5 6
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of true equation ops = 7
+> median
+
+Figure 8: Best validation NMSE versus wall-clock time on SRSD-Feynman Medium, grouped by ground-truth operator count. The 200 runs comprise 40 equations evaluated over five seeds. The groups contain fewer than five, five or six, and more than six true operators, with 75, 95, and 30 runs, respectively. indication of local-search progress. 0 10 20 30 40 50                     
+
+> Wall-clock time (s)
+> 10 32
+> 10 28
+> 10 24
+> 10 20
+> 10 16
+> 10 12
+> 10 8
+> 10 4
+> 10 0
+> Validation NMSE
+> # of Top-1 Decoded Sketch ops 12
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of Top-1 Decoded Sketch ops = 13 17
+> median
+> 010 20 30 40 50
+> Wall-clock time (s)
+> # of Top-1 Decoded Sketch ops 18
+> median
+
+Figure 9: Best validation NMSE versus wall-clock time on SRSD-Feynman Medium, grouped by top-1 decoded sketch operator count. The groups contain fewer than 13, between 13 and 17, and more than 17 decoded operators, with 82, 53, and 65 runs respectively. 
+
+B.3 SRSD-Feynman Hard 
+
+Ground-truth operator count. Figure 10 groups runs by the number of operators in the true equation. The medians for equations with fewer than nine operators and those with nine to 11 operators both cross the accuracy threshold early. The lower-count group subsequently reaches much lower NMSE. The median for equations with more than 11 operators improves gradually but remains above the threshold after 100 seconds. Ground-truth operator count therefore captures an important component of local-search difficulty on Hard. 20 0 20 40 60 80 100                     
+
+> Wall-clock time (s)
+> 10 32
+> 10 28
+> 10 24
+> 10 20
+> 10 16
+> 10 12
+> 10 8
+> 10 4
+> 10 0
+> Validation NMSE
+> # of true equation ops 8
+> median
+> 020 40 60 80 100
+> Wall-clock time (s)
+> # of true equation ops = 9 11
+> median
+> 020 40 60 80 100
+> Wall-clock time (s)
+> # of true equation ops 12
+> median
+
+Figure 10: Best validation NMSE versus wall-clock time during the 100-second search window on SRSD-Feynman Hard, grouped by ground-truth operator count. The 250 runs comprise 50 equations evaluated over five seeds. The groups contain fewer than nine, between nine and 11, and more than 11 true operators, with 115, 75, and 60 runs, respectively. 
+
+Decoded sketch operator count. Figure 11 shows a stronger separation by decoded sketch operator count. The median for sketches with fewer than 13 operators crosses the accuracy threshold almost immediately. The median for sketches with 13-19 operators crosses after about 40 seconds. The median for sketches with more than 19 operators remains above the threshold until the end of the 100 second window. A high decoded operator count therefore slows local search and may require the full available budget to reach the threshold. 0 20 40 60 80 100                     
+
+> Wall-clock time (s)
+> 10 32
+> 10 28
+> 10 24
+> 10 20
+> 10 16
+> 10 12
+> 10 8
+> 10 4
+> 10 0
+> Validation NMSE
+> # of Top-1 Decoded Sketch ops 12
+> median
+> 020 40 60 80 100
+> Wall-clock time (s)
+> # of Top-1 Decoded Sketch ops = 13 19
+> median
+> 020 40 60 80 100
+> Wall-clock time (s)
+> # of Top-1 Decoded Sketch ops 20
+> median
+
+Figure 11: Best validation NMSE versus wall-clock time on SRSD-Feynman Hard, grouped by top-1 decoded sketch operator count. The x-axis spans 0–100 seconds. The 250 runs comprise 50 equations evaluated over five seeds. The groups contain fewer than 13, between 13 and 19, and more than 19 decoded operators, with 107, 73, and 70 runs, respectively. 
+
+Overall implication. Across all three splits, higher ground truth operator counts generally slow convergence. In comparison, decoded sketch operator count produces a stronger and more consistent 21 separation of local-search outcomes. This finding is practically useful. Ground truth operator count is unknown at inference time. However, decoded sketch operator count is directly observable. These results motivate operator count aware decoding and resampling of sketches with unusually high operator counts. They also support adaptive allocation of the local-search budget based on proposal size. 
+
+## C Ablation Studies 
+
+We conduct the ablations on the Easy split of SRSD-Feynman, which contains 30 equations. Each result reports symbolic recovery under the same verification protocol as the main SRSD-Feynman experiment, together with numerical recovery. The component ablation is evaluated with three method seeds: 0, 1, and 2. 
+
+Contribution of each recovery stage. Table 4 compares sketch decoding alone, decoding followed by conditional MCTS, and the complete recovery procedure. Decoder only disables both MCTS and mutation search. The second stage adds conditional MCTS, while Full MOSAIC further applies 24 independent search paths with 300 mutations per path. Conditional MCTS improves numerical recovery for all three seeds and increases symbolic recovery for two of them. The complete procedure achieves 83.3–90.0% symbolic recovery, compared with 30.0–43.3% before mutation search, showing that the learned prior provides useful starting structures but does not replace equation repair. Table 4: Component ablation on 30 clean SRSD-Feynman Easy equations. Sym and Acc report symbolic and numerical recovery. All values are percentages. Decoder, Decoder + MCTS, and Full MOSAIC are evaluated with the same three method seeds.                           
+
+> Decoder Decoder + MCTS Full MOSAIC Seed Sym Acc Sym Acc Sym Acc 036.7 60.0 43.3 66.7 83.3 96.7 130.0 46.7 30.0 60.0 83.3 96.7 230.0 46.7 40.0 66.7 90.0 100.0
+
+Search breadth and depth. Table 5 varies the number of independent search paths and the number of mutation steps per path. The reported recovery rates are averaged over three method seeds. Paths are independent, and the columns are snapshots from continuous trajectories. Recovery generally improves with both search breadth and trajectory depth. At 500 steps, increasing the number of paths from one to 48 raises numerical recovery from 80.0% to 98.9% and symbolic recovery from 56.7% to 87.8%. The gains from additional steps become smaller at larger search budgets, with numerical recovery at 48 paths reaching 98.9% after 300 steps and remaining unchanged at 500 steps, while symbolic recovery increases from 85.6% to 87.8%. The gains from increasing the number of paths from 24 to 48 are also modest, improving numerical recovery by 1.1 percentage points and symbolic recovery by 2.2 percentage points at 500 steps. 22 Table 5: Search budget ablation on 30 SRSD-Feynman Easy equations. Sym and Acc denote symbolic and numerical recovery percentages averaged over three method seeds. 
+
+100 steps 300 steps 500 steps Paths Sym Acc Sym Acc Sym Acc 1 47.8 70.0 53.3 76.7 56.7 80.0 6 57.8 77.8 70.0 87.8 75.6 90.0 12 66.7 83.3 76.7 93.3 82.2 94.4 24 70.0 84.4 85.6 97.8 85.6 97.8 48 73.3 87.8 85.6 98.9 87.8 98.9 
+
+## D Implementation Details 
+
+The key implementation settings used in the reported experiments are summarized below. Table 6: Core optimization settings used in the two pretraining stages. 
+
+Setting Stage 1 Stage 2 Batch size 128 128 Training steps 400 ,000 250 ,000 Peak learning rate 10 −4 10 −5
+
+Encoder learning rate 10 −4 5 × 10 −6
+
+Warmup steps 16 ,000 2,000 Learning-rate schedule Cosine decay Constant AdamW β2 0.999 0.95 Weight decay 0.01 0.01 Gradient clipping 1.0 1.0
+
+Table 7: Detailed Transformer architecture used by MOSAIC-SR, including the numeric encoder, symbolic encoder, and symbolic decoder. The complete architecture has approximately 17 .4 million parameters and is relatively lightweight. 
+
+Parameter Value 
+
+Set-Transformer numeric encoder 
+
+Architecture Set Transformer Input dimension 11 (10 variables + output) ISAB blocks 4Hidden dimension 256 Attention heads 8Inducing points per ISAB 32 PMA seed vectors 16 Residual normalization Pre-LayerNorm PMA output dimension 16 × 256 = 4 ,096, then projected 
+
+Symbolic Transformer encoder 
+
+Encoder layers 6Hidden dimension 256 Attention heads 8Feed-forward dimension 1,024 Dropout 0.1 Activation GELU 
+
+Symbolic Transformer decoder 
+
+Decoder layers 4Hidden dimension 256 Attention heads 8Feed-forward dimension 1,024 Dropout 0.1 Maximum output length 128 tokens 
+
+Shared settings 
+
+Vocabulary size 45 
+
+23 Parameter Value Maximum variables 10 Total parameters Approximately 17 .4 M 
+
+Table 8: MOSAIC-SR inference time decoder, MCTS, and local-search budget for the cross-benchmark experiments. 
+
+Parameter Value Independent search paths 24 Mutations per path 300 Decoder/search passes 6Decoder sketches retained 24 Workers 12 Conditional MCTS Enabled MCTS trigger / expansions Validation NMSE 10 −4 / 1 ,500 Maximum evolved AST size 32 Constant-fitting starts 16 
+
+Table 9: SRSD-Feynman benchmark groups, variable count ranges, dummy variable distribution, data split sizes, and input domain extrema [17]. The extrema summarize equation specific sampling distributions rather than a shared interval. Dummy counts give the numbers of problems containing one, two, or three irrelevant variables. 
+
+Group Problems Variables 1/2/3 dummy Train/Val/Test 
+
+Without dummy variables Input domain extrema: 10 −30 –10 4
+
+Easy 30 1–5 0/0/0 8,000 /1,000 /1,000 Medium 40 1–6 0/0/0 8,000 /1,000 /1,000 Hard 50 1–8 0/0/0 8,000 /1,000 /1,000 
+
+With dummy variables Input domain extrema: 10 −33 –10 33 
+
+Easy + Dummy 30 3–8 6/11/13 8,000 /1,000 /1,000 Medium + Dummy 40 3–8 12/18/10 8,000 /1,000 /1,000 Hard + Dummy 50 3–10 13/18/19 8,000 /1,000 /1,000 
+
+Table 10: Numbers of problems, variable count ranges, training and test sample counts for the Nguyen [29], Korns [11], Keijzer [10], Vladislavleva [35], Strogatz [3, 27], and Livermore [21] benchmarks. 
+
+Dataset Problems Variables Training rows Test rows Nguyen 12 1–2 20 20 Korns 15 5 10 ,000 10 ,000 Keijzer 15 1–3 20–1 ,000 120–361 ,201 Vladislavleva 8 1–5 30–1 ,024 221–93 ,636 Strogatz 14 2 300 100 Livermore 22 1–2 20–1 ,000 20–1 ,000 
+
+24 E Qualitative Recovery Across Taylor Orders 
+
+These experiments examine how Taylor approximation order affects recovery of the underlying analytic structure. Here, K is the truncation order used to generate the observations. For each base function, we construct four datasets from Taylor polynomials truncated at K ∈ { 2, 5, 7, 10 } about the benchmark-specific expansion point and evaluate every method independently on each dataset. A prediction labeled K is therefore recovered from data generated at that order. Each table lists the data generating polynomials followed by the corresponding predictions. Ellipses abbreviate long expressions. 
+
+Logarithm. Ground truth: log ( x0 + 1). 
+
+Taylor data 2 x0 + (−1) · x20
+
+25 x50
+
+5 − x40
+
+4 + x30
+
+3 − x20
+
+2 + x0
+
+7 x70
+
+7 − x60
+
+6 + x50
+
+5 − x40
+
+4 + x30
+
+3 − x20
+
+2 + x0
+
+10 x90
+
+9 − x80
+
+8 + x70
+
+7 − x60
+
+6 + x50
+
+5 − x40
+
+4 + x30
+
+3 − x20
+
+2 + x0 + (−1) · x10 0
+
+10 
+
+MOSAIC-SR 2 −0.5 · x20 + x0
+
+5 x0 · (0 .6 · x40 − 0.75 · x30 + x20 − 1.5 · x0 + 3 .0) 37 log ( x0 + 1 .00006603079797) 10 log (0 .999982548715611 · x0 + 1 .0) PySR 2 x0 · (−0.50000006) · x0 + x0
+
+5 log ( x0 + e0.16825567 ·x40·(0 .1677055 ·x20+x0)·sin ( x0))7 log ( 0.9312916 · x20
+
+(8495 .134 · x0 + 4841 .4176432432) · cos ( x0 + sin ( x0) + 0 .55235815) + x0 + 0 .9999974) 10 x0
+
+px0 + e0.08364746 ·sin (sin ( x0·(−x0·(0 .007794200238976 −0.01248848 ·x0)+ x0))) 
+
+TPSR 2 (0 .001919221591558286 − 0.06896537602514179 · (3 .264972382184671 · x0
+
++ 0 .027804329418150822)) · (. . . − 4.45999942314764) 5 (. . . + 0 .1477134780683493) · (0 .4994556780444385 · (3 .5857739179080634 · x0
+
++ 0 .016444471966369778) − 0.008310635538500689) 7 (0 .0004599611012800237 − 0.007574319367220268 · (3 .675921308958977 · x0
+
++ 0 .060970365116553515)) · (. . . − 9.800723047144695) 10 (0 .00048668399774344864 − 0.008860476303170692 · (3 .547005732829724 · x0
+
++ 0 .05530797638861583)) · (. . . − 8.998199250504804) E2E-SR 2
+
+
+
+−6.33 + 7.87 
+
+. . . 
+
+
+
+· (. . . )5 (−9.9 − 3.00.055220918335784178 · x0 + 0 .0842532448682821 ) · (−0.021873220899239185 · x0
+
+− 3.1127899485564804 · 10 −7)7 (−0.00015 + 0.0565 3.675921308958977 · x0 + 6 .6709703651165538 ) · (. . . + (0 .16798960381942527 · x0
+
++ 6 .0327863456858267)) 10 (0 .00791 − 0.396 
+
+−5.536875948947199 · x0 − 9.1173357511426303 ) · (19 .54400158789178 · x0
+
++ 0 .00174694990127322) Operon 2 1.0 · ((1 .6375 − 2.1795 · x0) · (0 .2294 · x0 − 0.2865) + 0 .4691) + 0 .05 1.0 · (−(2 .7168 − 2.0625 · x0) − (. . . + 1 .3181) + ecos (0 .2009 ·x0) + sin ( −0.6926 · x0)) + 0 .07 1.0 · (cos ( −0.3504 · x0) · 0.3038 · x0 − 1.3606 · x0 · (−0.4265) · 10.5983 · x0 + 0 .8338 ) + 0 .010 1.0001 · log (0 .9999 · x0 + esin (cos (1 .5708)) ) + 0 .0
+
+25 Sine. Ground truth: sin ( x0). 
+
+Taylor data 2 x0
+
+5 x50
+
+120 − x30
+
+6 + x0
+
+7 x50
+
+120 − x30
+
+6 + x0 + (−1) · x70
+
+5040 10 x90
+
+362880 − x70
+
+5040 + x50
+
+120 − x30
+
+6 + x0
+
+MOSAIC-SR 2 x0
+
+5 −0.15 · x30 − 0.00833333333333333 · x0 · (−(x20 − 1) 2 − 0.949359216081706) + 0 .983755339865986 
+
+· x0
+
+7 0.995212385036962 · sin ( x0)10 sin (0 .999224487053661 · x0)PySR 2 x0
+
+5 sin ( x0 · (cos (sin ( x0 · x0 · 0.099885456 · cos (sin ( x0 · (−0.6655867))))) − 1 · 0.0023687228)) 
+
+· 1.0040035 7 sin ( x0
+
+cos ( x0 · (−0.03543025) · (−0.61757547 · x0 + sin (sin (sin (sin (sin (sin (sin (sin (sin ( x0))))))))))) )10 sin ( x0 · cos ( x0 · 0.0016573971 · 1(−1) · 2.5042472 · 1
+
+> −x0·x0·x0+sin (( x0+x0)·(−2.066677))
+
+)) TPSR 2 1.6952640543497626 · (0 .5898786076624276 · x0 − 0.1503609060667909) + 0 .2549014392344917 5 −(. . . + 0 .008829876210206134) + 0 .5311733478647308 · (0 .5442460160982873 · x0
+
++ 0 .03327453788862279) − 0.008829876210206504 7 0.0037014237986746907 − 1.1106297415087139 
+
+· sin (6 .201124685239097 − 1.7856942534231586 · (. . . − 0.04590158661878021)) 10 0.9998616696023864 
+
+· sin (1 .7327776217284636 · (. . . − 0.06370211051208034) + 0 .11012377319587009) + 6 .858283367093453 · 10 −5
+
+E2E-SR 2 (5 .0538457150294822 · 10 −5 − 0.017224455343742888 · x0) · (−0.0060226605842333864 · x0
+
+− 58 .016864815149059) 5 0.00832 − 0.9720000000000001 ·
+
+sin (0 .02411009851315413 · x0 + 0 .043594062028465994 − 0.807 
+
+. . . − 9.38 + 0 .0027099999999999997 )7 1.0 · sin (1 .00998324807091 · x0 − 0.00077925815314189615) + 0 .0021 10 1.0
+
+· sin (0 .9856914566698666 · x0 + 0 .0016099999999999999 · arctan ( . . . ) − 6.2710054014902136) 
+
+− 0.0Operon 2 1.0 · 1.0 · x0 + 0 .05 1.001 · (cos ( −1.0037 · x0) · 1.2879 · x0 − sin ( −(. . . − 1.4461 · x0) − 0.1272 · 0.0001)) + 0 .07 1.0 · (cos ( −0.4227 · x0) · 1.2701 · x0 − (. . . + 0 .0 · x0 − 0.2272) · sin (1 .5034 · x0)) + 0 .010 1.001 · (cos (0 .5492 · x0) · (−0.2811) · x0 − sin ( −0.9814 · x0) + cos ( . . . + 0 .626 · x0)) + 0 .0
+
+Feynman I.18.12. Ground truth: x0 · x1 · sin ( x2). 
+
+Taylor data 2 −x0 · x1 · x2 + π · x0 · x1
+
+5 . . . + −x0 · x1 · x52
+
+120 + π · x0 · x1 · x42
+
+24 − π2 · x0 · x1 · x32
+
+12 + x0 · x1 · x32
+
+6 − π · x0 · x1 · x22
+
+2+ π3 · x0 · x1 · x22
+
+12 7 . . . + x0 · x1 · x72
+
+5040 − π · x0 · x1 · x62
+
+720 − x0 · x1 · x52
+
+120 + π2 · x0 · x1 · x52
+
+240 − π3 · x0 · x1 · x42
+
+144 + π · x0
+
+· x1 · x42
+
+10 . . . + −x0 · x1 · x92
+
+362880 + π · x0 · x1 · x82
+
+40320 − π2 · x0 · x1 · x72
+
+10080 + x0 · x1 · x72
+
+5040 − π · x0 · x1 · x62
+
+720 + π3 · x0
+
+· x1
+
+MOSAIC-SR 2 x0 · x1 · (π − x2)5 x0 · x1 · sin ( x2)7 x0 · x1 · sin (1 .002337079977 · x2)10 0.564336516744925 · √π · x0 · x1 · sin ( x2)
+
+26 PySR 2 x0 · x1 · (3 .1415925 − x2)5 x0 · (0 .33221138 · x1 · sin (cos ( x2)) + x1) · sin (sin ( x2 · 0.4749027 + 1 .6496296) · 2.7744522) 0.9437794 7 x0 · x1 ·
+
+sin ( x2 − − 0.019365529 · (x2 − 3.146233) · cos (sin (sin (sin ( x2) · (−1.9357585))) · (−1.7473638))) 10 x0 · (x1 · ecos ( x2) · (−0.0030647963) · cos ( x2) + x1) · sin ( x2 · 0.9981049 − 1 · (−0.0058534783)) TPSR 2 (. . . + 0 .28331615049921344 + 0 .4956534371075346) · (0 .34386125723713024 · x0
+
+− 1.8420104004975268 + 1 .8420104004834439) 5 1.276389115335405 + 1 · 1
+
+. . . − 0.07925775134645766 + 0 .2495263264800342 + 0 .2580259436964331 + 0 .2746491984632519 7 sin ( −2.215140796977261 · | . . . + 0 .5758522222337376 + 1 .7552518942051996 | − 0.8214622877077248) + 0 .610334905734776 10 (. . . + 0 .0850328212232805 + 0 .1470358948108155) · (0 .36255539574241513 · x0
+
+− 1.8127229580805884 + 1 .812829094663855) E2E-SR 2 (−0.002704484223201092 · x1 − 0.60237161959079474) · (. . . + 0 .0011760054997509854 · x0
+
+− 0.0427947554976017 · x2 + 0 .13465458451346508) 5 (0 .76120861641426228 · x0 + 0 .022982771994114469) · (0 .37355026941984976 · x1
+
++ 0 .17673765134826056) · (. . . − 0.0016428320073234725 · x0 − 3.12) 7 (169 .62829714499832 − 54 .02295102376346 · x2) · (. . . + 1 .8694742958078208 · x1)
+
+· (0 .001513002143198883 · x0 + 4 .3499570545021802 · 10 −5)10 (0 .0018476647025342624 · x0 + 7 .4163269681210592 · 10 −5) · (−18 .721308938254057 · x1
+
+− 3.1062206918614961) · 28 .2 · sin ( . . . + 0 .9922408707994587) Operon 2 1.0 · 12 .6214 · x0 · (83 .0285 − 26 .4288 · x2) · (0 .0 · x0 + 0 .003 · x1) + 0 .05 1.0 · (−0.9508 · x2 − − 2.9873) · (. . . − 97 .4074 · x0 − 76 .7503 · x0) − 0.0011 7 1.0 · (−0.1636 · x0 · sin ( −0.539 · x2 − 1.4483) − 0.7675 · x2 − (. . . − 2.4113)) − 0.0007 10 1.0 · (0 .1933 · x0 · 5.0729 · x1 · sin (1 .0105 · x2) − 0.006 · x0 · (. . . + 5 .3587 · x1)) + 0 .0005 
+
+Feynman I.12.11. Ground truth: x0 · (x1 + x2 · x3 · sin ( x4)). 
+
+Taylor data 2 x0 · x1 −√2 · x0 · x2 · x3 · x24
+
+4 +
+
+√2 · π · x0 · x2 · x3 · x4
+
+8 +
+
+√2 · x0 · x2 · x3 · x4
+
+2
+
+−√2 · π · x0 · x2 · x3
+
+8 −√2 · π2 · x0 · x2 · x3
+
+64 +
+
+√2 · x0 · x2 · x3
+
+25 . . . + x0 · x1 +
+
+√2 · x0 · x2 · x3 · x54
+
+240 −√2 · π · x0 · x2 · x3 · x44
+
+192 +
+
+√2 · x0 · x2 · x3 · x44
+
+48 − √2 · x0
+
+· x2 · x3 · x4
+
+7 . . . + x0 · x1 −√2 · x0 · x2 · x3 · x74
+
+10080 −√2 · x0 · x2 · x3 · x64
+
+1440 +
+
+√2 · π · x0 · x2 · x3 · x64
+
+5760 − √2 · π2
+
+· x0
+
+10 . . . + x0 · x1 −√2 · x0 · x2 · x3 · x10 4
+
+7257600 +
+
+√2 · π · x0 · x2 · x3 · x94
+
+2903040 +
+
+√2 · x0 · x2 · x3 · x94
+
+725760 − √2 · π
+
+· x0
+
+MOSAIC-SR 2 x0 · (x1 + 0 .712793490396519 · x2 · x3 · x4 + 0 .0669510918992685 · x2 · x3)5 x0 · (x1 + x2 · x3 · sin ( x4)) 7 x0 · (x1 + 1 .0 · x2 · x3 · sin ( x4)) 10 x0 · (x1 + x2 · x3 · sin ( x4)) PySR 2 x0 · (x1 + x2 · x3 · (x4 · (1 .262467 + x4 · (−0.35355335)) − 1 · 0.06634307)) 5 x0 · (x1 + x3 · 0.99937403 · x2 · (0 .0004353141 · x4 + sin ( x4) + 8 .375039 · 10 −5)) 7 x0 · (x1 + x2 · x3 · (sin ( x4 − 5.59005 · 10 −8
+
+ex4 − 0.98920304 ) − 6.089482 · 10 −8
+
+cos ( x4) )) 10 x0 · (x1 + x2 · x3 · sin ( x4)) TPSR 2 −(. . . − 0.41703132683721883) + 0 .20866626498961413 · (0 .3604272691006456 · x1
+
+− 1.744712561451487) − 0.05296867316273429 5 . . . + 0 .34294855858724976 · x1 − 4.723488471036021 − 1.7988515848521762 + 1 .7989003805824426 + 2 .495998943387973 7 (. . . + 61 .51639518156274) · (0 .5088734890611518 · (0 .17031588558061792 · x0
+
+− 0.14978961891848902) + 0 .07771255202217539) 10 (. . . + 9 .407194864169705) · (0 .7224790948921128 · (0 .17230290182470367 · x0
+
+− 0.07264073340143025) + 0 .05248141132993334) 
+
+27 E2E-SR 2 (0 .1629358158362928 · x0 − 0.0023126882037319991) · (. . . + 6 .16330630162104 · x1
+
+− (−8.0523542289226607 · x3 − 1.4868480523885724)) 5 (−0.31289792906740601 · x0 − 0.0002607466038638947) · (−3.2888766768517251 · x1
+
++ 0 .3503022089874898 · x2 − (. . . − 0.06099736784503796 · x4)) 7 (0 .093673737069339864 · x0 − 0.0023842904051689659) · (. . . + 10 .452156425909193 · x1
+
+− (2 .038660868691718 − 0.5685205786851859 · x4)) 10 (. . . + 0 .0014473443753275107 · x0) · (0 .17230290182470367 · x0 − 0.004740733401430247) 
+
+· (0 .27324955376110477 · x4 − 0.97426820283141966) Operon 2 1.0 · (. . . − 2.3002 · x0 · 0.0 · x3 + 0 .0102 · x0 · (97 .7415 · x1 + 0 .0 · x2)) + 0 .05 1.0 · (2 .3026 · x1 · 0.4342 · x0 + 0 .0133 · x0 · 23 .3392 · x4 · (. . . + 0 .0236 · x2)) − 0.0025 7 1.0021 · (4 .6741 · x0 − (0 .6931 · x4 · (−0.0536) · x4 · 102 .1899 · x3 − (. . . − 29 .3384 · x3))) − 0.4812 10 1.0 · (−0.0658) · x4 · 1.1554 · x3 · (. . . − 0.1744 · x0 · (−5.8297) · x4) − 0.0127 
+
+## F SRSD-Feynman Predictions 
+
+We list predictions for twelve selected SRSD-Feynman equations, with four structurally varied examples from each difficulty split. The MOSAIC-SR row in each table reports the search-recovered formula. Ellipses indicate long baseline predictions abbreviated for readability. 
+
+Easy feynman-i.18.16. Ground truth: x0 · x1 · x2 · sin ( x3). Method Prediction 
+
+MOSAIC-SR x0 · x1 · x2 · sin( x3)PySR x0 · x1 · x2 · (( x2 − (x3 + ( x3 + sin ( x2) + cos ( x3)) · cos ( x1))) · (−1.090031 · 10 −8) + sin ( x3)) Operon 1.0 · sin (1 .0 · x3) · (−0.0027) · x1 · (0 .0 · x2 · esin (cos ( −2.0643 ·x3)) − 2.8718 · x2) · (−1.1801 · . . . · x1
+
++ 127 .7102 · x0) + 0 .0GP-GOMEA 0.560146 · x0 · x1 · x2 · ecos (sin (45 .244)) · sin ( x3) + 0 .0E2E-SR (−0.00047451032853731212 · x1 − 19 .400000000000002 · (. . . − 0.0034) · (30 .38912823447775 · x0
+
++ 28 .70121528936986) 2) · (sin (0 .5475682868652938 · x3 − 1.7094145799484706) − 0.0010999999999999998) SNIP-SR (2 .9242714060991837 · x0 + 2 .8138086776705413 · x2) · (0 .058021734319863794 · x1
+
+− (−0.11031702200615587) · 1 · 1 
+
+> ... −1.980797909 −0.6172368400935637
+
+) − 0.3353196824463989 GenSR (. . . + 24 .091230291278364 · x2) · sin (6 .886657042617201 · 10 −6 − 0.008195986325795546 · x1)
+
+· sin (0 .0002804611337327905 − 1.0000588864638429 · x3) + 4 .467432657398108 · 10 −5
+
+TPSR (. . . + 1 .3569011777772897) · (0 .5475682868652938 · x3 − 1.7035845799484706) · (−0.005572004061167991 
+
+· (0 .3736301799506395 · x1 − 0.8729182770047053) − 0.004869532050182299) SR4MDL 0.45952 · x3 − 0.415565 · √x4 · (x2 + x3) − 2.872366 · √x4 − 7.7 · 10 −5 · ex1+x3 + 3 .096114 + 3 .096114 · 13
+
++ 0.000134 ·ex1+x3
+
+> √x4
+
+feynman-i.47.23. Ground truth: 
+
+r x0 · x1
+
+x2
+
+.Method Prediction 
+
+MOSAIC-SR 
+
+q x0·x1
+
+> x2
+
+PySR 
+
+q x0·x1
+
+> x2
+
+Operon 0.0 + 1 .0 · (−0.3697 · x0 + 37267 .543 · x1 − 0.3693 · x2
+
++ log ( −(−1) · 405434 .875 · x1 + 0 .0036 · x2 + 1 .3023) + 0 .2423) · (−1.5741) · 1
+
+> ... −1.316
+
+GP-GOMEA 0.088311 · √x0 · x1 · ( x2 
+
+> 451 .691759865387
+
++ sin ( x2) − 3.832) · (−x1 + x2 − 8.635 + 3 .845) − 2.6 · 10 −5
+
+E2E-SR (0 .3 + 0.30.35927349724435038 ·x2+0 .1556208603753693 ) · (. . . + 0 .00019999999999999998 
+
+· p(77 .563144512331082 · x0 − 25 .889254950623197) · (369968 .1560669523 · x1 − 0.683865090989673)) SNIP-SR 0.0008867575457021422 · x0 − (0 .007603756123524418 · x1 − 0.013302360696511688 · x2 − (. . . − 0.0017) + 0 .0617609181319026 + 0 .07176091798886611) + 0 .0042390819407224665 GenSR 1 · 10.6409018128159457 ·x2+44 .900583821399 · (−0.04880077057906449 · x2 − (−3.602251682762495 · 10 −5) · 1
+
+· 1 
+
+> ... −0.40036479485058873 ·x1−60 .5
+
+) + 0 .004570229722831564 
+
+28 Method Prediction TPSR 0.0020274189653356795 · √. . . + 0 .01000005284616329 − 8.327178391121705 · 10 −5
+
+SR4MDL (x1·x1)0.25 ·(√x2)0.02439     
+
+> √x3·(1 ·1
+> x2)0.04878 ·((1 ·1
+> x2)3)0.146341
+
+feynman-iii.15.27. Ground truth: 2 · π · x0
+
+x1 · x2
+
+.Method Prediction 
+
+MOSAIC-SR 2·π·x0
+
+> x1·x2
+
+PySR x0 · 6.2831855 · 1
+
+> x1·x2
+
+Operon 1.0 · (−1.72) · x0 · 1(−1) ·0.5005 ·x1 · 10.5469 ·x2 + 354 .8659 GP-GOMEA 10326321737 .098848 · (x0 + x0 − (x0 + x1) · sin ( x0) − (−x1 + x2)) · e−√x1+cos ( x1) − 715320458 .443097 E2E-SR −0.00046093254802904855 · x0 + (23 .8 − 0.03485279359938367 · e0.03610003915333401 ·x1 )
+
+· (0 .016461876715323162 · x0 + 0 .004137440901804627) · (. . . − 3165117 .571990305 · x2 − 0.03078025829268) SNIP-SR x0 · e17 .656406591853308 −0.29635039365231586 ·x1 · 1 · 15611389 .50330818 ·x2+6 .00837704285586 ·10 −5
+
+− 607824857 .6181431 GenSR x0 · (−0.3 · x3 − 23 .291253293905406 
+
+· e−27 .183755788685495 ·x2·(−22 .69773947774609 ·x1−10553 .262925741388) 2+20 .414260546615335 ) · 1 · 1 
+
+> ... +0 .0
+
++ 0 .4TPSR 0.021329257679301977 · (0 .016461876715323162 · x0 + 0 .06263744090180463) − (0 .030151382790591357 
+
+· (. . . − 1.739119386211866 + 0 .0) + 0 .020088151245643712) + 0 .01991184875435629 SR4MDL 4.5 · 10 −5 + 6 .283185 · 1 · 1 
+
+> x3
+
+· ( x1 
+
+> x2
+
++ 2) − 12 .566371 · 1 · 1
+
+> x3
+
+feynman-ii.2.42. Ground truth: x0 · x3 · (x1 − x2)
+
+x4
+
+.Method Prediction 
+
+MOSAIC-SR x0·x3·(x1−x2)
+
+> x4
+
+PySR −1.1901392 · 0.84023786 · x0 · x3 · (−x1 + x2)
+
+x4
+
+Operon 0.0 + 1 .0 · (0 .0 · x1 + (−0.0018 ·x1+0 .0018 ·x2)·(−1.1077) ·x0·(30998 .9414 ·x3+... )63 .3968 ·x4 )GP-GOMEA −0.338812 − 0.204571 · √x3 · x20 · (x4 · x1 − (x1 − x2)) · esin x2−x4·x0
+
+E2E-SR (. . . + 0 .006059999999999999) · 14 .7 · | . . . | · (−6.38) · (0 .0003498200466886168 · x0
+
++ 0 .0001793022405506989) 2
+
+SNIP-SR 0.2680922469550011 + (... −2.0815424010112733 ·x2+2 .07626 ·x1)(0 .752254473241603 −0.7920820084794776 ·x4)·(21 .622118920174636 ·x4−0.02949544189126491) 
+
+GenSR 1.0898330073263349 · 10 −7 + |0.2901744163088101 · x0 + . . . | · |− 15 .679361999673807 · x3 + . . . | · x1−x2
+
+> x4
+
+TPSR 0.0021005245315504836 · | . . . + x0 · (x1 − x2) · x3 · x−14 |
+
+SR4MDL −7002 .54972 − 3506 .48298 · (x4 − 2) + 0 .043629 · x2 + 2.398534 ·x4·x2 
+
+> π−√x1
+
++ 9 .317983 · x5 − 0.071297 · x3
+
+− 2.43503 · x1
+
+Medium feynman-i.8.14. Ground truth: 
+
+q
+
+(x0 − x1)2 + ( x2 − x3)2.Method Prediction 
+
+MOSAIC-SR p(x0 − x1)2 + ( x2 − x3)2
+
+PySR p(x0 − x1)( x0 − x1 − 2.5 · 10 −7) + ( x2 − x3)2
+
+Operon 1.0 · (. . . + 0 .1434 · x0 · (−0.7572) · x1 + 0 .759 · x0 − 0.1087 · x2 · (−0.6665) · x2 + (0 .0003 · x2 − 0.0002 · x3)
+
+· (−347 .5512) · x3) + 0 .0GP-GOMEA 0.770164 · (√x2 − x3 · √x2 − x3 + p(−x0 + x1) · (−x0 + x1)) + 0 .315539 E2E-SR 0.07540000000000001 · . . . + ( −1.272562287287044 · x0 − 0.0780069168581643) · (0 .00078562116483634423 
+
+· x3 + 0 .00902697873784341) + 3 .52 · | 0.25922662262108978 · x3 + 0 .03979767739670666 |
+
+SNIP-SR 0.17291808796873243 · | 4.53620345462416 · x2 − 4.550165321708825 · x3| + 0 .10160093303248278 · | . . . 
+
+− 7.43758068232461 · x0 + 7 .587149571342 | + 0 .237128160071409 
+
+29 Method Prediction GenSR 0.008509295312002906 · | 92 .18053844654341 · x2 − 92 .46415995095859 · x3| + 0 .011009856991161837 · | . . . 
+
++ 70 .01558357608526 · x1 − 68 .6354 | + 0 .2371299728631482 TPSR 0.016238973336089528 · | . . . + 15 .111997986919254 · (0 .30056526331833355 · x2 + 0 .02710452923829583) 
+
+− 1 + 0 .3188695299052845 + 0 .32086952990527934 | + 0 .22061971100783573 SR4MDL 2.381338 · √x1 + 0 .086667 · x22 + 0 .082365 · x3 · (x3 − x4) + 0 .07982 · x24 − 0.259968 · (x1 + x1) + 1 .351056 
+
+feynman-bonus.18. Ground truth:   
+
+> 5618566741 .08146 ·(8.98755178736818 ·10 16 ·x0
+> x21
+> +x22)
+> π
+
+.Method Prediction 
+
+MOSAIC-SR 1.607 ·10 26 ·x0
+
+> x21
+
++ 1 .788 · 10 9 · x22
+
+PySR (x0 + x2 · x2) · 1828542300 .0Operon 1.0 · (−192 .0 · x0 + 904458403840 .0 · (. . . + 247344122675455525388288 .0 · x2)) − 2901952 .75 GP-GOMEA 0.551209 · (− . . . · x0 + x2 · x2 · (x0 · x2 − 3393026213 .036) · sin (11963926169 .822001)) + 51687513017 .491699 E2E-SR (9 .074947371606654 − 3.9595126882746026 · 10 −11 · x1) · (0 .00019487679974378762 · x0
+
++ 89 .997268492792118) · (2 .6396751255164016 · 10 −11 · x1 + 89 .950035085595564) · 0.8 · (. . . − 0.0+ 55 .505828465024757) SNIP-SR 1.6002061046745069 · (7 .741215005617892 − 85 .30817533148172 · x2)2 − 0.09952661536012392 · (. . . 
+
+− 9.581409582884245 · x0 + 2279 .3307399561345) + 5962 .31522397963 GenSR (74 .03999172190585 · x0 + 93 .5809269142206 · x2 · x2) · (0 .07 · x3 + 266 .6340257390697) 3 + 0 .4TPSR (89 .04012980501867 − 0.4282907493335717 · (0 .00324794666239646 · x0 − 0.045525120131368176)) 
+
+· (89 .56291606842636 − 0.9738208125647104 · (. . . − 0.8327485734072698 + 4 .3994585)) SR4MDL 927107321784793344 ·x1 
+
+> x2
+
++ 1790558743 .686736 · x23 − 583105027 .94195 · x3 + 17382482170 .32989 
+
+feynman-i.13.4. Ground truth: 0 .5 · x0 · (x21 + x22 + x23). Method Prediction 
+
+MOSAIC-SR x0·(x21+x22+x23)2
+
+PySR (x2 · x2 − (x1 · (2 .6849122 · 10 −8 − x1) − x3 · x3)) · 0.594442 · x0 · 0.84112495 Operon 1.0 · (− . . . + 0 .0044 · x0 · 0.8345 · x2 · (0 .0 · x0 + 135 .0603 · x2 − 0.0 · x3) + 0 .002 · x3 · (−8.7617) · x3
+
+· (−29 .1342) · x0) + 0 .0GP-GOMEA −0.466588 · x0 · (( −x1 + x2) · (x1 − x2) − (x1 · x2 + x3 · x3)) + 1 .557416 E2E-SR 0.060000000000000005 · | (0 .25330816576971352 · x0 + 0 .04483942013849232) · (0 .060000000000000005 · (. . . 
+
++ 22 .0195174746776) + 0 .060000000000000005 · (19 .7499472505697 · x1 + 2 .85561506727142) 2)|
+
+SNIP-SR (0 .01840704821112982 · x0 + 0 .027442044563726835) 2 · (9 .879745390847708 · x3 − 6.194380210972868 · 1
+
+· 1 
+
+> ... −4.9351334859321385+0 .0072800592259153
+
+) + 13 .64280530393845 GenSR 0.009061268976888942 · (1 .1636683092211803 · 10 −6 · x0 − 7.759100043386413 · x1)2
+
++ 0 .003956082223544278 · (. . . − 11 .742830367782478 · x2 + 2) + 2 .862096358497747 · 10 −5
+
+TPSR 0.05653942421008955 · | . . . + 63 .984404414849074 · (0 .28680461689317865 · x3 − 0.019022597441139 + 0 .01902259744018563) 2 + 0 .009063702394502786 | + 1 .0173098720910598 · 10 −9
+
+SR4MDL 1.251493 · . . . · | x2|0.268858 · | x2 − x4|0.338839 · | x4 + 1 |0.205401 · | x2 − 2 · x3 + x4|0.863298 
+
+· | log ( x1 + 2) |3.150474 · | sin (log ( x1 + 2)) |
+
+feynman-i.43.43. Ground truth: 1.380649 · 10 −23 · x1
+
+x2 · (x0 − 1) .Method Prediction 
+
+MOSAIC-SR 1.380649 ·10 −23 ·x1
+
+> x2·(x0−1)
+
+PySR e  
+
+> cos (sin (0 .733933372794484 ·x1)) cos (5 .7083836 ·sin x0)
+
+· cos (sin (log x1)) Operon 24 .9136 + 0 .9928 · esin (6 .2437 ·x1)+0 .9405 ·x1−10 .8365 
+
+> (sin (4 .6620 ·x1)+1) ·(√0.9405 ·x1+... )
+
+GP-GOMEA 24 .874483 − 1.5238670125519831 · 10 97 · e(x2−x0)·(220 .661 ·x0) · (√x1 + √−11502 .059 + . . . )
+
+30 Method Prediction E2E-SR 0.00783 ·
+
+(20 .5 − 0.635 (0 .01955351496819132 ·x0−0.0195847291063135) ·(1 .49301283178395 ·10 19 ·x2−0.0018505074099962075) ) · . . . 
+
+SNIP-SR −12 .202334840601555 − 0.0035234845524787085 · (5 .868107132362321 −6.00000000000062 ·x2)2
+
+−1.4130094715317487+1 .4542114898814111 ·x1 + . . . 
+
+GenSR 0.5458496473257973 + 60 .01042781140133 ·cos (17 .290782890292526 −95 .0·x2·x3)+ ... 
+
+−91 .63629774123922+91 .63433653923278 ·x0
+
+TPSR (0 .005499999972442505 + 0 .02088129903737334 · | . . . + 0 .0003968126680374485 · x1|) · (. . . + x−12 )SR4MDL 0.000177 · |x1+2 − 4 
+
+> x3
+
+|1.000005 
+
+|log x1|0.99984 ·| x21 
+
+> π
+
++2 |0.108164 ·| π2|19 .7823 
+
+Hard feynman-i.6.20. Ground truth: 
+
+√2 · e
+
+> (−1) ·x202·x21
+
+2 · √π · x1
+
+.Method Prediction 
+
+MOSAIC-SR 
+
+0.3989 ·exp 
+
+
+
+−0.5· x20
+
+> x21
+
+
+
+x1
+
+PySR sin (sin ( x0·0.44023314 · 1 
+
+> x1
+
+)·3.1941698) 
+
+x0·(x0·x0·0.55104643 · 1 
+
+> x1·x1
+
++3 .5161734) 
+
+Operon 0.933 · (−ee− 0.6815 ·x1−cos ( −0.9175 ·x0)cos ( ... ) +cos ( −0.418 ·x0)
+
++ ee−(0 .6795 ·x1−cos ( −0.9167 ·x0))+cos ( −0.4191 ·x0)
+
+)+ 0 .0543 GP-GOMEA 0.0 · e−(√x0+x1−26 .453)+ √−47 .357 ·cos ( x0) + 0 .041035 E2E-SR . . . + 1 .282299505658052 · 10 −8 · (−0.049681955299757749 · x0 − 0.82316389700632219) 2
+
+· (3 .8724298635018757 · (− atan (18 .363084125663076 · x0 − 30 .50603247242241)) − 8.06163517864935) 2
+
+− 1.7384408 SNIP-SR 0.03971435283239767 + e1.1335725598924378 −0.5147795206145964 ·x1 · 1
+
+· 110 .003562082456531 −0.03732680107658152 ·x0
+
+GenSR −0.0006356651178617335 + 1 · 10.24367615501981746 ·x1+0 .0028250296256753624 · 1
+
+· 10.537328069286272 ·(... +38 .88033280910367 ·... −0.15054245000970234)+8 .68696568888214 
+
+TPSR 1.0926398294500483 ·
+
+e−1.4158863435762834+4 .043613462929532 ·1· 17.216579701937648 ·(... −0.8885938581229681+0 .38062016744562)+5 .539885878646895 
+
+− 0.27468172229389765 SR4MDL . . . + 0 .003305 · ( 2
+
+x1 )2 + 0.007109 ·( 2 
+
+> x1
+
+)2
+
+ex2 − 0.058713 · psin ( x2) + 0 .045344 · sin ( x2) − 0.033139 · cos (( 2
+
+x1 )2)+ 0 .09065 − 0.003496 · 1 · 1sin ( x2)
+
+feynman-bonus.5. Ground truth: 244808 .861301089 · π · x1.50
+
+√x1 + x2
+
+.Method Prediction 
+
+MOSAIC-SR 769089 .72 ·x0r x1+x2
+
+> x0
+
+PySR 769089 .702160698 · x0 ·
+
+q x0
+
+x1+x2
+
+Operon 0.9991 · (−0.0153 · . . . + ( −0.0018 · x0 + 0.1102 ·x0
+
+log ( −124481448181760 .0·x0+1 .3068 ·x1+1 .3515 ·x2) ) · p√3.1423 · x0)+ 194935 .9375 GP-GOMEA 0.0 · √x0 · x0 · (27792532242127954164842496 .0 − x0) · (−√x0 − − 15960121508062442932928512 .0+ √x1 + x2) + 2592428 .592193 E2E-SR (9 .750140310322155 − 3.5192830562550441 · 10 −10 · x0) · 8.41 · (−2.77 + 0.04650000000000001 
+
+−8.5274752133162408 ·10 −27 ·x1−6.8927613619355 ·10 −27 ·x2−0.007543467070585526 )2 · (. . . + 2 .4049168319) SNIP-SR –GenSR (0 .4 · x4 + 3 .617938259977237 · | . . . − 0.00465368 |) · (9 .8 · x5 − 104 .67801968844174) 2 · | 185948 .4313612971 
+
+− 0.0002717440950239873 · x0| − 23103053 .624988906 TPSR −602246 .9322338329 · (. . . − 0.992553) − 1020047 .8728000051 · (3 .766536263352732 · 10 −25 · x2
+
+− 0.9041705958904984) + 3985390 .632626627 + 3985516 .888588936 + 3985756 .2297664313 
+
+31 Method Prediction SR4MDL 769089 .720197 ·x0.31 ·(x1·x1)0.6
+
+> √x2+x3
+
+feynman-bonus.17. Ground truth: x20·x22·x23·( x3·x4  
+
+> x5+1)+ x21
+> 2·x0
+
+.Method Prediction 
+
+MOSAIC-SR 0.5·x21
+
+> x0
+
+PySR x2 · (−213 .32457) · 1
+
+> x4−1·0.75216883
+
+Operon 1.0 · (. . . + 187 .625  
+
+> e40126340 .0·x1
+
++ 102002000 .0 
+
+> e32823758 .0·x1
+
+) − 358206272 .0GP-GOMEA 8235444610619720859648 .0 − 4117722181658013597696 .0 · (p√x0 + cos ( √x1)+ cos ( x1 · x1 · (x2 − 64871391778 .814003))) E2E-SR 83 .3 · (− . . . ) · (2996997476 .088138 · x1 + (0 .0027957553159015011 − 128292 .52353780801 · x1)
+
+· (−886458768 .06676007 · x3 − 4344590016 .9748102 · x5 − 79 .82124690760698) + 0 .700142210497718) 2
+
+SNIP-SR 2475 .4420995751925 · (785 .1938480983365 · x1 · (. . . + 501 .62243037789665 · (248 .55715087494292 − 9.9
+
+· x0)3) + 456 .80185093394306) + 380 .8454602832127 GenSR . . . · (−0.23288664214316973 · x4 + 23 .135639123247536 · (67220856 .93727316 · x1
+
++ 0 .08379184547075899) 2) − 0.2TPSR 0.19718990786562984 + 90 .27582145384471 − 8.75239768085726 · 1
+
+· 10.8940335705346859 ·√0.9471216397266307 −0.0016772113459999217 ·(... −0.02129158)+0 .6302969795300203 
+
+SR4MDL 0.5 ·
+
+q
+
+1 · 1 
+
+> x1
+
+· | x2|2 ·
+
+q
+
+|x4 + 1 · 1 
+
+> x1
+
+|
+
+feynman-iii.21.20. Ground truth: − x0 · x1 · x2
+
+x3
+
+.Method Prediction 
+
+MOSAIC-SR − x0·x1·x2
+
+> x3
+
+PySR x0 · x2 · (116 .94989 − x1)
+
+x3
+
+Operon −1556 .0109 + 2 .5895843701950685 · 10 25 · 2.4524 (−2.7636805717985786 ·10 27 ·x3)·x−11 ·(−25 .7193) ·x2·(−0.2950) ·x0
+
+GP-GOMEA −2029461039 .160109 − 2.4147765954346173 · 10 46 · cos (cos x1 · (x2 − 76913126293 .195007)) · x21 · (x0
+
++ x3)2 · sin x2
+
+E2E-SR (66 .829576481052452 · x2 − 0.0017371407519285152) · (−92 .6) · (0 .1078068308644714 
+
+− 3.2338505696933849 · 10 −11 · x1)2 · (4 .390271757193469 · 10 27 · x0 − 0.3531506873096935) 2 · . . . 
+
+SNIP-SR 753690240 .1795971 + x2 · (4 .368785986955585 · x1 − 43 .75053176204654 · e17 .15960871844588 −2.0·x0·x3 )
+
+· tan ( −7.954465726265568 + 73364 .55500241455 · . . . )GenSR −0.6 + (709 .5709262937739 · (0 .6 · x6 + 283 .85298348125826 · (−76 .27479590083885 + 9 .0 · x5)2) · (. . . + x0
+
+· x1 · x2 · x−13 )) TPSR 0.7537448782577802 · (0 .0006584109871255986 + 26 .947409871392118 · x2) · (0 .030073288639170904 
+
+− 0.7428317603163052 · | . . . + x0 · x1 · x−13 |)SR4MDL 189571765517 .15814 + 131401134781 .99579 · log 2 − 0.000427 · x4 + 8256334692 .58376 · cos ( x−14 )+ 379143531034 .32043 · (2 − 2 · x1) + . . . 
+
+## G Cross-Benchmark Predictions 
+
+We list predictions for six selected equations from the cross-benchmark datasets. Each table includes every method retained in the main-paper cross-benchmark comparison. 
+
+Nguyen-4. Ground truth: x61 + x51 + x41 + x31 + x21 + x1.Method Prediction 
+
+MOSAIC-SR 1.0 · x1 · (x31 + 1) · (1 .0 · x1 · (x1 + 1) + 1) PySR (x1 + 1 .0) · (x1 · x1 · x1 · (x1 · x1 + 1 .0) − x1 + x1 + x1 − 1 · 3.009093 · 10 −8)Operon 0.263197660446167 · exp(3 .121897220611572 · x1) − 0.250046372413635 
+
+32 Method Prediction GP-GOMEA 0.780175498806059 E2E-SR (0 .82722131708105334 − 0.0089588507630547431 · x1) · (−0.014978078619482149 · x1
+
+− 4.659629985505114) · (0 .06345852623830444 · x1 + 0 .06393233734253951) · (1 .5553560352525597 · x1
+
++ 0 .00177689565047806) · (0 .0137 · (−6.4184099828749757 · x1 − 0.6423212964360453) 3 − 2.63) SNIP-SR −787 .69917995555147 · (0 .00070707667540883934 · x1 + 1) 2 + 784 .8060091216709 − 289 .476805583656 
+
+· (73 .38150650502881 · x1 − 101 .72796954182427) −1
+
+GenSR 0.77644249309791224 · x1 · exp(1 .9762297509792082 · x1) − 0.052892466261292466 TPSR (1 .5553560352525597 · x1 − (−0.3773368424196556 · (1 .5553560352525597 · x1 − 0.03842310434952195) 
+
+− 0.22310537140050477) − 0.03842310434952195 + 0 .22310536281517437) · ((((0 .11785642826425316 
+
+− 0.0012268956671139082 · (1 .5553560352525597 · x1 − 0.03842310434952195)) · ((3 .295880062849909 
+
+· (1 .5553560352525597 · x1 − 0.03842310434952195) − 0.03672358170662421) 2 + 12 .63736506039501)) 2
+
+− 2.5713685830174153) · (0 .0006597917724206856 · (1 .5553560352525597 · x1 − 0.03842310434952195) + 0 .031343288513934704) + 0 .2842492306014455) · (1 .5553560352525597 · x1 − 0.03842310434952195 + 1 .5051862867904549) − (0 .009429561281775448 · (1 .5553560352525597 · x1 − 0.03842310434952195) + 0 .15816147970256972) SR4MDL 0.258935 · exp(3 .141592653589793 · x1) − 0.246514 
+
+Nguyen-11. Ground truth: xx2 
+
+> 1
+
+.Method Prediction 
+
+MOSAIC-SR exp((1 .0 · x2 + 1 .11259407539204 · 10 −17 ) · log( x1)) PySR exp( x2 · log( x1 − 7.453925 · 10 −9)) + 9 .259128 · 10 −9
+
+Operon 0.4424457312568320138828227 · x1 + 0 .526753962039948 GP-GOMEA 2.01164555549622 − 1.81258428096771 · cos(2 · x2 · (x21 − 1.00295400619507) · (5 .04862117767334 · x1 + x2
+
++ cos( x2) − 0.310173720121384) −1 + 0 .978409945964813) E2E-SR 0.62014723269920278 · x1 + (0 .052757803417621763 − 0.054718873473459068 · x1) · (0 .11515042468674191 
+
+− 0.031915295185792375 · x2) · (94 .508205254545958 − 203 .30043033349743 · x2) + 0 .4187448946002867 SNIP-SR 1.22898636248581 · x1 · x2 − 1.1248163129914415 · x2 + 0 .9561923734505865 GenSR x2 · sin(3 .090228538225934 · x1 + 0 .12294672738656137) · (0 .033708888164141505 − 3.899959165568685 
+
+· x1)−1 + 0 .9810675959848522 TPSR (3 .1915295185792374 · x2 − (6 .702556612707029 · (3 .6479248982306043 · x1 − 2.183853561174784) + 11 .474458434775793) − 5.18045843471929 − 1.5150424686741908) · (3 .6479248982306043 · x1
+
+− (5 .371492648034048 − 2.5796876031538174 · (3 .1915295185792374 · x2 − 1.5150424686741908)) 
+
+− 14 .370492648199649 − 2.183853561174784) · (0 .006338178745524264 · (3 .1915295185792374 · x2
+
+− 1.5150424686741908) + 0 .16228672092950178) · (0 .00436698533297426 · exp((3 .1915295185792374 · x2
+
+− 1.5150424686741908 − 1.0903856097940126) · 0.4431520325475648 · (3 .6479248982306043 · x1
+
+− 2.183853561174784)) + 0 .01042951702434242) SR4MDL 0.751037 · (x1 + x1 · x−12 )0.010698 · sin( −x1 + ( x2 + 3 .141592653589793) · 1−1 − 1) 1.571039 · (exp( x1 + x1
+
+· x−12 )0.001281 )−1 · x3.359886 2 · (sin( x2)3.470214 )−1
+
+Strogatz-shearflow2. Ground truth: 
+
+
+
+cos 2(x2) + 110 sin 2(x2)
+
+
+
+sin( x1). Method Prediction 
+
+MOSAIC-SR (0 .9 · cos( x2)2 + 0 .0999999999999999) · sin( x1)PySR sin( x1) · (cos(sin( x2) · 11 .785839 −1) − 0.99600285) · 250 .22122 Operon 0.05662523819582111 · x2 + 0 .017341127619147 GP-GOMEA 0.450004816055298 · sin( x1) · sin(2 · x2 − 4.71237802505493) + 0 .550020277500153 · sin( x1)
+
+− 7.75317403167719 · 10 −6
+
+E2E-SR 0.03790008096684952 · sin(0 .09445851906577567 + 0 .03960031064088332 · ((0 .05920507672980812 
+
+− 90 .0083517060878 · tan(0 .49632673547196763 · x1 + 0 .22256771097376267)) · (0 .2089712876837641 · x2
+
+− 0.900448620172386)) −1) − 0.02225101908746781 SNIP-SR 0.013779661168824415 · x21 + 0 .008255847908988898 · x1 − 0.13407144869680693 GenSR −(0 .35205590018522714 · cos(2 .0175339345367123 · x2 − 3.1461725251880917) − 1.7224017370428149 
+
+· (0 .010364063377607676 · x2 + 2 .445867155619959) −1)2 · sin(0 .9977696452910493 · x1
+
++ 3 .1302681031354256) + 0 .0027183801796846568 
+
+33 Method Prediction TPSR (−1.8419676778775944 · (0 .7251641631422997 · x2 + 0 .6318785594782278) − (1 .3871488161946197 
+
+· (0 .7251641631422997 · x2 + 0 .6318785594782278) − 0.5424641814306489) · (−0.011063257637029162 
+
+· (0 .36670071625456485 · x1 + 0 .20006113748695625) − 1.3363229583657414) − (1 .773370534513494 
+
+· (0 .36670071625456485 · x1 + 0 .20006113748695625) − 0.623428139816112) + 0 .5334281389900255) 
+
+· ((0 .7251641631422997 · x2 − 2.49723676249942 + 0 .6318785594782278) · (0 .8223668625439224 
+
+− 0.043119921942055064 · (0 .36670071625456485 · x1 + 0 .20006113748695625)) − 1.3351697306115864 
+
+· sin(2 .917585780146784 · sin(1 .0133095548227202 · (0 .7251641631422997 · x2 + 0 .6318785594782278) + 0 .01366990205656808)) + 0 .9996592250581154) · (0 .07210748715109865 + 1 .0791074864410393 
+
+− 0.10326251767611451 · 1 · (0 .0788989875961674 · (0 .36670071625456485 · x1 + 0 .20006113748695625) + 0 .1676990800057751) −1)SR4MDL −0.042743 · x1 · x2 − 0.051972 · x1 · sin( −x2 · 2 + x2) 12 + 1 .972781 · (−x1 · sin( −x2 · 2 + x2) 12 + x1)
+
+− 0.204562 · log( x2) − 0.02844 − 0.02844 · 13
+
+Livermore-1. Ground truth: x1 + sin( x21) + 13 .Method Prediction 
+
+MOSAIC-SR x1 + sin( x21) + 0 .333333333333333 PySR x1 + sin( x1 · x1) + 0 .3333334 Operon 0.99815390177276 · x1 + 0 .385755509138107 GP-GOMEA 0.416014617587274 E2E-SR 0.99510452368622162 · x1 − 1.03 · sin(0 .777 · (1 .1888631901860294 · x1 + 0 .090269873934594466) 2 − 3.77) + 0 .36129693740020308 SNIP-SR −90 .25067542494121 · (0 .005531892247014312 · x1 − 1) 2 + 90 .72787811926341 + 0 .0022187878284230704 
+
+· (0 .14762793267964414 · x1 + 1 .4559888306142952) −1
+
+GenSR 0.998153963905744 · x1 + 0 .3857558099256324 TPSR 5.8514992167604305 · (0 .17060586417335055 · x1 − 0.005171897428231887) − 0.5444981796790447 
+
+· sin((0 .5916941314151313 · (0 .17060586417335055 · x1 − 0.005171897428231887) + 0 .018303324214130782) 
+
+· (−60 .41281200227787 · (0 .17060586417335055 · x1 − 0.005171897428231887) − 1.8687415763958688)) + 0 .03033935030352127 + 0 .3613393503035212 SR4MDL 1.442695 · log(2) · x1 + sin( x21) + 0 .066667 − − 0.133333 · 2
+
+Livermore-11. Ground truth: x21x22
+
+x1 + x2
+
+.Method Prediction 
+
+MOSAIC-SR 1.0 · x21 · x22 · (x1 + x2)−1
+
+PySR x1 · x1 · x2 · (1 .0000085 + − sin(cos( x2 · x2)) · 1.2525511 · 10 −5) · (x2 + 8 .6958323 · 10 −7) · (x1 + x2)−1
+
+Operon 0.011714923195541 + 0 .0004353052779163251485 · exp( −16 .278768064237051 · x1 · x2)
+
+· cos(1 .651700139045715 · x1) · x−12
+
+GP-GOMEA 1.0 · x21 · x22 · (x1 + x2)−1
+
+E2E-SR (0 .06102565887369925 − 0.8666989784169188 · x2) · (5 .672968018606769 − 0.16969952289121198 
+
+· (−1.101556530062938 · x1 − 1.7747546914056933 · x2 − 1.3923669907018425) −1) · (0 .08756886213383504 
+
+· x1 − 0.366604846256249) · (1 .7505584083402312 · x2 − 0.12325958446073971) SNIP-SR −24535 .521299664357 · (7 .784214446548355 · 10 −5 · x1 + 1) 2 + 24534 .943977652507 + 4576 .952109241969 
+
+· (10366 .057719507926 − 10583 .112972836361 · x1)−1
+
+GenSR 0.060303244055858976 − 3.8764530048693256 · 10 −10 · exp( −36 .87562797196373 · x1 · x2)
+
+· sin(1 .6592119930151334 · x2 + 1 .594705827381022) TPSR −(−1.5352958873665828 · 10 −9 + 1 · (−(1 .7143334989974734 − 88 .43320312834005 · (1 .775147604164816 
+
+· x1 + 0 .03944382780585689)) + 89 .67537962342587 · (1 .7505584083402312 · x2 + 0 .006362112212304721) 
+
+− 2.344333499023583) −1) · (0 .006090218920752856 · (1 .775147604164816 · x1 + 0 .03944382780585689) 
+
+− 0.0002346013421339915) · (1 .775147604164816 · x1 − 0.04036802544161824 + 0 .03944382780585689) 
+
+· (30 .197815111921443 · (1 .7505584083402312 · x2 + 0 .006362112212304721) − 0.13937886363113336) 
+
+· (0 .7168363327318004 − 88 .39345664180456 · (1 .7505584083402312 · x2 + 0 .006362112212304721)) + 7 .821765446292284 · 10 −8 · (1 .7505584083402312 · x2 + 0 .006362112212304721) + 1 .1783101145614108 
+
+· 10 −7
+
+SR4MDL −0.910576 · − x2 · cos(3 .141592653589793) · x1 · (x1 + x2)−1 − 0.211742 · x2 + 0 .015383 
+
+· (3 .141592653589793 − x2) − 0.062503 
+
+34 Livermore-21. Ground truth: exp( −x21). Method Prediction 
+
+MOSAIC-SR exp( −x21)PySR −x1 + exp( x1 · 2.732575 · x1 · − 2.732575 −1) + x1 · x1 · x−11
+
+Operon 0.307795726557961 · x1 + 0 .889393270015717 GP-GOMEA 0.80009440459554 E2E-SR 0.4 · cos(2 .1126836069969081 · x1 − 0.03706022875549485) + 0 .6SNIP-SR 130 .29417035635083 · (1 − 0.027990232692061055 · x1)2 − 17 .620730166228215 · (1 − 0.20671522387448319 
+
+· x1)2 − 111 .70304890826463 GenSR −x1 · sin(0 .7057024858927093 · x1 + 0 .006436287112417469) + 0 .9762498782540814 TPSR 0.38835543110695137 · cos(0 .6509206497490071 − 0.954024508269838 · (2 .3474262299965645 · x1
+
++ 0 .6810441902716724)) + 0 .610552011368743 SR4MDL 1.0000000014612915 · exp( −x21)
+
+35

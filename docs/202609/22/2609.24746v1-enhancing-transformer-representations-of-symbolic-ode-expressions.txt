@@ -1,0 +1,201 @@
+Title: Enhancing Transformer Representations of Symbolic ODE Expressions
+
+URL Source: https://arxiv.org/pdf/2609.24746v1
+
+Published Time: Tue, 22 Sep 2026 02:53:10 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Enhancing Transformer Representations of Symbolic ODE Expressions 
+
+## Xiyue Fan 1, Adam Prugel-Bennett 1, Stuart E. Middleton 11University of Southampton 
+
+## X.Fan@soton.ac.uk, apb@ecs.soton.ac.uk, sem03@soton.ac.uk 
+
+Abstract: Existing approaches to solving differential equations, such as symbolic regression, physics-informed neural networks, and neural operators, typically focus on numerical approximations or blind sym-bolic search via fitting to numerical data. Less attention has been paid to learning structured representations of mathematical expressions that preserve commutative properties and could support mathematical reason-ing in symbolic forms. Transformer models have shown strong capabilities in solving symbolic differential equations. However, standard positional embeddings in transformers are designed for sequence data. Sym-bolic differential equations are naturally represented by expression trees, so these positional embeddings may not efficiently capture their hierarchical structures. We investigate existing tree positional embeddings in symbolic ordinary differential equation (ODE) tasks. We systematically study their effectiveness under different settings. Our results show that tree positional embeddings aid learning in early epochs and continue to improve performance throughout, ultimately yielding consistent advantages across various data sizes and tasks. Based on learned structural representations, we apply contrastive learning to support the commuta-tive property in mathematics. Ablation studies provide insight into how these methods interact in modelling symbolic mathematical structures. 
+
+Keywords: Transformers, symbolic ODE, tree positional embedding, contrastive learning 
+
+# 1. Introduction 
+
+Transformer-based models, especially Large Language Models (LLMs), have shown remarkable progress in performing mathematical tasks. They are the dominant models in symbolic regression [1–3], physics-informed neural networks [4–6], and neural operators [7, 8]. Even though they have achieved substantial progress in different areas in terms of generalisation, accuracy and computation efficiency [4–9], physics-informed neural networks and neural operators lack interpretability, while symbolic regression suffers from low search efficiency in the symbolic candidate space [7, 10, 11]. In contrast to these numerical approaches, evidence shows that training a neural network on symbolic data can enhance interpretability and increase model scalability and generalisation [12]. Lample and Charton [13] used an encoder-decoder transformer to process symbolic data and demonstrated its effectiveness in solving differential equations (DEs), finding solutions to many problems that Mathematica was unable to solve under a fixed time budget. However, they treated these symbolic DE expressions as sequential data. The dominant sequential-based positional embeddings in transformers do not match the structures of symbolic differential equations, and thus may not fully encode their rich positional information. These mathematical expressions are naturally represented as tree structures. We hypothesise that injecting this tree-structured hierarchy into a transformer would result in better representations. These structures encode parent-child and sibling relationships among nodes, delineate the functional scope of subtrees, and may facilitate identification of similar substructures. Existing studies have demonstrated that transformer models benefit from incorporating tree positional 1arXiv:2609.24746v1 [cs.LG] 21 Sep 2026 information through embeddings comparing sequence positional embedding in aiding Computer Algebra Systems [14] or code generation task [15]. Even though there is no standard technique to guide this im-plementation. Tree positional embeddings have shown promise in code translation, mathematical retrieval, and symbolic DE tasks [16–19]. Recent work has incorporated structural information into symbolic DE solvers through tree-relative self-attention [19]. While their approach modifies attention using structural information, the effectiveness of tree positional embeddings at the input-representation level remains largely unexplored in the context of symbolic differential equations. One issue with either absolute positional embeddings or tree positional embeddings is that they treat formulae that differ by commuting the arguments of commutative operators as different expressions. For example, the equations dy
+
+dx = 11 + 2 x , dy
+
+dx = 12 x + 1 , dy
+
+dx = 1
+
+x 2 + 1 (1.1) would each have different positional embeddings, despite being mathematically equivalent and having the same solution. To encourage the model to learn this equivalence, we have used contrastive learning to decrease the distance in latent space between formulae that are mathematical equivalent. In particular, we consider all nodes of the expression tree that correspond to the addition or multiplication operators and exchange the left and right subtrees. In contrastive learning we used a loss function that minimised the distance between these pairs of formulae, while maximising the distance between expressions that represent different equations. The hope was that if the model could identify mathematically identical expressions, this would reduce the vast combinatorial growth of valid mathematical expressions that is common recognised as an obstacle to complex mathematical reasoning tasks [10, 20]. Previous work has integrated contrastive learning into LLMs to enhance their mathematical reasoning abilities, but none has investigated its utility for symbolic ODEs. Some works have attempted to learn algebraic properties (i.e., the commutative and identity properties) via supervised training on various data [21, 22]. As we will see, the improvements of using contrastive learning for our task are minimal (and in some cases counterproductive). Instead, we get better performance by augmenting the training data by randomly permuting arguments of the addition and multiplication operator. This paper expands on the work of Lample and Charlton [13] in two directions: 
+
+• We investigated the utility of a transformer model with tree positional encoding for solving symbolic ODE problems, demonstrating that the structural representation improves performance in modelling symbolic ODE expressions. 
+
+• We examined how well contrastive learning captures the commutative property. Our findings indicate that prior structural representations are essential for learning the commutative property. However, the representation invariance acquired through this process does not provide additional benefits over direct supervised augmentation training. 
+
+# 2. Approach 
+
+As a baseline we have used the model of [13]. This uses a vanilla encoder-decoder transformer model [23], but trained it on differential equations and their solutions. The author achieved very strong results, finding solutions to problems that Mathematica were unable to solve under a fixed time budget. In their work both the differential equations and solutions were written in Polish notation and treated as a string, using standard absolute positional embeddings. In this paper we explore two extensions: the use of tree embeddings, and the use of contrastive learning to encourage formulae that differ only by commuting arguments of the addition and multiplication to be closer together in their latent representations. Note that in their paper, for the Forward task, Lample and Charlton trained the model on 20 million examples from a dataset of 40 million samples in total. As we have carried out many experiments, and to prevent unnecessary use of resources, we have run on smaller subsets of their training data (500 k, 1 M , 2 M and 5 M training examples). 2Fan et al. 
+
+## 2.1. Tree positional embeddings 
+
+Related work Shiv and Quirk [16] proposed a one-hot positional encoding to facilitate the relationships between symbols within the tree structure in the code translation task. Later, Wang et al. [17, 24] adapted this one-hot encoding approach for mathematical tasks by simplifying it to a binary encoding. However, this approach requires maintaining a stack during decoding to track tree positions and adding extra stop tokens, which increases implementation complexity. A subsequent study investigated which component, when jointly modelling natural and mathematical language, contributes most to model performance. Scarlatos and Lan [18] merged multiple properties of a mathematical expression into an LLM. Their results suggested that tree positional embeddings account for most of the performance improvement. Unlike these previous approaches, Park et al. [19] combined traversal-aware positional embedding with tree relative self-attention to process symbolic DE expressions. Since traversal-aware positional embedding and tree relative self-attention were implemented simultaneously, the individual contribution of each component remains unclear. In our task, the encoder aims to capture the semantics of the source expressions (that is, the differential equations we wish to solve); structurally enhanced representations would facilitate this. Moreover, their data also consists of mathematical expressions. Therefore, we adapted the method from [17, 24] to our symbolic ODE tasks by encoding the node relationships within mathematical expression trees. The tree positional embedding contains two parts: node embeddings along the tree traversal and tree positional encoding. 
+
+Node embeddings The source expressions are represented as binary trees and serialised into a sequence via prefix traversal. We obtain the node embeddings of these serialised input expressions using a learnable embedding layer. Each node in the tree is represented by a trainable embedding xt of dimension M, where 
+
+t is the position of the node in the serialised source expression. 
+
+Tree positional encoding The encoding process starts at the top of the binary tree, following the tree prefix traversal order. We encode the root node with ’0’. For each branch, the left child is encoded by appending ’0’ to its parent’s encoding, and the right child is encoded by appending ’1’ after its parent’s encoding. Figure 1 shows the mathematical expression tree’s encoding process. mul Y' add INT+      
+
+> 3
+> mul
+> 1
+> xadd xmul add exp
+> 4
+> x
+> 500 01 010 0100 01000 010100
+> sub
+> 01010 0101 011 0110 0111 01110 011110 01111 0111100 011101 011100 0111000 01011 0sos eos Tree Edge Sequence Boundary INT+ INT ‐
+> INT ‐
+> Figure 1. Example of encoding an ODE expression using tree positional encoding. Start by encoding the root node ’sub’ as 0, then encode its subsequent node by appending 0 to its left node and 1 to its right node. After encoding, SOS and EOS are added at the beginning and end of the expression.
+
+This encoding process yields a positional encoding list denoted by pd, which cannot be used directly by the model. To convert the discrete encoding list into dense vectors, we first add ’sos’ and ’eos’ tokens at the beginning and end of the expression. Then we unify their lengths within a batch and leverage a learnable embedding layer to map the original positional encoding list into positional dense vectors ( pt). The resulting positional dense vectors and corresponding node embeddings are then fed into a bidirectional gated recurrent unit (bi-GRU), following [24]. The process of fusing token embedding and positional dense vectors can be expressed as follows: h = f c(( xt; pt)) (2.1) 3where ( xt; pt) denotes the concatenation of the M dimensional node embedding, xt, and the D dimensional positional dense vector, pt. The bi-GRU function, f c : RM ×RD → RM , ensures that the combined embedding has the same dimensionality as the node embedding. While in [17, 24] they computed the final embedding as a weighted combination of GRU latent states, we instead add the GRU output to the corresponding node embeddings. This addition augments each node representation with its structural positional information. We only apply tree positional embedding at the encoder. This is because the encoder is responsible for capturing the semantics of the source expressions. Keeping the decoder unchanged while using absolute positional embeddings would simplify the process, eliminating the need to maintain a stack or introduce additional stop tokens. 
+
+## 2.2. Contrastive Learning 
+
+The aim of contrastive learning is to encourage the network to represent differential equations that differ only by commuting the subtrees of the addition and multiplication operators to be closer together. Clearly, such expressions represent equivalent equations and have the same solution. To achieve this we create augmented versions of our formulae by randomly choosing to swap the children of ’mul’ (the multiplication token) or ’add’ (the addition token) tokens in the source expressions. We use SimCLR [25] to encourage expressions that are known to be mathematically identical to be close together in latent space. SimCLR does not require labelling the expressions or mining hard negative samples. In the SimCLR method we create a batch consisting of some source expressions xi and augmented expressions x+ 
+
+> j
+
+. Other instances in the batch are treated as negative samples. While there is a very low likelihood that our data contains duplicate expressions, we cannot completely guarantee that there is no possibility that some mathematically equivalent expressions are treated as negatives. The loss functions can be expressed as follows 
+
+ℓi,j = − log exp(sim( zi, z + 
+
+> j
+
+)/τ )
+
+P2Nk=1 1[k̸ =i] exp(sim( zi, z k)/τ )
+
+!
+
+(2.2) loss cl = 
+
+> N
+
+X
+
+> i=1
+
+ℓi,j (2.3) loss = loss en + loss cl (2.4) where zi and z+ 
+
+> j
+
+are the normalised feature embedding of xi and x+ 
+
+> j
+
+, τ is the temperature, 1[k̸ =i] is an indicator function to exclude the anchor sample itself, ℓi,j is the loss of a pair of positive examples, loss cl is the contrastive loss within a batch and loss en is the cross-entropy loss. When computing the contrastive loss, there are no standard pooling approaches for mathematical expressions. In the BERT architecture, the CLS token serves as the learned global representation. Due to self-attention, the first token can aggregate information from all tokens in the expression. Therefore, we follow this practice by using the first token of the source expression as its global embedding. Specifically, we extracted the first token’s hidden state from the encoder’s outputs. Subsequently, we applied the L2 normalisation to obtain zi. The normalised results are used to compute the contrastive loss. 
+
+# 3. Experimental setup 
+
+## 3.1. Data 
+
+We obtained the training and test data from the original training dataset of the Forward (fwd) task in [13]. This data includes approximately 40 M samples, ensuring a diverse representation of symbolic ODE expressions. To systematically evaluate the scaling behaviour between data size and the efficacy of the proposed methods, we sampled training datasets of varying sizes: 500 K, 1 M , 2 M , and 5 M . Additionally, all models were evaluated on a fixed 10 K-sample test set with the same distribution as the training set. In addition to this in-distribution dataset (IDD), we also consider testing on out-of-distribution datasets. 4Fan et al. 
+
+These two OOD datasets come from the Lample and Charton paper [13]. These datasets, fwd test , and 
+
+ibp test were generated using different scenarios from the data used for training and consequently have a different distribution (in terms of length of expressions) from the training data, as illustrated in Figure A.6. We test on these datasets to assess generalisation performance under domain shift. Using IDD data ensures that the model may generalise within the target functional domain and provides an unbiased estimate of performance on the test data. Thus, we can easily isolate the specific advantages provided by the techniques used rather than the noise from data variance. Figure 2 shows the data distributions for the training and the test datasets.    
+
+> Figure 2. Training and test data distribution. The training and test data were sampled from the Forward task of training data in [13]. The x-axis is the number of operators in the expression. The y-axis is the proportion of the corresponding category.
+
+For contrastive learning, we generated positive data by swapping the operands of the commutable op-erators (i.e., ’add’ or ’mul’ token) in the expression tree. There can be multiple commutable operators in one expression. To reduce learning complexity, we execute the swapping mechanism for each expression only once, when commutable operators are encountered in order. If an expression contains no commutable operators, the original expression is used as the positive sample. Such instances account for 0 .0036% of the total dataset (500 K), thus their impact on model training is insignificant. Consistent with standard practice, we treat other data in the same batch as negative samples. 
+
+## 3.2. Model 
+
+We use the encoder-decoder transformer. Model parameter choices follow [13]. The encoder and decoder have 6 layers, respectively. Each layer has 8 attention heads. The embedding dimension is 512. We train a transformer model with absolute position embedding (APE) and tree positional embedding (TPE) separately, Optimisation was performed using an Adam optimiser with an initial learning rate of 0.0001 and weight decay of 0.0001 in a batch size of 256. The learning rate was modulated by a cosine annealing learning rate scheduler at a frequency of every 10 epochs. Then, we implemented instance-level contrastive learning after an initial warm-up phase. For all contrastive learning-related experiments, we first train the model with cross-entropy for the first 10 epochs. This allows the model to learn task-relevant representations before applying the contrastive objective. Then we train the model using cross-entropy and contrastive losses from the 11th epoch through the end of training. The temperature coefficient is set to 1 when computing contrastive loss. To maintain a controlled experimental environment and facilitate a clear comparison of scaling behaviours, all experiments were trained for a fixed 60 epochs. The choice of 60 is that training had converged by this stage in preliminary experiments. This avoids other factors, such as the variations during training caused by early-stopping criteria. We use exact match as a metric, comparing the generated solution against its 5ground truth using Sympy. 
+
+# 4. Results 
+
+## 4.1. Tree positional embedding      
+
+> Figure 3. Performance of the model using absolute positional embedding (APE) and the model using tree position embedding (TPE) trained on 500 K(-), 1 M(- -), 2 M(..) and 5 M(-.) data.
+
+Figure 3 shows the empirical results for models with identical configurations that are trained with absolute position embeddings (APE) and tree positional embeddings (TPE). These results suggest that encoding structural information is beneficial for a model to solve symbolic ODE problems. It is evident that the performance gap between these two models does not scale consistently with the size of the training data. The performance gap first increased from 1% at 500 K samples to 2 .7% at 1 M samples, then decreased to 1.6% at 2 M samples, before rising again to 2 .4% at 5 M samples. Some of this variation is clearly due to random fluctuations (we would expect the size of fluctuations on our test set of 10K samples to be around 0.5%), but there may also be a systematic pattern. One possible explanation is that, as the training set grows and reaches a certain amount, i.e., 2 M . Model APE becomes increasingly capable of fitting patterns in the training data, thereby reducing the relative advantage provided by TPE. But when the data size increases to 5 M , the performance gap rebounds slightly. It suggests that the structural information introduced by TPE does not vanish entirely at larger data scales. This can be supported by plotting their performance gap against the number of operators per expression, as shown in Figures A.1-A.4. Another observation is that at the first training epoch, Model TPE achieved slightly higher performance than Model APE . This performance gap continues to increase as the training epoch grows. This shows that explicitly imposing structural information improves model learning efficiency. Overall, the parent-child relationship encoded via TPE enables the model to perform better and more consistently across different data sizes. 
+
+## 4.2. Generalisation to Out of Distribution Data and Ablation Study 
+
+We train a transformer model with identical configurations using 500 K data points across different ex-perimental settings, as shown in Table 1. We then evaluate it on IDD and OOD datasets, respectively. We performed an ablation study where we considered models using absolute positional embeddings (APE), 6Fan et al. 
+
+Model Accuracy(%) 
+
+Model APE 59.4 
+
+Model TPE 60.4 
+
+Model TPE CL 60.7 
+
+Model APE merge 60.3 
+
+Model APE CL 58.4 
+
+Model TPE merge 62.4   
+
+> Table 1. The evaluation results of models with different configurations trained with 500K data. APE: Absolute positional embedding; TPE: Tree positional embedding; CL: Contrastive learning; Merge: The model was trained with raw and augmented training data. The best result is shown in bold.
+
+Model fwd test (%) ibp test (%) 
+
+Model APE 64.5 62.6 
+
+Model TPE 66.3 63.8 
+
+Model TPE CL 66.6 64.3 
+
+Model APE merge 65.2 63.7 
+
+Model APE CL 63.9 62.4 
+
+Model TPE merge 67.0 64.6          
+
+> Table 2. The accuracy of Model APE ,Model TPE ,Model TPE CL ,Model APE merge ,Model APE CL and
+> Model TPE merge trained with 500K data evaluated on fwd and ibp tasks. The best results are shown in bold.
+
+tree positional embeddings (TPE), with or without contrastive learning (CL) and where we also considered combining the original dataset with the augmented dataset (Merge). The results in Table 1 show that contrastive learning slightly increased the model’s performance by 0 .3% when comparing the results of Model TPE and Model TPE CL . However, the results from Model APE and 
+
+Model APE CL suggest that contrastive learning did not help the model to capture meaningful invariance representations of these expressions with APE. Instead, it made Model APE CL underperform Model APE ,as the performance dropped by 1%. It might be that Model APE CL , trained with APE, does not explicitly encode the structure of symbolic expressions. Contrastive pairs generated through commutative transfor-mations may be more difficult for Model APE CL to align in the latent space. Even though the marginal performance gain of Model TPE CL is against Model TPE . This result shows that TPE better preserves expression equivalence for structural invariance during contrastive learning, which can be supported by the T-SNE visualisation of their latent embeddings in Figure A.5. The comparison of the latent embed-dings of the same pair of positive expressions between Model TPE CL and Model APE CL suggests that TPE enables contrastive learning. For models that apply TPE, directly conducting supersized training on augmented data ( Model TPE merge ) outperforms training with contrastive loss ( Model TPE CL ). This sug-gests that the learning signal from contrastive learning might not be as strong as that from direct supervised learning in the IDD settings. Additionally, we observed that the model with APE trained on merged data (Model APE merge ) performs slightly worse than Model TPE . That is to say, Model TPE trained only on raw data (500 K) outperforms Model APE merge trained on merged data (1 M ). This indicates an additional advantage: TPE can yield larger gains than naive data scaling of APE, which can be interpreted as TPE being more data-efficient than APE. The performance improvements observed in the IDD setting are preserved under distribution shift, as shown in Table 2. Based on these results, models using TPE outperform those using APE. Model TPE merge ,trained with TPE on both raw and augmented data, achieved the best performance among these models and also demonstrated that explicit exposure to augmented data may be more beneficial than leveraging a contrastive loss to learn representation invariance in OOD. In the IDD setting, the performance gap between 
+
+Model TPE merge and Model TPE CL is 1.8 %, but decreases to 0.4 % in both the fwd test and ibp test 
+
+tasks. This suggests that the benefit of direct supervision on augmented data is more pronounced under in-distribution conditions, where structural information might be fully exploited to learn the pattern during training. In contrast, under distribution shift, generalisation limits might primarily constrain performance, and the advantage introduced by direct supervision on augmented data becomes less significant. The reduced performance gap suggests that contrastive learning might help stabilise performance under OOD conditions. 7In general, Model TPE merge and Model TPE CL achieved the best and second-best performance, respec-tively, in both IDD and OOD settings. This consistent ranking suggests that while distribution shift reduces the magnitude of improvements, it does not alter TPE’s comparative advantage. In other words, TPE provides a relatively stable and non-degrading performance gain that remains beneficial across different evaluation regimes. 
+
+# 5. Conclusions 
+
+We investigated the utility of tree positional embedding and contrastive learning for solving symbolic ODEs. The results suggest that tree positional embedding improves model performance and maintains a relatively strong advantage across different data sizes and tasks. Additionally, we found that the structural information provided by tree positional embedding is the foundation to enable contrastive learning in this task. The effectiveness of contrastive learning in learning invariant representations of a pair of symbolic expressions is limited compared to explicitly exposing the model to these augmentations. Several factors may contribute to this observation. The relatively small batch sizes imposed by computational constraints may reduce the effectiveness of contrastive learning, while applying a single transformation per expression may be insufficient to capture the rich semantic invariances inherent in complex symbolic structures. More broadly, these findings suggest that supervised training with augmented data may be more effective for symbolic ODE tasks than contrastive learning for invariant representations. However, our work has limitations. We conducted experiments on a single transformer model type and trained on one task. This is because we specifically selected this model to provide a direct comparison with the original baseline. Further work may explore diverse datasets and transformer models. When computing contrastive loss, we used nominalised embeddings to compute contrastive loss at a relative stable training stage. Therefore, we did not tune temperature’s value. We did not balance the cross entropy and contrastive losses either due to the empirically stable training, instead we adopted equal weighting to avoid additional parameter tuning. A comprehensive study of the influence of alpha and temperature is left for future work. This work was supported by the UK Research and Innovation Centre for Doctoral Training in Machine Intelligence for Nano-electronic Devices and Systems [EP/S024298/1]. 
+
+# References 
+
+[1] B. Wang, K. Li, T. Liu, et al. , “LLM-based scientific equation discovery via physics-informed token-regularized policy optimization,” arXiv preprint arXiv:2602.10576 , 2026. [2] B. Taskin, W. Xie, and T. Lazebnik, “Knowledge integration for physics-informed symbolic regression using pre-trained large language models,” Scientific Reports , 2026. [3] B. Wang et al. , “LLM-based scientific equation discovery via physics-informed token-regularized policy optimization,” arXiv preprint arXiv:2602.10576 , 2026. [4] S. Mansingh, J. Amarel, R. Arnab, et al. , “Towards reasoning for PDE foundation models: A reward-model-driven inference-time-scaling algorithm,” arXiv preprint arXiv:2509.02846 , 2025. [5] Q. Wuwu, C. Gao, T. Chen, et al. , “PINNsAgent: Automated PDE surrogation with large language models,” arXiv preprint arXiv:2501.12053 , 2025. [6] Z. Zhu, Y. Huang, and L. Liu, “PhysicsSolver: Transformer-enhanced physics-informed neural networks for forward and forecasting problems in partial differential equations,” Journal of Computational and Applied Mathematics , vol. 473, p. 116900, 2026. [7] H. Zhou, Y. Ma, H. Wu, et al. , “Unisolver: PDE-conditional transformers are universal neural PDE solver,” in ICLR 2025 Workshop on Foundation Models in the Wild. , 2025. [8] H. Wu, H. Luo, H. Wang, et al. , “Transolver: A fast transformer solver for pdes on general geometries,” 
+
+arXiv preprint arXiv:2402.02366 , 2024. 8Fan et al. 
+
+[9] S. Wen, A. Kumbhat, L. Lingsch, et al. , “Geometry aware operator transformer as an efficient and accurate neural surrogate for pdes on arbitrary domains,” in Advances in Neural Information Processing Systems , vol. 38, pp. 155423–155501, 2026. [10] Q. Li, Y. Hu, J. Liu, et al. , “GENSR: Symbolic regression based in equation generative space,” arXiv preprint arXiv:2602.20557 , 2026. [11] Z. Li, D. Shu, and A. Barati Farimani, “Scalable transformer for PDE surrogate modeling,” in Advances in Neural Information Processing Systems , vol. 36, pp. 28010–28039, 2023. [12] F. Arabshahi, S. Singh, and A. Anandkumar, “Towards solving differential equations through neural programming,” in ICML Workshop on Neural Abstract Machines and Program Induction (NAMPI) ,2018. [13] G. Lample and F. Charton, “Deep learning for symbolic mathematics,” arXiv preprint arXiv:1912.01412 , 2019. [14] K. D. Thellmann, B. Stadler, R. Usbeck, et al. , “Transformer with tree-order encoding for neural program generation,” arXiv preprint arXiv:2206.13354 , 2022. [15] R. Barket, M. England, and J. Gerhard, “Tree-based deep learning for ranking symbolic integration algorithms,” arXiv preprint arXiv:2508.06383 , 2025. [16] V. Shiv and C. Quirk, “Novel positional encodings to enable tree-based transformers,” in Advances in Neural Information Processing Systems , vol. 32, 2019. [17] Z. Wang, A. S. Lan, and R. G. Baraniuk, “Mathematical formula representation via tree embeddings,” in iTextbooks@AIED , 2021. [18] A. Scarlatos and A. Lan, “Tree-based representation and generation of natural and mathematical lan-guage,” in Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pp. 3714–3730, 2023. [19] Y. Park, A. C. Lu, S. C. Huang, et al. , “SymPlex: A structure-aware transformer for symbolic pde solving,” arXiv preprint arXiv:2602.03816 , 2026. [20] L. S. and Y. H., “Finite expression method for solving high-dimensional partial differential equations,” 
+
+arXiv preprint arXiv:2206.10121 , 2022. [21] N. Gangwar and N. Kani, “Semantic representations of mathematical expressions in a continuous vector space,” arXiv preprint arXiv:2211.08142 , 2022. [22] F.-C. Chang, Y.-C. Lin, and P.-Y. Wu, “Unraveling arithmetic in large language models: The role of algebraic structures,” arXiv preprint arXiv:2411.16260 , 2024. [23] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, L. Kaiser, and I. Polosukhin, “Attention is all you need,” in Advances in Neural Information Processing Systems, 30 , 2017. [24] Z. Wang, M. Zhang, R. G. Baraniuk, et al. , “Scientific formula retrieval via tree embeddings,” in 2021 IEEE International Conference on Big Data (Big Data) , pp. 1493–1503, IEEE, 2021. [25] T. Chen, S. Kornblith, M. Norouzi, et al. , “A simple framework for contrastive learning of visual rep-resentations,” in Proceedings of the International Conference on Machine Learning (ICML) , pp. 1597– 1607, PMLR, 2020. 9A. Supplementary Figures 
+
+Figure A.1. Performance difference between Model TPE and Model APE trained with 500 K data. 
+
+Figure A.2. Performance difference between Model TPE and Model APE trained with 1 M data. 
+
+10 Fan et al. 
+
+Figure A.3. Performance difference between Model TPE and Model APE trained with 2 M data. 
+
+Figure A.4. Performance difference between Model TPE and Model APE trained with 5 M data. 
+
+11 Figure A.5. T-SNE visualisation of latent embeddings for the original expression (the left side) and its augmented expression (the right side). Nodes are denoted by their name, an underline, and their position (marked as red) in the serialised expression. The node marked as blue is the commutable operator to generate the augmented data. Edges of the same colour connect nodes within the same subtree. SOS and EOS do not belong to any subtree. The top row shows the results of Model APE CL , and the bottom row shows the results of Model TPE CL .
+
+12 Fan et al. 
+
+Figure A.6. Distribution of test, fwd test and ibp test datasets. The x-axis is the number of operators in the expression. The y-axis is the proportion of the corresponding category. 
+
+13

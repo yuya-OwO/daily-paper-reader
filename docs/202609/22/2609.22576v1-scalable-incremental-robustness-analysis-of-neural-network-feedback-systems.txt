@@ -1,0 +1,2845 @@
+Title: Scalable Incremental Robustness Analysis of Neural Network Feedback Systems
+
+URL Source: https://arxiv.org/pdf/2609.22576v1
+
+Published Time: Tue, 22 Sep 2026 00:22:56 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+> IEEE TRANSACTIONS AND JOURNALS TEMPLATE 1
+
+# Scalable Incremental Robustness Analysis of Neural Network Feedback Systems 
+
+Zichen Wang 1, Peter Seiler 2, Fellow, IEEE , Geir Dullerud 3, Fellow, IEEE , and Bin Hu 1, Member, IEEE 
+
+Abstract — Semidefinite programming (SDP) certificates for feedback systems containing deep neural networks (NNs) typically scale with the total number of neurons, whereas small-gain tests are scalable but can be highly conservative. This paper develops a unified and scal-able framework for incremental robust stability and per-formance analysis of feedback interconnections involving high-dimensional NNs and unmodeled dynamics. By com-bining a structured decomposition of the full-order SDP condition with scalable Lipschitz constant estimation al-gorithms, we derive reduced verification conditions that certify incremental convergence and incremental ℓ2-gain bounds. The dimensions of the resulting control-analysis linear matrix inequalities (LMIs) depend only on the widths of the last two network layers and are independent of network depth . The framework preserves the coupling be-tween the plant and the NN, with the incremental small-gain condition recovered as a special case. To further reduce conservatism, we develop a multi-round alternating update scheme that iteratively refines the coupling vari-ables while preserving scalability. Numerical experiments show that the proposed framework achieves state-of-the-art incremental ℓ2-gain bounds for large-scale NN feedback systems. 
+
+Index Terms — Incremental stability. Integral quadratic constraints. Neural-network feedback systems. scalable verification 
+
+I. I NTRODUCTION 
+
+# NEURAL networks are increasingly incorporated into feedback control systems as learned controllers, policy representations, and nonlinear decision-making components in applications such as robotics, autonomous systems, and reinforcement learning [1], [2]. In many NN-in-the-loop ar-chitectures, a feedforward NN can be viewed as a static nonlinear mapping interconnected with a dynamical system. Rigorous guarantees on closed-loop stability and performance are therefore important for reliable deployment. Such guar-antees, however, become increasingly difficult to compute as 
+
+> †
+
+Generative AI tools were used solely to improve the language and presentation of the manuscript. All scientific ideas, analyses, results, and conclusions are those of the authors, who take full responsibility for the content of this work. *This work was supported by the AFOSR award FA9550-23-1-0732. 
+
+> 1
+
+Zichen Wang and Bin Hu are with the Coordinated Science Labora-tory and the Department of Electrical and Computer Engineering, Uni-versity of Illinois Urbana–Champaign ( zichenw6@illinois.edu; binhu7@illinois.edu ). 2Peter Seiler is with the Department of Electrical Engineering and Computer Science, at the University of Michi-gan ( pseiler@umich.edu ). 3Geir Dullerud is with the Electrical and Computer Engineering Department at the University of Minnesota (dullerud@umn.edu ). 
+
+modern NNs grow in depth and width. In addition, analysis relative to a prescribed equilibrium can be restrictive in the presence of NN biases, disturbances, or uncertain compo-nents. This motivates an incremental viewpoint, which studies the behavior of pairs of trajectories and provides a natural framework for characterizing convergence and input–output sensitivity [3]–[6]. Quadratic constraints, integral quadratic constraints (IQCs), and dissipativity provide a systematic framework for analyzing nonlinear and uncertain feedback interconnections [7]–[10]. These tools have been applied to NN feedback systems by exploiting quadratic constraints satisfied by slope-restricted activation functions [6], [11]–[15]. By retaining the layer-wise structure of the NN, the resulting SDP formulations preserve detailed information about the interaction between the NN nonlinearity and the surrounding dynamics [6], [11], [13]. Such formulations can yield expressive certificates for closed-loop stability, robustness, and, in some settings, input– output performance [12], [14]. The main limitation of such full-order formulations is scalability: the dimensions of their semidefinite constraints typically grow with the total number of neurons, leading to rapidly increasing computational and memory requirements for deep and wide networks. A natural scalable alternative is to summarize the NN by a global Lipschitz bound and combine it with a small-gain argument. Significant progress has been made in scalable Lipschitz constant estimation for deep NNs through sparsity exploitation, structured decompositions, first-order optimiza-tion, and compositional constructions [16]–[20]. When such estimates are used in small-gain-based closed-loop analysis, the resulting verification conditions can have dimensions that are independent of the internal depth of the NN [21], making them applicable to very deep networks. This scalability, how-ever, comes at the cost of conservatism: replacing the detailed NN description by a single global gain discards structural information about the coupling between the plant dynamics and the NN. Existing methods therefore exhibit a fundamental tradeoff between expressive full-order SDP certificates that preserve detailed plant–NN coupling but scale poorly, and highly scalable small-gain certificates that discard much of this coupling and may be substantially more conservative. This tradeoff becomes more pronounced when the NN is only one component of a larger uncertain feedback intercon-nection. Practical systems may additionally contain actuator uncertainty, modeling error, unmodeled dynamics, or other uncertain nonlinear or dynamical components [22], [23]. IQC-arXiv:2609.22576v1 [math.OC] 18 Sep 2026 2 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+based descriptions provide a natural mechanism for incor-porating uncertain and nonlinear components into a com-mon stability and performance analysis framework. Related work has analyzed NN feedback systems with additional perturbations using quadratic constraints and IQCs [11], [14], considered robust stability under structured model uncertainty [15], and used IQCs and dissipativity-based formulations to certify closed-loop robustness and performance [24]. However, directly combining detailed NN descriptions with additional unmodeled dynamics generally retains the scalability limita-tions of full-order SDP formulations, whereas collapsing the NN to a global gain can sacrifice useful structural coupling. These observations motivate a scalable verification frame-work that preserves informative plant–NN coupling, accom-modates additional IQC-described uncertainties, and avoids the conservatism of a purely gain-based reduction. To address this gap, this paper develops a unified framework for incremental stability and performance analysis of uncertain NN feedback interconnections. The main contributions are summarized as follows:  
+
+> •
+
+We develop a scalable verification framework for feed-back interconnections involving high-dimensional NNs and uncertainties, enabling a systematic tradeoff between computational and memory efficiency and the conser-vatism of the resulting stability and performance certifi-cates.  
+
+> •
+
+The framework provides sufficient conditions for incre-mental convergence and finite incremental ℓ2 gain and, under additional assumptions, for boundedness of closed-loop trajectories.  
+
+> •
+
+We show that, under an additional assumption ensuring the existence of a convergent trajectory, incremental con-vergence implies global convergence to a common limit point. We further provide a counterexample demonstrat-ing that such pointwise convergence cannot, in general, be guaranteed without this assumption. The remainder of this paper is organized as follows. Section II introduces the problem formulation. Section III develops the full-order incremental IQC framework, includ-ing incremental IQCs, dissipation-based analysis, and the incremental small-gain method. Section IV reviews scalable Lipschitz constant estimation methods for deep NNs. Sec-tion V develops the proposed scalable verification framework and an alternating update scheme for reducing conservatism. Section VI discusses further implications and limitations of the proposed sufficient conditions. Finally, Section VII presents the numerical results. 
+
+II. P ROBLEM FORMULATION 
+
+A. Notation 
+
+Let Z≥0 denote the set of non-negative integers, [N] :=
+
+{1, . . . , N}, and Rn the set of real vectors of dimension n.The Euclidean (or 2-) norm for a vector x ∈ Rn is defined by 
+
+∥x∥2 := √xTx. Let ℓn 
+
+> 2e
+
+denote the set of sequences v = {vk}∞
+
+> k=0
+
+,where vk ∈ Rn. The ℓ2-norm of a sequence v ∈ ℓn 
+
+> 2e
+
+is defined as 
+
+∥v∥2 :=  ∑∞ 
+
+> k=0
+
+∥vk∥22
+
+1/2. The space ℓn 
+
+> 2
+
+consists of sequences 
+
+G de G
+
+∆NN 
+
+∆U
+
+vp
+
+ - wq
+
+
+
+
+
+Fig. 1: Block diagram of the feedback interconnection 
+
+F(G, ∆NN , ∆U) with exogenous input d and performance out-put e.
+
+v ∈ ℓn 
+
+> 2e
+
+such that ∥v∥2 < ∞. Next, Rn×m denotes the set of 
+
+n × m real matrices. The n × n identity matrix is denoted by In, while 0 n and 0 n×m denote the n × n and n × m zero matrices, respectively. The maximum singular value (spectral norm) for any matrix A ∈ Rn×m is denoted by ∥A∥2. The eigenvalues of a square symmetric matrix A ∈ Rn×n are real and λmin (A) denotes the smallest eigenvalue. The operator diag (A, B) denotes the block-diagonal matrix with matrices A
+
+and B on its diagonal. Finally, RH ∞ denotes the set of real-rational, stable, and proper transfer functions. 
+
+B. System Model and Objectives 
+
+Consider the uncertain discrete-time feedback interconnec-tion F(G, ∆NN , ∆U) in Fig. 1, consisting of an LTI plant G, a NN nonlinearity ∆NN , and an uncertain perturbation ∆U. The dynamics of G are described by 
+
+xk+1 = AG xk + BG1 wk + BG2 qk + BG3 dk
+
+vk = CG1 xk + DG12 qk + DG13 dk
+
+pk = CG2 xk + DG21 wk + DG22 qk + DG23 dk
+
+ek = CG3 xk + DG31 wk + DG32 qk + DG33 dk
+
+(1) for all k ∈ Z≥0, where xk ∈ Rnx is the state, (pk, qk) ∈ Rnp ×
+
+Rnq denote the input-output pair of ∆U, (vk, wk) ∈ Rnv × Rnw
+
+denote the input-output pair of ∆NN , dk ∈ Rnd is the exogenous input, and ek ∈ Rne is the performance output. We next state a standing assumption on the perturbation ∆U.
+
+Assumption 1. For every admissible perturbation ∆U : ℓnp 
+
+> 2e
+
+→
+
+ℓnq
+
+> 2e
+
+, the feedback interconnection F (G, ∆NN , ∆U) is well posed, i.e., for every admissible initial condition and exogenous input, the feedback equations admit a unique trajectory. Moreover, 
+
+∆U is causal and satisfies ∆U(0) = 0.
+
+The perturbation can represent a broad class of uncertainties [7], including actuator saturation and other slope-restricted nonlinearities, as well as time-delay effects and unmodeled dynamics. The NN block ∆NN is a feedforward network with N layers. The input–output relation of ∆NN is given by 
+
+h0 
+
+> k
+
+= vk,
+
+hlk = φ
+
+
+
+Wl hl−1 
+
+> k
+
++ bl
+
+
+
+, l ∈ [N],
+
+wk = hNk .
+
+(2) WANG et al. : SCALABLE INCREMENTAL ROBUSTNESS ANALYSIS OF NEURAL NETWORK FEEDBACK SYSTEMS 3
+
+For each layer l ∈ [N], Wl ∈ Rnl ×nl−1 and bl ∈ Rnl denote the weight matrix and bias vector. The layer dimensions satisfy 
+
+n0 = nv and nN = nw, and the total number of neurons is nφ :=
+
+∑Nl=1 nl . In the NN architecture considered here, the output of the last nonlinear layer is directly taken as the NN output, i.e., wk = hNk , and no additional output layer is included. If an additional linear output layer with weight matrix WN+1 is present, its weight can, without loss of generality, be absorbed into BG1, DG21 , and DG31 . An output bias is not considered. The activation function φ acts componentwise on each layer and is assumed to be slope-restricted in [0, 1] and to satisfy 
+
+φ (0) = 0. These assumptions are satisfied by several standard activation functions, including ReLU, tanh, and leaky ReLU with a leak coefficient in [0, 1].When the bias terms {bl }Nl=1 and the external input d are zero, the origin is an equilibrium point of (1). In the presence of nonzero biases, however, the equilibrium may shift or may not exist, making stability analysis with respect to a fixed op-erating point inapplicable. We therefore adopt an incremental viewpoint and study pairs of system trajectories. Our objective is to characterize both trajectory convergence and sensitivity to input perturbations. The latter is quantified via the notion of incremental ℓ2 gain, which captures the input–output behavior between pairs of trajectories and does not rely on a specific equilibrium. We next define the incremental ℓ2 gain. 
+
+Definition 1 (Incremental ℓ2 gain [5]) . The system (1) is said to have an incremental ℓ2-gain bound √γ if, for any input pair d , d′ ∈ ℓnd 
+
+> 2
+
+and any initial conditions x 0, x′ 
+
+> 0
+
+∈ Rnx , the corresponding trajectories satisfy, for all K ∈ Z≥0,
+
+> K
+
+# ∑
+
+> k=0
+
+∥ek − e′
+
+> k
+
+∥22 ≤ γ
+
+> K
+
+# ∑
+
+> k=0
+
+∥dk − d′
+
+> k
+
+∥22 + χ(x0, x′
+
+> 0
+
+),
+
+where χ : Rnx ×Rnx → R≥0 is a nonnegative function satisfying 
+
+χ(x, x) = 0.
+
+Our objective is to derive scalable and verifiable sufficient conditions under which:  
+
+> •
+
+the closed-loop system is incrementally convergent and its state trajectories remain bounded; and  
+
+> •
+
+the interconnection F(G, ∆NN , ∆U ) admits a finite incre-mental ℓ2-gain bound √γ.We also identify additional conditions under which incremen-tal convergence implies convergence of all state trajectories to a common limit point. 
+
+III. I NCREMENTAL IQC-B ASED STABILITY AND 
+
+PERFORMANCE ANALYSIS 
+
+This section develops the full-order incremental IQC cer-tificate used in our analysis. We first introduce incremental IQCs to characterize the incremental input–output behavior of the NN and the uncertain perturbation, and then review the dissipation-based and incremental small-gain conditions used to analyze the resulting interconnection. 
+
+A. Incremental IQCs 
+
+We first characterize the incremental behavior of the NN nonlinearity ∆NN . For feedforward NNs with activation func-tions that are slope-restricted in [0, 1], the following structured 
+
+Λ-incremental QC characterization holds.   
+
+> a) Λ-incremental QC:
+
+For each l ∈ [N], let hl = φ (Wl hl−1 +
+
+bl ) denote the output of layer l as defined in (2), where h0 = v.We then define the stacked vector h := (h1)T · · · (hN )TT,corresponding to the input v. Similarly, h′ corresponds to the input v′. Then, for any v, v′ ∈ Rnv and any collection of diagonal positive semidefinite matrices Λ := {Λl }Nl=1 with 
+
+Λl ∈ Rnl ×nl , the following inequality holds: 
+
+δ v
+
+δ h
+
+T
+
+MNN (Λ)
+
+δ v
+
+δ h
+
+
+
+≥ 0, (3) where δ v = v − v′, δ h = h − h′, and 
+
+MNN (Λ) = 
+
+
+
+0 W T 
+
+> 1
+
+Λ1 0 · · · 0
+
+Λ1W1 −2Λ1 W T 
+
+> 2
+
+Λ2
+
+. . . ...0 Λ2W2 −2Λ2
+
+. . . 0... . . . . . . . . . W T 
+
+> N
+
+ΛN
+
+0 · · · 0 ΛNWN −2ΛN
+
+
+
+.
+
+The Λ-incremental QC characterizes the incremental input– output behavior of the feedforward NN through a structured QC that explicitly captures the layer-wise interconnection structure of the network. To characterize the uncertain per-turbation ∆U in a unified incremental framework, we adopt the following incremental ρ-hard IQC description.   
+
+> b) Incremental ρ-Hard IQC and System Representation:
+
+We adopt an incremental ρ-hard IQC to characterize the uncertain perturbation ∆U.
+
+Definition 2 (Incremental ρ-hard IQC) . Let ρ ∈ (0, 1], Ψ ∈
+
+RH nr ×(np+nq) 
+
+> ∞
+
+, and M = MT ∈ Rnr ×nr be given. An operator 
+
+∆U : ℓnp 
+
+> 2e
+
+→ ℓnq 
+
+> 2e
+
+satisfying Assumption 1 is said to satisfy the incremental ρ-hard IQC defined by (Ψ, M) if, for any p , p′ ∈
+
+ℓnp 
+
+> 2e
+
+with q = ∆U(p) and q ′ = ∆U(p′), the incremental signals 
+
+δ p := p − p′, δ q := q − q′ satisfy 
+
+> K
+
+# ∑
+
+> k=0
+
+ρ−k δ rT 
+
+> k
+
+Mδ rk ≥ 0, ∀K ∈ Z≥0, (4) 
+
+where δ r = Ψ
+
+δ p
+
+δ q
+
+
+
+with zero initial condition. 
+
+Remark 1 (Monotonicity in ρ [25]) . If ∆U satisfies the incremental ρ1-hard IQC defined by (Ψ, M) for some ρ1 ∈
+
+(0, 1], then it also satisfies the incremental ρ-hard IQC for any ρ ∈ [ρ1, 1].
+
+In this work, we characterize the uncertain perturbation 
+
+∆U using time-domain incremental ρ-hard IQCs. Specifically, 
+
+∆U is assumed to satisfy a collection of IQCs defined by 
+
+{(Ψi, Mi)}NΨ
+
+> i=1
+
+. The corresponding filters are aggregated into a single filter Ψ with the following state-space realization: 
+
+ψk+1 = AΨψk + BΨ1 pk + BΨ2qk
+
+rk = CΨψk + DΨ1 pk + DΨ2qk
+
+ψ0 = 0,
+
+(5) 4 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+where ψk ∈ Rnψ denotes the filter state and rk ∈ Rnr denotes the aggregated output. In particular, rk :=
+
+h
+
+r(1)T 
+
+> k
+
+. . . r(NΨ)T
+
+> k
+
+iT
+
+,where r(i) 
+
+> k
+
+is the output of the individual filter Ψi. Define the corresponding incremental filtered outputs by δ r(i) 
+
+> k
+
+:=
+
+r(i) 
+
+> k
+
+− r(i)
+
+> k
+> ′
+
+, i ∈ [NΨ] and δ rk :=
+
+h
+
+δ r(1)T 
+
+> k
+
+. . . δ r(NΨ)T
+
+> k
+
+iT
+
+.We further define the block-diagonal multiplier M(α) :=
+
+diag (α1M1, . . . , αNΨ MNΨ ), where α := {αi}NΨ 
+
+> i=1
+
+are nonnegative scalars. Then the incremental filtered output δ rk satisfies 
+
+> K
+
+# ∑
+
+> k=0
+
+ρ−k δ rT 
+
+> k
+
+M(α)δ rk =
+
+> NΨ
+
+# ∑
+
+> i=1
+
+αiK
+
+# ∑
+
+> k=0
+
+ρ−k δ r(i)T 
+
+> k
+
+Miδ r(i) 
+
+> k
+
+≥ 0. (6) Let ζk := xT 
+
+> k
+
+ψT
+
+> k
+
+T ∈ Rnx+nψ denote the extended state vector. Then, the dynamics of the uncertain interconnected system can be rewritten as 
+
+ζk+1
+
+rk
+
+ek
+
+ =
+
+ A B1 B2 B3
+
+C1 D11 D12 D13 
+
+C2 D21 D22 D23 
+
+
+
+ζk
+
+wk
+
+qk
+
+dk
+
+ , (7) where the state space matrices are 
+
+A =
+
+ AG 0
+
+BΨ1CG2 AΨ
+
+
+
+, B1 =
+
+ BG1
+
+BΨ1DG21 
+
+
+
+,
+
+B2 =
+
+ BG2
+
+BΨ1DG22 + BΨ2
+
+
+
+, B3 =
+
+ BG3
+
+BΨ1DG23 
+
+
+
+,
+
+C1 = DΨ1CG2 CΨ
+
+ , D11 = DΨ1DG21 ,
+
+D12 = DΨ1DG22 + DΨ2, D13 = DΨ1DG23 ,
+
+C2 = CG3 0 , D21 = DG31 ,
+
+D22 = DG32 , D23 = DG33 .
+
+B. Dissipation Analysis 
+
+We integrate the incremental characterizations developed in the previous subsections into a dissipation-based analysis. This leads to a large-scale SDP sufficient condition for incremental convergence and for certifying an upper bound on the incre-mental ℓ2 gain. For convenience in the subsequent LMI formulation, define matrices A(P, γ, α), B(P, α), C(P, α) as follows: 
+
+A(P, γ, α) :=
+
+
+
+ATPA − P ATPB 2 ATPB 3
+
+BT 
+
+> 2
+
+PA BT 
+
+> 2
+
+PB 2 BT 
+
+> 2
+
+PB 3
+
+BT 
+
+> 3
+
+PA BT 
+
+> 3
+
+PB 2 BT 
+
+> 3
+
+PB 3 − γInd
+
+
+
++
+
+
+
+CT 
+
+> 1
+
+M(α)C1 CT 
+
+> 1
+
+M(α)D12 CT 
+
+> 1
+
+M(α)D13 
+
+DT
+
+> 12
+
+M(α)C1 DT
+
+> 12
+
+M(α)D12 DT
+
+> 12
+
+M(α)D13 
+
+DT
+
+> 13
+
+M(α)C1 DT
+
+> 13
+
+M(α)D12 DT
+
+> 13
+
+M(α)D13 
+
+
+
++
+
+
+
+CT 
+
+> 2
+
+C2 CT 
+
+> 2
+
+D22 CT 
+
+> 2
+
+D23 
+
+DT
+
+> 22
+
+C2 DT
+
+> 22
+
+D22 DT
+
+> 22
+
+D23 
+
+DT
+
+> 23
+
+C2 DT
+
+> 23
+
+D22 DT
+
+> 23
+
+D23 
+
+ ,
+
+B(P, α) :=
+
+
+
+ATPB 1
+
+BT 
+
+> 2
+
+PB 1
+
+BT 
+
+> 3
+
+PB 1
+
+ +
+
+
+
+CT 
+
+> 1
+
+M(α)D11 
+
+DT
+
+> 12
+
+M(α)D11 
+
+DT
+
+> 13
+
+M(α)D11 
+
+ +
+
+
+
+CT 
+
+> 2
+
+D21 
+
+DT
+
+> 22
+
+D21 
+
+DT
+
+> 23
+
+D21 
+
+ ,
+
+C(P, α) :=BT 
+
+> 1
+
+PB 1 + DT
+
+> 11
+
+M(α)D11 + DT
+
+> 21
+
+D21 
+
+In addition, to simplify the subsequent analysis, we intro-duce an equivalent NN representation ∆′ 
+
+> NN
+
+with augmented input ξk := ζ T 
+
+> k
+
+qT 
+
+> k
+
+dT
+
+> k
+
+T ∈ Rm, m := nx + nψ + nq + nd :
+
+h0 
+
+> k
+
+= ξk,
+
+h1 
+
+> k
+
+= φ
+
+ eW1h0 
+
+> k
+
++ b1
+
+
+
+,
+
+hlk = φ
+
+
+
+Wl hl−1 
+
+> k
+
++ bl
+
+
+
+, l = 2, . . . , N,
+
+wk = hNk ,
+
+(8) where eW1 := W1
+
+CG1 0nv×nψ DG12 DG13 
+
+, which incorpo-rates the affine relation vk = CG1 0nv×nψ DG12 DG13 
+
+ ξk
+
+into the first layer. Compared with ∆NN (2), ∆′ 
+
+> NN
+
+(8) differs only in its first layer through the use of eW1. The remaining layers are identical. We next state the resulting large-scale SDP condition. 
+
+Theorem 1. Let G be the LTI plant defined by (1) , let ∆NN 
+
+denote the NN defined in (2) , and let ∆U : ℓnp 
+
+> 2e
+
+→ ℓnq 
+
+> 2e
+
+be an uncertain perturbation satisfying Assumption 1 and the incremental ρ-hard IQCs defined by {(Ψi, Mi)}NΨ
+
+> i=1
+
+. Suppose that there exist a positive definite matrix P, a scalar γ >
+
+0, nonnegative scalars α := {αi}NΨ
+
+> i=1
+
+, and diagonal positive semidefinite matrices Λ := {Λl }Nl=1 such that the following LMI condition holds: 
+
+eMNN (Λ) + MG(P, γ, α) ≺ 0, (9) 
+
+where 
+
+eMNN (Λ) = 
+
+
+
+0m eW T 
+
+> 1
+
+Λ1 0 · · · 0
+
+Λ1 eW1 −2Λ1 W T 
+
+> 2
+
+Λ2
+
+. . . ...
+
+0 Λ2W2 −2Λ2
+
+. . . 0
+
+... . . . . . . . . . W T 
+
+> N
+
+ΛN
+
+0 · · · 0 ΛNWN −2ΛN
+
+
+
+, (10) 
+
+MG(P, γ, α) = 
+
+
+
+A(P, γ, α) 0 · · · B(P, α)
+
+0 0 · · · 0
+
+... ... . . . ...
+
+B(P, α)T 0 · · · C(P, α)
+
+ . (11) 
+
+Then  
+
+> •
+
+If ρ ∈ (0, 1] and the external input d = 0, then the closed-loop trajectories are incrementally convergent, i.e., for any two trajectories initialized from x 0, x′ 
+
+> 0
+
+∈ Rnx , ∥xk −
+
+x′
+
+> k
+
+∥2 → 0 as k → ∞. 
+
+> •
+
+If ρ ∈ (0, 1], then the incremental ℓ2 gain of the system is bounded by √γ.
+
+A brief derivation and interpretation of the LMI structure in (9) are provided in Appendix I. Note that the dimension of eMNN (Λ) grows with the depth of the NN, which renders the resulting SDP computationally and memory intensive, and therefore not scalable to deep NNs. In addition, applying a chordal sparsity decomposition to (9) still yields an SDP con-dition whose size scales with the depth of the NN component [16], [17]. WANG et al. : SCALABLE INCREMENTAL ROBUSTNESS ANALYSIS OF NEURAL NETWORK FEEDBACK SYSTEMS 5
+
+C. Incremental Small Gain Method 
+
+In addition to the dissipation-based condition in Theorem 1, the incremental small-gain method provides an alternative condition for establishing incremental convergence and incre-mental ℓ2-gain bounds. 
+
+Proposition 1 (Incremental small gain method) . Under the assumptions of Theorem 1, suppose that √L is an upper bound on the Lipschitz constant of ∆′ 
+
+> NN
+
+(8) , i.e., ∥w−w′∥2 ≤ √L∥ξ −
+
+ξ ′∥2, where w = ∆′
+
+> NN
+
+(ξ ) and w ′ = ∆′
+
+> NN
+
+(ξ ′), for all ξ , ξ ′ ∈ Rm.If there exist a positive definite matrix P, a scalar γ > 0, a collection of nonnegative scalars α such that the following LMI condition holds: 
+
+A(P, γ, α) B(P, α)
+
+B(P, α)T C(P, α)
+
+
+
++ diag (Im, − 1 
+
+> L
+
+Inw ) ≺ 0. (12) 
+
+Then the conclusions of Theorem 1 follow. 
+
+Remark 2. Proposition 1 applies the incremental small-gain method to the feedback interconnection between ∆′ 
+
+> NN
+
+and an augmented system consisting of G, ∆U, the exogenous input channel d, and the performance output channel e. In the special case where ∆U and the external channels are absent, the interconnection reduces to the standard feedback loop between G and ∆NN , where the NN input coincides with the state (i.e., v = x), as considered in [21]. In this case, Proposition 1 specializes to the classical incremental small-gain method (see Proposition 1 in [21]), and the LMI condition in Proposition 1 simplifies to 
+
+AT
+
+> G
+
+PA G − P AT
+
+> G
+
+PB G1
+
+BT
+
+> G1
+
+PA G BT
+
+> G1
+
+PB G1
+
+
+
++ diag (Inv , − 1 
+
+> L
+
+Inw ) ≺ 0. (13) The dimension of the LMI in Proposition 1 depends only on the state-space matrices in (7) and the width of the last layer of the NN (i.e., nw), and is independent of the network depth. However, it may be overly conservative, as it does not fully exploit the structural coupling between G and ∆′
+
+> NN
+
+.The required Lipschitz bound can be obtained using Lipschitz constant estimation algorithms, which are introduced in the following section. 
+
+IV. S CALABLE LIPSCHITZ CONSTANT ESTIMATION FOR 
+
+DEEP NN S
+
+This section reviews scalable methods for certifying Lip-schitz bounds of deep NNs. We first introduce the LipSDP framework and then discuss its scalable variants, which will be used in the subsequent development of our scalable stability conditions. 
+
+LipSDP. For a ∆NN as defined in (2) with activation functions that are slope-restricted in [0, 1], the LipSDP framework [26]– [28] certifies tight upper bounds on the Lipschitz constant and has inspired a large body of subsequent work on Lipschitz NNs [29]–[35]. LipSDP certifies that the ∆NN is √L-Lipschitz if there exists a scalar L > 0 and a collection of diagonal positive semidefinite matrices Λ, such that the following LMI condition holds: 
+
+MNN (Λ) + diag (−Inv , 0nφ −nw , 1 
+
+> L
+
+Inw ) ≺ 0. (14) Equivalently, LipSDP can be viewed as an optimization problem that minimizes L subject to the matrix inequal-ity (14). For a given NN with weights {Wl }Nl=1, the con-straint (14) is affine in the decision variables Λ and λ :=
+
+1/L, resulting in a SDP that maximizes λ (equivalently, minimizes L). Since ∆′ 
+
+> NN
+
+differs from ∆NN only in the first layer, the same LipSDP formulation applies after re-placing MNN (Λ) + diag (−Inv , 0nφ −nw , 1 
+
+> L
+
+Inw ) with eMNN (Λ) + 
+
+diag (−Im, 0nφ −nw , 1 
+
+> L
+
+Inw ). While LipSDP often provides tight Lipschitz upper bounds, the dimension of the associated LMI grows with the network depth. As a result, the resulting SDP can become computationally and memory intensive for deep NNs. Motivated by the limited scalability of LipSDP, a variety of scalable methods [18]–[20] have been proposed. These methods construct structured feasible points for the LipSDP LMI (14) to obtain efficient approximations of the Lipschitz bound. 
+
+ECLipsE [19]. ECLipsE constructs a feasible point for the LipSDP LMI (14) by solving N small-scale SDPs. The method initializes with Ξ1 = −Inv . For each l ∈ [N], the matrix Λl is computed by solving the following SDP: max  
+
+> cl,Λl
+
+cl
+
+s.t. 
+
+−2Λl + clW T
+
+> l+1
+
+Wl+1 ΛlWl
+
+W T 
+
+> l
+
+Λl Ξl
+
+
+
+≺ 0,
+
+Λl ⪰ 0, cl > 0,
+
+(15) where we define WN+1 = Inw . For l = 2, · · · , N, the matrix Ξl
+
+is updated as 
+
+Ξl = −2Λl−1 − Λl−1Wl−1Ξ−1
+
+> l−1
+
+W T
+
+> l−1
+
+Λl−1. (16) Then ∆NN is certified to be √L-Lipschitz for any L > 0satisfying  
+
+> 1
+> L
+
+Inw − 2ΛN − ΛNWN Ξ−1 
+
+> N
+
+W T 
+
+> N
+
+ΛN ≺ 0. (17) The memory footprint of ECLipsE does not scale with the network depth, since it stores and updates only a constant number of matrices per layer. Its computational complexity, however, grows linearly with the network depth because one small SDP must be solved at each layer. Empirical results indicate that ECLipsE achieves Lipschitz upper bounds that are nearly as tight as those produced by LipSDP [19]. 
+
+ECLipsE-Fast [19]. To further improve scalability, ECLipsE-Fast constructs a feasible point of LipSDP LMI (14) that shares the recursive structure of ECLipsE while avoiding per-layer SDPs [19]. The method initializes with Ξ1 = −Inv . For each 
+
+l ∈ [N], ECLipsE-Fast computes Λl in closed form based on 
+
+Ξl as 
+
+Λl = 1
+
+∥Wl Ξ−1 
+
+> l
+
+W T 
+
+> l
+
+∥2
+
+Inl . (18) The matrix Ξl is then updated according to (16). The above construction yields a √L-Lipschitz upper bound for the ∆NN ,where L satisfies (17). In practice, both the memory footprint and runtime of ECLipsE-Fast are nearly insensitive to the network depth. This is because the per-layer computation 6 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+incurs negligible overhead and only requires inexpensive spectral norm approximations. Such approximations can be efficiently computed using Gram iteration [36]. However, this computational efficiency typically comes at the cost of increased conservatism, and ECLipsE-Fast typically produces looser Lipschitz bounds than ECLipsE in practice [19]. 
+
+Variants of ECLipsE-Fast [20]. Motivated by the efficiency of ECLipsE-Fast, several improved variants have been pro-posed to enhance the practical tightness of the resulting Lipschitz bounds while preserving scalability. These methods retain the recursive structure of ECLipsE-Fast while em-ploying different closed-form update rules for Λl . Represen-tative examples include ECLipsE-SN, which uses spectral-normalization-based scaling, and ECLipsE-GC/GCS, which leverage Gershgorin-type bounds with diagonal scaling. An-other variant, ECLipsE-Shift, introduces additional diagonal shifts to reduce conservatism. All these variants construct feasible points for the LipSDP LMI without solving per-layer SDPs, thereby inheriting the low memory footprint and computational efficiency of ECLipsE-Fast while maintaining scalability with respect to the network depth. Empirically, these variants often produce tighter Lipschitz bounds than ECLipsE-Fast [20]. 
+
+EP-LipSDP [18]. While ECLipsE-type methods provide highly efficient feasible-point constructions, they do not guar-antee optimality with respect to LipSDP. EP-LipSDP addresses this limitation by reformulating LipSDP as an eigenvalue-based optimization problem while preserving the optimal Lipschitz bound. This reformulation enables the use of first-order optimization methods, substantially reducing the mem-ory requirements compared with interior-point SDP solvers. Moreover, optimal solutions of EP-LipSDP can be directly mapped to optimal solutions of LipSDP [18]. 
+
+V. S CALABLE STABILITY AND PERFORMANCE ANALYSIS 
+
+In this section, we develop a scalable framework for stability and performance analysis by leveraging the Lipschitz estima-tion methods introduced in Section IV. The key idea is to decompose the original LMI condition in (9) so that part of the decision variables can be determined using scalable Lipschitz estimation algorithms, thereby reducing the dimension of the remaining optimization problem. Building on this decomposi-tion, we further introduce a multi-step update scheme to reduce conservatism. 
+
+A. Matrix Decomposition for Reducing LMI Dimension 
+
+We start with the following useful lemma, which extracts the weight matrices {Wl }Nl=1 and Λ from the original large-scale LMI (9). 
+
+Lemma 1. The LMI (9) holds if and only if there exist a positive definite matrix P, diagonal positive semidefinite matrices Λ, symmetric matrices Y 1,Y2, matrix Y 3, a collection of nonnegative scalars α, and a scalar γ > 0 such that the following coupled LMIs hold: 
+
+A(P, γ, α) −Y1 B(P, α) −Y3
+
+B(P, α)T −Y T 
+
+> 3
+
+C(P, α) −Y2
+
+
+
+≺ 0 (19) 
+
+eMNN (Λ) + M(Y1,Y2,Y3) ≺ 0, (20) 
+
+where 
+
+M(Y1,Y2,Y3) = 
+
+
+
+Y1 0 · · · Y3
+
+0 0 · · · 0
+
+... ... . . . ...Y T 
+
+> 3
+
+0 · · · Y2
+
+ .
+
+Lemma 1 decomposes the original large-scale LMI (9) into the coupled LMIs (19) and (20). The LMI (19) depends only on the state-space matrices in (7) and its size is independent of the NN dimensions, whereas the size of LMI (20) scales with the width and depth of the NN. The two LMIs are coupled through the auxiliary variables {Y1,Y2,Y3}. In particular, if there exist {P, α, γ, Λ,Y1,Y2,Y3} satisfying (19) and (20), then the original LMI condition (9) holds with the same choice of {P, α, γ, Λ}. Consequently, all conclusions of Theorem 1 follow. 
+
+Remark 3 (Small-gain method as a special case) . When the Lipschitz bound √L for ∆′ 
+
+> NN
+
+is certified by the corresponding LipSDP condition, the small-gain condition in Proposition 1 can be recovered from Lemma 1 using a particular param-eterization of the auxiliary variables Y 1,Y2,Y3. Specifically, consider the choice Y 1 = −Im, Y 2 = 1 
+
+> L
+
+Inw , Y 3 = 0. Under this parameterization, (19) coincides with the incremental small-gain condition in (12) , while (20) reduces to the LipSDP condition associated with ∆′
+
+> NN
+
+. Consequently, the small-gain-based stability condition in Proposition 1 can be viewed as a special case of the decomposition framework introduced in Lemma 1. 
+
+Under the parameterization Y1 = −Im, Y2 = 1 
+
+> L
+
+Inw , and Y3 = 0, the resulting small-gain condition admits a highly scalable im-plementation. In particular, any scalable Lipschitz estimation algorithm introduced in Section IV directly provides a feasible point for the LipSDP LMI. While this choice leads to an efficient stability verification procedure, it restricts Y1 and Y2
+
+to scaled identity matrices and fixes Y3 = 0, which may limit the achievable tightness of the resulting condition. Allowing 
+
+{Y1,Y2,Y3} to be general decision variables can therefore reduce conservatism. Motivated by this observation, we next develop a unified framework that systematically reduces the dimensionality of the NN-dependent LMI condition (20). 
+
+Theorem 2. Suppose that {ΛN−1,Y1} satisfy eMNN (ΛN−1) + 
+
+diag (Y1, 0nφ −nw ) ≺ 0, where ΛN−1 := {Λl }N−1 
+
+> l=1
+
+and 
+
+eMNN (ΛN−1) =                           
+
+> 
+> 0meWT
+> 1Λ10· · · 0
+> Λ1eW1−2Λ1WT
+> 2Λ2
+> . . ....
+> 0Λ2W2−2Λ2
+> . . .0
+> .... . .. . .. . .WT
+> N−1ΛN−1
+> 0· · · 0ΛN−1WN−1−2ΛN−1
+> 
+> .WANG et al. : SCALABLE INCREMENTAL ROBUSTNESS ANALYSIS OF NEURAL NETWORK FEEDBACK SYSTEMS 7
+
+Define Ξ1 = Y1 and Γ1 = Im, and define 
+
+Ξ2 = −2Λ1 − Λ1 eW1Ξ−11 eW T 
+
+> 1
+
+Λ1,
+
+Γ2 = −Λ1 eW1Ξ−11 Γ1. (21) 
+
+For l = 3, . . . , N, recursively define Ξl according to (16) and 
+
+Γl according to 
+
+Γl = −Λl−1Wl−1Ξ−1
+
+> l−1
+
+Γl−1.
+
+If there exist a positive definite matrix P, a diagonal positive semidefinite matrix ΛN , symmetric matrix Y 2, matrix Y 3, a scalar γ > 0, and a collection of nonnegative scalars α such that the following LMIs hold: 
+
+A(P, γ, α) −Y1 B(P, α) −Y3
+
+B(P, α)T −Y T 
+
+> 3
+
+C(P, α) −Y2
+
+
+
+≺ 0
+
+
+
+ΞN W T 
+
+> N
+
+ΛN + ΓNY3 0
+
+ΛNWN +Y T 
+
+> 3
+
+ΓT 
+
+> N
+
+Y2 − 2ΛN Y T
+
+> 3
+
+0 Y3
+
+
+
+∑N−1 
+
+> l=1
+
+ΓT 
+
+> l
+
+Ξ−1 
+
+> l
+
+Γl
+
+−1
+
+ ≺ 0,
+
+(22) 
+
+then LMIs (19) and (20) are satisfied with the same 
+
+{P, α, γ, Λ,Y1,Y2,Y3}, and consequently all conclusions of The-orem 1 remain valid. 
+
+Theorem 2 provides a scalable sufficient reduction of the NN-dependent LMI condition (20) after fixing an upstream NN certificate. The verification procedure consists of two main steps. First, we seek a feasible triplet {ΛN−1,Y1, L} satisfying 
+
+eMNN (ΛN−1) + diag 
+
+
+
+Y1, 0nφ −nN−1−nw , 1 
+
+> L
+
+InN−1
+
+
+
+≺ 0, with a small feasible value of L. The scalar √L can be interpreted as a Lipschitz upper bound for the first N − 1 layers of ∆′
+
+> NN
+
+. For a general Y1 ≺ 0, √L is the Euclidean Lipschitz bound of the transformed network under the input coordinate ˆξ = Rξ ,equivalently a weighted-input Lipschitz bound for the original network; see Remark 4. Since 1 
+
+> L
+
+InN−1 + ΞN ≺ 0 implies ΞN ≺ − 1 
+
+> L
+
+InN−1 , a smaller value of L imposes a more negative upper bound on ΞN . To gain further intuition, consider the special case Y3 = 0, under which the second LMI in (22) reduces to 
+
+ ΞN W T 
+
+> N
+
+ΛN
+
+ΛNWN Y2 − 2ΛN
+
+
+
+≺ 0.
+
+By the Schur complement, the above LMI is equivalent to 
+
+ΞN −W T 
+
+> N
+
+ΛN (Y2 − 2ΛN )−1 ΛNWN ≺ 0.
+
+Since (Y2 − 2ΛN )−1 ≺ 0, a more negative ΞN makes the Schur complement inequality easier to satisfy. This relation indicates that a smaller L, which enforces a more negative upper bound on ΞN , can potentially reduce the conservatism of condition (22). Owing to the computational efficiency and low memory footprint of the Lipschitz estimation algorithms introduced in Section IV, the first step can be carried out efficiently even for large-scale NNs. Besides, different algorithms in Section IV induce different tradeoffs between conservatism, computational complexity, and memory requirements. Algo-rithms that produce tighter Lipschitz upper bounds, such as EP-LipSDP, typically yield less conservative stability condi-tions at the expense of increased computational and memory costs. In contrast, lightweight methods such as ECLipsE-Fast and its variants substantially reduce the computational and memory cost, but usually produce looser Lipschitz bounds and therefore more conservative conditions. This tradeoff will also be illustrated in our numerical experiments. Second, based on this feasible point, the matrices ΞN and 
+
+ΓN are constructed via the proposed recursion, and the LMIs in (22) are subsequently verified. Importantly, checking (22) is computationally efficient. The sizes of these LMIs are independent of the depth of the NN and depend only on the dimensions of the last two layers (i.e., nN−1 and nw) and the state-space matrices in (7). Table I summarizes the scalability and structural tradeoffs among representative verification approaches in terms of the main control-analysis LMI dimension, depth dependence, and retained plant–NN coupling. However, the condition in Theorem 2 may still be conserva-tive, as Y1 is inherited from the initial Lipschitz certificate and subsequently fixed in the verification of (22). In the following subsection, we introduce a multi-step update rule that, when combined with Theorem 2, jointly refines Y1, Y2, and Y3 to further reduce conservatism. 
+
+B. Multi-Step Update Rules for Reducing Conservatism 
+
+Our approach follows a three-step alternating update pro-cedure. In the first step, we initialize Y1 ≺ 0 and compute a feasible ΛN−1 using a selected scalable Lipschitz constant estimation algorithm. 
+
+Remark 4. To apply the scalable Lipschitz estimation algo-rithms reviewed in Section IV for a general Y 1 ≺ 0, let R be any nonsingular matrix satisfying R TR = −Y1. Introducing the transformed input ˆξ = Rξ , the first-layer weight matrix becomes bW1 = eW1R−1. The standard −I-initialized scalable Lipschitz routine can then be applied to the transformed network. Indeed, − ˆξ T ˆξ = −ξ TRTRξ = ξ TY1ξ , so, under the inverse coordinate transformation, the resulting certificate corresponds to one initialized with the prescribed Y 1. Hence, throughout the following development, a scalable Lipschitz routine with a general Y 1 ≺ 0 refers to applying the standard routine to the transformed first-layer matrix bW1 = eW1R−1.
+
+In the second step, with Y1 and ΛN−1 fixed, we update ΛN ,
+
+Y2, and Y3. In the third step, with Y2, Y3, and Λ fixed, we update 
+
+Y1.Suppose that γ > 0 and Y1 ≺ 0 are fixed, and a feasible 
+
+ΛN−1 has been obtained using a scalable Lipschitz constant estimation algorithm. One convenient way to check the fea-sibility of the LMIs in (22) is to introduce an auxiliary scalar decision variable ν and solve the following optimization problem, which minimizes ν subject to LMI constraints, with 8 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+TABLE I : Comparison of the dimensions and structural properties of representative verification conditions.                           
+
+> Method Main control-analysis LMI dimension Depth dependence Coupling retained Full-order SDP (Theorem 1) m+∑lnlYes Full layerwise structure Chordal-DeepSDP [17] Small cliques; number grows with NYes Full structure via sparse decomposition Small gain (Proposition 1) m+nwVia Lipschitz estimation only Global scalar Lipschitz bound Reduced condition (Theorem 2) m+nN−1+nwVia Lipschitz estimation only General plant–NN coupling via Y1,Y2,Y3
+
+{P, α, ν, ΛN ,Y2,Y3} as the decision variables: 
+
+A(P, γ, α) −Y1 B(P, α) −Y3
+
+B(P, α)T −Y T 
+
+> 3
+
+C(P, α) −Y2
+
+
+
+⪯ νI
+
+
+
+ΞN W T 
+
+> N
+
+ΛN + ΓNY3 0
+
+ΛNWN +Y T 
+
+> 3
+
+ΓT 
+
+> N
+
+Y2 − 2ΛN Y T
+
+> 3
+
+0 Y3
+
+
+
+∑N−1 
+
+> l=1
+
+ΓT 
+
+> l
+
+Ξ−1 
+
+> l
+
+Γl
+
+−1
+
+ ≺ 0,
+
+(23) If the optimal value ν satisfies ν < 0, then the LMIs in (22) are feasible. Consequently, the resulting choice of 
+
+{P, α, γ, Λ,Y1,Y2,Y3} also provides a feasible solution to the original conditions (19) and (20) in Lemma 1. If the optimal value ν satisfies ν ≥ 0, then the corresponding solution {P, α, γ, Λ,Y1,Y2,Y3} does not yield a feasible solution to the original LMIs (19) and (20). In this case, one can fix 
+
+Λ, Y2, and Y3, and re-optimize over Y1, P, and the auxiliary variable ν. This re-optimization step amounts to solving a reduced SDP and guarantees that the resulting value of ν is less than or equal to the original one. When {Λ,Y2,Y3} are fixed, the size of the LMI condition 
+
+eMNN (Λ) + M(Y1,Y2,Y3) ≺ 0 can be reduced by recursively applying the Schur complement lemma N times, leading to an equivalent constraint of the form Y1 ≺ Θ, where Θ depends only on {Λ,Y2,Y3} and {Wl }Nl=1. Specifically, we initialize 
+
+Ξ′ 
+
+> 1
+
+= −2ΛN + Y2 and Γ′ 
+
+> 1
+
+= Inw . The matrices Ξ′ 
+
+> l
+
+and Γ′ 
+
+> l
+
+for 
+
+l = 2, . . . , N are recursively computed as 
+
+Ξ′ 
+
+> l
+
+= −2ΛN−l+1 −W T
+
+> N−l+2
+
+ΛN−l+2(Ξ′
+
+> l−1
+
+)−1ΛN−l+2WN−l+2,
+
+Γ′ 
+
+> l
+
+= −Γ′
+
+> l−1
+
+(Ξ′
+
+> l−1
+
+)−1ΛN−l+2WN−l+2.
+
+(24) Then, Θ can be rewritten as: 
+
+Θ =
+
+> N−1
+
+# ∑
+
+> l=1
+
+ Y3Γ′ 
+
+> l
+
+(Ξ′ 
+
+> l
+
+)−1(Y3Γ′ 
+
+> l
+
+)T
+
++   eW T 
+
+> 1
+
+Λ1 +Y3Γ′
+
+> N
+
+(Ξ′ 
+
+> N
+
+)−1  eW T 
+
+> 1
+
+Λ1 +Y3Γ′
+
+> N
+
+T.
+
+Therefore, we can fix {Λ,Y2,Y3} and minimize ν over the following LMI condition with {P, α, ν,Y1} being the decision variables: A(P, γ, α) −Y1 B(P, α) −Y3
+
+B(P, α)T −Y T 
+
+> 3
+
+C(P, α) −Y2
+
+
+
+⪯νIY1 ≺Θ.
+
+(25) The above multi-step update scheme can be viewed as one iteration of an approximate block coordinate descent (ABCD) method, in which different blocks of decision variables are updated successively. This observation naturally motivates a multi-round alter-nating algorithm. Initially, choose Y1 ≺ 0 and set ν = 0. In 
+
+Algorithm 1 Multi-round ABCD Algorithm 
+
+Require: state space matrices in (7), γ > 0, {Wl }Nl=1, maxi-mum number of rounds Kmax  
+
+> 1:
+
+Initialize Y1 ≺ 0, ν ← 0, k ← 0 
+
+> 2:
+
+while ν ≥ 0 do  
+
+> 3:
+
+k ← k + 1 
+
+> 4:
+
+{ΛN−1}-Initialization: Compute feasible ΛN−1 using a scalable Lipschitz constant estimation algorithm.  
+
+> 5:
+
+{Y2,Y3}-Update: Fix Y1 and ΛN−1. Minimize ν subject to the LMI (23), with {P, α, ν, ΛN ,Y2,Y3} being the decision variables.  
+
+> 6:
+
+if ν < 0 then  
+
+> 7:
+
+Return: CERTIFIED and the corresponding matrices 
+
+{P, α, γ, Λ,Y1,Y2,Y3} 
+
+> 8:
+
+end if  
+
+> 9:
+
+{Y1}-Update: Fix Y2, Y3, and Λ. Minimize ν subject to the LMI (25), with {P, α, ν,Y1} being the decision variables.  
+
+> 10:
+
+if ν < 0 then  
+
+> 11:
+
+Return: CERTIFIED and the corresponding matrices 
+
+{P, α, γ, Λ,Y1,Y2,Y3} 
+
+> 12:
+
+end if  
+
+> 13:
+
+if k ≥ Kmax then  
+
+> 14:
+
+break  
+
+> 15:
+
+end if  
+
+> 16:
+
+end while  
+
+> 17:
+
+Return: UNKNOWN 
+
+each round, feasible ΛN−1 is first computed from the network weight matrices and the current Y1 using a scalable Lipschitz constant estimation algorithm. Then, with ΛN−1 fixed, the variables {ΛN ,Y2,Y3} are updated by solving (23), and Y1 is subsequently updated by solving (25). The updated Y1 obtained at the end of the current round is used to initialize the next round. To ensure finite termination, Algorithm 1 is executed for at most Kmax rounds. If either update step yields ν < 0, the algorithm terminates with status C ERTIFIED , and the corre-sponding matrices {P, α, γ, Λ,Y1,Y2,Y3} constitute a feasible solution of the LMI conditions (19) and (20) in Lemma 1. If no such certificate is obtained within Kmax rounds, the algorithm terminates with status U NKNOWN . Importantly, an UNKNOWN status does not imply infeasibility of the original LMI conditions (19) and (20), since the alternating procedure provides a sufficient search strategy rather than a complete feasibility test. Algorithm 1 summarizes the proposed multi-round ABCD procedure. Moreover, for iterations beyond the first round, the Y1-update step continues to guarantee a non-increasing value of WANG et al. : SCALABLE INCREMENTAL ROBUSTNESS ANALYSIS OF NEURAL NETWORK FEEDBACK SYSTEMS 9
+
+ν, whereas the {Y2,Y3}-update step does not admit such a monotonicity guarantee. The reason is that the calculation of ΛN−1 in the {Y2,Y3}-update step is performed using a scalable Lipschitz estimation algorithm, which differs from directly minimizing ν while treating Λ as a decision variable in the SDP. Nevertheless, in the numerical experiments of Sec-tion VII, only a few rounds of ABCD are typically required, and in some cases a single round suffices. 
+
+VI. I MPLICATIONS AND LIMITATIONS OF THEOREM 1
+
+In this section, we further investigate the implications and limitations of the LMI condition in Theorem 1. In particular, we show that, under additional assumptions, feasibility of the LMI guarantees boundedness of individual closed-loop state trajectories, while it does not in general imply global asymptotic convergence to a fixed point. 
+
+Theorem 3 (Boundedness of the state trajectory) . Under the assumptions of Theorem 1, further suppose that ρ ∈ (0, 1) and the external input satisfies d = 0. If the LMI (9) is feasible, then, for any initial condition x 0 ∈ Rnx , the corresponding state trajectory satisfies sup k∈Z≥0 ∥xk∥2 < ∞.
+
+The following theorem shows that the conditions of Theo-rem 1 are insufficient to guarantee asymptotic convergence of the state trajectory. 
+
+Theorem 4 (Counterexample) . Under the assumptions of Theorem 1, further suppose that ρ ∈ (0, 1] and d = 0. For an uncertain perturbation ∆U satisfying Assumption 1, feasibility of the LMI (9) does not, in general, imply pointwise asymptotic convergence of the closed-loop state trajectory. In particular, there exists an admissible time-varying interconnection satisfy-ing all the above assumptions for which (9) is feasible, yet the corresponding closed-loop state trajectories do not converge to any fixed point. 
+
+The following remark clarifies an additional condition under which global convergence can be recovered. 
+
+Remark 5. Suppose that the external input d = 0 and there ex-ists a trajectory (ζ , v, w, p, q, d, e) of the interconnection start-ing from an initial condition x 0 ∈ Rnx such that lim k→∞ xk = x⋆
+
+for some x ⋆ ∈ Rnx . If the conditions in Theorem 1 hold, then the incremental convergence result in Theorem 1 implies that every trajectory starting from any initial condition in 
+
+Rnx also converges to the same limit point x ⋆. Therefore, under an additional assumption ensuring the existence of at least one convergent trajectory, the incremental convergence property established in Theorem 1 can be strengthened to global convergence to x ⋆.Similar assumptions have appeared in the literature. For example, [11] assumes that the closed-loop equilibrium is located at the origin, which directly provides a convergent reference trajectory. 
+
+VII. N UMERICAL EXPERIMENTS 
+
+A. Synthetic Examples 
+
+This section presents two synthetic instances to evaluate the scalability and effectiveness of the proposed framework. In both instances, the objective is to compute certified upper bounds on the incremental ℓ2 gain. 
+
+1) Setup: Instance 1 (Scalar Plant). The LTI plant G is given by 
+
+xk+1 = −0.5 xk + 1 . . . 1| {z }
+
+> nw
+
+wk + 0.5 qk + 0.4 dk,
+
+vk = xk
+
+pk = 2.5 xk + 0.6 dk,
+
+ek = 2 xk + 0.9 dk.
+
+The uncertain perturbation ∆U is described by two incremental 
+
+ρ-hard IQCs {Ψi, Mi}2 
+
+> i=1
+
+with ρ = 1. The first IQC {Ψ1, M1}
+
+is associated with M1 = diag (1, −1), where Ψ1 is given by 
+
+ψk+1 = −0.3 ψk + 1.3 pk,
+
+r(1) 
+
+> k
+
+=
+
+ 0
+
+−0.1
+
+
+
+ψk +
+
+0.2 00 −0.1
+
+  pk
+
+qk
+
+
+
+.
+
+The second IQC {Ψ2, M2} is associated with M2 =
+
+diag (1, −1), where Ψ2 is given by 
+
+r(2) 
+
+> k
+
+=
+
+−0.5 0.30 1.7
+
+  pk
+
+qk
+
+
+
+,
+
+which is static, i.e., it has no internal dynamics. 
+
+Instance 2 (Five-dimensional Plant). To further demonstrate the proposed framework on higher-dimensional systems, we consider the following LTI plant Gxk+1 = AGxk + BG1wk + BG2qk + BG3dk
+
+vk = xk
+
+pk = CG2xk + DG23 dk
+
+ek = CG3xk + DG33 dk,
+
+with system matrices given by                                     
+
+> AG=
+> 
+> 0.52 0.12 −0.08 0.05 0.03 0.12 0.47 0.11 −0.06 0.04
+> −0.08 0.11 0.38 0.09 −0.07 0.05 −0.06 0.09 0.31 0.10 0.03 0.04 −0.07 0.10 0.26
+> ,BG1=
+> 
+> 1. . . 11. . . 11. . . 11. . . 11. . . 1
+> |{z }
+> nw
+
+,                          
+
+> BG2=
+> 
+> 0.50.20.40.60.3
+> ,BG3=
+> 
+> 0.80.30.20.60.5
+> ,CG2=0.40.40.80.30.7,
+> DG23 =0.5,CG3=0.30.90.60.40.7,DG33 =0.5.
+
+The uncertain perturbation ∆U is described by the same two incremental ρ-hard IQCs {Ψi, Mi}2 
+
+> i=1
+
+as in Instance 1. We evaluate the ABCD framework combined with several scalable Lipschitz constant estimation algorithms. Specifically, we consider ABCD coupled with the following six meth-ods: ECLipsE, ECLipsE-SN, ECLipsE-GC, ECLipsE-GCS, ECLipsE-Shift, and EP-LipSDP. We do not include ECLipsE-Fast, since it is a special case of ECLipsE-SN [20]. For ECLipsE-SN, ECLipsE-GC, ECLipsE-GCS, and ECLipsE-Shift, we follow the setup in [20]. For EP-LipSDP, we solve it using the LipDiff algorithm proposed in [18]. We consider three baselines. The first is the full-order SDP in Theorem 1, which serves as the least conservative 10 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+baseline but does not scale to deep networks. The second is the small-gain condition in Proposition 1 combined with scalable Lipschitz estimation methods, which scales well but is more conservative. The third is the Chordal DeepSDP method [17], which exploits chordal sparsity to decompose the LMI and improves computational efficiency, while its memory and computational costs still grow with network depth. To assess scalability, we vary the depth of the NN compo-nent. Tables II and III report the incremental ℓ2-gain upper bounds for Instances 1 and 2, respectively, using networks with {20 , 40 , 60 , 80 , 100 , 5000 } layers and 50 neurons per layer (nw = 50). Fig. 2 reports the corresponding computational time for both instances using networks with 20 neurons per layer (nw = 20) and {20 , 40 , 60 , 80 , 100 , 120 } layers. For each method, we progressively decrease √γ and repeat-edly solve the corresponding verification problem to identify the smallest certified value of √γ found. The search resolution for √γ is set to 0 .01. For the proposed ABCD framework, we set the maximum number of rounds to Kmax = 10, and a trial value of √γ for which Algorithm 1 returns U NKNOWN 
+
+is not interpreted as infeasible. The incremental ℓ2-gain upper bounds reported in Tables II and III are the resulting certified values of √γ. The reported computation time measures the runtime of a single verification run at the final reported value of √γ. The time spent searching over different candidate values of √γ is not included. All methods are implemented in MATLAB using CVX with MOSEK as the underlying solver. All experiments are conducted on a standard laptop equipped with 16 GB of RAM. In the tables, “ ∼” indicates solver failure due to insufficient memory, and “ > 1h” indicates that the computation did not finish within one hour. Entries highlighted in red denote the tightest upper bound among all methods, whereas entries highlighted in blue denote the best result within the ABCD framework. 
+
+2) Results: From Tables II–III, when the network is small, the full-order SDP in Theorem 1 and Chordal-DeepSDP achieve the tightest upper bounds because they fully exploit the coupled SDP structure. However, the proposed ABCD framework combined with EP-LipSDP achieves upper bounds comparable to those achieved by these baselines. As the network size increases, Theorem 1 and Chordal-DeepSDP can no longer be solved due to memory limitations, while ABCD + EP-LipSDP continues to produce the tightest upper bounds among all tractable methods. For extremely deep networks (e.g., 5000 layers), EP-LipSDP can no longer be solved due to memory limitations and ECLipsE requires more than one hour to complete. In this regime, ABCD combined with ECLipsE-GC or ECLipsE-GCS provides the tightest upper bounds among all tractable approaches. Fig. 2 reports the computational time of the proposed methods and the baselines. To avoid cluttering the figure, we include only ECLipsE-GCS as a representative of the ECLipsE-Fast variants, since the other ECLipsE-Fast variants exhibit similar computational trends. As shown in Fig. 2, ABCD-based methods have runtimes comparable to those of small-gain approaches while providing significantly tighter upper bounds on the incremental ℓ2 gain. Overall, these results demonstrate that the proposed ABCD framework is less conservative than the incremental small-gain method while enabling a tunable tradeoff between computa-tional and memory efficiency and conservatism through the choice of scalable Lipschitz constant estimation algorithms. 
+
+TABLE II : Upper bounds on the incremental ℓ2 gain versus network depth (Instance 1)                                                                                           
+
+> Method 20 40 60 80 100 5000
+> Baselines
+> Theorem 1 6.48 6.47 6.41 ∼∼∼
+> Chordal-DeepSDP 6.48 6.47 6.41 ∼∼∼
+> Small-Gain + ECLipsE 7.86 7.89 7.39 7.56 7.67 >1h Small-Gain + ECLipsE-SN 10.75 10.23 9.16 10.40 14.74 10.61 Small-Gain + ECLipsE-GC 9.28 8.80 8.11 8.46 9.47 7.61 Small-Gain + ECLipsE-GCS 9.38 8.91 8.19 8.61 9.86 7.61 Small-Gain + ECLipsE-Shift 10.44 10.01 9.05 10.23 14.42 9.53 Small-Gain + EP-LipSDP 7.40 7.44 7.14 7.28 7.35 ∼
+> ABCD Framework
+> ABCD + ECLipsE 6.88 6.90 6.55 6.67 6.74 >1h ABCD + ECLipsE-SN 8.60 8.33 7.71 8.41 10.32 8.52 ABCD + ECLipsE-GC 7.75 7.48 7.03 7.25 7.88 6.92 ABCD + ECLipsE-GCS 7.83 7.57 7.11 7.37 8.12 6.92 ABCD + ECLipsE-Shift 8.48 8.26 7.67 8.36 10.28 7.98 ABCD + EP-LipSDP 6.51 6.52 6.46 6.49 6.49 ∼
+
+TABLE III : Upper bounds on the incremental ℓ2 gain versus network depth (Instance 2)                                                                                           
+
+> Method 20 40 60 80 100 5000
+> Baselines
+> Theorem 1 7.76 7.80 7.68 ∼∼∼
+> Chordal-DeepSDP 7.76 7.80 7.68 ∼∼∼
+> Small-Gain + ECLipsE 10.64 10.68 10.58 10.59 10.81 >1h Small-Gain + ECLipsE-SN 11.60 11.65 11.57 11.53 12.45 11.48 Small-Gain + ECLipsE-GC 10.74 10.84 10.73 10.73 11.40 10.29 Small-Gain + ECLipsE-GCS 10.75 10.87 10.76 10.78 11.50 10.29 Small-Gain + ECLipsE-Shift 10.91 10.95 10.87 10.85 11.74 11.12 Small-Gain + EP-LipSDP 9.82 10.26 9.20 9.35 9.72 ∼
+> ABCD Framework
+> ABCD + ECLipsE 8.25 8.49 7.90 7.94 8.18 >1h ABCD + ECLipsE-SN 9.23 9.50 9.21 8.98 9.20 8.91 ABCD + ECLipsE-GC 8.85 9.16 8.54 8.50 8.75 7.72 ABCD + ECLipsE-GCS 8.88 9.26 8.62 8.59 8.89 7.73 ABCD + ECLipsE-Shift 9.03 9.28 9.01 8.86 9.09 8.76 ABCD + EP-LipSDP 7.91 8.01 7.75 7.73 7.98 ∼
+
+B. Docking Case Study 
+
+We next consider a spacecraft docking example adapted from the ARCH-COMP AINNCS benchmark [37] to demon-strate the applicability of the proposed framework to a phys-ically meaningful closed-loop control problem. We adopt the relative-motion dynamics and physical parameters from the benchmark, while constructing a new NN-augmented closed-loop system for the verification study. 
+
+1) System Description: Consider the two-dimensional spacecraft docking problem based on the Clohessy–Wiltshire relative-motion model [37]. The state is defined as xk =sx,k sy,k ˙sx,k ˙sy,k
+
+T, where sx,k and sy,k denote the relative position of the active deputy spacecraft with respect to the passive chief spacecraft in Hill’s reference frame, and ˙ sx,k and ˙sy,k denote the corresponding relative velocities. WANG et al. : SCALABLE INCREMENTAL ROBUSTNESS ANALYSIS OF NEURAL NETWORK FEEDBACK SYSTEMS 11 
+
+> (a) Instance 1
+> (b) Instance 2
+
+Fig. 2 : Computational time versus network depth. Following the benchmark setup, we use the spacecraft mass 
+
+msc = 12 kg, orbital mean motion norb = 0.001027 rad/s, and sampling period Ts = 1 s. The discretized dynamics are 
+
+xk+1 = Ad xk + Bd uk,
+
+where 
+
+Ad =
+
+
+
+1 0 1 00 1 0 13n2orb 0 1 2norb 
+
+0 0 −2norb 1
+
+ , Bd =
+
+
+
+0 00 01/msc 00 1/msc 
+
+ .
+
+The input uk = ux,k uy,k
+
+T represents the control forces along the two axes of Hill’s reference frame. For the closed-loop verification study, we design a nominal LQR controller uLQR  
+
+> k
+
+= KLQR xk and augment it with a neural-network residual. The resulting commanded control force is 
+
+pk = KLQR xk + wk,
+
+where wk = ∆NN (xk) denotes the NN output. The NN is trained by supervised learning to approximate a bounded nonlinear correction over the operating region of interest. The NN has dimensions 4-256-256-2 and uses the tanh activation function at each layer, with a bias term included in each layer. To account for actuator uncertainty, we consider indepen-dent multiplicative gain variations in the two thrust channels, 
+
+qk = ∆U(pk), ∆U = diag (δ1, δ2), |δi| ≤ εU,
+
+where εU = 0.05. The uncertainty is described by the static incremental ρ-hard IQC {Ψ, M} with ρ = 1, where 
+
+rk =
+
+εUI2 00 I2
+
+  pk
+
+qk
+
+
+
+, M = diag (I2, −I2).
+
+Including an additive thrust disturbance dk ∈ R2, the actual plant input is uk = pk + qk + dk. Hence, the closed-loop dynamics are 
+
+xk+1 = ( Ad + Bd KLQR )xk + Bd wk + Bd qk + Bd dk.
+
+This is a special case of the general interconnection considered in Section II. In particular, 
+
+AG = Ad + Bd KLQR , BG1 = Bd , BG2 = Bd , BG3 = Bd ,
+
+CG1 = I4, DG12 = DG13 = 0,
+
+CG2 = KLQR , DG21 = I2, DG22 = DG23 = 0.
+
+Finally, we choose the performance output as ek = xk, so that 
+
+CG3 = I4, DG31 = DG32 = DG33 = 0.
+
+Hence, the incremental ℓ2 gain from the additive thrust distur-bance d to the relative-motion state e quantifies the closed-loop disturbance attenuation performance.  
+
+> 2) Verification Results:
+
+We evaluate the proposed verifica-tion methods on the closed-loop docking system described above. The experimental setup and solver settings are the same as those used in the previous numerical experiments. Table IV compares the resulting incremental ℓ2 gain bounds with the full-order SDP in Theorem 1, Chordal-DeepSDP, and the small gain approach. Theorem 1 and Chordal-DeepSDP provide the tightest gain bound of 1 .15. Among the scalable approaches, ABCD consistently yields tighter bounds than the corresponding small gain methods. In particular, ABCD with EP-LipSDP achieves a gain bound of 1 .23, which is close to the full-order SDP bound, while the corresponding small-gain bound is 1 .79. 
+
+VIII. C ONCLUSION 
+
+This paper develops a unified and scalable framework for incremental stability and performance analysis of feedback interconnections involving NNs and additional uncertainties. By combining a structured decomposition of the full-order SDP condition with scalable Lipschitz constant estimation, the resulting control-analysis LMIs depend only on the widths of the last two network layers. A multi-round alternating update scheme is further introduced to reduce conservatism. The proposed conditions guarantee incremental convergence and a finite upper bound on the incremental ℓ2 gain, and, under the 12 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+TABLE IV : Upper bound of the incremental ℓ2 gain for the spacecraft docking example.                 
+
+> Method ℓ2Gain Bound Baselines
+> Theorem 1 1.15 Chordal-DeepSDP 1.15 Small-Gain + ECLipsE 1.96 Small-Gain + ECLipsE-SN 2.10 Small-Gain + ECLipsE-GC 2.08 Small-Gain + ECLipsE-GCS 2.08 Small-Gain + ECLipsE-Shift 2.01 Small-Gain + EP-LipSDP 1.79
+> ABCD Framework
+> ABCD + ECLipsE 1.38 ABCD + ECLipsE-SN 1.48 ABCD + ECLipsE-GC 1.46 ABCD + ECLipsE-GCS 1.46 ABCD + ECLipsE-Shift 1.45 ABCD + EP-LipSDP 1.23
+
+additional assumptions of Theorem 3, also guarantee bounded individual state trajectories. Pointwise asymptotic convergence to a common limit may require an additional assumption. Numerical experiments demonstrate the scalability and re-duced conservatism of the proposed framework compared with existing scalable approaches. 
+
+APPENDIX IINTERPRETATION OF THE LMI C ONDITION (9) We provide a brief derivation to clarify the structure of the LMI condition in (9). Define the stacked vector of all layer activations as h := (h1)T · · · (hN )TT. Then, the augmented NN in (8) can be equivalently written as 
+
+h = φ (Wh + Uξ + b) , (26) where 
+
+W =
+
+
+
+0 0
+
+W2 0. . . . . .0 WN 0
+
+ . U =
+
+eW1
+
+0...0
+
+ , b =
+
+
+
+b1
+
+b2
+
+...
+
+bN
+
+ .
+
+Thus, the recursive representation in (8) can be viewed as a structured interconnection of N slope-restricted nonlinearities 
+
+φ , with W encoding the feedforward connections between consecutive layers and U injecting the NN input into the first layer. Consider two inputs ξ , ξ ′ and their corresponding stacked layer activations h, h′. Define δ ξ := ξ − ξ ′ and δ h := h − h′.Since φ is slope-restricted in [0, 1], we have 2δ h⊤Λblk (Wδ h + Uδ ξ − δ h) ≥ 0, (27) for any Λblk = diag (Λ1, . . . , ΛN ), where each Λl ⪰ 0 is diago-nal. Expanding (27) in terms of δ ξ T, δ hTT gives 
+
+δ ξ δ h
+
+T
+
+eMNN (Λ)
+
+δ ξ δ h
+
+
+
+≥ 0,
+
+where eMNN (Λ) is exactly the matrix defined in (10). Finally, the remaining interconnected system interacts with the NN only through its input ξ and output w = hN . Hence, its dissipation inequality can be expressed in the same stacked coordinates by padding the blocks corresponding to the in-termediate layer activations with zeros, yielding MG(P, γ, α)
+
+in (11). Combining this dissipation inequality with the NN quadratic constraint above yields (9). 
+
+APPENDIX II OMITTED PROOFS FOR SECTION III 
+
+A. Proof of Theorem 1 
+
+Proof. We prove the two claims separately. 
+
+Incremental convergence. If LMI (9) holds, then there exists a scalar ε ∈ (0, 1) such that 
+
+eMNN (Λ) + MG(P, γ, α) + ε diag  P, 0nφ +nq+nd
+
+ ≺ 0. (28) Now consider two arbitrary trajectories (ζ , v, w, p, q, d, e)
+
+and (ζ ′, v′, w′, p′, q′, d′, e′) associated with initial conditions 
+
+x0, x′ 
+
+> 0
+
+∈ Rnx , where dk = d′ 
+
+> k
+
+= 0 for all k ∈ Z≥0. Define the incremental signals δ ζ k := ζk − ζ ′
+
+> k
+
+, δ vk := vk − v′
+
+> k
+
+, δ hk :=
+
+hk − h′
+
+> k
+
+, δ qk := qk − q′ 
+
+> k
+
+and δ dk := dk − d′
+
+> k
+
+, where hk :=
+
+(h1 
+
+> k
+
+)T · · · (hNk )TT and h′ 
+
+> k
+
+defined analogously. By the definition of vk, we have W1δ vk = eW1
+
+δ ζ T 
+
+> k
+
+δ qT 
+
+> k
+
+δ dT
+
+> k
+
+T.Hence, 
+
+δ ζ T 
+
+> k
+
+δ qT 
+
+> k
+
+δ dT 
+
+> k
+
+δ hT
+
+> k
+
+ eMNN (Λ) ⋆T
+
+=
+
+δ vk
+
+δ hk
+
+T
+
+MNN (Λ)
+
+δ vk
+
+δ hk
+
+
+
+≥ 0, (29) where [⋆]T denotes the transpose of the preceding block vector. Therefore, premultiplying and postmultiplying (28) by δ ζ T 
+
+> k
+
+δ qT 
+
+> k
+
+δ dT 
+
+> k
+
+δ hT
+
+> k
+
+ and its transpose yields 
+
+V (δ ζ k+1) − (1 − ε)V (δ ζ k) + δ rT 
+
+> k
+
+M(α) δ rk ≤ 0, ∀k ∈ Z≥0,
+
+where V (δ ζ ) := δ ζ TPδ ζ and δ rk := rk − r′
+
+> k
+
+. Summing the above inequality from k = 0 to K for any K ∈ Z≥0 gives 
+
+V (δ ζ K+1) + 
+
+> K
+
+# ∑
+
+> k=0
+
+ε V (δ ζ k) + 
+
+> K
+
+# ∑
+
+> k=0
+
+δ rT 
+
+> k
+
+M(α) δ rk ≤ V (δ ζ 0).
+
+Since ∆U satisfies incremental ρ-hard IQCs and, by Re-mark 1, the same inequality holds with ρ = 1, the term 
+
+∑Kk=0 δ rT 
+
+> k
+
+M(α) δ rk is nonnegative for all K ∈ Z≥0. Therefore, 
+
+V (δ ζ K+1) + 
+
+> K
+
+# ∑
+
+> k=1
+
+ε V (δ ζ k) ≤ V (δ ζ 0).
+
+Because V (·) ≥ 0 and ε > 0, the above inequality implies that 
+
+∑∞ 
+
+> k=1
+
+V (δ ζ k) < ∞, and hence V (δ ζ k) → 0 as k → ∞. Since 
+
+P ≻ 0, the state components satisfy ∥xk − x′
+
+> k
+
+∥2 → 0. 
+
+Incremental ℓ2 gain upper bound. Now consider two arbi-trary trajectories (ζ , v, w, p, q, d, e) and (ζ ′, v′, w′, p′, q′, d′, e′)
+
+of the above interconnection starting from x0, x′ 
+
+> 0
+
+∈ Rnx ,where d, d′ ∈ ℓnd 
+
+> 2
+
+. Premultiplying and postmultiplying (9) by δ ζ T 
+
+> k
+
+δ qT 
+
+> k
+
+δ dT 
+
+> k
+
+δ hT
+
+> k
+
+ and its transpose yields 
+
+∥δ ek∥22 − γ∥δ dk∥22 +V (δ ζ k+1) −V (δ ζ k)+ δ rT 
+
+> k
+
+M(α)δ rk ≤ 0, k ∈ Z≥0, (30) WANG et al. : SCALABLE INCREMENTAL ROBUSTNESS ANALYSIS OF NEURAL NETWORK FEEDBACK SYSTEMS 13 
+
+where δ ek := ek − e′
+
+> k
+
+. Since ∑Kk=0 δ rT 
+
+> k
+
+M(α)δ rk ≥ 0 for all K ∈
+
+Z≥0, summing (30) from k = 0 to any K ∈ Z≥0 yields 
+
+> K
+
+# ∑
+
+> k=0
+
+∥δ ek∥22 ≤ γ
+
+> K
+
+# ∑
+
+> k=0
+
+∥δ dk∥22 +V (δ ζ 0).
+
+Based on Definition 1, this shows that √γ is a valid upper bound on the incremental ℓ2 gain. 
+
+B. Proof of Proposition 1 
+
+Proof. We prove the two claims separately. 
+
+Incremental convergence. Suppose that LMI (12) holds. Then there exists a scalar ε ∈ (0, 1) such that 
+
+A(P, γ, α) B(P, α)
+
+B(P, α)T C(P, α)
+
+
+
++ diag (Im, − 1 
+
+> L
+
+Inw )+ ε diag  P, 0nw+nq+nd
+
+ ≺ 0.
+
+(31) Consider two arbitrary trajectories (ζ , v, w, p, q, d, e) and 
+
+(ζ ′, v′, w′, p′, q′, d′, e′) associated with initial conditions x0, x′ 
+
+> 0
+
+∈
+
+Rnx , where dk = d′ 
+
+> k
+
+= 0 for all k ∈ Z≥0. Define ξk :=
+
+ζ T 
+
+> k
+
+qT 
+
+> k
+
+dT
+
+> k
+
+T, and the incremental signals δ wk := wk − w′
+
+> k
+
+,
+
+δ ξ k := ξk − ξ ′
+
+> k
+
+. Premultiplying and postmultiplying (31) by δ ζ T 
+
+> k
+
+δ qT 
+
+> k
+
+δ dT 
+
+> k
+
+δ wT
+
+> k
+
+ and its transpose yields 
+
+V (δ ζ k+1) − (1 − ε)V (δ ζ k) + δ rT 
+
+> k
+
+M(α)δ rk
+
++ ∥δ ξ k∥22 − 1 
+
+> L
+
+∥δ wk∥22 ≤ 0, ∀k ∈ Z≥0. (32) By assumption, √L is an upper bound on the Lipschitz con-stant of ∆′ 
+
+> NN
+
+as defined in (8), so that ∥δ wk∥2 ≤ √L ∥δ ξ k∥2.Consequently, ∥δ ξ k∥22 − 1 
+
+> L
+
+∥δ wk∥22 ≥ 0, and therefore the pre-vious inequality implies 
+
+V (δ ζ k+1) − (1 − ε)V (δ ζ k) + δ rT 
+
+> k
+
+M(α) δ rk ≤ 0.
+
+The remainder of the argument proceeds exactly as in the proof of Theorem 1. 
+
+Incremental ℓ2 gain upper bound. Consider two arbi-trary trajectories (ζ , v, w, p, q, d, e) and (ζ ′, v′, w′, p′, q′, d′, e′)
+
+of the above interconnection starting from x0, x′ 
+
+> 0
+
+∈ Rnx ,where d, d′ ∈ ℓnd 
+
+> 2
+
+. Premultiplying and postmultiplying (12) by δ ζ T 
+
+> k
+
+δ qT 
+
+> k
+
+δ dT 
+
+> k
+
+δ wT
+
+> k
+
+ and its transpose yields 
+
+∥δ ek∥22 − γ∥δ dk∥22 +V (δ ζ k+1) −V (δ ζ k) + δ rT 
+
+> k
+
+M(α)δ rk
+
++ ∥δ ξ k∥22 − 1 
+
+> L
+
+∥δ wk∥22 ≤ 0, ∀k ∈ Z≥0.
+
+(33) Since ∥δ wk∥2 ≤ √L∥δ ξ k∥2, the above inequality implies that 
+
+∥δ ek∥22 − γ∥δ dk∥22 +V (δ ζ k+1) −V (δ ζ k) + δ rT 
+
+> k
+
+M(α)δ rk ≤ 0.
+
+Summing the above inequality from k = 0 to K and proceeding as in the proof of Theorem 1 establishes the desired incremen-tal ℓ2 gain bound. 
+
+APPENDIX III OMITTED PROOFS FOR SECTION V
+
+A. Proof of Lemma 1 
+
+Proof. We first prove the “if” direction. Suppose there exist matrices {Y1,Y2,Y3} such that (19) and (20) hold. From (19), it follows that 
+
+MG(P, γ, α) − M(Y1,Y2,Y3) ⪯ 0.
+
+Adding this inequality to (20) yields (9), which establishes the “if” direction. We now prove the “only if” direction. Suppose that (9) holds for some {P, α, γ, Λ}. Since the inequality is strict, there exists 
+
+ε > 0 such that 
+
+eMNN (Λ) + MG(P, γ, α) + εdiag  Im, 0nφ −nw , Inw
+
+ ≺ 0.
+
+Define Y1 := A(P, γ, α) + εIm, Y2 := C(P, α) + εInw , and Y3 :=
+
+B(P, α). By direct substitution, this choice of {Y1,Y2,Y3}
+
+satisfies both (19) and (20), thereby completing the proof. 
+
+B. Proof of Theorem 2 
+
+Proof. Suppose that {ΛN−1,Y1} is given such that 
+
+eMNN (ΛN−1)+ diag (Y1, 0nφ −nw ) ≺ 0. By the Schur complement, this condition implies that Ξl ≺ 0 for all l ∈ [N], where Ξ1 = Y1,
+
+Ξ2 is defined in (21) and Ξl , l = 3, . . . , N is defined in (16). Applying the Schur complement, the matrix eMNN (Λ) + 
+
+M(Y1,Y2,Y3) is negative definite if and only if Ξ1 ≺ 0, Ξ2 ≺ 0, and 
+
+
+
+Ξ2 W T 
+
+> 2
+
+Λ2 0 · · · Γ2Y3
+
+Λ2W2 −2Λ2 W T 
+
+> 3
+
+Λ3
+
+. . . ...0 Λ3W3
+
+. . . . . . ...... . . . . . . −2ΛN−1 W T 
+
+> N
+
+ΛN
+
+Y T 
+
+> 3
+
+ΓT 
+
+> 2
+
+· · · 0 ΛNWN Y2 − 2ΛN −Y T 
+
+> 3
+
+ΓT 
+
+> 1
+
+Ξ−11 Γ1Y3
+
+
+
+≺ 0.
+
+By recursively applying the same argument, we obtain that (20) holds if and only if Ξl ≺ 0 for all l ∈ [N] and                     
+
+> ΞNWT
+> NΛN+ΓNY3
+> ΛNWN+YT
+> 3ΓT
+> NY2−2ΛN−YT
+> 3
+>  ∑N−1
+> l=1ΓT
+> lΞ−1
+> lΓl
+> Y3
+> 
+> ≺0.
+
+(34) Since {ΛN−1,Y1} guarantees Ξl ≺ 0 for all l ∈ [N], feasibility of (34) for some {Y1,Y2,Y3} immediately implies the validity of (20). Noting that (34) contains bilinear terms in Y3, we rewrite it as  ΞN W T 
+
+> N
+
+ΛN + ΓNY3
+
+ΛNWN +Y T 
+
+> 3
+
+ΓT 
+
+> N
+
+Y2 − 2ΛN
+
+
+
+−
+
+ 0
+
+Y T
+
+> 3
+
+  N−1
+
+# ∑
+
+> l=1
+
+ΓT 
+
+> l
+
+Ξ−1 
+
+> l
+
+Γl
+
+ 0 Y3
+
+ ≺ 0.
+
+A further application of the Schur complement then yields 
+
+
+
+ΞN W T 
+
+> N
+
+ΛN + ΓNY3 0
+
+ΛNWN +Y T 
+
+> 3
+
+ΓT 
+
+> N
+
+Y2 − 2ΛN Y T
+
+> 3
+
+0 Y3
+
+
+
+∑N−1 
+
+> l=1
+
+ΓT 
+
+> l
+
+Ξ−1 
+
+> l
+
+Γl
+
+−1
+
+ ≺ 0.
+
+Note that ∑N−1 
+
+> l=1
+
+Γ⊤ 
+
+> l
+
+Ξ−1 
+
+> l
+
+Γl is negative definite and hence in-vertible, since its first term equals Ξ−11 with Ξ1 ≺ 0, while the remaining terms are negative semidefinite. Therefore, if the two LMIs in (22) are satisfied, then the conditions (19) and (20) hold for the same {P, α, γ, Λ,Y1,Y2,Y3}.14 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+APPENDIX IV OMITTED PROOFS FOR SECTION VI 
+
+A. Proof of Theorem 3 
+
+Proof. Define c := ∑Nl=1 bT 
+
+> l
+
+bl . If c = 0, then all bias terms vanish. Since φ (0) = 0, d = 0, and ∆U(0) = 0, the zero trajec-tory is an admissible reference trajectory. Hence, boundedness follows directly from the incremental convergence result in Theorem 1. Therefore, it remains to consider the case c > 0. Let E :=
+
+h
+
+C2 D22 D23 0ne×(nφ −nw) D21 
+
+i
+
+, and define 
+
+M0
+
+> G
+
+(P, γ, α) as the matrix obtained from MG(P, γ, α) by re-moving the positive semidefinite performance term ETE, i.e., 
+
+MG(P, γ, α) = M0
+
+> G
+
+(P, γ, α) + ETE.
+
+Since ETE ⪰ 0, feasibility of (9) implies 
+
+eMNN (Λ) + M0
+
+> G
+
+(P, γ, α) ≺ 0.
+
+Moreover, M0
+
+> G
+
+(P, γ, α) is homogeneous in (P, γ, α).Since the above inequality is strict, there exist scalars ε > 0and 0 < σ ≤ 1−ρ 
+
+> c
+
+such that 
+
+eMNN (Λ) + M0
+
+> G
+
+(P, γ, α) + σ diag  cP , 0nφ +nq+nd
+
+
+
++ εσ diag  0m, Λ21, . . . , Λ2
+
+> N
+
+ ≺ 0.
+
+Define ˜ P := εP, ˜ γ := εγ , ˜ α := εα , ˜ Λl := εΛl , and ˜ Λ := { ˜Λl }Nl=1.Multiplying the preceding inequality by ε and using the homogeneity of eMNN and M0 
+
+> G
+
+yields 
+
+eMNN ( ˜Λ) + M0
+
+> G
+
+( ˜P, ˜γ, ˜α) + σ diag  c ˜P, 0nφ +nq+nd
+
+
+
++ 1
+
+σ diag  0m, ˜Λ21, . . . , ˜Λ2
+
+> N
+
+ ≺ 0. (35) Applying the Schur complement, (35) is equivalent to diag 
+
+ eMNN ( ˜Λ) + M0
+
+> G
+
+( ˜P, ˜γ, ˜α), 0nφ
+
+
+
++
+
+σ diag  c ˜P, 0nφ +nq+nd
+
+ Mb( ˜Λ)T
+
+Mb( ˜Λ) −σ Inφ
+
+
+
+≺ 0,
+
+(36) where 
+
+Mb( ˜Λ) :=
+
+
+
+0 ˜Λ1 0 · · · 00 0 ˜Λ2 · · · 0... ... ... . . . ...0 · · · · · · · · · ˜ΛN
+
+ .
+
+Now consider an arbitrary trajectory (ζ , v, w, p, q, d, e) asso-ciated with an initial condition x0 ∈ Rnx and satisfying dk = 0for all k ∈ Z≥0. Since ∆U(0) = 0, the incremental IQC can be applied to (p, q) and the zero input-output pair, so that the incremental filtered signal coincides with rk. Premultiplying and postmultiplying (36) by ζ T 
+
+> k
+
+qT 
+
+> k
+
+dT 
+
+> k
+
+hT 
+
+> k
+
+bT and its transpose, where b := bT 
+
+> 1
+
+· · · bT
+
+> N
+
+T, and using the quadratic constraint associated with the slope restriction of φ and φ (0) = 
+
+0, we obtain 
+
+V (ζk+1) −V (ζk) + rT 
+
+> k
+
+M( ˜α)rk
+
++ σ c −
+
+> N
+
+# ∑
+
+> l=1
+
+bT 
+
+> l
+
+bl
+
+!
+
++ σ c V (ζk) − 1 < 0, ∀k ∈ Z≥0,
+
+where V (ζk) := ζ T 
+
+> k
+
+˜Pζk. Using the definition of c, the constant term cancels. Define ˜ V (ζk) := V (ζk) − 1. Then ˜V (ζk+1) − (1 − σ c) ˜V (ζk) + rT 
+
+> k
+
+M( ˜α)rk < 0. (37) Recursively applying this inequality gives, for every K ∈ Z≥0,˜V (ζK+1) < (1 − σ c)K+1 ˜V (ζ0) −
+
+> K
+
+# ∑
+
+> k=0
+
+(1 − σ c)K−krT 
+
+> k
+
+M( ˜α)rk.
+
+Since the uncertain perturbation satisfies the incremental 
+
+ρ-hard IQCs and ρ ≤ 1 − σ c, Remark 1 gives ∑Kk=0(1 −
+
+σ c)−krT 
+
+> k
+
+M( ˜α)rk ≥ 0. Multiplying both sides by (1 − σ c)K
+
+yields ∑Kk=0(1 − σ c)K−krT 
+
+> k
+
+M( ˜α)rk ≥ 0. Hence, 
+
+V (ζK+1) < (1 − σ c)K+1 V (ζ0) − 1 + 1.
+
+Finally, since 
+
+V (ζ ) = ζ T ˜Pζ ≥ λmin ( ˜P)∥ζ ∥22
+
+and xk is a component of ζk, we obtain 
+
+∥xK+1∥2 <
+
+s
+
+(1 − σ c)K+1 V (ζ0) − 1 + 1
+
+λmin ( ˜P) , ∀K ∈ Z≥0.
+
+Thus, sup k∈Z≥0 ∥xk∥2 < ∞.
+
+B. Proof of Theorem 4 
+
+Proof. Consider the following scalar discrete-time system: 
+
+xk+1 = 0.5xk + wk + qk,
+
+vk = xk
+
+pk = xk
+
+where vk, xk, wk, qk ∈ R. We define a special one layer NN: 
+
+wk = φ (0 vk + b), φ (x) = x,
+
+so that the output of the NN wk = b is a constant and can be seen as a constant offset. The uncertain perturbation ∆U is given by 
+
+qk = ∆U (pk) = βk pk,
+
+where the gain βk switches periodically with the parity of k:
+
+βk =
+
+(
+
+0.1, k odd ,
+
+0.2, k even .
+
+It can be verified directly that ∆U and the interconnection satisfy Assumption 1. For any two input sequences p and p′ (with the same switching rule {βk}), the corresponding outputs satisfy 
+
+δ qk := qk − q′ 
+
+> k
+
+= βk(pk − p′
+
+> k
+
+) = βk δ pk, ∀k ∈ Z≥0.
+
+Since βk ∈ [0.1, 0.2], the operator ∆U satisfies the following incremental QC 
+
+δ pk
+
+δ qk
+
+T −0.02 0.15 0.15 −1
+
+  δ pk
+
+δ qk
+
+
+
+≥ 0, ∀k ∈ Z≥0.
+
+Hence, the corresponding weighted sum is nonnegative for any 
+
+ρ ∈ (0, 1], and therefore ∆U satisfies the required incremental 
+
+ρ-hard IQC. WANG et al. : SCALABLE INCREMENTAL ROBUSTNESS ANALYSIS OF NEURAL NETWORK FEEDBACK SYSTEMS 15 
+
+For this instance, the LMI in Theorem 1 reduces to 
+
+0.25 P − P 0.5P 0.5P
+
+0.5P P P
+
+0.5P P P
+
+ +
+
+0 0 00 0 00 0 −2Λ
+
+
+
++ α1
+
+1 00 10 0
+
+−0.02 0.15 0.15 −1
+
+  1 0 00 1 0
+
+
+
+≺ 0,
+
+where P > 0, Λ ≥ 0, and α1 ≥ 0 are decision variables. By solving the above LMI, we verify that it admits a feasible solution given by P = 0.245, Λ = 0.533 and α1 = 1.418. However, the resulting closed-loop trajectories do not nec-essarily converge to any point. Indeed, for the above scalar instance, 
+
+xk+1 = ( 0.5 + βk)xk + b,
+
+where βk alternates between 0 .1 and 0 .2. If b̸ = 0 and {xk}
+
+converges to some x⋆, then taking limits along even and odd subsequences yields x⋆ = 0.6x⋆ + b and x⋆ = 0.7x⋆ + b, which imply 0 .4x⋆ = b and 0 .3x⋆ = b, a contradiction. Hence, there exists an admissible interconnection for which the LMI is feasible, yet the closed-loop trajectories do not converge to any point. 
+
+REFERENCES 
+
+[1] Z.-P. Jiang, T. Bian, and W. Gao, “Learning-based control: A tutorial and some recent results,” Foundations and Trends® in Systems and Control ,vol. 8, no. 3, pp. 176–284, 2020. [2] L. Bus ¸oniu, T. De Bruin, D. Toli´ c, J. Kober, and I. Palunko, “Reinforce-ment learning for control: Performance, stability, and deep approxima-tors,” Annual Reviews in Control , vol. 46, pp. 8–28, 2018. [3] D. Angeli, “A Lyapunov approach to incremental stability properties,” 
+
+IEEE Transactions on Automatic Control , vol. 47, no. 3, pp. 410–421, 2002. [4] W. Lohmiller and J.-J. E. Slotine, “On contraction analysis for non-linear systems,” Automatica , vol. 34, no. 6, pp. 683–696, 1998. [5] R. Wang and I. R. Manchester, “Robust contraction analysis of nonlinear systems via differential IQC,” in IEEE 58th Conference on Decision and Control , 2019, pp. 6766–6771. [6] N. Hashemi, J. Ruths, and M. Fazlyab, “Certifying incremental quadratic constraints for neural networks via convex optimization,” in Proceedings of the 3rd Conference on Learning for Dynamics and Control , ser. Proceedings of Machine Learning Research, vol. 144. PMLR, 2021, pp. 842–853. [7] A. Megretski and A. Rantzer, “System analysis via integral quadratic constraints,” IEEE Transactions on Automatic Control , vol. 42, no. 6, pp. 819–830, 1997. [8] J. Willems, “Dissipative dynamical systems,” European Journal of Control , vol. 13, no. 2-3, pp. 134–151, 2007. [9] P. Seiler, “Stability analysis with dissipation inequalities and integral quadratic constraints,” IEEE Transactions on Automatic Control , vol. 60, no. 6, pp. 1704–1709, 2015. [10] B. Hu, M. J. Lacerda, and P. Seiler, “Robustness analysis of uncertain discrete-time systems with dissipation inequalities and integral quadratic constraints,” International Journal of Robust and Nonlinear Control ,vol. 27, no. 11, pp. 1940–1962, 2017. [11] H. Yin, P. Seiler, and M. Arcak, “Stability analysis using quadratic con-straints for systems with neural network controllers,” IEEE Transactions on Automatic Control , vol. 67, no. 4, pp. 1980–1987, 2022. [12] S. V. Noori, B. Hu, G. Dullerud, and P. Seiler, “Stability and performance analysis of discrete-time ReLU recurrent neural networks,” in IEEE 63rd Conference on Decision and Control , 2024, pp. 8626–8632. [13] C. R. Richardson, M. C. Turner, and S. R. Gunn, “Strengthened circle and Popov criteria for the stability analysis of feedback systems with ReLU neural networks,” IEEE Control Systems Letters , vol. 7, pp. 2635– 2640, 2023. [14] C. de Souza, A. Girard, and S. Tarbouriech, “Event-triggered neural network control using quadratic constraints for perturbed systems,” 
+
+Automatica , vol. 157, p. 111237, 2023. [15] Y. Zhang and X. Xu, “Robust stability of neural network control systems with interval matrix uncertainties,” Automatica , vol. 177, p. 112289, 2025. [16] A. Xue, L. Lindemann, A. Robey, H. Hassani, G. J. Pappas, and R. Alur, “Chordal sparsity for Lipschitz constant estimation of deep neural networks,” in IEEE 61st Conference on Decision and Control ,2022, pp. 3389–3396. [17] A. Xue, L. Lindemann, and R. Alur, “Chordal sparsity for SDP-based neural network verification,” Automatica , vol. 161, p. 111487, 2024. [18] Z. Wang, B. Hu, A. Havens, A. Araujo, Y. Zheng, Y. Chen, and S. Jha, “On the scalability and memory efficiency of semidefinite programs for Lipschitz constant estimation of neural networks,” in Proceedings of the International Conference on Learning Representations , 2024. [19] Y. Xu and S. Sivaranjani, “ECLipsE: Efficient compositional Lipschitz constant estimation for deep neural networks,” in The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. [20] U. Syed and B. Hu, “Improved scalable Lipschitz bounds for deep neural networks,” arXiv preprint arXiv:2503.14297 , 2025. [21] Z. Wang, P. J. Seiler, G. Dullerud, and B. Hu, “Scalable decomposition for stability analysis of feedback systems with high-dimensional neural network components,” in 2025 IEEE 64th Conference on Decision and Control , 2025, pp. 8022–8027. [22] K. Zhou, J. C. Doyle, and K. Glover, Robust and Optimal Control .Prentice Hall, 1996. [23] S. Skogestad and I. Postlethwaite, Multivariable Feedback Control: Analysis and Design , 2nd ed. John Wiley & Sons, 2005. [24] N. Junnarkar, M. Arcak, and P. Seiler, “Synthesizing neural network controllers with closed-loop dissipativity guarantees,” Automatica , vol. 193, p. 113185, 2026. [25] L. Lessard, B. Recht, and A. Packard, “Analysis and design of opti-mization algorithms via integral quadratic constraints,” SIAM Journal on Optimization , vol. 26, no. 1, pp. 57–95, 2016. [26] M. Fazlyab, A. Robey, H. Hassani, M. Morari, and G. Pappas, “Efficient and accurate estimation of Lipschitz constants for deep neural networks,” in Advances in Neural Information Processing Systems , 2019. [27] P. Pauli, A. Koch, J. Berberich, P. Kohler, and F. Allg¨ ower, “Training robust neural networks using Lipschitz bounds,” IEEE Control Systems Letters , vol. 6, pp. 121–126, 2021. [28] P. Pauli, N. Funcke, D. Gramlich, M. A. Msalmi, and F. Allg¨ ower, “Neu-ral network training under semidefinite constraints,” in IEEE Conference on Decision and Control , 2022, pp. 2731–2736. [29] M. Revay, R. Wang, and I. R. Manchester, “Recurrent equilibrium networks: Flexible dynamic models with guaranteed stability and ro-bustness,” IEEE Transactions on Automatic Control , vol. 69, no. 5, pp. 2855–2870, 2024. [30] A. Araujo, A. J. Havens, B. Delattre, A. Allauzen, and B. Hu, “A unified algebraic perspective on Lipschitz neural networks,” in International Conference on Learning Representations , 2023. [31] Z. Wang, G. Prakriya, and S. Jha, “A quantitative geometric approach to neural-network smoothness,” in Advances in Neural Information Processing Systems , 2022. [32] A. Havens, A. Araujo, S. Garg, F. Khorrami, and B. Hu, “Exploiting connections between Lipschitz structures for certifiably robust deep equilibrium models,” in Advances in Neural Information Processing Systems , 2023. [33] P. Pauli, A. J. Havens, A. Araujo, S. Garg, F. Khorrami, F. Allg¨ ower, and B. Hu, “Novel quadratic constraints for extending LipSDP beyond slope-restricted activations,” in International Conference on Learning Representations , 2024. [34] N. H. Barbara, R. Wang, and I. R. Manchester, “On robust reinforcement learning with Lipschitz-bounded policy networks,” in Symposium on Systems Theory in Data and Optimization , 2024, pp. 137–152. [35] R. Wang and I. Manchester, “Direct parameterization of Lipschitz-bounded deep networks,” in International Conference on Machine Learning , 2023. [36] B. Delattre, Q. Barth´ elemy, A. Araujo, and A. Allauzen, “Efficient bound of Lipschitz constant for convolutional layers by gram iteration,” in 
+
+International Conference on Machine Learning , 2023. [37] D. M. Lopez, M. Althoff, L. Benet, S. Coogan, M. Forets, A. Harapana-halli, T. T. Johnson, T. Ladner, C. Schilling, H. Zhang, and X. Zhong, “ARCH-COMP25 category report: Artificial intelligence and neural network control systems for continuous and hybrid systems plants,” in 
+
+Proceedings of the 12th International Workshop on Applied Verification 16 IEEE TRANSACTIONS AND JOURNALS TEMPLATE 
+
+for Continuous and Hybrid Systems , ser. EPiC Series in Computing, vol. 108. EasyChair, 2025, pp. 71–121. 
+
+Zichen Wang received the B.E. degree in Elec-tronic Information Engineering from Southwest University, Chongqing, China, in 2024. He is currently a Ph.D. student in the Department of Electrical and Computer Engineering and the Coordinated Science Laboratory at the Univer-sity of Illinois Urbana-Champaign. His research interests include analysis and verification of learning-based control systems and reinforcement learning. 
+
+Peter Seiler (Fellow, IEEE) received B.S. de-grees in Mathematics and Mechanical Engi-neering from the University of Illinois, Urbana-Champaign in 1996. He received the Ph.D. de-gree in Mechanical Engineering from the Uni-versity of California, Berkeley, in 2001. He is currently a Professor in Electrical Engineering and Computer Science at the University of Michi-gan, Ann Arbor. He was previously on the fac-ulty at the University of Minnesota, Twin Cities, in Aerospace Engineering and Mechanics from 2011-2019. He was also a Principal Scientist R&D at the Honeywell Labs in Minneapolis Minnesota from 2004-2008. His current research interests include merging robust control techniques with online opti-mization and learning-based methods. Dr. Seiler received the National Science Foundation CAREER Award in 2013, Brockett-Willems Out-standing Paper Award in 2021, and the O. Hugo Schuck Best Paper Award in 2003. 
+
+Geir E. Dullerud (Fellow, IEEE) is Department Head and Professor of Electrical and Computer Engineering at the University of Minnesota. Prior to this, 1998-2025, he was on the faculty of the University of Illinois as a member of the Mechan-ical Science and Engineering Department, and the Coordinated Science Laboratory. Preceding this he was an Assistant Professor in Applied Mathematics with the University of Waterloo, Waterloo, ON, Canada, before which he held the appointment of Research Fellow and Lecturer with the Department of Electrical Engineering, California Institute of Technology, Pasadena, CA, USA. He has held visiting positions with the KTH Royal Institute of Technology, Stockholm, Sweden, and Stan-ford University, Stanford, CA, USA. He holds a PhD from Cambridge University in engineering. His current research interests include AI and machine learning in control, cooperative robotics, networks, and system verification. He is a Senior Editor for the IEEE Transactions on Automatic Control. 
+
+Bin Hu (Member, IEEE) received the B.S. de-gree in theoretical and applied mechanics from the University of Science and Technology of China, Hefei, China, in 2008, the M.S. degree in computational mechanics from Carnegie Mellon University, Pittsburgh, PA, USA, in 2010, and the Ph.D. degree in aerospace engineering and mechanics from the University of Minnesota, Minneapolis, MN, USA, in 2016. Between July 2016 and July 2018, He was a Postdoctoral Researcher with the Wisconsin Institute for Dis-covery, University of Wisconsin-Madison, Madison, WI, USA. He is currently an Associate Professor with the Department of Electrical and Computer Engineering, University of Illinois Urbana Champaign, Champaign, IL, USA, and holds affiliations with the Coordinated Science Laboratory and the Siebel School of Computing and Data Science. His research focuses on establishing fundamental connections between control and machine learning. Bin received the NSF CAREER award and the Amazon Research Award in 2021, and the O. Hugo Schuck Best Paper Award in 2024

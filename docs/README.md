@@ -6,29 +6,31 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-09-21
-- 运行时间：2026-09-21 22:34:13 UTC
+- 最新运行日期：2026-09-22
+- 运行时间：2026-09-22 21:53:31 UTC
 - 运行状态：成功
 - 本次总论文数：3
 - 精读区：1
 - 速读区：2
 
 ### 今日简报（AI）
-今日精读1篇、速读2篇，覆盖符号回归与Lyapunov稳定性两大方向。最值得关注的是获满分10.0的MOSAIC-SR，用Transformer引导符号回归恢复科学方程，另可留意CALOS将控制仿射Lyapunov方法用于四旋翼安全强化学习、以及多项式向量场Lyapunov稳定性不可判定这一理论结论。普通读者可先读MOSAIC-SR了解AI辅助科学发现，再按需跟进另两篇。
-- 详情：[/202609/21/README](/202609/21/README)
+1) 9月22日共3篇论文，Transformer表示符号ODE表达式获9.0分领跑，另两篇速读聚焦符号算法与神经网络鲁棒性。
+2) 最值得看的是精读《Enhancing Transformer Representations of Symbolic ODE Expressions》，速读可关注平面切换系统Lyapunov常数符号算法和神经网络反馈系统增量鲁棒性分析。
+3) 普通读者建议先读9.0分精读，再按兴趣选速读，重点看方法能否迁移到符号计算或鲁棒性场景。
+- 详情：[/202609/22/README](/202609/22/README)
 
 ### 精读区论文标签
-1. [MOSAIC-SR: Transformer-Guided Symbolic Regression for Scientific Equation Recovery](/202609/21/2609.20997v1-mosaic-sr-transformer-guided-symbolic-regression-for-scientific-equation-recovery)  
-   标签：评分：10.0/10、query:sr
-   evidence：Transformer引导的符号回归方程恢复
+1. [Enhancing Transformer Representations of Symbolic ODE Expressions](/202609/22/2609.24746v1-enhancing-transformer-representations-of-symbolic-ode-expressions)  
+   标签：评分：9.0/10、query:sr
+   evidence：面向符号表达式与符号回归的Transformer表示
 
 ### 速读区论文标签
-1. [CALOS: Control-Affine Lyapunov On-manifold Safety Layer for Safe Deep Reinforcement Learning for Quadrotors](/202609/21/2609.17758v1-calos-control-affine-lyapunov-on-manifold-safety-layer-for-safe-deep-reinforcement-learning-for-quadrotors)  
+1. [An Efficient Symbolic Algorithm for Computing Lyapunov Constants in Planar Switching Systems](/202609/22/2609.16908v1-an-efficient-symbolic-algorithm-for-computing-lyapunov-constants-in-planar-switching-systems)  
    标签：评分：6.0/10、query:lyapunov-ai
-   evidence：将李雅普诺夫下降条件作为安全层用于四旋翼深度强化学习
-2. [Lyapunov stability of polynomial vector fields is undecidable](/202609/21/2609.22058v1-lyapunov-stability-of-polynomial-vector-fields-is-undecidable)  
+   evidence：用符号代数算法计算切换系统的李雅普诺夫常数，属传统稳定性分析
+2. [Scalable Incremental Robustness Analysis of Neural Network Feedback Systems](/202609/22/2609.22576v1-scalable-incremental-robustness-analysis-of-neural-network-feedback-systems)  
    标签：评分：6.0/10、query:lyapunov-ai
-   evidence：多项式向量场李雅普诺夫稳定性不可判定
+   evidence：为神经网络反馈系统提供可扩展的增量稳定性与性能证书
 
 
 <div class="dpr-home-promo-card">

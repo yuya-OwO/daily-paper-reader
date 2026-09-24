@@ -1,0 +1,1033 @@
+Title: Learning Dissipative Dynamics with Dissipativity-by-Construction Discrete-Time Neural Networks
+
+URL Source: https://arxiv.org/pdf/2609.27188v1
+
+Published Time: Thu, 24 Sep 2026 00:28:57 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Learning Dissipative Dynamics with Dissipativity-by-Construction Discrete-Time Neural Networks 
+
+Tuan Luong Hyungpil Moon 
+
+Department of Mechanical Engineering, Sungkyunkwan University, Suwon 16419, South Korea 
+
+luongtuan@g.skku.edu hyungpil@g.skku.edu 
+
+Corresponding author: Hyungpil Moon ( hyungpil@g.skku.edu )
+
+This material is based upon work supported by the Air Force Office of Scientific Research under award number FA2386-24-1-4039. This work was supported by the National Research Foundation of Korea (NRF) grant funded by the Korea government (MSIT) (RS-2025-24683341). 
+
+Abstract 
+
+Dissipativity is a fundamental system-theoretic property closely related to stability, pas-sivity, and input–output stability, and is particularly important in robotics, where learned dynamics models are often embedded within feedback control loops. However, most exist-ing approaches for learning dissipative dynamics are based on continuous-time formulations, which require ODE solvers during training or inference and can therefore be computationally expensive. Moreover, because practical implementations are inherently discrete-time, direct discretization of a continuous-time passive system does not necessarily preserve passivity, motivating the need for explicit discrete-time guarantees. This study proposes a method for learning incrementally dissipative dynamics from input–output time-series data using a deep multilayer perceptron formulated directly in discrete time. Through a constrained parame-terization and a dedicated training procedure, the proposed model guarantees incremental dissipativity by construction rather than through regularization. Lyapunov-based analy-sis establishes the corresponding dissipativity and stability guarantees, while simulations on robotic dynamical systems demonstrate competitive prediction accuracy, computational efficiency, and consistent preservation of incremental dissipativity compared with baseline methods. 
+
+Keywords: Physical AI, dissipative neural networks, dissipativity, stable system modeling, Lyanpunov stability 
+
+# 1 Introduction 
+
+Learning-based models of dynamical systems are increasingly used in simulation, prediction, and control pipelines. Compared with first-principles modeling, data-driven approaches can achieve high accuracy even when physical parameters are uncertain, unmodeled dynamics exist, or analytical modeling is intractable [1]. However, despite strong short-horizon performance, purely data-driven models can suffer from distribution shift, compounding errors over long rollouts, and instability in feedback loops. This is mainly because standard neural architectures are optimized for pointwise prediction accuracy without explicitly enforcing structural properties of physical systems. As a result, even when training trajectories are stable, the learned dynamics may produce unstable or physically implausible behavior outside the training distribution [2]. Therefore, ensuring stability and reliability is a key design objective for learned dynamics models intended for long-horizon simulation, control, and generalization. 1arXiv:2609.27188v1 [cs.RO] 23 Sep 2026 To address the problem, recent research has explored ways to incorporate stability principles directly into learning frameworks. One direction leverages Lyapunov-based ideas to constrain or certify stability of neural systems, aiming to connect learning objectives with provable dynamical guarantees [3]. Another direction focuses on continuous-time modeling through neural ordinary differential equations, providing a flexible representation that aligns naturally with physics-based time evolution [4]. In parallel, theoretical approaches such as contraction-based learning of stable dynamical systems have been proposed to encourage globally consistent behavior [5]. These approaches highlight that enforcing structure can be essential for producing models that behave predictably beyond the training regime. We address the problem of integrating incremental dissipativity into a neural network archi-tecture for learning dynamical systems. Dissipativity [6, 7] is important because it provides an energy-based framework for analyzing stability, robustness, and input–output consistency of dy-namical systems. In particular, incremental dissipativity constrains the evolution of differences between trajectories through an incremental storage function and supply rate, preventing de-viations between two input–output trajectories from amplifying beyond the energy injected by their input differences [8]. This property is especially useful for closed-loop and interconnected systems, since dissipative systems preserve desirable stability properties under interconnection; for example, parallel and negative-feedback interconnections of passive systems remain dissi-pative [9]. Although learning dissipative models has been extensively studied, most existing approaches focus on continuous-time dynamics. For examples, some approaches rely on specific port-Hamiltonian parameterizations [10], consider incremental dissipativity with multi-stage learning procedures [11], or use continuous-time Neural ODE projections to enforce dissipativ-ity [2], which can introduce high computational cost and may affect modeling accuracy. In this work, we pursue a different viewpoint: instead of treating dissipativity as an aux-iliary penalty or post-hoc certificate, we design the hypothesis class itself so that the learned discrete-time dynamics are incrementally dissipative by construction. Specifically, we develop a deep discrete-time neural network architecture whose parameters are explicitly constrained to satisfy incremental dissipativity throughout training. This provides two main advantages: first, the learned model inherently preserves the desired dissipativity property without requiring pro-jection onto a dissipativity-preserving space; second, the discrete-time formulation avoids the high computational cost associated with Neural ODE-based methods such as [2]. Our compu-tational complexity analysis and simulation results show that the proposed method achieves competitive prediction accuracy while being significantly more computationally efficient than continuous-time Neural ODE approaches. Moreover, since digital devices operate in discrete time, the proposed framework is naturally suited for practical deployment on digital hardware and embedded control platforms. The remaining of this paper is organized as follows. Section 2 presents the incrementally dissipative neural network model and its learning algorithm. Case studies demonstrating the performance of the proposed network and evaluations are presented in Section 3 and 4. We conclude the paper in Section 5. 
+
+# 2 Method 
+
+2.1 Problem formulation 
+
+In this work, we consider discrete-time nonlinear systems of the form 
+
+xk+1 = f (xk, uk) (1) 
+
+yk = g(xk, uk) (2) where xk ∈ Rn×1, uk ∈ Rm×1, and yk ∈ Rp×1 are the state, input, and output at time step k,respectively. We assume f (0) = 0 and g(0) = 0. 2Definition 2.1. The system in Eqs. (1)–(2) is said to be ( Q, S, R)-dissipative, where Q ⪯ 0, 
+
+Q ∈ Rp×p, S ∈ Rm×p, and R = RT ∈ Rm×m, if there exists a nonnegative storage function 
+
+Vk(∆ xk) ≥ 0 such that 
+
+Vk+1 (∆ xk+1 ) − Vk(∆ xk)
+
+≤
+
+[
+
+∆yk
+
+∆uk
+
+]T [
+
+Q ST
+
+S R
+
+] [ 
+
+∆yk
+
+∆uk
+
+]
+
+. (3) Some important special cases of ( Q, S, R) dissipativity include passivity and finite-gain L2
+
+stability. In particular, a passive system corresponds to Q = 0, R = 0, and S = 12 I. An L2
+
+system is dissipative with S = 0 and Q = 1 
+
+> ξ
+
+I, where ξ is the L2 gain of the system [12]. When the input–output data ( uk, yk) are given and modeled using a neural network, the system is represented as 
+
+xk+1 = fnn (xk, uk, θ nn ) (4) ˆyk = Cx k + Du k + by (5) and the parameters are trained by solving min 
+
+> θnn ,
+
+C,D
+
+> N
+
+∑
+
+> i=1
+
+L(ˆ yi, yi), (6) where θnn are trainable weights of the network, C ∈ Rp×n, D ∈ Rp×m, by ∈ Rp×1, and ˆyi, yi are the predicted output and the ground truth at time step i, respectively. It should be noted here that since state dynamics is nonlinear, the input-output relationship in Eqs. (4)-(5) is nonlinear. Indeed, the same discrete-time system structure has been successfully used to represent various types of nonlinear dynamics such as in [13]. Our contribution goes beyond input–output modeling by preserving the dissipative properties of incrementally dissipative systems through the network parameter construction. In Section 2.2, we derive a condition under which the discrete-time MLP system in Eqs. (4)–(5) is Q, S, R-dissipative. Section 2.3 then presents a training algorithm that enforces this dissipativity condition by construction, without solving iterative LMI problems. 
+
+2.2 Necessary condition of a discrete-time dissipative neural network 
+
+Expressing the state dynamics using a discrete-time multilayer perceptron neural network, Eq. (4) can be expanded as follows 
+
+z1 
+
+> k
+
+= ϕ(W 11uk + W 21xk + b1)
+
+z2 
+
+> k
+
+= ϕ(W 22z1 
+
+> k
+
++ b2)...
+
+zLk = ϕ(W L 
+
+> 2
+
+zL−1 
+
+> k
+
++ bL),
+
+(7) 
+
+xk+1 = Bz Lk + bx, (8) ˆyk = Cx k + Du k + by, (9) where W 11 ∈ Rq×m, W 21 ∈ Rq×n, bi ∈ Rq×1 (i = 1 , · · · , L ), W i 
+
+> 2
+
+∈ Rq×q (i = 2 , · · · , L ), 
+
+B ∈ Rn×q, and bx ∈ Rn×1. The activation function is denoted by ϕ(·). Eq. (7) can be represented in a stacked form as 
+
+xk+1 = BB 0ϕ(W uuk + W 1xk + W 2zk + bz ) + bx (10) ˆyk = Cx k + Du k + by (11) 3where 
+
+B0 =
+
+[
+
+0 0 · · · Iq×q]
+
+∈ Rq×Lq ,
+
+W u =
+
+
+
+W 11
+
+0
+
+...
+
+0
+
+ ∈ RLq ×m.
+
+(12) 
+
+W 1 =
+
+
+
+W 21
+
+0
+
+...
+
+0
+
+ ∈ RLq ×n,
+
+W 2 =
+
+
+
+0 0 · · · 0
+
+W 22 0 · · · 0
+
+... . . . . . . ...
+
+0 · · · W L 
+
+> 2
+
+0
+
+ ∈ RLq ×Lq .
+
+(13) 
+
+bz =
+
+[
+
+bT 
+
+> 1
+
+bT 
+
+> 2
+
+· · · bTL
+
+]T
+
+∈ RLq ×1,
+
+zk =
+
+[
+
+(z1
+
+> k
+
+)T (z2
+
+> k
+
+)T · · · (zLk )T ]T
+
+∈ RLq ×1.
+
+(14) 
+
+Assumption 2.2. The activation function ϕ is piecewise differentiable and slope-restricted as 0 ≤ α ≤ ϕ(x2) − ϕ(x1)
+
+x2 − x1
+
+≤ β. (15) This assumption holds for widely used activation functions such as ReLU, Leaky ReLU (α > 0 for stable implementation), sigmoid, tanh, softplus, ELU, SELU, Hard Sigmoid, hard tanh. While the dissipativity condition can be extended to general finite values of α and β,the proposed training algorithm focuses on the case α ≥ 0. One possible solution for the case 
+
+α < 0 is to reformulate the problem using the shifted activation function ˜ϕ(v) = ϕ(v) − αv.This extension will be investigated in our future work. 
+
+Proposition 2.3. The systems described in 10–11 are (Q, S, R) dissipative if there exists a positive definite matrix P = P T ≻ 0 such that 
+
+
+
+P + CT QC −γW T 
+
+> 1
+
+Λ CT ST + CT QD 
+
+−γΛW 1 Λ∗ −γΛW u
+
+SC + DT QC −γW Tu Λ R1
+
+
+
++ ρ
+
+
+
+W T
+
+> 1
+
+W T
+
+> 2
+
+W Tu
+
+ Λ
+
+[
+
+W 1 W 2 W u
+
+]
+
+≻ 0.
+
+(16) 
+
+where Λ∗ = Λ−γW ∗ 
+
+> 2
+
+−BT 
+
+> 0
+
+BT P BB 0, W ∗ 
+
+> 2
+
+= ΛW 2 +W T 
+
+> 2
+
+Λ, R1 = R+SD +DT ST +DT QD ,
+
+and Λ = diag( λ1, λ 2, · · · , λ Lq ) with λi > 0 ( i = 1 , · · · , Lq ).Proof. Consider the storage function 
+
+Vk(∆ xk) = ∆ xTk P ∆xk. (17) 4Left and right multiplying (16) by [∆ xTk ∆zTk ∆uTk ] and its transpose yields (see Appendix A) 
+
+Vk+1 (∆ xk+1 ) − Vk(∆ xk)
+
+≤
+
+[
+
+∆yk
+
+∆uk
+
+]T [
+
+Q ST
+
+S R
+
+] [ 
+
+∆yk
+
+∆uk
+
+]
+
++
+
+[
+
+∆vk
+
+∆zk
+
+]T [
+
+ρΛ −γΛ
+
+−γΛ Λ
+
+] [ 
+
+∆vk
+
+∆zk
+
+]
+
+≤
+
+[
+
+∆yk
+
+∆uk
+
+]T [
+
+Q ST
+
+S R
+
+] [ 
+
+∆yk
+
+∆uk
+
+]
+
+.
+
+(18) where ∆ vk = ∆ W uuk + ∆ W 1xk + ∆ W 2zk. Moreover, using the slope restriction (see Ap-pendix B), 
+
+[
+
+vk
+
+zk
+
+]T [
+
+ρΛ −γΛ
+
+−γΛ Λ
+
+] [ 
+
+vk
+
+zk
+
+]
+
+≤ 0 (19) Combining 18 and 19 yields the dissipativity condition 3. 
+
+Remark 2.4 . Since the second term in Eq. (16) is positive semidefinite for ρ ≥ 0 and Λ ≻ 0, a sufficient (more conservative) condition for 16 is 
+
+
+
+P + CT QC −γW T 
+
+> 1
+
+Λ CT ST + CT QD 
+
+−γΛW 1 Λ∗ −γΛW u
+
+SC + DT QC −γW Tu Λ R1
+
+ ≻ 0. (20) 
+
+2.3 Training algorithm for the dissipative network 
+
+The following procedure finds network parameters that satisfy the constraint in (16). 
+
+Step 1: Choose D such that 
+
+R1 = R + SD + DT ST + DT QD ≻ 0 (see Appendix C). (21) If R1 ≻ 0, the LMI in (16) can be rewritten using the Schur complement as 
+
+[
+
+P + CT QC −γW T 
+
+> 1
+
+Λ
+
+−γΛW 1 Λ − γW ∗ 
+
+> 2
+
+− P
+
+]
+
+−
+
+[
+
+CT (ST + QD )
+
+−γΛW u
+
+]
+
+R−11
+
+[
+
+CT (ST + QD )
+
+−γΛW u
+
+]T
+
+≻ 0.
+
+(22) 
+
+Step 2: Choose C, B, and ΛW u as free variables, and find P , Λ such that 
+
+[
+
+P + CT QC −γW T 
+
+> 1
+
+Λ
+
+−γΛW 1 Λ − γW ∗ 
+
+> 2
+
+− P
+
+]
+
+≻ XT X
+
++
+
+[
+
+CT ST + CT QD 
+
+−γΛW u
+
+]
+
+R−11 [SC + DT QC − γW Tu Λ] (23) Denote 
+
+H =
+
+[
+
+H11 H12 
+
+H21 H22 
+
+]
+
+= XX T
+
++
+
+[
+
+CT ST + DT QC 
+
+−γΛW u
+
+]
+
+R−11 [SC + CT QD − γW Tu Λ] (24) 5We construct H∗ satisfying 
+
+H∗ =
+
+[
+
+H11 + ϵ1I H∗ 
+
+> 12
+
++ YH∗T 
+
+> 12
+
++ Y T H22 + ϵ1I
+
+]
+
+≻
+
+[
+
+H11 H12 
+
+HT 
+
+> 12
+
+H22 
+
+]
+
+, (25) where H∗ 
+
+> 12
+
+is obtained from H12 by zeroing out all non-diagonal block matrices while preserving the diagonal blocks in the same form as W 1 in (13). The matrix Y ∈ RLq ×Lq is trainable and has the same structure as W 1. A sufficient condition for (25) is 
+
+ϵ1 ≥ ∥ H∗ 
+
+> 12
+
++ Y − H12 ∥2. (26) Finally, P and γW T 
+
+> 1
+
+Λ are chosen as 
+
+P = H11 − CT QC + ϵ1I ≻ 0, (27) 
+
+−γW T 
+
+> 1
+
+Λ = H∗ 
+
+> 12
+
++ Y . (28) By choosing B freely and selecting Λ as 
+
+Λ =
+
+(
+
+max 
+
+> i
+
+∣∣∣∣∣eig i
+
+(
+
+H22 + BT 
+
+> 0
+
+BT P BB 0
+
++ γW ∗ 
+
+> 2
+
++ ϵ1I
+
+)∣∣∣∣∣ + ϵ2
+
+)
+
+I.
+
+(29) with ϵ2 > 0, the constraint (22) is satisfied. 
+
+2.4 Improved training algorithm 
+
+It is observed that the matrices W i 
+
+> 2
+
+for i = 2 , . . . , L significantly affect the performance of deep neural networks as the depth L increases. In particular, if ∥W i
+
+> 2
+
+∥ becomes too small or too large, it may lead to vanishing or exploding gradients, respectively [14], due to repeated multiplication by the same weight matrix during backpropagation. While exploding gradients can be mitigated by gradient clipping [15], vanishing gradients are more challenging to address in our setting because layer normalization cannot be applied under our constraints. Motivated by identity connections, which have been shown to be effective in alleviating vanishing gradients in ResNets [16] and through gating mechanisms in LSTMs [17], we modify the network by replacing W i 
+
+> 2
+
+for i = 2 , . . . , L with an identity connection. Specifi-cally, the network is modified to W i 
+
+> 2
+
++ Iq for i = 2 · · · L where Iq is the identity matrix with size q × q.
+
+Λ =
+
+(
+
+max 
+
+> i
+
+∣∣∣∣∣eig i
+
+([
+
+I − γ(Iw2 + ITw2)
+
+]−1
+
+×
+
+[
+
+H22 + BT 
+
+> 0
+
+BT P BB 0 + γW ∗ 
+
+> 2
+
++ ϵ1I
+
+])∣ ∣∣∣∣ + ϵ2
+
+)
+
+I.
+
+(30) where ϵ2 > 0, ILq is an identity matrix size Lq × Lq , and 
+
+Iw2 =
+
+
+
+0 0 · · · 0
+
+Iq 0 · · · 0
+
+... ... . . . ...
+
+0 0 Iq 0
+
+ ∈ RLq ×Lq (31) 62.5 Computational complexity of the algorithm 
+
+The computational complexity per iteration of the training algorithm can be estimated as follows. The computational complexity of the proposed algorithm can be estimated as follows. The dominant computations in Eqs. (21)–(29) involve large matrices of size ( Lq ) × (Lq ). In particular, Eq. (25) requires matrix multiplications between ( Lq ) × (Lq ) matrices, resulting in a complexity of O((Lq )3). Similarly, the norm computation in Eq. (26) for a matrix of size (Lq ) × (Lq ) also incurs a complexity of O((Lq )3). In addition, Eq. (31) requires an eigenvalue decomposition of an ( Lq ) × (Lq ) matrix, whose complexity is O((Lq )3). Thus, the per-iteration complexity of the proposed algorithm is dominated by cubic-order matrix operations, yielding 
+
+O((Lq )3). In contrast, Neural ODE-based continuous-time approaches [2] depend on both the ODE solver and network structure, with rough complexity Neval O((Lq )2), where Neval is the number of solver function evaluations. Since Neval can reach hundreds or thousands of effective layers [4, 18], it often becomes a major computational bottleneck. 
+
+# 3 Case studies 
+
+In this section, the proposed dissipative network will be evaluated through the following robotic modeling examples: a mass-spring-damper model and n-DOF manipulaltor dynamics, which were both proven to be incrementally dissipative. Note that the following storage functions are used only to establish the dissipativity properties of the systems and are not required as prior information by our algorithm. The matrix P associated with the storage function of the proposed dissipative neural network is learned during training as shown in Eq.( 27). 
+
+3.1 Mass-spring-damper system 
+
+The dynamics of a mass–spring–damper (MSD) system are given by 
+
+m¨x(t) + b ˙x(t) + kx (t) = u(t), (32) where m, b, and k denote the mass, damping, and spring coefficients, respectively. The input is f (t) and the position output is x(t). From the energy-based analysis (see Appendix D), the mass–spring–damper (MSD) system is incrementally dissipative . For two trajectories ( x1, ˙x1, u 1) and ( x2, ˙x2, u 2), define ∆ x := 
+
+x1 − x2, ∆ ˙ x := ˙ x1 − ˙x2, ∆u := u1 − u2. The incremental storage function is chosen as 
+
+V∆(∆ x, ∆ ˙ x) = 12 k(∆ x)2 + 12 m(∆ ˙ x)2, (33) and the incremental supply rate is defined by 
+
+w∆(∆ u, ∆ ˙ x) = ∆ ˙ x ∆u =
+
+> [
+
+∆ ˙ x
+
+∆f 
+
+> ]T[
+
+0 1212 0
+
+> ] [
+
+∆ ˙ x
+
+∆f
+
+> ]
+
+. (34) 
+
+3.2 n-DOF manipulator dynamics 
+
+The dynamics of an n-DOF manipulator system are given by 
+
+M ¨q(t) + D ˙q(t) + Kq (t) = τ (t), (35) where q(t) ∈ Rn is the joint position vector, τ (t) ∈ Rn is the input torque vector, and M , D,and K denote the inertia, damping, and stiffness matrices, respectively. The input is τ (t) and the output is chosen as the joint velocity ˙ q(t). From the energy-based analysis (see Appendix E), 7(a) Noise-free training. 
+
+> (b) Noisy training.
+> (c) Dissipativity condition of the MLP model
+
+Figure 1: Performance comparison for the mass–spring–damper (MSD) system. (a) Noise-free case, where data from 0–10 s are used for training and data from 10–20 s for testing; an additional disturbed input is used to verify incremental dissipativity. (b) Noisy case with Gaussian training noise ( σ = 0 .3), showing that the proposed dissipative network maintains good prediction accuracy and robustness. (c) The standard MLP without dissipativity constraints fails to preserve incremental dissipativity, evaluated using Eq. (3) with known MSD parameters. the n-DOF manipulator system is incrementally dissipative . For two trajectories ( q1, ˙q1, τ 1) and 8(q2, ˙q2, τ 2), define ∆q := q1 − q2, ∆ ˙ q := ˙ q1 − ˙q2, ∆τ := τ1 − τ2.
+
+The incremental storage function is chosen as 
+
+V∆(∆ q, ∆ ˙ q) = 12 ∆ ˙ qT M ∆ ˙ q + 12 ∆qT K∆q, (36) and the incremental supply rate is defined by 
+
+w∆(∆ τ, ∆ ˙ q) = ∆ ˙ qT ∆τ =
+
+> [
+
+∆ ˙ q
+
+∆τ 
+
+> ]T[
+
+0 12 I 
+
+> 12
+
+I 0
+
+> ] [
+
+∆ ˙ q
+
+∆τ
+
+> ]
+
+. (37) 
+
+# 4 Evaluation results 
+
+The proposed incrementally dissipative network (DMLP) is used to identify the discrete-time input–output dynamics of the considered systems. To isolate the effect of enforcing incremen-tal dissipativity by construction, we compare DMLP against a baseline multilayer perceptron (MLP) trained purely by supervised learning without any dissipativity constraint. The incremental dissipativity of the proposed DMLP is evaluated using the discrete-time incremental inequality ∆yk∆uk − ∆Vk ≥ 0, (38) where ∆ uk := uk − uk−1, ∆ yk := yk − yk−1, and ∆ Vk := Vk − Vk−1 is the storage increment. The inequality in (38) is checked along the rollout trajectories and visualized in the dissipativity plots. Implementation configurations and hyperparameters are showen in Appendix G. 
+
+4.1 Results on the prediction performance of MSD and n-DOF manipulator dynamics with and without training noises 
+
+The evaluation results for the MSD system are shown in Fig. 1. Fig. 1a compares the baseline MLP and the proposed DMLP under external forcing inputs. Although both models capture the main oscillatory behavior of position and velocity, the MLP shows larger transient deviations, whereas DMLP provides more consistent tracking. Moreover, the dissipativity plot verifies that DMLP satisfies the incremental dissipativity condition along the rollout. This is evaluated using the training input (Input 1) and an additional disturbed input (Input 2), as shown in the top subplot. In contrast, Fig. 1c shows that the standard MLP fails to preserve incremental dissipativity, evaluated using Eq. (3) with known MSD parameters. Fig. 1b presents the noisy-training case, where the outputs are corrupted by Gaussian noise. The baseline MLP becomes more sensitive to noise and exhibits larger prediction errors, while DMLP maintains accurate predictions and preserves incremental dissipativity. The quantitative results in Table 1 further confirm this trend. For example, when N = 100 under noisy training, DMLP reduces the mean prediction error from 38 .9 × 10 −2 to 14 .3 × 10 −2, demonstrating its robustness and advantage in the low-data regime. Similar improvements are observed for the manipulator systems: for the 2-DOF system with 
+
+N = 100, DMLP reduces the error from 32 .80 × 10 −2 to 15 .3 × 10 −2 under noisy training and from 23 .2 × 10 −2 to 14 .7 × 10 −2 without noise. For the 3-DOF system, the improvement is even more pronounced, with the error reduced from 20 .0×10 −2 to 6 .9×10 −2 under noisy training and from 10 .3 × 10 −2 to 5 .84 × 10 −2 without noise. These results suggest that the proposed DMLP provides improved robustness and data efficiency, particularly when the amount of training data is limited. The superior modeling performance of DMLP over the standard MLP for the 2-DOF and 3-DOF manipulator dynamics is also visually confirmed in Fig. 3, Appendix E. 9Table 1: Mean prediction errors ( ± std) of MLP and DMLP on the MSD, 2-DOF, and 3-DOF systems for different training sizes N and noise settings. 
+
+System N Noise MLP DMLP 
+
+MSD 100 Yes 38 .9 ± 0.02 14 .3 ± 0.02 No 11 .1 ± 0.03 8.21 ± 0.01 200 Yes 5.02 ± 0.01 4.42 ± 0.00 No 2.53 ± 0.02 3.06 ± 0.01 2-DOF 100 Yes 32 .80 ± 0.02 15 .3 ± 0.01 No 23 .2 ± 0.01 14 .7 ± 0.02 200 Yes 10 .3 ± 0.03 11 .2 ± 0.01 No 6.96 ± 0.02 11 ± 0.03 3-DOF 100 Yes 20 .0 ± 0.02 6.9 ± 0.01 No 10 .3 ± 0.01 5.84 ± 0.02 200 Yes 5.3 ± 0.02 5.95 ± 0.03 No 2.44 ± 0.01 5.79 ± 0.02 
+
+Figure 2: Training loss histories of the baseline model, the original dissipative network, and the improved dissipative network, demonstrating the effectiveness of the improved training algorithm. (a) MSD system. (b) 2-DOF manipulator. (c) 3-DOF manipulator. 
+
+4.2 Training loss update 
+
+In addition to trajectory prediction, we compare the training loss histories of the baseline model and the dissipativity-constrained models. Fig. 2 reports the loss curves for the baseline MLP, the original dissipative network (DMLP), and the improved dissipative network (DMLP, improved) in the noise-free setting for MSD, 2-DOF manipulator and 3-DOF manipulator. The baseline MLP typically converges quickly at the beginning of training, but may exhibit less stable optimization behavior. In contrast, the dissipativity-constrained training yields smoother and more consistent loss decay. Moreover, the improved dissipative training procedure achieves the lowest and most stable loss profile, confirming the effectiveness of the proposed algorithmic refinement. 
+
+4.3 Comparison with baseline methods 
+
+In addition to demonstrating the modeling performance of our proposed method compared with the standard MLP baseline, we have added a comparison with the state-of-the-art work of [2], which models dissipative systems using a continuous-time Neural ODE approach. We utilized their open-source implementation and evaluated it on the three dynamic systems. As 10 summarized in Table 2, the proposed DMLP achieves competitive prediction accuracy while being significantly more computationally efficient. For example, on the MSD system, DMLP requires 491 .7 ± 5 seconds, whereas the Neural ODE approach requires 6 .33 ± 0.2 hours. These results demonstrate that our discrete-time DMLP provides a practical and computationally efficient alternative for learning dissipative dynamics with comparable modeling performance. Table 2: Performance comparison between MLP, DMLP, and Dissipative Neural ODE.                                                           
+
+> Model Performance MLP DMLP Dissipative
+> Neural ODE MSD (10000 epochs) Mean error 2.53 ±0.02 ( ×10 −2)3.06 ±0.01 ( ×10 −2)0.108 ±0.03 Computation time 403 ±10 s 491 .7±5 s 6.33 ±0.2 h 2-DOF manipulator (5000 epochs) Mean error 6.96 ±0.02 ( ×10 −2)11 ±0.03 ( ×10 −2)0.15 ±0.02 Computation time 262 ±11 s 442 ±8 s 4.15 ±0.5 h 3-DOF manipulator (5000 epochs) Mean error 2.44 ±0.01 ( ×10 −2)5.79 ±0.02 ( ×10 −2)0.10 ±0.01 Computation time 302 ±15s 525 ±10s 7.22 ±0.7 hour
+
+An ablation study that confirmed again the effectiveness of our method can be seen in Appendix F. 
+
+# 5 Conclusions 
+
+In this work, we proposed a dissipative network model that can learn the dynamics and preserve the dissipative property of a known dissipative nonlinear model. This was realized through the design and learning algorithm of the network structure so that the weights satisfy dissipative constraints and they can be solved with non-constrained optimization method. The proposed network was evaluated and compared with a naive model on a mass-spring-damper system and a flexible joint model, which are incrementally dissipative with particular input-output pairs. The results showed the effectiveness performance of our dissipative network compared in guaranteeing both good modeling performance and physical meaning preservation. This is expected to provide a useful tool for designing a more effective and physically mean-ingful network applicable across a wide range of applications. Research on the modeling of the proposed model on more complex case studies, and extension of the idea to other types of networks will be our future work. 
+
+# A PROOF OF EQ. (18) 
+
+Left and right multiplying Eq. (16) by [∆ xTk ∆zTk ∆uTk ] and [∆ xTk ∆zTk ∆uTk ]T respec-tively, one can obtain ∆xTk P ∆xk − ∆zTk BT P B ∆zk
+
++ ∆ xTk CT QC ∆xk + 2∆ xTk DT QC ∆uk + 2∆ xTk CT S∆uk
+
++ ∆ uTk R1∆uk − 2γ∆vTk Λ∆zk + ∆ zTk Λ∆zk ≥ 0 (39) 11 taking into account that ∆ vk = W u∆uk + W 2∆zk + W 1∆xk, and Vk+1 (∆ xk+1 ) − Vk(∆ xk) = ∆xTk BT P B ∆xk − ∆xTk P ∆xk, and [∆ yTk ∆uTk ]
+
+[
+
+Q ST
+
+S R
+
+] [ 
+
+∆yk
+
+∆uk
+
+]
+
+= ∆ xTk CT QC ∆xk + 2∆ xTk DT QC ∆uk+2∆ xTk CT S∆uk + ∆ uTk (R + DT QD )∆ uk (40) Eq. (39) then can be re-written as 
+
+Vk+1 (∆ xk+1 ) − Vk(∆ xk) ≤ [∆ yTk ∆uTk ]
+
+[
+
+Q ST
+
+S R
+
+] [ 
+
+∆yk
+
+∆uk
+
+]
+
++ [∆ vTk ∆zTk ]
+
+[
+
+ρΛ −γΛ
+
+−γΛ Λ
+
+] [ 
+
+∆vk
+
+∆zk
+
+]
+
+(41) 
+
+# B PROOF OF EQ. (19) 
+
+The slopes of widely-used activation functions ϕ(), such as ReLU, tanh, exponential linear functions, are restricted by the range [alpha, beta]. We have 
+
+α∆vk ≤ ∆zk = ϕ(v(1)  
+
+> k
+
+) − ϕ(v(2)  
+
+> k
+
+) ≤ β∆vk (42) Therefore (∆ zk − α∆vk)Λ(∆ zk − β∆vk) (43) [∆ vTk ∆zTk ]
+
+[
+
+ρΛ −γΛ
+
+−γΛ Λ
+
+] [ 
+
+∆vk
+
+∆zk
+
+]
+
+≤ 0 (44) where, ρ = αβ, γ = 12 (α + β). 
+
+# C Choose D such that 
+
+R1 = R + SD + DT ST + DT QD ≻ 0 (45) It is noticed that Eq. (45) will be satisfied if 
+
+L = R + SD + DT ST + DT Q1D ≻ 0 (46) where Q1 = Q − ϵI with I ∈ Rp×p, and ϵ is a sufficiently small constant to guarantee that 
+
+Q1 ≺ 0. ϵ can be chosen as 0 in case Q ≺ 0. Then Q1 can be represented as Q1 = −LTq Lq.
+
+D can be chosen as follow [19] 
+
+D = −Q−11 ST + L−1 
+
+> q
+
+N L r (47) where Lr ∈ Rm×m is found from Eq. (48) 
+
+R − SQ 1ST = LTr Lr (48) 
+
+N and M can be chosen as follows if p ≥ m
+
+M = Y T 
+
+> 1
+
+Y 1 + Y 2 − Y T 
+
+> 2
+
++ Y T 
+
+> 3
+
+Y 3 + ϵ3Im (49) 
+
+N =
+
+[
+
+(Im − M )( Im + M )−1
+
+−2Y 3(Im + M )−1
+
+]
+
+(50) 12 where Y 1 ∈ Rm×m, Y 2 ∈ Rm×m, and Y 3 ∈ R(p−m)×m are free variables, ϵ3 > 0, Im is the identity matrix with size m × m.if p < m 
+
+M = Y T 
+
+> 1
+
+Y 1 + Y 2 − Y T 
+
+> 2
+
++ Y T 
+
+> 3
+
+Y 3 + ϵ3Ip (51) 
+
+N =
+
+[
+
+(Im + M )−1(Im − M ) − 2( Im + M )−1Y T
+
+> 3
+
+]
+
+(52) where Y 1 ∈ Rp×p, Y 2 ∈ Rp×p, and Y 3 ∈ R(m−p)×p are free variables, Ip is the identity matrix with size p × p.It can be proven that N N T ≺ I and R1 = LTr (I − N N T )Lr ≻ 0. where I the identity matrix with the same size as N N T .
+
+# D Incremental dissipativity of MSD. 
+
+Consider 
+
+m¨x + b ˙x + kx = u, y = ˙ x, 
+
+with m > 0, b ≥ 0, k > 0. For two trajectories ( xi, ˙xi, u i), define 
+
+δx = x1 − x2, δv = ˙ x1 − ˙x2,δu = u1 − u2, δy = y1 − y2 = δv. 
+
+Subtracting dynamics gives 
+
+mδ ˙v + bδv + kδx = δu, δ ˙x = δv. 
+
+Choose storage 
+
+V = 12 k(δx )2 + 12 m(δv )2.
+
+Then ˙V = kδx δ ˙x + mδv δ ˙v = kδx δv + δv (δu − bδv − kδx )= δy δu − b(δy )2 ≤ δy δu. 
+
+Hence the MSD system is incrementally dissipative (incrementally passive) from u to y = ˙ x.
+
+# E Incremental dissipativity of the n-DOF manipulator and mod-eling performance 
+
+Consider the n-DOF manipulator dynamics 
+
+M ¨q + D ˙q + Kq = τ, (53) where q, τ ∈ Rn. Assume that 
+
+M = M ⊤ ≻ 0, D = D⊤ ⪰ 0, K = K⊤ ⪰ 0.
+
+Define the input–output pair 
+
+u = t, y = ˙ q. (54) Let ( q1, τ 1) and ( q2, τ 2) be two trajectories of Eq. (53). Define the incremental variables ∆q := q1 − q2, ∆ ˙ q := ˙ q1 − ˙q2, ∆τ := τ1 − τ2.
+
+13 Subtracting the two systems gives 
+
+M ∆¨ q + D∆ ˙ q + K∆q = ∆ τ. (55) Choose the incremental storage function 
+
+V (∆) := 12 ∆ ˙ q⊤M ∆ ˙ q + 12 ∆q⊤K∆q. (56) Since M ≻ 0 and K ⪰ 0, we have V (∆) ≥ 0. Taking the time derivative of V , we obtain ˙V = ∆ ˙ q⊤M ∆¨ q + ∆ q⊤K∆ ˙ q. (57) Using Eq. (55), we have 
+
+M ∆¨ q = ∆ τ − D∆ ˙ q − K∆q.
+
+Substituting this into Eq. (57) gives ˙V = ∆ ˙ q⊤ (∆ τ − D∆ ˙ q − K∆q) + ∆ q⊤K∆ ˙ q
+
+= ∆ ˙ q⊤∆t − ∆ ˙ q⊤D∆ ˙ q − ∆ ˙ q⊤K∆q + ∆ q⊤K∆ ˙ q. (58) Because K = K⊤, we have 
+
+−∆ ˙ q⊤K∆q + ∆ q⊤K∆ ˙ q = 0 .
+
+Therefore, ˙V = ∆ ˙ q⊤∆τ − ∆ ˙ q⊤D∆ ˙ q. (59) Since D ⪰ 0, it follows that ˙V ≤ ∆ ˙ q⊤∆τ. (60) Thus, the n-DOF manipulator is incrementally dissipative from 
+
+u = τ
+
+to 
+
+y = ˙ q
+
+with supply rate 
+
+w(∆ u, ∆y) = ∆ u⊤∆y = ∆ τ ⊤∆ ˙ q, (61) and incremental storage function given by Eq. (56). 14 (a) 2-DOF manipulator (b) 3-DOF manipulator 
+
+Figure 3: Comparison of the performance between baseline MLP model and the dissipative model. (a) 2-DOF manipulator without training noise, where data from 0 s to 20 s were used for training and data from 20 s to 40 s were used for testing. (b) 3-DOF manipulator without training noise, where data from 0 s to 10 s were used for training and data from 10 s to 20 s were used for testing. In both cases, besides the input used in training, a disturbed input signal was also used to check the incremental dissipativity condition of the proposed network. 
+
+# F Ablation studies 
+
+An additional ablation study was conducted to further evaluate the contribution of each com-ponent of the proposed method. As summarized in Table 3, we compare the unconstrained MLP baseline with the dissipativity-constrained DMLP, evaluate the proposed model with and without the improved training algorithm, and test different network configurations, including different depths and activation functions. These comparisons are performed across multiple systems, including the MSD system, the 2-DOF manipulator, and the 3-DOF manipulator. The results show that the dissipativity-constrained DMLP provides more reliable modeling 15 Table 3: Ablation study with the number of data samples N = 100.                                                                                                                                                                                                       
+
+> Ablation cases MSD (10000 epochs) 2-DOF manipulator (5000 epochs) 3-DOF manipulator (5000 epochs)
+> Mean error (×10 −2)Training time Mean error (×10 −2)Training time Mean error (×10 −2)Training time Dissipativity constraints No (MLP) 2.53 ±0.02 403 ±10 s 6.96 ±0.02 262 ±11 s 2.44 ±0.01 302 ±15 s Yes (DMLP) 3.06 ±0.01 491 .7±5 s 11 ±0.03 423 ±10 s 5.79 ±0.02 525 ±10 s Training algorithm (DMLP) Improved 3.06 ±0.01 491 .7±13 s 11 ±0.03 423 ±10 s 5.79 ±0.02 525 ±10 s Original 4.98 ±0.02 625 ±12 s 13 .4±0.02 472 ±12 s 6.02 ±0.03 578 ±11 s Number of layers (DMLP) 15.02 ±0.01 500 ±15 s 15 .5±0.01 412 ±13 s 7.33 ±0.02 502 ±13 s 23.06 ±0.01 491 .7±5 s 11 ±0.03 423 ±10 s 5.79 ±0.02 525 ±10 s 34.89 ±0.03 702 ±11 s 13 .8±0.03 445 ±15 s 6.02 ±0.03 565 ±9 s 44.92 ±0.04 732 ±10 s 12 .3±0.04 492 ±13 s 6.25 ±0.06 602 ±15 s Activation functions (DMLP) Tanh 3.06 ±0.01 491 .7±5 s 11 ±0.03 423 ±10 s 5.79 ±0.02 525 ±10 s Sigmoid 4.02 ±0.03 633 ±11 s 13 .6±0.01 481 ±11 s 6.36 ±0.05 536 ±10 s ReLU 4.08 ±0.01 614 ±10 s 14 .0±0.03 416 ±9 s 5.72 ±0.06 510 ±8 s
+
+performance than the unconstrained MLP baseline. Moreover, the improved training algorithm consistently enhances the performance of DMLP while reducing the training time across the considered systems. The additional comparisons with different network depths and activation functions further demonstrate that the proposed framework can be applied under various ar-chitectural choices. Overall, the ablation results confirm the effectiveness and scalability of the proposed method across systems with increasing dynamical complexity. 
+
+# G Implementation settings and Hyperparameters 
+
+All simulations were conducted on a desktop workstation with an Intel(R) Core(TM) i9-9900K CPU @ 3.6 GHz, 128 GB RAM, and an NVIDIA GeForce RTX 2080 Ti GPU. Both MLP and DMLP were trained by minimizing the mean squared error (MSE) loss between the predicted and true system outputs. Specifically, the loss function is defined using nn.MSELoss() , and the model parameters are optimized using the Adam optimizer with learning rate 10 −3.In our experiments, approximately 25–50% of the available dataset is used for training, while the remaining samples are reserved for testing. This split allows us to evaluate the generalization ability of the learned model under limited training data. For the MSD system, all models were trained for 10000 epochs, while for the 2-DOF and 3-DOF manipulator systems all models were trained for 5000 epochs. The hyperparameters of the DMLP and MLP networks are identical and are in Table 4. Table 4: Hyperparameters used in the simulation. 
+
+Hyperparameter MSD 2-DOF 3-DOF 
+
+Input size 1 2 3Hidden size 32 32 32 Output size 2 4 6Number of layers 2 2 2Activation function tanh tanh tanh 16 References 
+
+[1] G. Lee, S. S. Srinivasa, and M. T. Mason, “Gp-ilqg: Data-driven robust optimal control for uncertain nonlinear dynamical systems,” arXiv preprint arXiv:1705.05344 , 2017. [2] Y. Okamoto and R. Kojima, “Learning deep dissipative dynamics,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 39, pp. 19749–19757, 2025. [3] Y.-C. Chang, N. Roohi, and S. Gao, “Neural lyapunov control,” Advances in neural infor-mation processing systems , vol. 32, 2019. [4] R. T. Chen, Y. Rubanova, J. Bettencourt, and D. K. Duvenaud, “Neural ordinary differ-ential equations,” Advances in neural information processing systems , vol. 31, 2018. [5] C. Blocher, M. Saveriano, and D. Lee, “Learning stable dynamical systems using contrac-tion theory,” in 2017 14th International Conference on Ubiquitous Robots and Ambient Intelligence (URAI) , pp. 124–129, IEEE, 2017. [6] Y. Ren, W. Wang, Y. Wang, and W. Zhou, “Exponentially incremental dissipativity for nonlinear stochastic switched systems,” International Journal of Control , vol. 93, no. 5, pp. 1074–1087, 2020. [7] P. J. Koelewijn, R. Tóth, and S. Weiland, “Incremental dissipativity based control of discrete-time nonlinear systems via the lpv framework,” in 2021 60th IEEE Conference on Decision and Control (CDC) , pp. 3281–3286, IEEE, 2021. [8] R. Lozano, B. Brogliato, O. Egeland, and B. Maschke, Dissipative systems analysis and control: theory and applications . Springer Science & Business Media, 2013. [9] J. Bao and P. L. Lee, Process control: the passive systems approach . Springer, 2007. [10] J. Drgo vna, A. Tuor, S. Vasisht, and D. Vrabie, “Dissipative deep neural dynamical sys-tems,” IEEE Open Journal of Control Systems , vol. 1, pp. 100–112, 2022. [11] Y. Xu and S. Sivaranjani, “Learning dissipative neural dynamical systems,” IEEE Control Systems Letters , vol. 7, pp. 3531–3536, 2023. [12] B. Brogliato, R. Lozano, B. Maschke, O. Egeland, et al. , “Dissipative systems analysis and control,” Theory and applications , vol. 2, pp. 2–5, 2007. [13] W. D’Amico, A. La Bella, and M. Farina, “An incremental input-to-state stability condition for a class of recurrent neural networks,” IEEE Transactions on Automatic Control , vol. 69, no. 4, pp. 2221–2236, 2023. [14] A. Zhang, Z. C. Lipton, M. Li, and A. J. Smola, “Dive into deep learning,” arXiv preprint arXiv:2106.11342 , 2021. [15] I. Goodfellow, Y. Bengio, and A. Courville, Deep learning . MIT press, 2016. [16] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image recognition,” in 
+
+Proceedings of the IEEE conference on computer vision and pattern recognition , pp. 770– 778, 2016. [17] S. Hochreiter and J. Schmidhuber, “Long short-term memory,” Neural computation , vol. 9, no. 8, pp. 1735–1780, 1997. 17 [18] C. Finlay, J.-H. Jacobsen, L. Nurbekyan, and A. Oberman, “How to train your neural ode: the world of jacobian and kinetic regularization,” in International conference on machine learning , pp. 3154–3164, PMLR, 2020. [19] M. Revay, R. Wang, and I. R. Manchester, “Recurrent equilibrium networks: Flexible dy-namic models with guaranteed stability and robustness,” IEEE Transactions on Automatic Control , vol. 69, no. 5, pp. 2855–2870, 2023. 18

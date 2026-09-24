@@ -1,0 +1,956 @@
+Title: Data-driven discrete-time deep recurrent neural network-based modeling for dissipative systems
+
+URL Source: https://arxiv.org/pdf/2609.27186v1
+
+Published Time: Thu, 24 Sep 2026 00:23:46 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# Data-driven discrete-time deep neural network-based modeling for dissipative systems 
+
+Tuan Luong ∗ Hyungpil Moon †
+
+Abstract 
+
+Physical AI has gained increasing attention for its role in developing AI systems that better understand, predict, and control real-world dynamics. Achieving this requires AI models that not only achieve high prediction accuracy but also preserve fundamental physical properties of dynamical systems. In this paper, we propose a deep discrete-time dissipative recurrent neural network (DissipNet) that explicitly enforces dissipativity, a key property related to stability and energy dissipation, through structural weight constraints and a dedicated training algorithm. By construction, the proposed network is capable of learning dissipative dynamics while preserving their inherent stability, which is formally analyzed using Lyapunov theory. In contrast to Physics-Informed Neural Networks (PINNs), which incorporate governing equations into the training loss but do not guarantee preservation of internal analytical properties such as dissipativity or passivity, our approach provides explicit guarantees on stability at the model level. We demonstrate the effectiveness of the proposed method through several modeling applications, and compare its performance with a naive recurrent neural network (RNN) and a PINN-based model. 
+
+Keywords: Physical AI, dissipative neural networks, dissipativity, stable system modeling, Lyapunov stability 
+
+# 1 Introduction 
+
+Neural Networks (NN) have spread as a powerful tool for multiple purposes in many fields such as signal processing, modelling, and control of dynamical systems. Many types of NNs, Multi-Layer Perceptron (MLP), Vanilla Recurrent Neural Networks (RNNs), Long-Short Term Memory (LSTMs), Convolutional Neural Networks (CNNs), Generative Models, etc., and their hybrid models [1], have been proposed for different applications. However, in most of the work, NNs are considered only as a nonlinear system that fit a collection of data, which have no information about the physical characteristics. In general, a neural network does not preserve the physical properties of a real system. For example, the modeling of a dynamic system using a traditional data-based network model might result in a model that violates physical constraints [2]. Preserving physical properties of network models, such as stability properties, is therefore an important research topic to be investigated. Amongst physical properties, dissipativity is a relevant issue that has been widely used to analyse the stability of linear and nonlinear systems. The dissipativity theory has found successful applications in various areas such as signal processing [3], human-robot interaction [4], impedance control [5], disturbance estimation and control of aircraft [6], mobile robot [7]. It may deal with nonlinear systems using only the general characteristics of the input–output dynamics and offers elegant solutions for the proof of absolute stability. Dissipative systems exhibit many   
+
+> ∗Department of Mechanical Engineering, Sungkyunkwan University, Suwon 16419, South Korea. E-mail:
+> luongtuan@g.skku.edu .
+> †Department of Mechanical Engineering, Sungkyunkwan University, Suwon 16419, South Korea. E-mail:
+> hyungpil@g.skku.edu . Corresponding author.
+
+1arXiv:2609.27186v1 [cs.LG] 23 Sep 2026 desirable properties, for example, 1) the free dynamics and zero dynamics of Dissipative systems are Lyapunov stable; 2) the parallel and negative feedback interconnections of passive systems remain dissipative. This property allows the independent modelling and control of separate dissipative systems; and 3) a dissipative system can achieve stability using output feedback [8]. The property can be applied to design a controller for the systems that are unstable. In fact, there are many engineering systems (e.g., high-performance aircraft or even some more exotic circuits) which are even designed to be unstable for some range of initial conditions in order to take advantages of improved performance for other ranges of initial data. For those systems, an input feedforward dissipative (IFP) or an output feedback passivity (OFP) can be used to render the process dissipative [9]. Due to the importance of dissipative properties, effort has been made to study dissipavivity and passivity (related property) of neural networks. The passivity properties of static multilayer neural networks are examined in [10]. By means of analysing the interconnection of error models, the study derived the relationship between passivity and closed-loop stability. Passivity properties of dynamic neural networks can be found in [11]. In [12], dynamic multilayer neural networks are used for nonlinear system on-line identification. The passivity approach is applied to access several stability properties of the neuro identifier. The passivity conditions for delayed neural networks (DNNs) are considered in [13], where the passivity conditions for DNNs without uncertainties were derived, and then extend the results to the case with time-varying parametric uncertainties. The passivity conditions for DNNs with uncertainties are considered in [14]. In [8], the global dissipativity of a general class of continuous-time recurrent neural networks are addressed. It is worth pointing out that although some passivity analysis has been done, they require the solving of linear matrix equations which face challenges when scaling to large networks. Some recent studies on learning dissipative neural dynamics have been restricted to specific port-Hamiltonian network structures [15]. However, these models are only applicable when the system inputs remain constant. In [16], the incremental dissipativity of a system with external inputs is considered. However, the approach does not consider the state model and requires multi-step learning process. In [17], a continuous dissipative Neural ODE model was obtained by projecting the original ODE onto a space that guarantees dissipativity. However, while the training process was time-consuming, a degradation in modeling accuracy may have occurred during the projection step. In this paper, we aim to develop a discrete-time dissipative recurrent neural network (Dis-sipNet) for learning a discrete model of a nonlinear system that is known to be dissipative. Our contribution includes the proposition of a linear matrix inequality condition for the network to ensure its dissipative property. We also contribute a sufficient learning algorithm that uses simple unconstrained optimization to determine weights that satisfy these conditions, which is simpler and provide more flexibility compared with [16]. The network’s stability is proven using Lyapunov theory. The integration of physical meaning into a generic network aligns with an emerging research topic known as physics-informed neural network (PINN) [18]. The underlying approaches are that PINN encode model equations, like Partial Differential Equations (PDE), as a component of the neural network itself. In this approach, NN must fit observed data while reducing a minimize a loss function, which includes reflecting the initial and boundary condi-tions along the space-time domain’s boundary and the PDE residual. It has been demonstrated that the PINN can efficiently leverage the predictive ability of neural networks PINNs address-ing problems that are described by few data, or with noisy experiment observations. The work aims to learn the equations and replace them by NNs. However, there is no guarantee that the NN will preserve the equation’s internal analytical properties, for example, passivity in case of robotics, as opposed to our proposal. The remaining of this paper is organized as follows. Section 2 presents the dissipative neural network model and its learning algorithm. Case studies demonstrating the performance of the proposed network and comparisons with a PINN model and a Naive RNN model are presented 2in Section 3. We conclude the paper in Section 5. 
+
+# 2 Dissipative Recurrent Neural Networks 
+
+In this section, the problem under research will be described, and the proposed network and the conditions for it to be dissipative will be given. Then, an algorithm on how the neural network will be trained will be presented. 
+
+2.1 Problem formulation 
+
+In this work, we consider the discrete nonlinear systems of the form 
+
+xk+1 = f (xk, uk) (1) 
+
+yk = g(xk, uk) (2) where xk ∈ Rn×n, uk ∈ Rm×1, yk ∈ Rp×1 are states, inputs and outputs of the system at time step k. f (0) = 0, g(0) = 0. 
+
+Definition 1. Definition 1: The system in Eq.( 1) and Eq.( 2) is said to be (Q, S, R) dissipa-tive, where 0 ⪰ Q ∈ Rp×p, S ∈ Rm×p and R = RT ∈ Rm×m if there exists a Lyapunov function 
+
+Vk(xk) ≥ 0 such that 
+
+Vk+1 (xk+1 ) − Vk(xk) ≤ [yTk uTk ]
+
+[
+
+Q ST
+
+S R
+
+] [ 
+
+yk
+
+uk
+
+]
+
+(3) Some important cases of the ( Q, S, R) dissipative are found in passivity, finite-gain L2
+
+stability. A passive system is dissipative with supply rate given by Q = 0, R = 0, and S = 12 I.An L2 system is dissipative with supply rate S = 0, Q = 1 
+
+> ξ
+
+I, where ξ is the L2 gain of the system. When the input-output data ( uk, yk) are given and are modeled using RNN networks, the system dynamics is represented by the following equations: 
+
+hk+1 = frnn (hk, uk, θ rnn ) (4) ˆyk = Ch Lk + Du k + by (5) min 
+
+> θrnn ,
+
+C,D
+
+> N
+
+∑
+
+> i=1
+
+L(ˆ yi, yi) (6) where θrnn are trainable weights of the RNN network with L layers, hk = [ h0 
+
+> kT
+
+h1 
+
+> kT
+
+· · · hLkT ]T ,
+
+hik ∈ Rq×1 (i = 1 , · · · , L ) are the vectors of hidden states, C ∈ Rp×q, D ∈ Rp×m, and ˆ yi, yi
+
+are the output of the model and the ground truth, respectively at the time step i(i = 1 , · · · , N ), where N is the number of data samples. If we choose xk = hk, the Eqs. (4-5) have the same form as Eqs. (1-2). Note that for a discrete-time system to be dissipative, D̸ = 0 is necessary [19]. 
+
+2.2 Dissipative Recurrent Neural Networks 
+
+The model in Eq. (4) can be expanded in the following form 
+
+h1 
+
+> k+1
+
+= ϕ(W 1
+
+> ih
+
+uk + W 1
+
+> hh
+
+h1 
+
+> k
+
++ b1
+
+> h
+
+)
+
+h2 
+
+> k+1
+
+= ϕ(W 2
+
+> ih
+
+h1 
+
+> k+1
+
++ W 2
+
+> hh
+
+h2 
+
+> k
+
++ b2
+
+> h
+
+)...
+
+hLk+1 = ϕ(W Lih hL−1 
+
+> k+1
+
++ W Lhh hLk + bLh )(7) 3ˆyk = Ch Lk + Du k + by (8) where W 1 
+
+> ih
+
+∈ Rq×m, bihT ∈ Rq×q, W ihh ∈ Rq×q (i = 1 , · · · , L ), W iih ∈ Rq×q (i = 2 , · · · , L )and Bh ∈ Rn×q,W 1 
+
+> ih
+
+∈ Rq×m. ϕ(·) is the activation function. Eq. (7) can be represented as follows 
+
+hk+1 = ϕ(W uuk + W ih hk+1 + W hh hk + bh) (9) ˆyk = Chhk + Du k + by (10) Where 
+
+W hh =
+
+
+
+W 1 
+
+> hh
+
+0 · · · 00 W 2 
+
+> hh
+
+· · · 0
+
+... ... . . . ...
+
+0 0 · · · W Lhh 
+
+ ∈ RLq ×Lq (11) 
+
+W ih =
+
+
+
+0 0 · · · 0
+
+W 2 
+
+> ih
+
+0 · · · 0
+
+... ... . . . ...
+
+0 0 W Lih 0
+
+ ∈ RLq ×Lq (12) 
+
+W u =
+
+
+
+W 1
+
+> ih
+
+00
+
+...
+
+0
+
+
+
+∈ RLq ×m (13) 
+
+Ch =
+
+[
+
+C 0 0 · · · 0
+
+]
+
+∈ Rp×Lq (14) 
+
+bh = [ b1 
+
+> hT
+
+b2 
+
+> hT
+
+· · · bLhT ]T ∈ RLq ×1 (15) 
+
+by ∈ Rp×1 (16) For a sequence length of T, the RNN network can be represented as 
+
+hk+1 = ϕ(W uuk + W ih hk+1 + W hh hk + bh)
+
+hk+2 = ϕ(W uuk+1 + W ih hk+2 + W hh hk+1 + bh)...
+
+hk+T = ϕ(W uuk+T + W ih hk+T + W hh hk+T −1 + bh)(17) Then ˆyk+T −1 = ChhLk+T −1 + Du k+T −1 + by (18) Eqs. (17)-(18) can be converted into the form of Eqs. (1)-(2) as follows 
+
+νk+1 = ϕ1(W uuk + W ih νk+1 + W hh νk)
+
+νk+2 = ϕ1(W uuk+1 + W ih νk+2 + W hh νk+1 )...
+
+νk+T = ϕ1(W uuk+T + W ih νk+T + W hh νk+T −1)(19) Then ˆyk+T −1 = ChνLk+T −1 + Du k+T −1 (20) where νk = hk − ϕ(0), ϕ 1 = ϕ − ϕ(0), bh = ( W ih + W hh )ϕ(0), by = Chϕ(0),
+
+4Assumption 1. The activation function θ is piecewise differentiable and has slope restricted in [α = 0 , β ]
+
+α = 0 ≤ ϕ(x2) − ϕ(x1)
+
+x2 − x1
+
+≤ β (21) This assumption holds for the most widely used activation functions, such as tanh, ReLU, and the sigmoid function. While the dissipativity condition proposed in this work can be easily extended for all finite values of α and β, the proposed training algorithm is restricted to the case α = 0. The extension to cases with α̸ = 0 is left for future work. 
+
+Proposition 1. The systems described in Eqs. (19)-(20) will be (Q, S, R) dissipative if there is a positive definite matrix P = P T such that 
+
+
+
+P + CTh QC h −γW Thh Λ CTh ST + CTh QD 
+
+−γΛW hh Λ − γW ∗ 
+
+> ih
+
+− P −γΛW u
+
+SC h + DT QCh −γW Tu Λ R1
+
+ (22) 
+
+is positive definite. where W ∗ 
+
+> ih
+
+= ΛW ih + W Tih Λ, R1 = R + SD + DT ST + DT QD , Λ = diag (λ1, λ 2, · · · , λ Lq )
+
+with λi > 0 (i = 1 , · · · , Lq ).Proof. Consider the Lyapunov function as follows 
+
+Vk(νk) = νTk P ν k (23) Left and right multiplying Eq. (22) by [ νTk νTk+1 uTk ] and [ νTk νTk+1 uTk ]T , where vk =
+
+W uuk + W ih νk+1 + W hh νk, respectively, one can obtain [see Appendices A]. 
+
+Vk+1 (νk+1 ) − Vk(νk) ≤ [yTk uTk ]
+
+[
+
+Q ST
+
+S R
+
+] [ 
+
+yk
+
+uk
+
+]
+
++ [ vTk νTk+1 ]
+
+[
+
+0 −γΛ
+
+−γΛ Λ
+
+] [ 
+
+vk
+
+νk+1 
+
+]
+
+≤ [yTk uTk ]
+
+[
+
+Q ST
+
+S R
+
+] [ 
+
+yk
+
+uk
+
+]
+
+(24) Moreover, it can be shown that [see Appendices B] [vTk νTk+1 ]
+
+[
+
+0 −γΛ
+
+−γΛ Λ
+
+] [ 
+
+vk
+
+νk+1 
+
+]
+
+≤ 0 (25) From Eq. (24) and Eq. (25), one has 
+
+Vk+1 (νk+1 ) − Vk(νk) ≤ [yTk uTk ]
+
+[
+
+Q ST
+
+S R
+
+] [ 
+
+yk
+
+uk
+
+]
+
+(26) Which implies the network model is ( Q, S, R) dissipative. 
+
+2.3 Training algorithm for DissipNet 
+
+The algorithm to find the weights of the network to guarantee the constraints in Eq. (27). Step 1: Choose D such that L = R + SD + DT ST + DT QD ≻ 0 [See Appendices B.1] 5If R1 = R + SD + DT ST + DT QD ≻ 0, using Schur complement the LMI condition in Eq. (22) can be rewritten as follows 
+
+[
+
+P + CTh QC h −γW Thh Λ
+
+−γΛW hh Λ − γW ∗ 
+
+> ih
+
+− P
+
+]
+
+−
+
+[
+
+CTh ST + CTh QD 
+
+−γΛW u
+
+]
+
+R−11
+
+[
+
+CTh ST + CTh QD 
+
+−γΛW u
+
+]T
+
+≻ 0 (27) Step 2. Choose Ch, B, ΛW u as free variables, we will choose P , Λ such that 
+
+[
+
+P + CTh QC h −γW Thh Λ
+
+−γΛW hh Λ − γW ∗ 
+
+> ih
+
+− P
+
+]
+
+≻ XT X
+
++
+
+[
+
+CTh ST + CTh QD 
+
+−γΛW u
+
+]
+
+R−11 [SC h + DT QC h − γW Tu Λ] (28) Where X is a free variable. Denote 
+
+H =
+
+[
+
+H11 H12 
+
+H21 H22 
+
+]
+
+= XX T
+
++
+
+[
+
+CTh ST + CTh QD 
+
+−γΛW u
+
+]
+
+R−11 [SC h + DT QC h − γW Tu Λ] (29) We bring another matrix H∗ that satisfies 
+
+H∗ =
+
+[
+
+H11 + ϵ1I H∗ 
+
+> 12
+
++ YH∗T 
+
+> 12
+
++ Y T H22 + ϵ1I
+
+]
+
+≻
+
+[
+
+H11 H12 
+
+HT 
+
+> 12
+
+H22 
+
+]
+
+(30) where H∗ 
+
+> 12
+
+is the matrix that is obtained from H12 by zeroing out all non-diagonal block matrices while preserving the diagonal block matrices in the same form as matrix W hh in Eq. (11). Y ∈ RLq ×Lq is the trainable matrix that has the same form as W hh . For Eq. (30) to be satisfied, ϵ1 will be chosen such that 
+
+ϵ1 ≥ ∥ H∗ 
+
+> 12
+
++ Y − H12 ∥ (31) Finally, P and γW Thh Λ can be chosen as follows 
+
+P = H11 − CTh QC h + ϵ1I ≻ 0 (32) 
+
+−γW Thh Λ = H∗ 
+
+> 12
+
++ Y (33) where diag (·) and ReLU (·) are diagonal operator and Rectified Linear Unit (ReLU) function, respectively. It is easily seen that the Eqs. (32-33) guarantee that 
+
+[
+
+P + CT QC −γW Thh Λ
+
+−γΛW hh Λ − γW ∗ 
+
+> ih
+
+− P
+
+]
+
+≻
+
+[
+
+H11 + ϵ1I H∗
+
+> 12
+
+H∗T 
+
+> 12
+
+H22 + ϵ1I
+
+]
+
+(34) By choosing γΛW ih freely and Λ as in Eq. (35) 
+
+Λ = ( ∥H22 + P + γW ∗ 
+
+> ih
+
++ ϵ1I∥ + ϵ2) I (35) where ϵ2 > 0. We can also obtain that 
+
+[
+
+P + CTh QC h −γW Thh Λ
+
+−γΛW hh Λ − γW ∗ 
+
+> ih
+
+− P
+
+]
+
+≻
+
+[
+
+H11 H12 
+
+H21 H22 
+
+]
+
+(36) Using Eq. (35), matrices W hh , W ih , W u then can be calculated, given ΛW hh , ΛW ih , ΛW u.From Eq. (34) and Eq. (36), Eq. (27) is satisfied. 63 Case studies 
+
+In this section, the proposed DissipNet will be evaluated through two robotic modeling examples: a mass-spring-damper model and a two degree-of-freedom planar manipulator, which were both proven to be dissipative. 
+
+3.1 Mass-spring-damper system 
+
+The equation of the model of a mass-spring-damper (MSD) model can be expressed as 
+
+m¨x(t) + b ˙x(t) + kx (t) = f (t) (37) Here m, b, k are mass, damping, and spring coefficients, respectively. f is the input of the system, and x is the position of the mass. The energy relation of the MSD system is as follows 
+
+∫ T
+
+> 0
+
+f (t) ˙ x = 12 kx 2(T ) − 12 kx 2(0)+ 12 m ˙x2(T ) − 12 m ˙x2(0) + 
+
+∫ T
+
+> 0
+
+b ˙x(t)dt (38) Eq. (38) implies that the continous system is dissipative with the following storage function and the supply rate 
+
+V (x) = 12 kx 2(t) + 12 m ˙x2(t) (39) 
+
+w(u, y ) = 
+
+[
+
+yT f
+
+]
+
+0 0 00 −b 12
+
+0 12 0
+
+[
+
+yT f
+
+]T
+
+(40) where y =
+
+[
+
+x ˙x
+
+]T
+
+Parameters of the MSD model are follows: m = 1 (kg), k = 4 .2N/m , b = 2 .5N s/m , and the sampling time was 0.05s. 
+
+3.2 Two DOF manipulator 
+
+Modeling of a planar two link manipulator is used to evaluate the performance of the DissipNet. The equation of motion of the manipulator can be expressed as follows [20] 
+
+M (q)¨ q + C(q, ˙q) ˙ q + F f riction = τ (41) where q = [ q1 q2]T denotes the joint angles of the manipulator. 
+
+M (q) = 
+
+[
+
+m11 m12 
+
+m21 m22 
+
+]
+
+(42) 
+
+C(q, ˙q) = 
+
+[
+
+c11 c12 
+
+c21 c22 
+
+]
+
+(43) 
+
+F f riction =
+
+[
+
+b1 ˙q1 b2 ˙q2
+
+]T
+
+(44) 
+
+τ =
+
+[
+
+τ1 τ2
+
+]T
+
+(45) 
+
+M (q), C(q, ˙q), F f riction , τ are the mass matrix, Corriolis and Centrifugal matrix, friction torques, and the vector of applied torques to the joints, respectively. m11 = m1 l21 
+
+> 4
+
++ m2(l21 + l22/4 + 
+
+l1l2cos (q2)) + Iz1 + Iz2 m12 = m2( 14 + l1l2 
+
+> 4
+
+cos (q2)) + Iz2, m21 = m12 , m 22 = m2 l22 
+
+> 4
+
++ Iz2
+
+7c11 = −m2l1l2 ˙q2sin (q2), c 12 = − 12 l1l2 ˙q2sin (q2) c21 = − 14 m2l1l2 ˙q2sin (q2) + 12 m2l1l2 ˙q1sin (q2), 
+
+c22 = − 14 m2l1l2 ˙q1sin (q2)
+
+τ1 = τm1 + g
+
+[
+
+l1
+
+( m1
+
+2 + m2
+
+)
+
+cos q1 + m2l2
+
+2 cos( q1 + q2)
+
+]
+
+− px [l1 sin q1 + l2 sin( q1 + q2)] + 
+
+py [l1 cos q1 + l2 cos( q1 + q2)] ,τ2 = τm2 + 12 m2gl 2 cos( q1 + q2)
+
+− pxl2 sin( q1 + q2) + pyl2 cos( q1 + q2). (46) Here, mi(i = 1 , 2) denotes the mass of ith link; li is the length of ith link, and Ii is the moment of inertia of the link about the axis passing through the center of the mass and perpendicular to the plane of motion. px and py are the x and y components of the external forces, which are considered to be zero in this paper. τm1, τ m2 are active joint torques. The parameters of the 2-dof manipulator were m1 = m2 = 1( kg ), l1 = l2 = 1( m), Iz1 = Iz2 = 0 .1kgm 2,
+
+b1 = b2 = 0 .01 N ms . The sampling time was 0.05s. It can be shown that the input-output pair of the continuous system f and ˙ q is passive [5]. 
+
+# 4 Evaluation results 
+
+The DissipNet will be used to model the input-output relationship of the models described above. Moreover, we will compare the performance of our model with an RNN model without dissipativity property (Naive RNN) and a physics-informed neural network model (PINN) [18]. Here, the idea of the PINN modelling approach is to integrate the system’s known dynamics by adding the physical model into the cost with a regularization coefficient. In particular, the loss for the MSD and 2-DOF manipulator will be as in Eq. 47 and Eq. 48, respectively. 
+
+L =
+
+> N
+
+∑
+
+> i=1
+
+[
+
+L(yi, ydi ) + λ(m ¨xi + b ˙xi + kx i − fi)2]
+
+(47) 
+
+L =
+
+> N
+
+∑
+
+> i=1
+
+[
+
+L(yi, ydi ) + λrTi ri
+
+]
+
+(48) where ri = M (qi) ¨ qi + C(qi, ˙qi) ˙ qi + F f riction,i − τ i
+
+The dissipavitivy of the DissipNet model is evaluated using Eq. (3) where V = νkP ν k as shown in Eq. (3). For the PINN model (continous model), the condition to show the dissipativity is ∫ Tk
+
+> 0
+
+yudt ≥ V (Tk) − V (0) (49) All simulations were conducted on a desktop workstation with an Intel(R) Core(TM) i9-9900K CPU @ 3.6 GHz, 128 GB RAM, and an NVIDIA GeForce RTX 2080 Ti GPU. For both the 2-DOF manipulator and the MSD systems, the RNN and DRNN models share the same archi-tecture with a hidden dimension of 64, and 2 recurrent layers. The PINN baseline is a 4-layer feed-forward network with a hidden dimension of 128. All models were trained using the MSE loss and the Adam optimizer with a learning rate of 10 −3 for 5000 and 10000 epochs for the 2-DOF manipulator and MSD systems, respectively. 8Figure 1: Comparison of DissipNet model (DRNN) and PINN model on a mass-spring-damper (MSD) model under an external input force. The second and third subplots from the top show that all RNN, DRNN and PINN models can capture the dynamics of the MSD system. However, the fourth subplot shows that the PINN model does not preserve dissipativity property, as opposed to the dissipativity property of the DNN model implied in the last subplot. Here, the shaded color shows the area where the value is negative. Data from 0s to 40s were used for training, and data from 40s to 80s were used for testing. 9Figure 2: Comparison between RNN, DRNN and PINN models when the training data are subjected to noises. Here, Gaussian noise with zero mean and standard deviation σ = 0 .1 is added to the outputs in the training. It is seen that the DRNN obtained better results compared with RNN and PINN while preserving dissipativity property, which indicates the robustness of the proposed DissipNet modelled when modeling dissipative systems. 10 Figure 3: Comparison of the DissipNet model (DRNN), the Naive RNN model (RNN) and PINN model on the 2-dof manipulator modeling. The second and third subplots from the top show that all the naive RNN model, DRNN and PINN model can capture the dynamics of the system, however, the fourth subplot indicates that the PINN model is not dissipative as opposed to the DRNN model implied from the bottom subplot. Here, data from 0s to 20s were used for training, and data from 20s to 40s were used for testing. 11 Figure 4: Comparison between RNN, DRNN, and PINN models when the training data are corrupted by noise (Gaussian noise with zero mean and standard deviation σ = 0 .1). The results show that the proposed DRNN achieves superior prediction performance and exhibits lower sensitivity to noise compared with both RNN and PINN, indicating the robustness of the proposed DissipNet. Data from 0 s to 20 s are used for training, while data from 20 s to 40 s are used for testing. 12 Table 1: Comparing mean errors ( ± std) of prediction performance using RNN, DRNN and PINN models for the MSD model (N is the number of training samples)                                           
+
+> NTraining noise RNN ( ×10 −5)DRNN ( ×10 −5)PINN ( ×10 −5)
+> 200 Yes 6.53 ±0.01 1.12 ±0.00 5.60 ±0.01 No 0.43 ±0.00 0.07 ±0.00 0.26 ±0.00 400 Yes 6.59 ±0.00 1.24 ±0.00 4.47 ±0.00 No 0.30 ±0.00 0.06 ±0.00 0.07 ±0.00
+
+Table 2: Comparing mean errors ( ± std) of prediction performance using RNN, DRNN and PINN models for the 2DOF manipulator model (N is the number of training samples)                                           
+
+> NNoise RNN ( ×10 −4)DRNN ( ×10 −4)PINN ( ×10 −4)
+> 200 Yes 4.60 ±3.49 3.59 ±2.91 1.39 ±1.92 No 3.60 ±3.28 2.10 ±1.64 0.56 ±1.23 400 Yes 2.50 ±2.29 1.66 ±1.43 1.84 ±2.69 No 1.60 ±2.22 0.76 ±0.57 0.91 ±2.23
+
+Fig. 1 compares the proposed DissipNet (DRNN) with a naive RNN and a PINN on the MSD model. While all three networks can capture the system dynamics of the MSD system, notable differences arise in terms of energy behavior. In particular, the PINN does not preserve the dissipativity property, as evidenced by the corresponding energy evolution. In contrast, the energy plot of the proposed DRNN (bottom subplot) clearly demonstrates dissipative behavior, confirming that the dissipativity constraint is effectively enforced by the network architecture. Fig. 2 compares the performance of the models when the training data are corrupted by noise. The results show that the proposed DRNN achieves superior prediction accuracy with less noise sensitivity compared with both the RNN and PINN, while simultaneously preserving the dissipativity property. Table 1 presents a quantitative comparison of the mean prediction errors and corresponding standard deviations obtained using RNN, PINN, and the proposed DRNN for the MSD model, under varying training noise conditions and numbers of training samples. In all evaluated scenarios, the proposed DRNN consistently achieves significantly lower prediction errors than the standard RNN, demonstrating the effectiveness of enforcing dissipativity constraints in improving learning stability and accuracy. For N = 200 with training noise, DRNN reduces the mean error from 6 .53 × 10 −2 to 1 .12 × 10 −2, corresponding to an improvement of over 80%, while also exhibiting a markedly smaller variance. A similar trend is observed for N = 400, where DRNN attains a mean error of 1 .24 × 10 −2 compared to 6.59 × 10 −2 for RNN, indicating that the performance advantage of DRNN persists as the dataset size increases. When compared with PINN, DRNN demonstrates superior robustness to training noise, particularly in the low-data regime. For N = 200 with noise, DRNN achieves nearly a fivefold reduction in error relative to PINN, while for N = 400 the improvement remains substantial. In the absence of training noise, both DRNN and PINN benefit from increased data availability; however, DRNN consistently attains the lowest error across all cases, reaching 6 .0 × 10 −4 for 
+
+N = 400. These results collectively indicate that incorporating dissipativity directly into the network dissipativity directly into the network architecture leads to improved generalization and noise robustness compared with both purely data-driven RNNs and physics-informed PINNs in modeling MSD dynamics. In Fig. 3, the proposed DRNN is compared with a naive RNN and a PINN on the modeling of a 2-DOF manipulator. Similar to the MSD system, the PINN fails to preserve the dissipativity property of the modeled system, in contrast to the proposed DRNN. Fig. 4 illustrates the performance of all models when the robot joint angles are corrupted by Gaussian noise. It is seen that DRNN is less sensitive to noise, and in both Fig. 3 and Fig. 4, the proposed DRNN consistently achieves lower prediction errors than both the RNN and PINN, while preserving dissipativity. This superior modeling performance is further confirmed by the quantitative 13 results reported in Table 2. Table 2 compares the prediction error of RNN, PINN, and the proposed DRNN under different data lengths and noise conditions. Across all settings, DRNN consistently achieves lower mean error and reduced variance compared to the standard RNN, indicating improved accuracy and robustness due to the imposed dissipative structure. In particular, for N = 200, with noise, DRNN reduces the error by approximately 22% relative to RNN, while for N = 400 the reduction increases to about 40%. Compared with PINN, DRNN performs competitively under noisy conditions and shows a clear advantage in noise-free cases, especially as the data length increases, where DRNN attains the lowest error among all methods. These results suggest that explicitly enforcing dissipativity leads to better generalization and noise robustness than both purely data-driven RNNs and physics-regularized PINNs. 
+
+# 5 Conclusions 
+
+In this work, we proposed a dissipative recurrent network model that can learn the dynamics and preserve the dissipative property of a known dissipative nonlinear model. This was realized through the design and learning algorithm of the network structure so that the weights satisfy dissipative constraints and they can be solved with non-constrained optimization method. The proposed network was evaluated and compared with a PINN model and a naive RNN on a mass-spring-damper system and a 2-dof planar manipulator, which are dissipative with partic-ular input-output pairs. The results showed the superior performance of our dissipative RNN network compared to Naive RNN and PINN networks in guaranteeing both good modeling per-formance and physical meaning preservation. Moreover, it can be observed that, while PINN networks do not guarantee the preservation of the dissipativity property of the system, they also require prior knowledge of the system dynamics in the form of explicit equations, which is not needed in the proposed network. This is expected to provide a useful tool for designing a more effective and physically mean-ingful network applicable across a wide range of applications. Research on the modeling of the proposed model on more complex case studies, and improving the training time will be our future work. 
+
+# A PROOF OF EQ. (24) 
+
+Left and right multiplying Eq. (22) by [ νTk νTk+1 uTk ] and [ νTk νTk+1 uTk ]T respectively, one can obtain 
+
+νTk P ν k − νTk+1 P ν k+1 + νTk CTh QC hνk + 2 νTk DT QC huk
+
++ 2 νTk CTh ST uk + uTk R1uk − 2γvTk Λνk+1 + νTk+1 Λνk+1 ≥ 0 (50) taking into account that vk = W uuk + W ih νk+1 + W hh νk, and Vk+1 (νk+1 ) − Vk(νk) = 
+
+νTk+1 P ν k+1 − νTk P ν k, and [yTk uTk ]
+
+> [
+
+Q ST
+
+S R
+
+> ] [
+
+yk
+
+uk
+
+> ]
+
+= νTk CTh QC hνk
+
++ 2 νTk DT QC huk + 2 νTk CTh ST uk + uTk R1uk (51) where R1 = R + SD + DT ST + DT QD .14 Eq. (50) then can be re-written as 
+
+Vk+1 (νk+1 ) − Vk(νk) ≤ [yTk uTk ]
+
+[
+
+Q ST
+
+S R
+
+] [ 
+
+yk
+
+uk
+
+]
+
++ [ vTk νTk+1 ]
+
+[
+
+0 −γΛ
+
+−γΛ Λ
+
+] [ 
+
+vk
+
+νk+1 
+
+]
+
+(52) 
+
+# B PROOF OF EQ. (25) 
+
+The slopes of widely-used activation functions ϕ(), such as ReLU, tanh, exponential linear functions, are restricted by the range [alpha, beta]. We have 
+
+αvk ≤ νk+1 = ϕ(vk) − ϕ(0) ≤ βνk (53) Therefore (νk+1 − αvk)Λ(νk+1 − βvk) (54) [vTk νTk+1 ]
+
+[
+
+ρΛ −γΛ
+
+−γΛ Λ
+
+] [ 
+
+vk
+
+νk+1 
+
+]
+
+≤ 0 (55) where, ρ = αβ, γ = 12 (α + β). From assumption 1, Eq. (55) becomes [vTk νTk+1 ]
+
+[
+
+0 −γΛ
+
+−γΛ Λ
+
+] [ 
+
+vk
+
+νk+1 
+
+]
+
+≤ 0 (56) 
+
+B.1 Choose D such that 
+
+R1 = R + SD + DT ST + DT QD ≻ 0 (57) It is noticed that Eq. (57) will be satisfied if 
+
+L = R + SD + DT ST + DT Q1D ≻ 0 (58) where Q1 = Q − ϵI with I ∈ Rp×p, and ϵ is a sufficiently small constant to guarantee that 
+
+Q1 ≺ 0. ϵ can be chosen as 0 in case Q ≺ 0. Then Q1 can be represented as Q1 = −LTq Lq.
+
+D can be chosen as follow [21] 
+
+D = −Q−11 ST + L−1 
+
+> q
+
+N L r (59) where Lr ∈ Rm×m is found from Eq. (60) 
+
+R − SQ 1ST = LTr Lr (60) 
+
+N and M can be chosen as follows if p ≥ m
+
+M = Y T 
+
+> 1
+
+Y 1 + Y 2 − Y T 
+
+> 2
+
++ Y T 
+
+> 3
+
+Y 3 + ϵ3Im (61) 
+
+N =
+
+[
+
+(Im − M )( Im + M )−1
+
+−2Y 3(Im + M )−1
+
+]
+
+(62) where Y 1 ∈ Rm×m, Y 2 ∈ Rm×m, and Y 3 ∈ R(p−m)×m are free variables, ϵ3 > 0, Im is the identity matrix with size m × m.15 if p < m 
+
+M = Y T 
+
+> 1
+
+Y 1 + Y 2 − Y T 
+
+> 2
+
++ Y T 
+
+> 3
+
+Y 3 + ϵ3Ip (63) 
+
+N =
+
+> [
+
+(Im + M )−1(Im − M ) − 2( Im + M )−1Y T
+
+> 3
+> ]
+
+(64) where Y 1 ∈ Rp×p, Y 2 ∈ Rp×p, and Y 3 ∈ R(m−p)×p are free variables, Ip is the identity matrix with size p × p.It can be proven that N N T ≺ I and R1 = LTr (I − N N T )Lr ≻ 0. where I the identity matrix with the same size as N N T .
+
+# Acknowledgment 
+
+This material is based upon work supported by the Air Force Office of Scientific Research under award number FA2386-24-1-4039. 
+
+# References 
+
+[1] T. Hagan, B. Demuth, and O. D. Jesús, “An introduction to the use of neural networks in control systems,” International Journal of Robust and Nonlinear Control: IFAC-Affiliated Journal , vol. 12, no. 11, pp. 959–985, 2002. [2] T. Luong, K. Kim, S. Seo, J. Jeon, C. Park, M. Doh, J. C. Koo, H. R. Choi, and H. Moon, “Long short term memory model based position-stiffness control of antagonistically driven twisted-coiled polymer actuators using model predictive control,” IEEE Robotics and Au-tomation Letters , vol. 6, no. 2, pp. 4141–4148, 2021. [3] L. Xie, M. Fu, and H. Li, “Passivity analysis and passification for uncertain signal pro-cessing systems,” IEEE Transactions on Signal Processing , vol. 46, no. 9, pp. 2394–2403, 1998. [4] C. T. Landi, F. Ferraguti, C. Fantuzzi, and C. Secchi, “A passivity-based strategy for coaching in human-robot interaction,” in 2018 IEEE International Conference on Robotics and Automation (ICRA) , pp. 3279–3284, IEEE, 2018. [5] A. Albu-Schäffer, C. Ott, and G. Hirzinger, “A unified passivity-based control framework for position, torque and impedance control of flexible joint robots,” The international journal of robotics research , vol. 26, no. 1, pp. 23–39, 2007. [6] J. E. Slightam, D. R. McArthur, S. J. Spencer, and S. P. Buerger, “Passivity analysis of quadrotor aircraft for physical interactions,” in 2021 Aerial Robotic Systems Physically Interacting with the Environment (AIRPHARO) , pp. 1–8, IEEE, 2021. [7] C. Ren, Y. Sun, and S. Ma, “Passivity-based control of an omnidirectional mobile robot,” 
+
+Robotics and Biomimetics , vol. 3, pp. 1–9, 2016. [8] X. Liao and J. Wang, “Global dissipativity of continuous-time recurrent neural networks with time delay,” Physical Review E , vol. 68, no. 1, p. 016118, 2003. [9] H. K. Khalil and J. W. Grizzle, Nonlinear systems , vol. 3. Prentice hall Upper Saddle River, NJ, 2002. [10] S. Commuri and F. L. Lewis, “Cmac neural networks for control of nonlinear dynamical systems: structure, stability and passivity,” Automatica , vol. 33, no. 4, pp. 635–641, 1997. 16 [11] W. Yu and X. Li, “Some stability properties of dynamic neural networks,” IEEE Trans-actions on Circuits and Systems I: Fundamental Theory and Applications , vol. 48, no. 2, pp. 256–259, 2001. [12] W. Yu, “Passivity analysis for dynamic multilayer neuro identifier,” IEEE Transactions on Circuits and Systems I: Fundamental Theory and Applications , vol. 50, no. 1, pp. 173–178, 2003. [13] C. Li and X. Liao, “Passivity analysis of neural networks with time delay,” IEEE Trans-actions on Circuits and Systems II: Express Briefs , vol. 52, no. 8, pp. 471–475, 2005. [14] J. H. Park, “Further results on passivity analysis of delayed cellular neural networks,” 
+
+Chaos, Solitons & Fractals , vol. 34, no. 5, pp. 1546–1551, 2007. [15] J. Drgo vna, A. Tuor, S. Vasisht, and D. Vrabie, “Dissipative deep neural dynamical sys-tems,” IEEE Open Journal of Control Systems , vol. 1, pp. 100–112, 2022. [16] Y. Xu and S. Sivaranjani, “Learning dissipative neural dynamical systems,” IEEE Control Systems Letters , vol. 7, pp. 3531–3536, 2023. [17] Y. Okamoto and R. Kojima, “Learning deep dissipative dynamics,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 39, pp. 19749–19757, 2025. [18] S. Cuomo, V. S. Di Cola, F. Giampaolo, G. Rozza, M. Raissi, and F. Piccialli, “Scientific machine learning through physics–informed neural networks: Where we are and what’s next,” Journal of Scientific Computing , vol. 92, no. 3, p. 88, 2022. [19] C. I. Byrnes and W. Lin, “Losslessness, feedback equivalence, and the global stabilization of discrete-time nonlinear systems,” IEEE Transactions on automatic control , vol. 39, no. 1, pp. 83–98, 1994. [20] N. Van Khang, “Consistent definition of partial derivatives of matrix functions in dynamics of mechanical systems,” Mechanism and Machine Theory , vol. 45, no. 7, pp. 981–988, 2010. [21] M. Revay, R. Wang, and I. R. Manchester, “Recurrent equilibrium networks: Flexible dy-namic models with guaranteed stability and robustness,” IEEE Transactions on Automatic Control , vol. 69, no. 5, pp. 2855–2870, 2023. 17

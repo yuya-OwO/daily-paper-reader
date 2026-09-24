@@ -1,0 +1,384 @@
+Title: Discovery of fully efficient fault indicators along a data-based diagnosis process
+
+URL Source: https://arxiv.org/pdf/2609.28087v1
+
+Published Time: Thu, 24 Sep 2026 01:13:17 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Discovery of fully efficient fault indicators along a data-based diagnosis process 
+
+Igor Bezmaternykh ∗ Louise Trav´ e-Massuy` es ∗
+
+Elodie Chanthery ∗∗ LAAS-CNRS, Universit´ e de Toulouse, INSA, Toulouse, France e-mails: bezmaternykh@insa-toulouse.fr, louise@laas.fr, echanthery@laas.fr 
+
+Abstract: The integration of model-based and data-driven paradigms provides a powerful framework for fault diagnosis by combining the interpretability of analytical redundancy relations, i.e., input-output relations that are used as diagnosis indicators in model-based diagnosis, with the adaptability of learning techniques. DT4X is a recent diagnosis algorithm that uses symbolic regression to generate multivariate relations leveraging some properties of analytical redundancy relations and uses them as split functions in a decision tree. However, its symbolic regression procedure optimizes only the separation between two selected classes at each node, often fragmenting the remaining classes and degrading both interpretability and diagnosis performance. This paper introduces DT4X+, an enhanced version of DT4X that modifies the construction of training sets and the symbolic-regression loss so that expressions separate the target classes while preserving the coherence of non-target classes. The resulting relations become fully consistent with ARR properties and lead to more informative splits, improved robustness, and better performance on dynamic-system datasets. Experiments conducted on several benchmark systems demonstrate the benefits of this enhanced formulation. 
+
+Keywords: Data-based diagnosis, knowledge discovery, diagnosis indicators, decision trees 1. INTRODUCTION Data-based diagnosis methods are increasingly popular, as they enable fault diagnosis even when expert knowledge is limited or when a method must be rapidly adapted to a new system without redesigning a full model. However, black-box learning approaches, such as neural networks, often lack interpretability, which is a key requirement in fault diagnosis. This motivates the use of decision trees, whose structure and split functions bring insights into the diagnostic process. Several studies (Assaf and Dugan (2005); Gaddam et al. (2007); Guh and Shiue (2008); Sun et al. (2007)) have applied decision trees to fault detection and isolation. Yet, traditional univariate trees remain inadequate because, in model-based diagnosis, the distinction between normal and faulty behaviours relies on multivariate relations, which can be captured by analytical redundancy relations (ARRs) when an analytical model is known, rather than by single-variable relations. This limitation has motivated the use of multivariate de-cision trees (Ca˜ nete-Sifuentes et al. (2021)). Some con-tributions rely on linear combinations of the variables used as features, while others incorporate non-linear split functions using synthetic features, kernel methods, or neural networks as presented in Section 2 that surveys related work. Although these approaches increase expres-siveness, they often require strong prior knowledge about the expected functional form. More recently, symbolic-regression-based decision trees have emerged as a promis-ing alternative, as they can discover meaningful multi-variate relations automatically (Fong and Motani (2024)). Among them, DT4X (Goupil et al. (2024)) has shown that symbolic regression can be guided to produce expressions leveraging some properties of analytical redundancy rela-tions ARRs, thus reconnecting data-driven learning with well-established concepts from model-based diagnosis. Despite its strengths, DT4X has an intrinsic limitation. Its symbolic-regression procedure optimizes the discrimi-nation between two target classes at each node but does not impose the behavior of the resulting expression for the remaining classes. As a result, non-target classes may be arbitrarily fragmented across child nodes, producing split functions that are less informative and forcing the tree to compensate with additional relations at deeper levels. In this respect, the identified relationships do not fully align with the properties of ARRs, since an ARR partitions all classes entirely into two distinct groups. As a matter of fact, ARRs are zero for samples of the nominal class. For other classes, ARRs may be zero (when not sensitive to the fault of the class) or non-zero (when sensitive to the fault of the class), and they remain consistent across all samples within a given class. Consequently, classes can be discriminated using a sufficient set of ARRs and the corresponding sensitivity Boolean vector, known as the ARR fault support. To address this issue, we propose DT4X+, an enhanced version of DT4X that incorporates all classes during sym-bolic regression and introduces a loss term penalizing the fragmentation of non-target classes. This modification encourages the discovery of split functions that better preserve class structure while still separating the target arXiv:2609.28087v1 [cs.AI] 23 Sep 2026 classes. The resulting relations are then fully consistent with ARR properties, serving as fully efficient fault indica-tors, and ultimately yield more coherent and interpretable decision trees. The article is organized as follows: Section 2 reviews re-lated work on multivariate and symbolic-regression-based decision trees. Section 3 presents the DT4X algorithm. Section 4 introduces the DT4X+ extension and its revised loss function. Section 5 reports experimental results on both static and dynamic systems. Finally, section 6 con-cludes the paper and outlines perspectives for future work. 2. RELATED WORK Multivariate decision trees have been explored through a variety of formulations over the years. Early approaches focused on linear combinations of features to define oblique splits, as in OC1 and its variants (Murthy et al. (1993); Norouzi et al. (2015)), or more recent continuous-optimization methods (Utgoff (1989); Wickramarachchi et al. (2016)). While these approaches improve expressive-ness compared to univariate trees, their linear nature limits their ability to capture the nonlinear relations typically required for fault indicators. Several strategies have been proposed to address this lim-itation. Some works augment the feature space by gener-ating synthetic attributes through algebraic combinations of original variables (Kou et al. (2020)), enabling standard tree learners to exploit nonlinear relationships. However, such feature expansion scales poorly when the number of variables increases, often leading to combinatorial explo-sion. Other methods (Hutchison et al. (2024)) incorporate a limited set of predefined nonlinear split functions within otherwise univariate trees. These techniques rely heavily on prior domain knowledge and restrict the variety of relations that can be discovered. A different class of methods embeds nonlinear classifiers within the nodes of a decision tree. Approaches based on support vector machines (Bennett and Blue (1998) and Monta˜ nana et al. (2021)) make use of kernel functions to obtain nonlinear boundaries, whereas neural or perceptron trees (Balestriero (2017); Yıldız et al. (2001)) rely on multilayer perceptrons to model split functions. While these produce flexible decision boundaries, the resulting models lose interpretability due to the opaque nature of their internal parametrization, which is undesirable for fault diagnosis. Symbolic-regression-based trees offer an alternative that preserves interpretability while enabling nonlinear multi-variate splits. The SREDT algorithm proposed by Fong and Motani (2024) uses genetic programming to gener-ate candidate expressions and selects them using a split-impurity criterion. This method performs competitively on fault-oriented datasets, but the expressions it generates do not correspond to analytical redundancy relations (ARRs), as the splitting threshold remains arbitrary. DT4X, proposed by Goupil et al. (2024), addresses this limitation by constraining symbolic regression (Kron-berger et al. (2024)), embedded into symbolic classifica-tion, to produce expressions leveraging some properties of ARRs, in particular the fact that ARRS are (ideally) zero for the nominal class and non-zero for some faulty classes. DT4X learns such analytical relations and integrates them directly into a decision-tree structure. This approach yields accurate diagnosis trees with meaningful, interpretable split functions derived automatically from data. However, DT4X does not fully account for all the prop-erties of ARRs. Indeed, DT4X constructs each split by focusing solely on the discrimination between a pair of tar-get classes. As a consequence, samples from other classes may be arbitrarily partitioned across the tree’s branches. This fragmentation can hinder interpretability and de-crease diagnostic performance, especially for systems with many fault modes or heterogeneous behaviours. This is not surprising since it contravenes the definition of ARRs, whereby all samples in a class must behave in the same way (evaluating ARRs 0 or non-zero). DT4X+ builds upon DT4X and addresses this limitation. By incorporating all classes during symbolic regression and penalizing the fragmentation of non-target classes, DT4X+ leads to coherent splits while fully preserving the ARR properties of the learned relations. 3. THE TREE BASED DIAGNOSIS METHOD DT4X DT4X, detailed in (Goupil et al. (2024)), is briefly re-minded here. It constructs a diagnosis tree T recursively, generating at each node a multivariate relation that sep-arates two target classes (( c1, c 2) in Algorithm 1). These relationships are derived through symbolic classification, constrained to emulate a key property of ARRs: an ARR that evaluates to zero for samples of one class and non-zero for samples of another class can discriminate between the two classes. Symbolic classification subsumes symbolic regression to automatically discover explicit mathematical expressions to distinguish between classes, based on input features, i.e., variables and operators. At each node, DT4X identifies the subset of classes that are sufficiently represented in the local dataset. If the nominal class c0 is present in sufficient proportion, the algorithm considers target pairs of the form ( c0, c x) with cx one of the other sufficiently represented classes. Otherwise, all ordered pairs of sufficiently represented classes are considered ( generate pairs , line 9, Algorithm 1). The learning process for a given pair proceeds as follows. First, a training set is built by sampling data from the two target classes. When a non-nominal class is involved, nominal samples are added to the training set and as-signed to the first class of the pair to enforce the ARR structure. In any case, the balance function creates two perfectly balanced sets of samples (line 12, Algorithm 1, and see balance function in Algorithm 2). Second, DT4X attempts to construct an analytical relation that separates the two classes. For this purpose, symbolic classification (SC, line 13, Algorithm 1) is applied using a threshold around zero as the decision function and the log loss 
+
+function as the fitness criterion: 
+
+log loss = − 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+[yi log( pi) + (1 − yi) log(1 − pi)] (1) where: 
+
+• N is the number of samples. • yi is the label (0 ou 1) for sample i.
+
+• pi is the predicted probability for the sample i to belong to class 1. This encourages the algorithm to identify expressions that evaluate close to zero for one target class and have a non-zero value for the other. If the best expression sufficiently separates the target classes, the node is split according to the expression (lines 17 and 18, Algorithm 1), and the procedure is applied recursively to the resulting child nodes. If no candidate expression achieves the required separation, the node becomes a leaf labeled with the majority class (lines 20 and 21, Algorithm 1). The tree is grown in a breadth-first manner: for each node, class pairs are evaluated sequentially until a suitable ex-pression is found or all pairs are exhausted. The resulting decision tree contains at each internal node a symbolic expression playing the role of a fault indicator, while the leaves correspond to fault classes. 
+
+Algorithm 1 DT4X pseudo-code 
+
+Inputs: D, O, Hyper-Parameters, untrained DT ( n0)
+
+Output: T trained decision tree with diagnosis indicators  
+
+> 1:
+
+Initialize tree T with a single root node n0 containing dataset D 
+
+> 2:
+
+Initialize currentN odes ← n0 
+
+> 3:
+
+while currentN odes is not empty do  
+
+> 4:
+
+for all node ∈ currentN odes do  
+
+> 5:
+
+if node is pure with label l then  
+
+> 6:
+
+node is leaf  
+
+> 7:
+
+node ← l 
+
+> 8:
+
+else  
+
+> 9:
+
+pairsT oT ry ← generate pairs  
+
+> 10:
+
+(c1, c 2) ← first element of pairsT oT ry  
+
+> 11:
+
+while not cbest and pairsT oT ry not empty 
+
+do  
+
+> 12:
+
+Xtrain , y train ← balance (Dn, c1, c2)  
+
+> 13:
+
+cbest ← SC (Xtrain , y train ) 
+
+> 14:
+
+pair ← next element of pairsT oT ry  
+
+> 15:
+
+end while  
+
+> 16:
+
+if cbest then  
+
+> 17:
+
+lN ode, rN ode ← split according to cbest  
+
+> 18:
+
+f utureN odes ← +lN ode, rN ode  
+
+> 19:
+
+else  
+
+> 20:
+
+node is leaf  
+
+> 21:
+
+node ← majority label l 
+
+> 22:
+
+end if  
+
+> 23:
+
+end if  
+
+> 24:
+
+end for  
+
+> 25:
+
+currentN odes ← f utureN odes  
+
+> 26:
+
+end while 
+
+4. ENHANCING DT4X WITH DT4X+ This section introduces DT4X+, an extension of DT4X designed to address the fragmentation of non-target classes during split construction. The modifications concern both the construction of the symbolic-regression training sets and the definition of the loss function used to evaluate candidate expressions. 
+
+4.1 Identification of the problem 
+
+In DT4X, the symbolic-regression process optimizes ex-pressions exclusively to separate a selected pair of tar-get classes. Samples belonging to other classes do not contribute to the loss and therefore do not influence the structure of the learned relation. As a consequence, an expression that cleanly separates the two target classes may arbitrarily divide the remaining classes across the two branches of the split. This phenomenon is illustrated in Fig. 4.1: although the split correctly separates the target pair (Nominal and Fault 2), it fragments another class (Fault 1) across both children, compromising interpretabil-ity and forcing the tree to compensate with additional relations at deeper levels. This behaviour is problematic for two reasons. First, a relation that fragments a class conveys no diagnosis information about that class, contradicting the ARR-inspired objective of producing interpretable indicators. Second, unnecessary fragmentation increases the number of required splits, leading to deeper and potentially less robust trees. These limitations become more pronounced in datasets with many fault classes or heterogeneous fault signatures. 
+
+Node 0 
+
+> Nominal Fault 1 Fault 2 Symbolic expression
+
+Node 1 
+
+> Nominal Fault 1
+
+Node 2 
+
+> Fault 2 Fault 1
+
+Fig. 1. Illustration of a non-target class being fragmented. 
+
+4.2 DT4X+ revised loss 
+
+To mitigate class fragmentation, DT4X+ introduces an additional loss term that penalizes splits responsible for dispersing non-target classes across different branches. The symbolic classification objective therefore becomes a combination of two components: (1) a discrimination loss, denoted Ltarget that enforces discrimination of the target pair, identical to the DT4X loss given by the log loss of equation (1), and (2) a fragmentation loss, denoted Lfrag ,that measures how non-target classes are distributed after the split: 
+
+Loss DT 4X+ = Ltarget + Lfrag (2) For the fragmentation term, DT4X+ uses the gini impurity computed separately for each non-target class. This split score is similar to the metric of split impurity commonly used in decision trees, but calculated over classes instead of over nodes. It is more coherent because it aligns the impurity measure directly with the distribution of each class within a node, rather than aggregating across all classes indiscriminately. Let nt be the set of non-target classes, the fragmentation loss, using the gini impurity normalized for a binary split, is defined as: 
+
+Lfrag = X
+
+> k∈nt
+
+4 · pleft ,k · pright ,k · wk (3) with pleft,k and pright ,k = 1 − pleft ,k the proportions of samples of class k sent to each branch, and wk the weight of class k according to sample count, i.e., its relative frequency (lines 11-15, Algorithm 3). Lfrag is essentially a weighted and normalized version of the Gini impurity applied to each non-target class. The loss for one class k
+
+is therefore 0 when all samples of class k fall into a single branch (no fragmentation) and 1 when the class is split evenly between both branches (highest fragmentation). The factor ”4” normalizes the Gini impurity for a binary split so that its maximum value is 1 (when pleft ,k =
+
+pright ,k = 0 .5). By summing over all non-target classes, we obtain a global measure of undesirable fragmentation caused by the split. This loss is small when each non-target class remains entirely in a single branch (good separation) and large when non-target classes are dispersed between the two branches (high fragmentation). Hence, it favors splits that preserve the integrity of non-target classes. The metric Lfrag is simple to compute as it does not require exponentiation or logarithms. This is important because it is calculated on all samples of non-target classes. When combined with the log-loss used for target-class discrimina-tion, it ensures that fragmentation is only penalized when the expression already achieves sufficiently high separation accuracy on the target pair, thus preserving the target pair discrimination behaviour, as detailed below. The log loss function (line 5, Algorithm 3) cannot op-erate on probabilities equal to 0, since log(0) is undefined. To avoid this issue, the gplearn implementation that we use adopts clipping , replacing predicted probabilities equal to 0 with 10 −15 , and probabilities equal to 1 with 1 −10 −15 .In DT4X, the decision function outputs only 0 or 1, so after clipping, the effective probabilities passed to log loss are restricted to the set {10 −15 , 1 − 10 −15 }. As a consequence, the log-loss of a sample takes only two possible values, depending solely on whether the sample is correctly or incorrectly classified. For a misclassified sample, the clipped probability is p =10 −15 , leading to a log-loss of 
+
+− log(10 −15 ) = 15 log(10) ≈ 34 .54 .
+
+For a correctly classified sample, the clipped probability is 
+
+p = 1 − 10 −15 , for which 
+
+− log(1 − 10 −15 ) ≈ 10 −15 ,
+
+a negligible value. Thus, the total log-loss becomes essen-tially proportional to the number of misclassified samples. Being N the total number of samples and Nincorrect the number of misclassified ones, the accuracy is defined as accuracy = 1 − Nincorrect 
+
+N .
+
+Since each misclassified sample contributes approximately 15 log(10) to the log-loss, we obtain log loss ≈ (1 − accuracy) × 15 log(10) .
+
+The Lfrag value lies within [0,1], so it has an influence on 
+
+LDT 4X+ , the total loss of DT4X+, only when Ltarget is less than 1. 
+
+Ltarget = log loss < 1 ⇔ (1 − accuracy) × 15 log(10) < 1
+
+⇔ accuracy > 0.97 .
+
+The threshold of 0.97 for accuracy corresponds to a high target-class separation quality, confirming that Lfrag enters into play only when sufficient high separation of the target classes is achieved. 
+
+4.3 DT4X+ algorithm 
+
+DT4X+ modifies two parts of the original algorithm: the construction of the training dataset and the computation of the fitness function. Unlike DT4X, the training dataset always includes all classes present in the node. Target classes are balanced as before, while all other classes are added in their original proportions. This ensures that sym-bolic regression receives information about how non-target classes respond to candidate expressions. The modified 
+
+balance function is described in Algorithm 2. During training, the fitness of a candidate expression becomes the sum of the DT4X classification loss on the target classes Ltarget and the fragmentation loss on the non-target classes Lfrag (Algorithm 3). Expressions that cleanly separate the target pair while maintaining class coherence are therefore favoured. 
+
+Algorithm 2 DT4X vs DT4X+ balance pseudo code -The text in magenta shows the changes made in DT4X+ compared to DT4X in black. 
+
+Inputs: Dn: dataset at current node, ( c1, c 2): target pair classes 
+
+Output: Xtrain , y train : training dataset for SC (symbolic classifier)  
+
+> 1:
+
+Nmin ← min(count( Dn, c1), count( Dn, c2))  
+
+> 2:
+
+▷ Build samples for class c2  
+
+> 3:
+
+Sc2 ← sample (Dn, c2, Nmin ) 
+
+> 4:
+
+if c1̸ = nominal then  
+
+> 5:
+
+Snom ← sample (Dn, nominal, Nmin /2)  
+
+> 6:
+
+Sc1 ← sample (Dn, c1, Nmin /2)  
+
+> 7:
+
+Sc1 ← concatenate (Snom , S c1) 
+
+> 8:
+
+else  
+
+> 9:
+
+Sc1 ← sample (Dn, c1, Nmin ) 
+
+> 10:
+
+end if  
+
+> 11:
+
+▷ Add non-target classes in original proportions  
+
+> 12:
+
+Sextra ← samples in Dn whose labels are not in 
+
+{nominal, c 1, c 2} 
+
+> 13:
+
+Xtrain ← concatenate (Sc1, Sc2, Sextra ) 
+
+> 14:
+
+ytrain ← labels (Xtrain ) 
+
+> 15:
+
+return shuffle (Xtrain , y train )For all other aspects such as pair selection, recursive tree construction, stopping criterion, DT4X+ follows the same procedure as DT4X (Goupil et al. (2024)). 5. EXPERIMENTS 
+
+5.1 Experimental Setup Datasets – DT4X+ was evaluated on four datasets used for fault diagnosis: a static polybox system composed of Algorithm 3 DT4X+ loss pseudo code 
+
+Inputs: ˆy: predicted class labels from SC, y: true class labels, (c1, c2): target class pair  
+
+> 1:
+
+▷ Target-class loss (same as DT4X)  
+
+> 2:
+
+mask target ← indices where y ∈ { c1, c 2} 
+
+> 3:
+
+ˆytarget ← ˆy[mask target]  
+
+> 4:
+
+ytarget ← y[mask target]  
+
+> 5:
+
+Ltarget ← log loss (ˆ ytarget , y target ) 
+
+> 6:
+
+▷ Fragmentation loss on non-target classes  
+
+> 7:
+
+mask non target ← indices where y / ∈ { c1, c 2} 
+
+> 8:
+
+ˆynt ← ˆy[mask non target]  
+
+> 9:
+
+ynt ← y[mask non target]  
+
+> 10:
+
+Lf rag ← 0 
+
+> 11:
+
+for all class k in unique (y nt) do  
+
+> 12:
+
+plef t ← proportion of samples of class k with ˆynt = lef t  
+
+> 13:
+
+pright ← proportion of samples of class k with ˆynt = right  
+
+> 14:
+
+wk ← count (ynt == k)/ length (ynt ) 
+
+> 15:
+
+Lf rag ← Lf rag + 4 · plef t · pright · wk 
+
+> 16:
+
+end for  
+
+> 17:
+
+return Ltarget + Lf rag 
+
+adders and multipliers, a static logical circuit representing a subtractor (Goupil et al. (2023)), a dynamic two-tank system with 12 different possible faults (Goupil et al. (2024)) and a cyber-attack detection dataset (Sztyber-Betley et al. (2023)) corresponding to the superheater 4.2 subsystem of a steam-generation process. For the dynamic datasets, additional temporal features were generated us-ing finite-difference approximations (NumPy’s gradient operator) to capture dynamic behaviour. For the super-heater dataset, the training set was subsampled to reduce training time. 
+
+Baselines – DT4X was taken as the main baseline for evaluation, as it provides state-of-the-art results on these problems and shares the same symbolic-regression back-bone as DT4X+ (Goupil et al. (2023)). Using DT4X as a reference enables a direct comparison of the diagnostic relevance and interpretability of the relations produced by both methods. 
+
+Evaluation Metrics – Performance was assessed using accuracy and F1-score, which are suitable for class-imbalanced fault datasets. Computational cost was eval-uated through training time and inference latency. This allows analysing the benefit–cost trade-off introduced by DT4X+. 
+
+Implementation Details – Both algorithms, DT4X and DT4X+, were implemented in Python using the gplearn li-brary for genetic-programming-based symbolic regression. Some gplearn classes were overridden to reduce overhead and ensure consistent behaviour across both methods. Experiments were run on an HP 996M4ET workstation. To achieve a fair comparison, the two algorithms share the same hyperparameter values. The code is made available on GitHub 1 as well as the hyperparameter values.  
+
+> 1https://github.com/Igor-Bzk/DT4X plus
+
+5.2 Evaluation Results 
+
+Tables 1 and 2 report the performance obtained by DT4X and DT4X+ on all datasets.                     
+
+> Dataset Accuracy F1-scores Inference Time Training time
+> sf polybox 0.79909 0.73210 0.00067s 158.15s sf subtractor 0.84989 0.82223 0.0019s 240.32s sw water tanks 0.99713 0.99713 0.022s 1909.62s steam superheater 42 0.98968 0.98983 0.0013s 96.67s
+
+Table 1. DT4X results per dataset                     
+
+> Dataset Accuracy F1-scores Inference Time Training time
+> sf polybox 0.79909 0.73210 0.00075s 188.26s sf subtractor 0.84867 0.81647 0.0018s 546.19s sw water tanks 0.99847 0.99847 0.031s 10318.46s steam superheater 42 0.99479 0.99483 0.0015s 187.91s
+
+Table 2. DT4X+ results per dataset On the polybox system, both algorithms produced iden-tical trees, resulting in identical accuracy and F1-scores. On the subtractor circuit, DT4X+ shows a slight de-crease in global metrics (–0.012 in accuracy, –0.058 in F1-score). However, a detailed inspection reveals that DT4X fails to distinguish classes 1 and 2, whereas DT4X+ suc-cessfully isolates a subset of class 1 without introducing false positives. The improved behaviour is confirmed by the confusion matrices and tree structures (cf. Github 1 ). DT4X+ provides a consistent improvement on dynamic datasets. On the two-tank system, both accuracy and F1-score increase by around 0.02. On the superheater dataset, the gains reach approximately 0.05. These improvements reflect the ability of DT4X+ to produce relations that pre-serve the coherence of non-target classes, thereby enabling more meaningful splits and reducing error propagation deeper in the tree. Inference latency remains essentially unchanged. Increases observed on the two-tank system (0.022 s to 0.031 s) are attributed to differences in tree structure rather than computational complexity. DT4X+ produced a root split that grouped more classes on one side, requiring additional downstream splits. On dynamic datasets, DT4X+ consistently produces expressions that better separate classes and correspond more closely to ARR-like behaviours. For example, in the two-tank sys-tem, the root relation produced by DT4X fragments sev-eral classes, whereas DT4X+ isolates each class into one of the two child nodes, with only a few classes appearing in both nodes, and even then, they exhibit a negligible number of samples in one of them (cf. Github 1 ).The learned relations therefore provide more usable diagnostic insight. DT4X+ isolated each of the classes into one of the two nodes, with only classes 0, 3, 5 and 10 having a presence in both Node 1 and 2, though still having a very significant majority in one of the two nodes. 
+
+5.3 Impact on computation time 
+
+DT4X+ and DT4X have almost identical inference time. However, training time increases significantly with DT4X+. Because the fragmentation loss requires evaluating the distribution of all non-target classes, the computational cost grows with both the number of classes and the number of samples per class. On the two-tank system, training time is multiplied by nearly 5. On the subtractor and superheater datasets, training time roughly doubles. On the polybox system, the impact remains below 20%, due to the small number of classes and limited dataset size. If training time matters, DT4X+ is particularly advanta-geous for dynamic systems, where the performance gains justify the additional training cost. For simpler static sys-tems, the original DT4X remains a competitive option. 6. CONCLUSION This paper proposes DT4X+, an enhanced version of the symbolic-regression-based decision tree algorithm DT4X. The approach addresses a structural limitation of DT4X: the fragmentation of non-target classes caused by optimiz-ing splits solely for target-pair discrimination. By modify-ing both the training-set construction and the symbolic-regression loss function, DT4X+ explicitly incorporates non-target classes and penalizes their dispersion across branches. The resulting split functions remain consistent with ARR principles while providing more coherent and informative class separation. They gain in interpretability because their sensitivity is defined for every class, whereas it was uncertain for some classes in the fault indicators of DT4X. Experimental results on both static and dy-namic systems show that DT4X+ improves diagnostic performance, especially on dynamic datasets, where class interactions and temporal behaviours are more complex. These benefits come at the cost of a higher training time, whose magnitude depends on the number of classes and samples. Future work will focus on integrating model-based constraints more deeply into the symbolic-regression process. This could strengthen the link between data-driven learning and diagnosis meta-knowledge. ACKNOWLEDGEMENTS The authors would like to thank Louis Goupil, co-designer and developer of DT4X and now Technical Lead at ATOS, for his invaluable help on DT4X. This work has benefited from the AI Interdisciplinary Institute ANITI funded by the France 2030 program under the Grant agreements n °ANR-19-PI3A-0004 and n °ANR-23-IACL-0002. REFERENCES Assaf, T. and Dugan, J.B. (2005). Build better diagnostic decision trees. IEEE instrumentation & measurement magazine , 8(3), 48–53. Balestriero, R. (2017). Neural decision trees. arXiv preprint arXiv:1702.07360 .Bennett, K.P. and Blue, J. (1998). A support vector ma-chine approach to decision trees. In IEEE international joint conference on neural networks proceedings. IEEE world congress on computational intelligence , volume 3, 2396–2401. IEEE. Ca˜ nete-Sifuentes, L., Monroy, R., and Medina-P´ erez, M.A. (2021). A review and experimental comparison of multivariate decision trees. IEEE Access , 9, 110451– 110479. Fong, K.S. and Motani, M. (2024). Symbolic regres-sion enhanced decision trees for classification tasks. In AAAI Conference on Artificial Intelligence , volume 38/11, 12033–12042. Gaddam, S.R., Phoha, V.V., and Balagani, K.S. (2007). K-means+ ID3: A novel method for supervised anomaly detection by cascading k-means clustering and ID3 decision tree learning methods. IEEE transactions on knowledge and data engineering , 19(3), 345–354. Goupil, L., Chanthery, E., Trav´ e-Massuy` es, L., and De-lautier, S. (2023). Tree based diagnosis enhanced with meta knowledge. In 34th International Workshop on Principles of Diagnosis (DX’23) .Goupil, L., Trav´ e-Massuy` es, L., Chanthery, E., Kohler, T., and Delautier, S. (2024). Tree based diagnosis enhanced with meta knowledge applied to dynamic systems. IFAC-PapersOnLine , 58(4), 1–6. doi:https:// doi.org/10.1016/j.ifacol.2024.07.184. Guh, R.S. and Shiue, Y.R. (2008). An effective application of decision tree learning for on-line detection of mean shifts in multivariate control charts. Computers &Industrial Engineering , 55(2), 475–493. Hutchison, C., Zizyte, M., Guttendorf, D., Le Goues, C., and Koopman, P. (2024). Active learning omnivariate decision trees for fault diagnosis in robotic systems. In IEEE/IFIP International Conference on Dependable Systems and Networks-Supplemental Volume (DSN-S) ,118–124. IEEE. Kou, L., Liu, C., Cai, G., Zhou, J., and Yuan, Q. (2020). Data-driven design of fault diagnosis for three-phase pwm rectifier using random forests technique with tran-sient synthetic features. IET Power Electronics , 13(16), 3571–3579. Kronberger, G., Burlacu, B., Kommenda, M., Winkler, S.M., and Affenzeller, M. (2024). Symbolic regression .Chapman and Hall/CRC. doi:https://doi.org/10.1201/ 9781315166407. Monta˜ nana, R., G´ amez, J.A., and Puerta, J.M. (2021). Stree: A single multi-class oblique decision tree based on support vector machines. In Conference of the Spanish Association for Artificial Intelligence , 54–64. Springer. Murthy, S.K., Kasif, S., Salzberg, S., and Beigel, R. (1993). OC1: a randomized algorithm for building oblique deci-sion trees. In Proceedings of AAAI , volume 93, 322–327. Citeseer. Norouzi, M., Collins, M.D., Fleet, D.J., and Kohli, P. (2015). CO2 forest: Improved random forest by con-tinuous optimization of oblique splits. arXiv preprint arXiv:1506.06155 .Sun, W., Chen, J., and Li, J. (2007). Decision tree and PCA-based fault diagnosis of rotating machinery. 
+
+Mechanical systems and signal processing , 21(3), 1300– 1317. Sztyber-Betley, A., Syfert, M., Ko´ scielny, J.M., and G´ orecka, Z. (2023). Controller cyber-attack detection and isolation. doi:https://doi.org/10.3390/s23052778. Utgoff, P.E. (1989). Perceptron trees: A case study in hybrid concept representations. Connection Science ,1(4), 377–391. Wickramarachchi, D.C., Robertson, B.L., Reale, M., Price, C.J., and Brown, J. (2016). HHCART: an oblique decision tree. Computational Statistics & Data Analysis ,96, 12–23. Yıldız, O.T., Yildiz, C., Alpaydın, E., and Alpaydin, E. (2001). Omnivariate decision trees. IEEE Transactions on Neural Networks , 12(6), 1539–1546.

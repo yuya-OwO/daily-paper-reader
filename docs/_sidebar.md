@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-09-25 <!--dpr-date:20260925-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/25/2609.22491v1-a-candidate-counterexample-to-a-conjecture-on-iss-for-time-delay-systems" data-sidebar-item="{&quot;title&quot;: &quot;A Candidate Counterexample to a Conjecture on ISS for Time-Delay Systems&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.22491v1-a-candidate-counterexample-to-a-conjecture-on-iss-for-time-delay-systems&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;时滞系统的李雅普诺夫-克拉索夫斯基泛函与输入-状态稳定性&quot;}">A Candidate Counterexample to a Conjecture on ISS for Time-Delay Systems</a>
   * 2026-09-24 <!--dpr-date:20260924-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/24/2609.20399v2-siphy-sparse-identification-of-port-hamiltonian-systems-from-noisy-data" data-sidebar-item="{&quot;title&quot;: &quot;SIPHy: Sparse identification of port-Hamiltonian systems from noisy data&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.20399v2-siphy-sparse-identification-of-port-hamiltonian-systems-from-noisy-data&quot;, &quot;score&quot;: &quot;8.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;sr&quot;}], &quot;evidence&quot;: &quot;从含噪数据对动力系统进行结构保持的符号回归&quot;}">SIPHy: Sparse identification of port-Hamiltonian systems from noisy data</a>

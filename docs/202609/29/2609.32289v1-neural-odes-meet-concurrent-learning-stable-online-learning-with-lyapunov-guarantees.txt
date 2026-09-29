@@ -1,0 +1,1994 @@
+Title: Neural ODEs Meet Concurrent Learning: Stable Online Learning with Lyapunov Guarantees
+
+URL Source: https://arxiv.org/pdf/2609.32289v1
+
+Published Time: Tue, 29 Sep 2026 00:42:01 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+Preprint. Under review as a conference paper at ICLR 2027. 
+
+# NEURAL ODE S MEET CONCURRENT LEARNING :STABLE ONLINE LEARNING WITH LYAPUNOV GUARANTEES 
+
+Omkar Sudhir Patil 
+
+Division of Electrical and Computer Engineering Louisiana State University Baton Rouge, LA 70803, USA 
+
+opatil1@lsu.edu 
+
+ABSTRACT 
+
+Neural ODEs learn dynamics from trajectory losses, but their adjoint gradients lack the regressor-times-parameter-error structure on which Lyapunov analyses of online adaptation rest, so training on streaming data comes without stability guarantees. We show that this structure is in fact present: the adjoint gradient de-composes exactly into a positive semi-definite trajectory operator acting on the parameter error plus a nonlinear perturbation with explicit, horizon-dependent bounds. A quadratic Lyapunov function then certifies online Neural ODE training over sliding windows under computable gain and horizon conditions, and the same certificate extends to stored data: its drift branch recovers concurrent learning, and its trajectory branch yields NODE-CL, a stored-segment Gauss–Newton method built on batched forward sensitivities that needs no state-derivative estimates. On four DeepMind Control Suite domains, NODE-CL attains the lowest median pre-diction error on three under velocity measurement noise, where observer-based concurrent learning degrades by up to 8×; with clean measurements it is best on the pendulum and within a factor of 1.6 of the best stored-data baseline on the cartpole and reacher. 
+
+1 INTRODUCTION 
+
+Two communities learn unknown dynamics from data with neural networks and rarely talk to each other. In machine learning, a neural ordinary differential equation (Neural ODE) is fitted by mini-mizing a loss over predicted trajectories with adjoint gradients (Chen et al., 2018); the loss is infor-mative because a trajectory mismatch integrates the modeling error through the dynamics, but train-ing is offline, with no guarantee about the parameter flow on streaming data. In adaptive control, the same network is updated online from the instantaneous prediction error, and a Lyapunov argument certifies that the estimation error stays bounded (Sanner & Slotine, 1992; Lewis et al., 1999; Patil et al., 2022), because that residual is, to first order, a known regressor times the parameter error. Trajectory losses lack that structure: the predicted trajectory depends on the parameters through an entire solve, so the adjoint gradient is not a regressor times a parameter error, and least-squares gains inject an indefinite term into any Lyapunov derivative. Concurrent learning (Chowdhary & Johnson, 2011), which replays stored samples, sits in between: certified, but tied to the instantaneous residual and hence to a state-derivative observer. This paper proposes NODE-CL, a stored-segment Gauss–Newton method for online Neural ODE identification that needs no state-derivative estimates and comes with a Lyapunov certificate, and shows that the same certificate covers both communities’ methods (Figure 1). The result that makes this possible is a trajectory-error decomposition, under which the adjoint gradient decomposes into a positive semi-definite trajectory operator acting on the parameter estimation error plus a perturbation with explicit, window-length dependent constants. A quadratic Lyapunov function then suffices: online Neural ODE training over sliding windows is certified under computable gain and horizon conditions, the window can be replaced by stored segments, and a Gauss–Newton gain from batched forward sensitivities can be added without leaving the certificate. The drift-based formulation is the 1arXiv:2609.32289v1 [eess.SY] 26 Sep 2026 Preprint. Under review as a conference paper at ICLR 2027. 01 DATA 02 TWO RESIDUAL PATHWAYS 03 SHARED UPDATE                                                                                     
+
+> Streaming measurements
+> x, ˙x, u
+> Stored data
+> Window or selected set
+> Drift residual OBSERVER-BASED
+> Drift observer
+> ˆf≈f(X),
+> ∥f−ˆf∥ ≤ ¯fT
+> Windowed residual
+> E= ˆf−Φ( X, ˆθ)
+> on [t−T, t ]
+> Ξf= Ψ ˜θ+ηf
+> Ψ = ∫tt−TΦ′⊤ Φ′dτ ⪰0
+> Window: drift-window law Stored pairs: concurrent learning (CL, CL-LS)
+> Trajectory residual ROLLOUT
+> Virtual rollout
+> ˙ˆXp=F( ˆXp,ˆθ, τ )
+> Trajectory residual
+> e=ˆXp−X
+> Ξa=H˜θ+ηa
+> H=∫tt−TW⊤W dτ ⪰0
+> Window: Neural ODE training Stored segments: NODE-CL (proposed)
+> Key result: the trajectory-error decomposition gives the adjoint gradient the form H˜θ+ηa
+> One certified update
+> ˙ˆθ= proj Γ
+> (ˆθ, α Ξ−kσˆθ)
+> ˙Γ = β0Γ( Ip−Γ/¯λ)−ςΓΓRΓ
+> GAIN-LAW REGRESSOR
+> R= Ψ (drift window, CL)
+> R=GS≈HS(NODE-CL)
+> Γ≡Γ0(adjoint window)
+> LYAPUNOV CERTIFICATE
+> V=12˜θ⊤Γ−1˜θ
+> ˙V≤ − λV +c
+> =⇒uniform ultimate boundedness (UUB)
+
+Figure 1: Streaming data (01) feed two residual pathways (02), an instantaneous drift residual formed with an observer and a trajectory residual formed by rolling the model out from stored initial states; each gradient decomposes into a positive semi-definite operator on the parameter error plus a bounded perturbation, so both pathways share one certified update (03). foundation: with a least-squares gain driven by the regressor of the gradient decomposition, the indefinite gain-dynamics term is dominated by the gradient term, and the stored-set version of that law contains the stack structure of concurrent learning as its constant-gain instance. 
+
+Contributions. First, NODE-CL: on four DeepMind Control Suite domains it is the most robust of the compared methods to velocity measurement noise and, with clean data, is best on the pendu-lum and within a factor of 1.6 of the best stored-data baseline on the cartpole and reacher, against concurrent-learning baselines derived from Hart et al. (2025a) (CL-LS and CL) and controlled Adam replay, with horizon, observer, and gain ablations. Second, the trajectory-error decomposition, which gives the adjoint gradient of a nonlinear-in-parameter trajectory model the regressor form needed for Lyapunov analysis, with explicit horizon-dependent constants. Third, two further certi-fied online methods that the same analysis yields, drift-window and adjoint-window identification. Computational costs and limitations are reported in Section K. 
+
+Related work. Neural ODEs (Chen et al., 2018; Dupont et al., 2019; Rubanova et al., 2019; Kidger et al., 2020; Massaroli et al., 2020; Kidger, 2022) are commonly trained offline with adjoint or checkpointed gradients (Zhuang et al., 2020), and long horizons are handled by multiple shooting (Turan & J¨ aschke, 2022; Massaroli et al., 2021) or by regularizing the flow (Finlay et al., 2020). Existing Lyapunov-based neural adaptive laws (Sanner & Slotine, 1992; Lewis et al., 1999; Patil et al., 2022; Joshi & Chowdhary, 2019; Sun et al., 2022) use instantaneous residuals; composite adaptation and concurrent learning add recorded data (Slotine & Li, 1989; Chowdhary & Johnson, 2011; Kamalapurkar et al., 2017). Least-squares DNN laws appear in Makumi et al. (2025); Hart et al. (2025a). Our drift branch adds certified gain bounds and a gain-metric projection, while the trajectory branch removes the derivative observer. The NODE-CL gain recursion is related to covariance updates in extended-Kalman-filter and recur-sive Gauss–Newton training (Singhal & Wu, 1989; Puskorius & Feldkamp, 1994; Haykin, 2001); the new ingredient is the trajectory-error decomposition that places this update inside a Lyapunov cer-tificate. This differs from certifying properties of the learned dynamics themselves, such as stability of the learned flow (Kolter & Manek, 2019; Kang et al., 2021; Rodriguez et al., 2022; Luo et al., 2025) or of a constraint or attractor set (White et al., 2023; Sochopoulos et al., 2024), and from re-gret guarantees for instantaneous nonlinear adaptation (Boffi & Slotine, 2021; Boffi et al., 2021) and meta-learned adaptive controllers (Richards et al., 2021; Shi et al., 2021; O’Connell et al., 2022); the certificate here concerns the online parameter flow. Classical identification and sparse regression use different model classes (Ljung, 1999; Brunton et al., 2016); the projection follows Lavretsky & Wise (2013); Cai et al. (2006). Section 2 formulates the problem, Section 3 develops the methods, and Section 4 reports the experiments. 2Preprint. Under review as a conference paper at ICLR 2027. 
+
+2 PROBLEM FORMULATION 
+
+Consider the second-order nonlinear system 
+
+¨x = f (x, ˙x) + g(x, ˙x)u, (1) where x, ˙x ∈ Rn are measurable states, f : Rn × Rn → Rn is an unknown drift to be identified, 
+
+g : Rn × Rn → Rn×m is a known input matrix, and u ∈ Rm is a known external input. Let 
+
+X ≜ [x⊤ ˙x⊤]⊤ ∈ R2n and B ≜ [0 n×n In]⊤ ∈ R2n×n; we write f (X) and g(X) for f (x, ˙x) and 
+
+g(x, ˙x). The following assumptions describe the identification experiment and the regularity of the system. 
+
+Assumption 1. The external input is bounded, ∥u(t)∥ ≤ ¯u for all t ≥ t0, and the resulting state trajectory is bounded, ∥X(t)∥ ≤ ¯X for all t ≥ t0 (standard in identification, where boundedness is enforced by a stabilizing baseline input, as in Section 4). 
+
+Assumption 2. The drift f is continuously differentiable, and g is twice continuously differentiable. Consequently, on {X : ∥X∥ ≤ ¯X} there exist constants cf x , c f v , ¯f , ¯g > 0 such that ∥∂f /∂x ∥ ≤ 
+
+cf x , ∥∂f /∂ ˙x∥ ≤ cf v , ∥f ∥ ≤ ¯f , and ∥g∥ ≤ ¯g.Let Φ : R2n × Rp → Rn denote a DNN with parameters θ ∈ Rp and Φ′(X, θ ) ≜ ∂Φ/∂θ ∈ Rn×p.Let Θ ≜ {θ ∈ Rp : ∥θ∥ ≤ ¯θ} denote the admissible parameter set. Fix a margin ϖ > 0 and define the compact convex domain Ω ≜ {X ∈ R2n : ∥X∥ ≤ ¯X + ϖ}, which contains the trajectory and a tube in which the virtual predictions below remain. Since Φ is a composition of smooth layers, it is twice continuously differentiable on any compact set, so there exist constants ¯υ, c θθ , c Xθ > 0 such that, on Ω × Θ, ∥Φ′(X, θ )∥ ≤ ¯υ, ∂2Φ/∂θ 2 ≤ cθθ , and ∂2Φ/∂X∂θ ≤ cXθ .Let μ denote a finite Borel measure on Ω, and define the ideal parameters as θ∗ =arg min θ∈Θ
+
+R 
+
+> Ω
+
+∥f (X) − Φ( X, θ )∥2 dμ (X) + ρ ∥θ∥2 with a regularization weight ρ > 0.1 The drift is then modeled as 
+
+f (X) = Φ( X, θ ∗) + ε(X), max  
+
+> X∈Ω
+
+∥ε(X)∥ ≤ ¯ε, (2) where ¯ε can be made small by an expressive architecture and a large enough ¯θ; every ultimate bound below grows with ¯ε.The objective is an online law for ˆθ(t) under which the estimation error ˜θ(t) ≜ θ∗ − ˆθ(t) is uni-formly ultimately bounded, with an exponential rate into a residual set determined by the leakage, approximation, and observer errors, which shrinks under a window persistence-of-excitation condi-tion stated in the appendix. Section 3 develops the adaptation laws that achieve this objective. 
+
+3 METHOD : F ROM LOCAL RESIDUALS TO NODE-CL 
+
+We develop the method in three stages, each building on the previous one. First, we define a drift residual, the mismatch between an observer-based drift estimate and the model over a sliding win-dow, and derive a gradient-based estimator with a certified least-squares gain. Second, we replace the drift residual by a trajectory residual, the mismatch between a model rollout and the measured trajectory, which removes the observer, and show that its adjoint gradient admits the same certified estimator. Third, we apply concurrent learning to the trajectory regressor: NODE-CL replays stored trajectory segments instead of a sliding window and rescales their directions with a Gauss–Newton gain. Section 3.1 presents the first stage. 3.1 STAGE I: PROPOSED DRIFT -WINDOW METHOD 
+
+We introduce the drift-window method to convert streaming state and input measurements into ap-proximate drift labels and to adapt the model over a sliding window of those labels. Let ˆf denote a drift estimate and ˜f ≜ f (X) − ˆf its error. Dynamic state-derivative estimators are standard in 
+
+> 1The reader is referred to Hart et al. (2025b) for identifiability conditions under which this regularized minimizer is unique.
+
+3Preprint. Under review as a conference paper at ICLR 2027. concurrent learning (Kamalapurkar et al., 2017; Hart et al., 2025a). Throughout, the estimate is kept by a projection (introduced in Section 3.1.2) inside Θϵ ≜ {θ : ∥θ∥ ≤ ¯θ + ϵθ }, the inflation of 
+
+Θ by a margin ϵθ > 0, so ˜θ(t) ≤ ¯˜θ ≜ 2¯θ + ϵθ ; the constants ¯υ, c θθ , c Xθ are taken so that the bounds of Section 2 hold on Ω × Θϵ. The analysis below requires only an estimator error envelope, rather than a particular construction. For completeness, Section A specifies the observer used in the experiments and proves the bound below. For a window length T > 0 and t ≥ t0 + T , the resulting bound on the observer error over the window is 
+
+sup  
+
+> τ∈[t−T,t ]
+
+˜f (τ ) ≤ ¯fT (t) ≜ ∥zo(t0)∥ e−ko(t−T −t0) + ¯ zo. (3) where zo is the observer error state, ko > 0 its decay rate, and ¯zo its steady-state residual, which de-creases with the observer gain (all given explicitly in Section A). Section 3.1.1 defines the windowed loss and decomposes its gradient, Section 3.1.2 introduces the gain and projection, and Section 3.1.3 states the adaptation law and its guarantee. 3.1.1 WINDOW LOSS AND GRADIENT DECOMPOSITION 
+
+To make the update less sensitive to the error of any single sample, we accumulate the residual over a sliding window rather than at a single instant, and we show that the gradient of this windowed loss has the regressor form needed for the Lyapunov analysis. Fix a window length T > 0. For 
+
+t ≥ t0 + T , the windowed drift prediction error and loss are defined as 
+
+E(τ ; t) ≜ ˆf (τ ) − Φ( X(τ ), ˆθ(t)) , (4) 
+
+Ef (t) ≜ 12
+
+Z tt−T
+
+∥E(τ ; t)∥2 dτ, (5) where the pairs (X(τ ), ˆf (τ )) are buffered and ˆθ(t) is the current estimate. Since only Φ depends on 
+
+ˆθ, the negative gradient of Equation (5) is 
+
+Ξf (t) ≜ −∇ ˆθ Ef (t) = 
+
+Z tt−T
+
+Φ′(X(τ ), ˆθ(t)) ⊤E(τ ; t) dτ. (6) Expanding Φ( X(τ ), θ ∗) about ˆθ(t) in each sample gives the following decomposition of Ξf , which is the form every Lyapunov argument below relies on. 
+
+Proposition 1. Let Theorems 1 and 2 hold, and let ˆθ(t) ∈ Θϵ. Then, for t ≥ t0 + T ,
+
+Ξf (t) = Ψ( t) ˜θ(t) + ηf (t), (7) 
+
+where the windowed regressor 
+
+Ψ( t) ≜
+
+Z tt−T
+
+Φ′(X(τ ), ˆθ(t)) ⊤Φ′(X(τ ), ˆθ(t)) dτ (8) 
+
+is positive semi-definite with ∥Ψ( t)∥ ≤ T ¯υ2, and the perturbation satisfies 
+
+∥ηf (t)∥ ≤ cη1 ˜θ(t) 2
+
++ cη2 ¯fT (t) + cη3, (9) 
+
+with cη1 ≜ 12 T ¯υ c θθ , cη2 ≜ T ¯υ, and cη3 ≜ T ¯υ ¯ε.
+
+The proof is given in Section E; the three terms in Equation (9) are the Taylor remainder, the observer error, and the approximation error, each scaled by T . Section 3.1.2 introduces the gain and projection used in the update law. 3.1.2 LEAST -SQUARES GAIN AND PROJECTION 
+
+The adaptation law also requires a least-squares gain for excited directions and a projection that keeps the estimate inside Θϵ, where the smoothness constants of Φ hold. The gain evolves as 
+
+˙Γ = β0 Γ  Ip − Γ/¯λ − ςΓ(t) Γ Ψ( t) Γ , Γ( t0) = Γ 0, (10) 4Preprint. Under review as a conference paper at ICLR 2027. where β0 > 0 is the forgetting rate and ¯λ > 0 is a cap. The Lipschitz gate ςΓ(t) = ς(λmin (Γ( t))) 
+
+is zero below the floor λ, one above 2λ, and linear between them, with 0 < λ < ¯λ/ 2; set Ψ = 0 
+
+during the initial window. Driving the gain by the same regressor as Equation (7) preserves λI p ⪯
+
+Γ( t) ⪯ ¯λI p (proved in Section C). The gain-metric projection proj Γ(θ, y ) equals Γy inside Θ and, in the margin between Θ and Θϵ, removes the component of Γy that points outward (defined in Section D); it keeps ˆθ(t) ∈ Θϵ and satisfies, for every θ∗ ∈ Θ,
+
+˜θ⊤Γ−1proj Γ(ˆθ, y ) ≥ ˜θ⊤y (11) (proved in Section D). This metric compatibility is the property used in every Lyapunov proof. Section 3.1.3 states the adaptation law and its guarantee. 3.1.3 ADAPTATION LAW AND GUARANTEE 
+
+The drift-based windowed adaptation law is designed as 
+
+˙ˆθ = proj Γ
+
+ˆθ, α Ξf (t) − kσ ˆθ
+
+
+
+, (12) where α > 0 is the learning gain and kσ > 0 is a sigma-modification gain; set Ξf = 0 during the initial window. This is a projected, least-squares preconditioned gradient flow on Equation (5). Existence and uniqueness of solutions are addressed in Section D. The following proposition certifies this law. 
+
+Proposition 2. Let Theorems 1 and 2 hold, let ˆθ(t0) ∈ Θϵ, let λI p ⪯ Γ0 ⪯ ¯λI p, and let the gains satisfy α > 12 and kσ > α T ¯υ c θθ ¯˜θ. Suppose the drift estimate satisfies Equation (3) . Then, under the gain dynamics in Equation (10) and the adaptation law in Equation (12) , the parameter estimation error satisfies, for all t ≥ t1 ≜ t0 + T ,
+
+˜θ(t) ≤
+
+r 
+
+> ¯λλ
+
+˜θ(t1) 2
+
+e−λd(t−t1) + 2¯λλd cd(t1), lim sup 
+
+> t→∞
+
+˜θ(t) ≤
+
+q 2¯λλd c∞ 
+
+> d
+
+, (13) 
+
+where k1 ≜ kσ 
+
+> 2
+
+− αc η1 ¯˜θ > 0, λd ≜ 2k1λ,
+
+cd(t) ≜ kσ ¯θ2 + α2
+
+> kσ
+
+ cη2 ¯fT (t) + cη3
+
+2 , c∞ 
+
+> d
+
+≜ kσ ¯θ2 + α2 
+
+> kσ
+
+(cη2 ¯zo + cη3)2 . (14) The proof is given in Section F: in V = 12 ˜θ⊤Γ−1 ˜θ the gain dynamics produce 12 ςΓ ˜θ⊤Ψ˜θ and the projected gradient −α˜θ⊤Ψ˜θ, so α > 12 leaves a sink; kσ ¯θ2 is the usual sigma-modification tradeoff. Without excitation no law can localize θ beyond the projection set, and Equation (13) reflects this (see the remark in Section F). Two further consequences are stated and proved in Section F: the sink retained in the Lyapunov argument bounds the time-averaged first-order functional error without excitation, and it improves the parameter rate under a window persistence-of-excitation condition. The analysis also applies to noncontiguous stored drift pairs with uniformly bounded observer errors (Section J); this stored-set result supplies the guarantee used by the adapted CL-LS baseline. Section 3.2 replaces the drift residual by a trajectory residual. 3.2 STAGE II: PROPOSED ADJOINT -WINDOW METHOD 
+
+We now replace the drift residual by a trajectory residual, the mismatch between a model rollout and the measured trajectory, which needs no derivative estimate. The difficulty is that its adjoint gradient has no immediate regressor form, and this section derives one: Section 3.2.1 defines the rollout and decomposes its adjoint gradient, and Section 3.2.2 states the update and its guarantee. 3.2.1 VIRTUAL SYSTEM , WINDOW LOSS , AND ADJOINT GRADIENT 
+
+Define the model vector field F : R2n × Rp × R → R2n as F (χ, θ, τ ) ≜ [χ⊤ 
+
+> v
+
+, (Φ( χ, θ ) + 
+
+g(χ) urec (τ )) ⊤]⊤, where χ = [ χ⊤ 
+
+> x
+
+χ⊤ 
+
+> v
+
+]⊤ and urec is the recorded input. At time t ≥ t0 + T , the virtual predicted trajectory ˆXp(·; t) : [ t − T, t ] → R2n is generated by 
+
+d ˆXp
+
+dτ = F ( ˆXp, ˆθ(t), τ ), ˆXp(t − T ; t) = X(t − T ), (15) 5Preprint. Under review as a conference paper at ICLR 2027. and the trajectory window loss and prediction error are defined as 
+
+ET (t) ≜ 12
+
+Z tt−T
+
+∥e(τ ; t)∥2 dτ, e(τ ; t) ≜ ˆXp(τ ; t) − X(τ ). (16) Let LF , L F X > 0 bound ∥∂F/∂χ ∥ and ∂2F/∂χ 2 on Ω × Θϵ, and let κT ≜ (eLF T − 1) /L F .The virtual trajectory remains in Ω under the window condition 
+
+κT
+
+
+
+¯υ ¯˜θ + ¯ ε
+
+
+
+< ϖ, (17) (proved in Section H), which also gives ∥e(τ ; t)∥ < ϖ .By the adjoint sensitivity method (Chen et al., 2018), the gradient of Equation (16) with respect to ˆθ
+
+is 
+
+∇ˆθ ET (t) = 
+
+Z tt−T
+
+ ∂F ∂θ ( ˆXp, ˆθ(t), τ )
+
+⊤
+
+ν(τ ) dτ, dν dτ = −
+
+ ∂F ∂χ ( ˆXp, ˆθ(t), τ )
+
+⊤
+
+ν − e(τ ; t), ν(t) = 0 2n,
+
+(18) where ν : [ t − T, t ] → R2n is the adjoint state (derived in Section G). Since ∂F/∂θ = B Φ′( ˆXp, θ ), partitioning ν = [ ν⊤ 
+
+> x
+
+ν⊤ 
+
+> v
+
+]⊤ gives the trajectory gradient signal 
+
+Ξa(t) ≜ −∇ ˆθ ET (t) = −
+
+Z tt−T
+
+Φ′( ˆXp(τ ; t), ˆθ(t)) ⊤νv (τ ) dτ. (19) The main result of the paper, stated next, shows that the trajectory gradient has the same structure as the drift gradient: a positive semi-definite operator acting on the parameter error plus a bounded perturbation. It follows from an exact representation of the rollout error, obtained by variation of constants applied to a mean-value linearization, which yields a trajectory regressor W (τ ) and a remainder d(τ ) with e = −(W ˜θ + d); their definitions and all constants are given in Section H. 
+
+Theorem 1. Let Theorems 1 and 2 and Equation (17) hold, and let ˆθ(t) ∈ Θϵ. Let W and d be the explicitly constructed quantities in Section H. Then e(τ ; t) = −
+
+
+
+W (τ ) ˜θ(t) + d(τ )
+
+
+
+for all 
+
+τ ∈ [t − T, t ], and the adjoint gradient signal in Equation (19) decomposes as 
+
+Ξa(t) = H(t) ˜θ(t) + ηa(t), (20) 
+
+where H(t) ≜ R tt−T W (τ )⊤W (τ ) dτ ⪰ 0 with ∥H(t)∥ ≤ T ¯w2, and 
+
+∥ηa(t)∥ ≤ b1 ˜θ 2
+
++ b2 ˜θ + b3, (21) 
+
+with ¯w ≜ ¯υκ T and constants b1, b 2, b 3 ≥ 0 defined in Section H, where b1 = O(T κ 2 
+
+> T
+
+), b2 is proportional to ¯ε, and b3 vanishes with ¯ε.
+
+The proof is given in Section H. Every constant in Equation (21) carries a factor T κ T , so b1, b 2, b 3 →
+
+0 as T → 0. No observer error appears because Equation (16) compares the rollout with measured states. The corresponding cost is the Gronwall growth of the constants with T . Section 3.2.2 uses this decomposition to certify the online update. 3.2.2 CERTIFIED ONLINE UPDATE 
+
+The trajectory-based windowed adaptation law is designed as 
+
+˙ˆθ = proj Γ0
+
+ˆθ, α Ξa(t) − kσ ˆθ
+
+
+
+, (22) with a constant symmetric positive definite gain Γ0 satisfying λI p ⪯ Γ0 ⪯ ¯λI p, and Ξa ≜ 0p on 
+
+[t0, t 0 + T ]. Forming H online would require extra solves, so the trajectory law uses a constant gain. This gain contributes no additional Lyapunov term, and therefore α > 12 is not required. The resulting guarantee is stated next. 6Preprint. Under review as a conference paper at ICLR 2027. 
+
+Proposition 3. Let Theorems 1 and 2 hold, let ˆθ(t0) ∈ Θϵ, and let the window length and gains satisfy Equation (17) and kσ > 2α
+
+
+
+b1 ¯˜θ + b2
+
+
+
+. Then, for the adaptation law in Equation (22) with the adjoint gradient in Equation (19) , the parameter estimation error satisfies, for all t ≥ t1 =
+
+t0 + T ,
+
+˜θ(t) ≤
+
+r 
+
+> ¯λλ
+
+˜θ(t1) 2
+
+e−λa(t−t1) + ¯λ c a  
+
+> k1aλ
+
+, (23) 
+
+where k1a ≜ kσ 
+
+> 2
+
+− α
+
+
+
+b1 ¯˜θ + b2
+
+
+
+> 0, λa ≜ 2k1aλ, and ca ≜ kσ ¯θ2 + α2b23/k σ .
+
+The proof is given in Section I. Since b3 vanishes with ¯ε, the residual α2b23/k σ vanishes with the approximation error. Moreover, b1, b 2 → 0 as T → 0, so the gain condition can always be met by shortening the window. For LF T ≤ 1, it holds whenever T ≤ (kσ /(2 αC b)) 1/3 for a computable constant Cb (Section I). Section 3.3 extends the trajectory law to stored segments. 3.3 STAGE III: PROPOSED STORED -SEGMENT NODE-CL We now replace the sliding window of Stage II by stored trajectory segments, in the spirit of concur-rent learning. A sliding window retains only the most recently visited region of the state space, and a constant gain does not compensate for the scale of the trajectory operator H, which grows as T 3
+
+for short windows since ∥H∥ ≤ T ¯w2 and ¯w = ¯ υκ T ≈ ¯υT . NODE-CL addresses these limitations by retaining selected trajectory segments and adapting the gain. Let S(t) = {(Xj (·), u j (·)) }Ns 
+
+> j=1
+
+be 
+
+Ns stored segments, each a measured state and input record over [tj , t j + Ts] with tj + Ts ≤ t and membership piecewise constant in t; let ˆXp,j solve Equation (15) from Xj (tj ) with the current ˆθ(t),
+
+ej ≜ ˆXp,j − Xj , and Sj ≜ ∂ ˆXp,j /∂ ˆθ. Define 
+
+ΞS ≜ − 1
+
+NsNsX
+
+> j=1
+
+Z tj +Ts
+
+> tj
+
+S⊤ 
+
+> j
+
+ej dτ, GS ≜ 1
+
+NsNsX
+
+> j=1
+
+Z tj +Ts
+
+> tj
+
+S⊤ 
+
+> j
+
+Sj dτ, (24) the negative gradient of the averaged segment loss and its Gauss–Newton matrix, both produced by one batched forward pass at cost O(NsNwn2p) per update ( Nw integration steps per segment). Applying the trajectory-error decomposition of Theorem 1 segment by segment gives ΞS = HS ˜θ +
+
+ηS with HS ≜ 1
+
+> Ns
+
+PNs
+
+> j=1
+
+R tj +Ts 
+
+> tj
+
+W ⊤ 
+
+> j
+
+Wj dτ ⪰ 0 and ∥ηS ∥ ≤ b1 ˜θ 2
+
++ b2 ˜θ + b3 at segment length Ts. The computable GS differs from HS only through Sj − Wj : as shown in Section J, 
+
+∥GS − HS ∥ ≤ g2 ˜θ 2
+
++ g1 ˜θ + g0 for constants g0, g 1, g 2 built from those of Theorem 1 at Ts.The stored-segment law is ˙ˆθ = proj Γ(ˆθ, α ΞS − kσ ˆθ) with Γ generated by Equation (10), using 
+
+GS in place of Ψ. On the excited subspace, the forgetting update equilibrates at Γ ≈ β0G−1 
+
+> S
+
+. The resulting projected Gauss–Newton flow is insensitive to the T 3 
+
+> s
+
+scale and can therefore use short segments. 
+
+Algorithm 3 Proposed NODE-CL: Stored-Segment Gauss–Newton Identification 
+
+Require: Segment length Ts, budget Ns, gains α, k σ , β 0, ¯λ, λ 
+
+1: Initialize ˆθ(t0) ∈ Θϵ, Γ( t0) = Γ 0, and segment set S ← ∅ 
+
+2: for each update time t do 
+
+3: Form a candidate from the latest Ts of (X, u ) and admit it if it improves the minimum singular value of the stacked terminal sensitivities 
+
+4: Roll out all segments in S with current ˆθ; integrate sensitivities Sj and accumulate ΞS , G S
+
+by Equation (24) 
+
+5: Update Γ by Equation (10), replacing Ψ with GS
+
+6: Update ˆθ by ˙ˆθ = proj Γ(ˆθ, α ΞS − kσ ˆθ)
+
+7: end for 
+
+NODE-CL uses short segments to control sensitivity growth and admits segments that add comple-mentary directions within a fixed memory budget. Before the projected update, GS rescales those di-7Preprint. Under review as a conference paper at ICLR 2027. rections. Segment length therefore determines a bias–conditioning tradeoff, while the admission rule remains a data-selection heuristic rather than an excitation guarantee. The Gauss–Newton rescaling distinguishes NODE-CL from replaying the same segments with a generic optimizer. The following theorem certifies NODE-CL. 
+
+Theorem 2. Let Theorems 1 and 2 hold, let Equation (17) hold at Ts, and activate NODE-CL at time ts with a nonempty segment set, ˆθ(ts) ∈ Θϵ, and λI p ⪯ Γ( ts) ⪯ ¯λI p. Suppose α > 12 and 
+
+kσ > 2α(b1 ¯˜θ + b2) + g2 ¯˜θ2 + g1 ¯˜θ + g0. (25) 
+
+Then λI p ⪯ Γ( t) ⪯ ¯λI p for all t ≥ ts. For any φs ≥ 0 such that HS (t) ⪰ φsIp for all t ≥ ts
+
+(always valid with φs = 0 ), let 
+
+k1s ≜ kσ 
+
+> 2
+
+−α(b1 ¯˜θ +b2)− 12 (g2 ¯˜θ2 +g1 ¯˜θ +g0), ks(φs) ≜ k1s +( α− 12 )φs, λs(φs) ≜ 2ks(φs)λ. 
+
+(26) 
+
+The parameter error satisfies 
+
+˜θ(t) ≤
+
+s ¯λλ ˜θ(ts) 2
+
+e−λs(φs)( t−ts) + ¯λc a
+
+λk s(φs) , lim sup 
+
+> t→∞
+
+˜θ(t) ≤
+
+s ¯λc a
+
+λk s(φs) . (27) The proof is given in Section J. Thus excitation increases ks(φs), improving both the exponential rate and the certified ultimate radius; without excitation, set φs = 0 . The ratio ¯λ/λ in Equation (27) arises only from converting the Lyapunov metric to the Euclidean norm. By the same bound on 
+
+GS − HS , the computable condition GS ⪰ φI p implies HS ⪰ (φ − g2 ¯˜θ2 − g1 ¯˜θ − g0)Ip, so the enhanced rate holds with that φs whenever it is positive. Segments are admitted by the singular-value maximizing rule of Chowdhary & Johnson (2011) on the stacked terminal sensitivities Sj (tj + Ts),a heuristic that does not itself guarantee excitation. The complete procedure is given in Algorithm 3; pseudocode for the drift-window and adjoint-window methods is in Section B. Section 4 evaluates the three methods. 
+
+4 SIMULATIONS 
+
+The experiments test whether the observer-free trajectory pathway is robust to velocity noise while staying competitive on clean data; two diagnostic systems then check individual theorem conditions. Section 4.1 reports the benchmark and Section 4.2 the diagnostics. 4.1 BENCHMARK SUITE 
+
+Methods. NODE-CL is the proposed stored-segment method evaluated here. Baselines are single-step adaptation, CL-LS (the identification form of the least-squares concurrent-learning law for DNNs of Hart et al. (2025a), the stored-set extension of Proposition 2 in Section J), CL (the same DNN point stack with a constant gain, i.e., the classical stack of Chowdhary & Johnson (2011) applied to the DNN Jacobian, a simplification of Hart et al. (2025a) rather than a separate prior method), and NODE-replay (Adam (Kingma & Ba, 2015) applied to exactly the NODE-CL seg-ments). The drift- and adjoint-window methods are evaluated in the diagnostics. 
+
+Protocol. Four DeepMind Control Suite domains (Tassa et al., 2018), pendulum, cartpole, ac-robot, and reacher, are used unmodified, and the full acceleration map ¨x = Φ( z, θ ) with z =[ϕ(x)⊤, ˙x⊤, u ⊤]⊤ is identified, where ϕ maps unlimited hinge angles to (cos , sin) ; no input matrix is assumed known, and Section 3.2 applies with F = [ χ⊤ 
+
+> v
+
+, Φ( z, θ )⊤]⊤. Each run streams 60 s of 
+
+1 kHz measurements under a multisine excitation with a weak stabilizing baseline; five evaluation seeds vary excitation, initialization, and noise; a sixth, tuning-only seed is excluded. Evaluation is open-loop prediction from eight held-out initial conditions on a held-out record: root-mean-square state error normalized by the state standard deviation at 1 s and 4 s horizons, angles wrapped. All methods use the same network (one hidden layer, 73 to 162 parameters) and, per seed and noise level, the same measurement stream; CL and CL-LS share a point stack, NODE-replay and NODE-CL a segment budget and admission rule, the observer-based methods the observer, and the projected laws the projection. Gains were selected on the tuning seed and held fixed; 2 a six-link swimmer (p = 356 ) that no method learns at this budget is reported in Section K. 8Preprint. Under review as a conference paper at ICLR 2027. Table 1: Benchmark suite (five evaluation seeds, tuning seed excluded, 60 s): held-out 1 s prediction error normalized by the state standard deviation, median over seeds, clean (c) and with velocity noise 
+
+σv = 3 × 10 −3 (n); in parentheses, seeds on which it is best; best median in bold. Initial-model errors: 2.16 , 2.08 , 1.52 , 1.71 . CL-LS is the identification form of the DNN concurrent-learning law of Hart et al. (2025a) (stored-set extension of Proposition 2, Section J); CL is its constant-gain simplification; NODE-CL is the proposed method in Theorem 2.                                                                                                                           
+
+> pendulum ( p= 73 )cartpole ( p= 146 )acrobot ( p= 162 )reacher ( p= 162 )Method cncncncnsingle-step 1.643 (0) 1.650 (0) 3.287 (0) 3.145 (0) 1.621 (1) 1.232 (2) 1.509 (0) 1.516 (0) CL (constant gain) 0.315 (0) 0.609 (0) 0.623 (0) 1.363 (0) 3.615 (0) 4.385 (0) 1.007 (0) 0.976 (0) CL-LS (Hart et al., 2025a) 0.195 (0) 1.642 (0) 0.251 (4) 1.984 (0) 1.409 (0) 2.015 (0) 0.064 (2) 0.215 (0) NODE-replay (control) 0.183 (0) 0.141 (3) 0.311 (0) 0.741 (1) 1.002 (2) 2.129 (1) 0.077 (2) 0.088 (2) NODE-CL (proposed) 0.035 (5) 0.038 (2) 0.381 (1) 0.302 (4) 1.545 (2) 1.279 (2) 0.069 (1) 0.075 (3) 10 310 2
+> v(0 at 3 × 10 4)
+> 10 2
+> 10 1
+> 10 0
+> held-out 1 s error (median)
+> pendulum
+> 10 310 2
+> v(0 at 3 × 10 4)
+> 10 0
+> 10 1
+> cartpole
+> 10 310 2
+> v(0 at 3 × 10 4)
+> 10 0
+> 10 1
+> acrobot
+> 10 310 2
+> v(0 at 3 × 10 4)
+> 10 1
+> 10 0
+> reacher
+> single-step CL (const. gain) CL-LS (Hart et al.) NODE-replay NODE-CL (proposed)
+
+Figure 2: Held-out 1 s error against velocity noise per domain (five seeds, median and range; dotted, initial model). The 10 −2 level was not run for the acrobot and reacher. 
+
+Results (Table 1, Figure 2). With clean measurements, NODE-CL is best on every pendulum seed (0.035 against 0.18 to 0.32 ) but not on the other domains. On the cartpole and reacher, the three stored-set methods lie within a factor of 1.6. Under velocity noise of 3 × 10 −3, CL-LS degrades on these three domains by a factor of 3.3 to 8.4 relative to its clean error, and CL degrades by up to 2.2;
+
+kf = 200 was tuned on clean data rather than per noise level. NODE-CL has the lowest median on all three domains and wins nine of fifteen seeds, the expected advantage of trajectory residuals when derivative estimates are corrupted by noise. The advantage is not uniform: on the pendulum NODE-replay wins three seeds at 3 × 10 −3 despite a higher median, and at 10 −2 NODE-CL is ahead of NODE-replay on the cartpole ( 0.73 against 1.10 ) but behind on the pendulum ( 0.23 against 
+
+0.18 ). On the acrobot, NODE-CL improves on the initial model at 10 −3 and 3 × 10 −3 (1.00 and 
+
+1.28 against 1.52 ) but not with clean data ( 1.55 ), whereas NODE-replay does so only with clean data ( 1.00 ). Section 4.2 tests individual conditions of the analysis on two diagnostic systems. 4.2 DIAGNOSTIC STUDIES AND ABLATIONS 
+
+Two diagnostic systems, a teacher network (S1, p = 25 ) with known θ∗ and a two-link manipulator (S2, p = 86 ), test distinct predictions of the analysis. Excited subspace: in S1, the component of the parameter error in the excited subspace contracts to 0.27 of its initial value while the ratio for the full parameter error remains near 0.80 , consistent with the excitation-free functional bound of Section F. 
+
+Horizon: the adjoint-window error increases about 3.7-fold from T = 0 .8 to 1.6 s, consistent with the horizon dependence in Equation (21). Sufficient gains: sampled implementations remain stable below the conservative thresholds on α and leakage. Full curves, seed ranges, and condition checks are in Section K. Section 5 concludes. 
+
+> 2
+
+As is standard for Lyapunov-based nonlinear and adaptive designs, the gain conditions in Propositions 2 and 3 and Theorem 2 are sufficient, not necessary, and conservative (worst-case Lipschitz and Taylor constants); the gains were tuned for performance and, as Figure 11(c) and Section K show, the sampled implementations remain stable well below the certified thresholds. 
+
+9Preprint. Under review as a conference paper at ICLR 2027. 
+
+5 CONCLUSION 
+
+We showed that online Neural ODE training and concurrent learning fit in one Lyapunov-certified framework for adaptive identification: drift and trajectory residuals both yield a gradient of the form regressor times parameter error plus a bounded perturbation, so one projected least-squares update is certified for windowed and stored data, and its stored-segment instance, NODE-CL, brings a Gauss– Newton gain to concurrent learning without state-derivative estimates. On the pendulum, cartpole, and reacher, NODE-CL is best at σv = 3 ×10 −3, where the observer-based CL-LS degrades sharply; with clean data it is best on the pendulum and within a factor of 1.6 of the best method on the cartpole and reacher, and on the acrobot the advantage is not uniform. REPRODUCIBILITY STATEMENT 
+
+All assumptions are stated in Section 2, and complete proofs of every lemma, theorem, and corollary are given in Sections A and C to J. NODE-CL pseudocode is given in Algorithm 3, the proposed drift-window and adjoint-window algorithms in Section B, and every gain, window length, sam-pling rate, architecture, excitation signal, and evaluation metric used in the simulations is listed in Section 4 and Section K. The supplementary material contains the complete simulation code, the resumable experiment drivers for the main comparison, the noise sweep, and the ablations, the anal-ysis scripts that generate the tables and figures from the run records, the saved summary files from which the tables and Figure 2 are reproduced, and the numerical checks described in Section K; the raw run records are omitted from the archive for size and are regenerated by the drivers. The simulations are deterministic given the seed. AI USE STATEMENT 
+
+In this work, generative AI tools were used for implementing the simulation code, for interpreting simulation results, and for drafting and editing the text and formatting references. The two illustra-tive icons in Figure 1 (a sensor module and a memory stack) are AI-generated conceptual images; no reported experimental data or numerical results were produced by generative AI, and the research questions were determined by the author(s). Selected benchmark derivatives and numerical updates were checked against the mathematical formulation, including finite-difference checks of the tra-jectory gradient and Gauss–Newton matrix and numerical checks of the projection inequality, the gain matrix bounds, the observer bound, and the drift gradient decomposition on simulated data; all AI-assisted text was reviewed. Responsibility for the final content of this work, including text, claims, and artifacts produced with the aid of generative AI, rests with the author(s). 
+
+REFERENCES 
+
+Nicholas M. Boffi and Jean-Jacques E. Slotine. Implicit regularization and momentum algorithms in nonlinearly parameterized adaptive control and prediction. Neural Computation , 33(3):590–673, 2021. Nicholas M. Boffi, Stephen Tu, and Jean-Jacques E. Slotine. Regret bounds for adaptive nonlinear control. In Proceedings of the 3rd Conference on Learning for Dynamics and Control (L4DC) ,volume 144 of Proceedings of Machine Learning Research , pp. 471–483. PMLR, 2021. Steven L. Brunton, Joshua L. Proctor, and J. Nathan Kutz. Discovering governing equations from data by sparse identification of nonlinear dynamical systems. Proceedings of the National Academy of Sciences , 113(15):3932–3937, 2016. Zhijun Cai, Marcio S. de Queiroz, and Darren M. Dawson. A sufficiently smooth projection operator. 
+
+IEEE Transactions on Automatic Control , 51(1):135–139, 2006. Ricky T. Q. Chen, Yulia Rubanova, Jesse Bettencourt, and David Duvenaud. Neural ordinary dif-ferential equations. In Advances in Neural Information Processing Systems , volume 31, 2018. Girish Chowdhary and Eric Johnson. Theory and flight-test validation of a concurrent-learning adaptive controller. Journal of Guidance, Control, and Dynamics , 34(2):592–607, 2011. 10 Preprint. Under review as a conference paper at ICLR 2027. Emilien Dupont, Arnaud Doucet, and Yee Whye Teh. Augmented neural ODEs. In Advances in Neural Information Processing Systems , volume 32, 2019. Chris Finlay, J¨ orn-Henrik Jacobsen, Levon Nurbekyan, and Adam M. Oberman. How to train your neural ODE: The world of Jacobian and kinetic regularization. In Proceedings of the 37th In-ternational Conference on Machine Learning , volume 119 of Proceedings of Machine Learning Research , pp. 3154–3164. PMLR, 2020. Rebecca G. Hart, Omkar Sudhir Patil, Zachary I. Bell, and Warren E. Dixon. Concurrent learning for system identification and control using Lyapunov-based deep neural networks. IEEE Control Systems Letters , 9:2957–2962, 2025a. Rebecca G. Hart, Omkar Sudhir Patil, Zachary I. Bell, and Warren E. Dixon. System identifica-tion and control using Lyapunov-based deep neural networks without persistent excitation: A concurrent learning approach. arXiv preprint arXiv:2505.10678 , 2025b. Simon Haykin (ed.). Kalman Filtering and Neural Networks . Wiley, 2001. Girish Joshi and Girish Chowdhary. Deep model reference adaptive control. In IEEE Conference on Decision and Control , pp. 4601–4608, 2019. Rushikesh Kamalapurkar, Benjamin Reish, Girish Chowdhary, and Warren E. Dixon. Concurrent learning for parameter estimation using dynamic state-derivative estimators. IEEE Transactions on Automatic Control , 62(7):3594–3601, 2017. Qiyu Kang, Yang Song, Qinxu Ding, and Wee Peng Tay. Stable neural ODE with Lyapunov-stable equilibrium points for defending against adversarial attacks. In Advances in Neural Information Processing Systems , volume 34, pp. 14925–14937, 2021. Hassan K. Khalil. Nonlinear Systems . Prentice Hall, 3rd edition, 2002. Patrick Kidger. On Neural Differential Equations . PhD thesis, University of Oxford, 2022. Patrick Kidger, James Morrill, James Foster, and Terry Lyons. Neural controlled differential equa-tions for irregular time series. In Advances in Neural Information Processing Systems , volume 33, pp. 6696–6707, 2020. Diederik P. Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In International Conference on Learning Representations , 2015. J. Zico Kolter and Gaurav Manek. Learning stable deep dynamics models. In Advances in Neural Information Processing Systems , volume 32, 2019. Eugene Lavretsky and Kevin A. Wise. Robust and Adaptive Control with Aerospace Applications .Springer, 2013. Frank L. Lewis, Sarangapani Jagannathan, and Aydin Yesildirek. Neural Network Control of Robot Manipulators and Nonlinear Systems . Taylor & Francis, 1999. Lennart Ljung. System Identification: Theory for the User . Prentice Hall, 2nd edition, 1999. Chaoyang Luo, Yan Zou, Wanying Li, and Nanjing Huang. FxTS-Net: Fixed-time stable learning framework for neural ODEs. Neural Networks , 185:107219, 2025. Wanjiku Makumi, Omkar Sudhir Patil, and Warren E. Dixon. Lyapunov-based adaptive deep system identification for approximate dynamic programming. Automatica , 180:112462, 2025. Stefano Massaroli, Michael Poli, Jinkyoo Park, Atsushi Yamashita, and Hajime Asama. Dissecting neural ODEs. In Advances in Neural Information Processing Systems , volume 33, pp. 3952–3963, 2020. Stefano Massaroli, Michael Poli, Sho Sonoda, Taiji Suzuki, Jinkyoo Park, Atsushi Yamashita, and Hajime Asama. Differentiable multiple shooting layers. In Advances in Neural Information Processing Systems , volume 34, pp. 16532–16544, 2021. 11 Preprint. Under review as a conference paper at ICLR 2027. Michael O’Connell, Guanya Shi, Xichen Shi, Kamyar Azizzadenesheli, Anima Anandkumar, Yisong Yue, and Soon-Jo Chung. Neural-Fly enables rapid learning for agile flight in strong winds. Science Robotics , 7(66):eabm6597, 2022. Omkar Sudhir Patil, Duc M. Le, Max L. Greene, and Warren E. Dixon. Lyapunov-derived control and adaptive update laws for inner and outer layer weights of a deep neural network. IEEE Control Systems Letters , 6:1855–1860, 2022. Gintaras V. Puskorius and Lee A. Feldkamp. Neurocontrol of nonlinear dynamical systems with Kalman filter trained recurrent networks. IEEE Transactions on Neural Networks , 5(2):279–297, 1994. Spencer M. Richards, Navid Azizan, Jean-Jacques Slotine, and Marco Pavone. Adaptive-control-oriented meta-learning for nonlinear systems. In Proceedings of Robotics: Science and Systems ,2021. Ivan Dario Jimenez Rodriguez, Aaron D. Ames, and Yisong Yue. LyaNet: A Lyapunov frame-work for training neural ODEs. In Proceedings of the 39th International Conference on Machine Learning , volume 162 of Proceedings of Machine Learning Research , pp. 18687–18703. PMLR, 2022. Yulia Rubanova, Ricky T. Q. Chen, and David Duvenaud. Latent ordinary differential equations for irregularly-sampled time series. In Advances in Neural Information Processing Systems , vol-ume 32, 2019. Robert M. Sanner and Jean-Jacques E. Slotine. Gaussian networks for direct adaptive control. IEEE Transactions on Neural Networks , 3(6):837–863, 1992. Guanya Shi, Kamyar Azizzadenesheli, Michael O’Connell, Soon-Jo Chung, and Yisong Yue. Meta-adaptive nonlinear control: Theory and algorithms. In Advances in Neural Information Processing Systems , volume 34, pp. 10013–10025, 2021. Sharad Singhal and Lance Wu. Training multilayer perceptrons with the extended Kalman algo-rithm. In Advances in Neural Information Processing Systems , volume 1, 1989. Jean-Jacques E. Slotine and Weiping Li. Composite adaptive control of robot manipulators. Auto-matica , 25(4):509–519, 1989. Andreas Sochopoulos, Michael Gienger, and Sethu Vijayakumar. Learning deep dynamical sys-tems using stable neural ODEs. In IEEE/RSJ International Conference on Intelligent Robots and Systems , pp. 11163–11170, 2024. Runhan Sun, Max L. Greene, Duc M. Le, Zachary I. Bell, Girish Chowdhary, and Warren E. Dixon. Lyapunov-based real-time and iterative adjustment of deep neural networks. IEEE Control Sys-tems Letters , 6:193–198, 2022. Yuval Tassa, Yotam Doron, Alistair Muldal, Tom Erez, Yazhe Li, Diego de Las Casas, David Bud-den, Abbas Abdolmaleki, Josh Merel, Andrew Lefrancq, Timothy Lillicrap, and Martin Ried-miller. DeepMind control suite. arXiv preprint arXiv:1801.00690 , 2018. Evren Mert Turan and Johannes J¨ aschke. Multiple shooting for training neural differential equations on time series. IEEE Control Systems Letters , 6:1897–1902, 2022. Alistair White, Niki Kilbertus, Maximilian Gelbrecht, and Niklas Boers. Stabilized neural differen-tial equations for learning dynamics with explicit constraints. In Advances in Neural Information Processing Systems , volume 36, pp. 12929–12950, 2023. Juntang Zhuang, Nicha Dvornek, Xiaoxiao Li, Sekhar Tatikonda, Xenophon Papademetris, and James Duncan. Adaptive checkpoint adjoint method for gradient estimation in neural ODE. In 
+
+Proceedings of the 37th International Conference on Machine Learning , volume 119 of Proceed-ings of Machine Learning Research , pp. 11639–11649. PMLR, 2020. 12 Preprint. Under review as a conference paper at ICLR 2027. 
+
+A DRIFT OBSERVER AND ERROR BOUND 
+
+The experiments instantiate the drift estimate with the following state-derivative observer. Let ˆv ∈
+
+Rn denote an auxiliary filter state and ˜v ≜ ˙x − ˆv its measurable error. For gains αo, k f > 0, define 
+
+˙ˆv = αo ˜v + ˆf + g(X)u, (28) 
+
+ˆf (t) = ˆf (t0) + kf (˜ v(t) − ˜v(t0)) + 
+
+Z tt0
+
+(kf αo + 1) ˜ v(τ ) dτ. (29) Differentiating Equation (29) and using Equations (1) and (28), the errors ˜v and ˜f = f (X) − ˆf
+
+satisfy ˙˜v = ˜f − αo ˜v and ˙˜f = ˙f − kf ˜f − ˜v. Let zo ≜ [˜ v⊤ ˜f ⊤]⊤.
+
+Lemma 3. Let Theorems 1 and 2 hold. Then, for all t ≥ t0,
+
+∥zo(t)∥ ≤ ∥ zo(t0)∥ e−ko(t−t0) + ¯ zo, (30) 
+
+where ko ≜ min {αo, k f /2}, ¯zo ≜ df /p2kf ko, and df ≜ cf x ¯X + cf v ( ¯f + ¯ g¯u).Proof. Consider the observer Lyapunov function Vo = 12 ˜v⊤ ˜v+ 12 ˜f ⊤ ˜f , which satisfies Vo = 12 ∥zo∥2.Taking the time derivative along the observer error dynamics yields 
+
+˙Vo = ˜ v⊤( ˜f − αo ˜v) + ˜f ⊤( ˙f − kf ˜f − ˜v) = −αo ∥˜v∥2 − kf ˜f 2
+
++ ˜f ⊤ ˙f , (31) where the cross terms cancel. Under Theorems 1 and 2, the drift derivative along the trajectory satisfies ˙f = ∂f ∂x ˙x + ∂f ∂ ˙x (f + gu ) ≤ cf x ¯X + cf v 
+
+  ¯f + ¯ g¯u = df . (32) Using Young’s inequality, ˜f ⊤ ˙f ≤ kf 
+
+> 2
+
+˜f 2
+
++ d2 
+
+> f
+> 2kf
+
+, and therefore 
+
+˙Vo ≤ − ko ∥zo∥2 + co = −2koVo + co, (33) where ko = min {αo, k f /2} and co = d2 
+
+> f
+
+/(2 kf ). The comparison lemma (Khalil, 2002) yields 
+
+Vo(t) ≤ Vo(t0)e−2ko(t−t0) + co 
+
+> 2ko
+
+, and using ∥zo∥ = √2Vo together with √a + b ≤ √a + √b gives Equation (30) with ¯zo = pco/k o = df /p2kf ko. ■
+
+B PSEUDOCODE FOR THE PROPOSED DRIFT -W INDOW AND 
+
+ADJOINT -W INDOW METHODS 
+
+The two windowed laws of Section 3 are given in pseudocode here, in the form implemented in the experiments. 
+
+Algorithm 1 Proposed Drift-Window Identification 
+
+Require: T , gains αo, k f , α, k σ , β 0, ¯λ, λ 
+
+1: Initialize ˆθ(t0) ∈ Θϵ, Γ( t0) = Γ 0, ˆv(t0) = ˙ x(t0), ˆf (t0) = 0 , empty circular buffer 
+
+2: for each time step t do 
+
+3: Measure x, ˙x; record u
+
+4: Update observer Equation (28)–Equation (29); push (X(t), ˆf (t)) to buffer 
+
+5: if t ≥ t0 + T then 
+
+6: E(τ ) ← ˆf (τ ) − Φ( X(τ ), ˆθ) over the buffer 
+
+7: Ξf ← quadrature of Φ′(X(τ ), ˆθ)⊤E(τ )
+
+8: Ψ ← quadrature of Φ′(X(τ ), ˆθ)⊤Φ′(X(τ ), ˆθ)
+
+9: else 
+
+10: Ξf ← 0p; Ψ ← 0p×p
+
+11: end if 
+
+12: Update Γ by Equation (10) with gate ςΓ
+
+13: Update ˆθ by Equation (12) 
+
+14: end for 
+
+13 Preprint. Under review as a conference paper at ICLR 2027. 
+
+Algorithm 2 Proposed Adjoint-Window Identification 
+
+Require: T , gains α, k σ , constant Γ0 
+
+> 1:
+
+Initialize ˆθ(t0) ∈ Θϵ, empty circular buffer  
+
+> 2:
+
+for each time step t do  
+
+> 3:
+
+Measure x, ˙x; record u; push (X(t), u (t)) to buffer  
+
+> 4:
+
+if t ≥ t0 + T then  
+
+> 5:
+
+Forward: integrate Equation (15) from X(t − T ) 
+
+> 6:
+
+Backward: integrate the adjoint equation in Equation (18) from ν(t) = 0  
+
+> 7:
+
+Ξa ← − quadrature of Φ′( ˆXp, ˆθ)⊤νv 
+
+> 8:
+
+else  
+
+> 9:
+
+Ξa ← 0p 
+
+> 10:
+
+end if  
+
+> 11:
+
+Update ˆθ by Equation (22)  
+
+> 12:
+
+end for 
+
+C GAIN -M ATRIX BOUNDS 
+
+This appendix proves that the gated forgetting update keeps the gain matrix inside the certified interval. 
+
+Lemma 4. If λI p ⪯ Γ0 ⪯ ¯λI p, then the solution of Equation (10) satisfies λI p ⪯ Γ( t) ⪯ ¯λI p for all t ≥ t0, and ddt Γ−1 = −β0
+
+ Γ−1 − ¯λ−1Ip
+
+ + ςΓΨ with Γ−1 − ¯λ−1Ip ⪰ 0.
+
+The right-hand side of Equation (10) is locally Lipschitz in Γ (it is polynomial in Γ, and ςΓ is Lipschitz in Γ through λmin ), and Ψ is piecewise continuous, so solutions are unique and absolutely continuous, and Nagumo’s theorem applies to the closed convex sets Ku ≜ {Γ : Γ ⪯ ¯λI p} and 
+
+Kℓ ≜ {Γ : Γ ⪰ λI p}: each set is forward invariant if, at every boundary point, the vector field lies in the tangent cone, which for these sets holds if v⊤ ˙Γv ≤ 0 (respectively ≥ 0) for every unit vector 
+
+v in the extremal eigenspace. For the upper bound, let Γ ∈ ∂Ku, so λmax (Γ) = ¯λ, and let v be any unit vector with Γv = ¯λv . Then 
+
+v⊤ ˙Γv = β0 ¯λ(1 − ¯λ/ ¯λ) − ςΓv⊤ΓΨΓ v ≤ 0. Since Γ0 ∈ K u, forward invariance yields Γ( t) ⪯ ¯λI p
+
+for all t, hence Γ−1 − ¯λ−1Ip ⪰ 0. The expression for ddt Γ−1 follows from ddt Γ−1 = −Γ−1 ˙ΓΓ −1.For the lower bound, let Γ ∈ ∂Kℓ, so λmin (Γ) = λ, and let v be any unit vector with Γv = λv . Then 
+
+ςΓ = ς(λ) = 0 , so v⊤ ˙Γv = β0λ(1 − λ/ ¯λ) > 0 since λ < ¯λ. Since Γ0 ∈ K ℓ, forward invariance yields Γ( t) ⪰ λI p for all t. ■
+
+D GAIN -M ETRIC PROJECTION 
+
+This appendix defines the gain-metric projection used in every adaptation law and proves its two properties. The projection operator is defined as follows. Let pc(θ) ≜ (∥θ∥2 − ¯θ2)/(2 ϵθ ¯θ + ϵ2 
+
+> θ
+
+), so that pc(θ) ≤ 0 if and only if θ ∈ Θ and pc(θ) = 1 if and only if ∥θ∥ = ¯θ + ϵθ . For a symmetric positive definite Γ, the projection operator is defined as 
+
+proj Γ(θ, y ) ≜
+
+
+
+Γy − pc(θ) Γ∇pc∇p⊤ 
+
+> c
+
+Γ y
+
+∇p⊤ 
+
+> c
+
+Γ∇pc
+
+, if pc(θ) > 0 and ∇p⊤ 
+
+> c
+
+Γy > 0,
+
+Γy, otherwise ,
+
+(34) where ∇pc = ∇pc(θ); cf. the smooth projection operators in Lavretsky & Wise (2013); Cai et al. (2006). The operator removes only the component of Γy that points outward across the boundary of 
+
+Θϵ, and it does so in the Γ metric, which yields the following properties. 
+
+Lemma 5. Let Γ( t) be continuous, symmetric, and positive definite for each t, and let ˆθ evolve by 
+
+˙ˆθ = proj Γ(ˆθ, y (t)) for a piecewise continuous y. If ˆθ(t0) ∈ Θϵ, then (i) ˆθ(t) ∈ Θϵ for all t ≥ t0,and (ii) for every θ∗ ∈ Θ, Equation (11) holds. 
+
+14 Preprint. Under review as a conference paper at ICLR 2027. The projection is continuous and locally Lipschitz across both switching surfaces. Together with the smoothness of Φ, this makes the right-hand sides of the proposed adaptation laws locally Lipschitz in ˆθ between data-set updates; hence their Carath´ eodory solutions exist and are unique. For (i), on the boundary pc(ˆθ) = 1 , the outward normal component of the flow satisfies ∇p⊤
+
+> c
+
+˙ˆθ =(1 − pc(ˆθ)) ∇p⊤ 
+
+> c
+
+Γy = 0 when the activation condition A holds, and ∇p⊤
+
+> c
+
+˙ˆθ = ∇p⊤ 
+
+> c
+
+Γy ≤ 0 other-wise; hence the sublevel set {pc ≤ 1} = Θ ϵ is forward invariant. For (ii), when A does not hold, Equation (11) holds with equality. When A holds, 
+
+˜θ⊤Γ−1proj Γ(ˆθ, y ) − ˜θ⊤y = − pc(ˆθ)
+
+˜θ⊤∇pc
+
+  ∇p⊤ 
+
+> c
+
+Γy
+
+∇p⊤ 
+
+> c
+
+Γ∇pc
+
+. (35) By convexity of pc and pc(θ∗) ≤ 0 < p c(ˆθ), it follows that ˜θ⊤∇pc = ( θ∗ − ˆθ)⊤∇pc(ˆθ) ≤
+
+pc(θ∗) − pc(ˆθ) < 0. Since pc(ˆθ) > 0, ∇p⊤ 
+
+> c
+
+Γy > 0, and ∇p⊤ 
+
+> c
+
+Γ∇pc > 0, the right-hand side is nonnegative, which establishes Equation (11). ■
+
+E PROOF OF THE WINDOWED GRADIENT DECOMPOSITION 
+
+This appendix proves the windowed gradient decomposition of Proposition 1. Using ˆf = f − ˜f and Equation (2), 
+
+E(τ ; t) = Φ( X(τ ), θ ∗) + ε(X(τ )) − ˜f (τ ) − Φ( X(τ ), ˆθ(t)) . (36) Since Θϵ is convex and contains both ˆθ(t) and θ∗, Taylor’s theorem with the Lagrange form of the remainder yields 
+
+Φ( X(τ ), θ ∗) − Φ( X(τ ), ˆθ(t)) = Φ ′(X(τ ), ˆθ(t)) ˜θ(t) + R(τ ), ∥R(τ )∥ ≤ 12 cθθ ˜θ(t) 2
+
+, (37) where the remainder bound follows from the bound on ∂2Φ/∂θ 2. Substituting into Equation (6) gives Equation (7) with Ψ as in Equation (8) and 
+
+ηf (t) = 
+
+Z tt−T
+
+Φ′(X(τ ), ˆθ(t)) ⊤ h
+
+R(τ ) + ε(X(τ )) − ˜f (τ )
+
+i
+
+dτ. (38) The matrix Ψ is an integral of Gram matrices and is therefore positive semi-definite with ∥Ψ∥ ≤ 
+
+T ¯υ2. Using ∥Φ′∥ ≤ ¯υ, the definition of ¯fT , and integrating over the window of length T yields Equation (9). ■
+
+F PROOF OF THE DRIFT -W INDOW GUARANTEE AND ITS CONSEQUENCES 
+
+This appendix proves Proposition 2 and states and proves its two consequences, the excitation-dependent rate and the excitation-free functional bound. The windowed excitation condition and the corresponding result are stated here. Since Φ′(X, θ ) ∈ Rn×p, the integrand of Ψ has rank at most 
+
+n, so a full-rank Ψ requires the Jacobian row space to rotate through all of Rp within each window. 
+
+Definition 6. The closed loop satisfies window persistence of excitation (WPE) if there exist φ > 0
+
+and t∗ ≥ t1 such that Ψ( t) ⪰ φI p for all t ≥ t∗. Since Ψ( t) is evaluated at ˆθ(t), this is a condition on the signals generated by the closed loop rather than on the state trajectory alone. Under this condition the rate of Proposition 2 improves as follows. 
+
+Theorem 7. Under the conditions of Proposition 2 and Theorem 6, the bounds in Equation (13) 
+
+hold for t ≥ t∗ with t1 replaced by t∗ and the rate λd replaced by λe ≜ 2  k1 +  α − 12
+
+ φ λ.
+
+Without any excitation, the same Lyapunov argument still bounds the time-averaged first-order func-tional error. 
+
+Proposition 4. Under the conditions of Proposition 2, lim sup S→∞ 1
+
+> S
+
+R t1+St1
+
+˜θ(r)⊤Ψ( r) ˜θ(r) dr ≤
+
+c∞ 
+
+> d
+
+/(α − 12 ).
+
+15 Preprint. Under review as a conference paper at ICLR 2027. The quantity ˜θ(r)⊤Ψ( r)˜θ(r) is the first-order functional error of the current model accumulated along the recent trajectory. Thus, up to the Taylor remainder and approximation error, Proposition 4 bounds the time-averaged squared mismatch between Φ( ·, ˆθ) and f without requiring excitation. For p ≫ n, a bounded trajectory typically excites only a parameter subspace, making this functional statement more informative than a full-parameter claim. Consider the Lyapunov function V = 12 ˜θ⊤P (t)˜θ with P ≜ Γ−1, which, by Theorem 4, satisfies the sandwich inequality  
+
+> 12¯λ
+
+˜θ 2
+
+≤ V ≤ 12λ ˜θ 2
+
+. (39) Since ˙P = −P ˙ΓP , the update Equation (10) gives ˙P = −β0(P − ¯λ−1Ip) + ςΓΨ. Using ˙˜θ = − ˙ˆθ
+
+and the projection property Equation (11) with y = αΞf − kσ ˆθ,
+
+˙V = −˜θ⊤P ˙ˆθ + 12 ˜θ⊤ ˙P ˜θ ≤ − α˜θ⊤Ξf + kσ ˜θ⊤ ˆθ − β0 
+
+> 2
+
+˜θ⊤(P − ¯λ−1Ip)˜θ + ςΓ 
+
+> 2
+
+˜θ⊤Ψ˜θ. (40) Substituting Equation (7), using ˆθ = θ∗ − ˜θ, 0 ≤ ςΓ ≤ 1, Ψ ⪰ 0, and P − ¯λ−1Ip ⪰ 0 (Theorem 4), 
+
+˙V ≤ −  α − 12
+
+ ˜θ⊤Ψ˜θ − kσ ˜θ 2
+
++ kσ ˜θ⊤θ∗ − α˜θ⊤ηf . (41) Using Young’s inequality in the form ab ≤ a2 
+
+> 4
+
++ b2, the sigma-modification cross term is bounded as kσ ˜θ⊤θ∗ ≤ kσ 
+
+> 4
+
+˜θ 2
+
++ kσ ¯θ2. Using Equation (9) and the projection bound ˜θ ≤ ¯˜θ,
+
+α ˜θ⊤ηf ≤ αc η1 ¯˜θ ˜θ 2
+
++ α  cη2 ¯fT (t) + cη3
+
+ ˜θ
+
+≤
+
+
+
+αc η1 ¯˜θ + kσ
+
+> 4
+
+ ˜θ 2
+
++ α2
+
+> kσ
+
+ cη2 ¯fT (t) + cη3
+
+2 ,
+
+(42) where Young’s inequality with parameter kσ /2 was applied to the linear term. Collecting terms in Equation (41) yields 
+
+˙V ≤ −  α − 12
+
+ ˜θ⊤Ψ˜θ − k1 ˜θ 2
+
++ cd(t), (43) with k1 = kσ 
+
+> 2
+
+− αc η1 ¯˜θ, which is positive by the gain condition of Proposition 2 since 2αc η1 ¯˜θ =
+
+αT ¯υc θθ ¯˜θ, and cd(t) as in Equation (14). 
+
+Proof of Proposition 2. Dropping the first (non-positive) term in Equation (43) and using Equa-tion (39) in the form ˜θ 2
+
+≥ 2λV ,
+
+˙V ≤ − λdV + cd(t), λd = 2 k1λ. (44) The comparison lemma gives, for t ≥ t1,
+
+V (t) ≤ V (t1)e−λd(t−t1) +
+
+Z tt1
+
+e−λd(t−s)cd(s) ds. (45) Since ¯fT is nonincreasing by the definition of ¯fT , cd is nonincreasing with lim t→∞ cd(t) = c∞ 
+
+> d
+
+, so the integral is bounded by cd(t1)/λ d and its limit superior by c∞ 
+
+> d
+
+/λ d. Converting through Equa-tion (39), ˜θ(t) 2
+
+≤ 2¯λV (t) and V (t1) ≤ ˜θ(t1) 2
+
+/(2 λ), which yields both bounds in Equa-tion (13). ■
+
+Remark. Since c∞ 
+
+> d
+
+≥ kσ ¯θ2 and k1 < k σ /2, the excitation-free radius in Equation (13) satisfies  
+
+> 2¯λλd
+
+c∞ 
+
+> d
+
+= ¯λk1λ c∞ 
+
+> d
+
+> 2 ¯λλ ¯θ2, i.e., it exceeds ¯θp2¯λ/λ > 2¯θ (for the diagnostic gains ¯λ/λ = 20 ,more than 6¯θ), whereas the projection alone gives ˜θ ≤ 2¯θ + ϵθ . The same computation for Equation (23) gives a radius of at least √2 ¯θ. This is the usual sigma-modification tradeoff: without excitation, Propositions 2 and 3 certify invariance and the exponential rate into the residual set, Proposition 4 certifies the averaged functional error, and parameter localization requires excitation (Theorem 7). 16 Preprint. Under review as a conference paper at ICLR 2027. 
+
+Proof of Proposition 4. Retaining the first term in Equation (43) and dropping −k1 ˜θ 2
+
+, integration over [t1, t 1 + S] gives 
+
+ α − 12
+
+ Z t1+St1
+
+˜θ(r)⊤Ψ( r)˜θ(r) dr 
+
+≤ V (t1) − V (t1 + S) + 
+
+Z t1+St1
+
+cd(r) dr 
+
+≤ ¯˜θ2 
+
+> 2λ
+
++
+
+Z t1+St1
+
+cd(r) dr, 
+
+(46) where V ≥ 0 and Equation (39) with ˜θ ≤ ¯˜θ were used. Dividing by S and letting S → ∞ , the first term vanishes and the Cesaro mean of the nonincreasing cd converges to c∞ 
+
+> d
+
+, which establishes the bound in Proposition 4. ■
+
+Proof of Theorem 7. For t ≥ t∗, ˜θ⊤Ψ˜θ ≥ φ ˜θ 2
+
+, so Equation (43) yields ˙V ≤−  k1 + ( α − 12 )φ ˜θ 2
+
++ cd(t) ≤ − λeV + cd(t), and the argument of Proposition 2 applies verbatim with λd replaced by λe. ■
+
+G ADJOINT REPRESENTATION OF THE TRAJECTORY GRADIENT 
+
+This appendix states and proves the adjoint representation of the trajectory gradient used in Sec-tion 3.2. 
+
+Theorem 8. Let Equation (17) hold, let ˆXp satisfy Equation (15) , and let ν satisfy the backward equation in Equation (18) with ν(t) = 0 2n. Then ∇ˆθ ET (t) equals the integral in Equation (18) .
+
+Let S(τ ) = ∂ ˆXp(τ ; t)/∂ ˆθ denote the sensitivity, which satisfies S′ = ∂F ∂χ ( ˆXp)S + ∂F ∂θ ( ˆXp) with 
+
+S(t − T ) = 0 , since the initial condition X(t − T ) does not depend on ˆθ. By the chain rule, 
+
+∇ˆθ ET =
+
+Z tt−T
+
+S(τ )⊤e(τ ; t) dτ. (47) Consider R tt−T ν⊤
+
+
+
+S′ − ∂F ∂χ S − ∂F ∂θ 
+
+
+
+dτ = 0 . Integrating ν⊤S′ by parts and using ν(t) = 0 and 
+
+S(t − T ) = 0 eliminates the boundary terms, leaving 
+
+Z tt−T
+
+
+
+− ˙ν⊤ − ν⊤ ∂F ∂χ 
+
+
+
+S dτ =
+
+Z tt−T
+
+ν⊤ ∂F ∂θ dτ. (48) Selecting ν to satisfy the backward equation in Equation (18) makes the left integrand equal e⊤S,so Equation (47) equals R tt−T
+
+  ∂F ∂θ 
+
+⊤ ν dτ , which is Equation (18). ■
+
+H CONTAINMENT AND PROOF OF THE TRAJECTORY DECOMPOSITION 
+
+This appendix proves that the virtual trajectory stays in Ω and then proves the trajectory decompo-sition of Theorem 1. The containment lemma referenced in Section 3.2 is stated first. 
+
+Lemma 9. Let Theorems 1 and 2 hold, let ˆθ(t) ∈ Θϵ, and let the window condition in Equation (17) 
+
+hold. Then ˆXp(τ ; t) ∈ Ω and ∥e(τ ; t)∥ < ϖ for all τ ∈ [t − T, t ].Proof of Theorem 9. Let τ ∗ ≜ sup {τ ∈ [t − T, t ] : ∥e(s; t)∥ ≤ ϖ ∀s ∈ [t − T, τ ]}, which is well defined with τ ∗ > t − T by continuity and e(t − T ; t) = 0 . For τ ≤ τ ∗, both ˆXp(τ ) and the segment between X(τ ) and ˆXp(τ ) lie in Ω. On this interval, 
+
+˙e = F ( ˆXp, ˆθ, τ ) − F (X, ˆθ, τ ) + F (X, ˆθ, τ ) −
+
+ ˙xf (X) + g(X)u
+
+
+
+= F ( ˆXp, ˆθ, τ ) − F (X, ˆθ, τ ) − B
+
+
+
+f (X) − Φ( X, ˆθ)
+
+
+
+,
+
+(49) 17 Preprint. Under review as a conference paper at ICLR 2027. so, using the mean value bound F ( ˆXp, ˆθ, τ ) − F (X, ˆθ, τ ) ≤ LF ∥e∥ and, by Equation (2) and the mean value theorem on the segment [ˆθ, θ ∗] ⊂ Θϵ, f (X) − Φ( X, ˆθ) ≤ ¯υ ˜θ + ¯ ε ≤ ¯υ ¯˜θ + ¯ ε,the Gronwall inequality yields 
+
+∥e(τ ; t)∥ ≤ eLF (τ −(t−T )) − 1
+
+LF
+
+
+
+¯υ ¯˜θ + ¯ ε
+
+
+
+≤ κT
+
+
+
+¯υ ¯˜θ + ¯ ε
+
+
+
+< ϖ, (50) by Equation (17). If τ ∗ < t , then continuity would require ∥e(τ ∗; t)∥ = ϖ, contradicting Equa-tion (50); hence τ ∗ = t and the claim follows. ■
+
+The operators used in Theorem 1 are defined as follows. Let Xs(τ ) ≜ X(τ ) + s e (τ ; t) for s ∈ [0 , 1] 
+
+denote the segment between the measured and predicted states, and define the mean-value system matrix and its transition matrix as 
+
+¯A(τ ) ≜
+
+Z 10
+
+∂F ∂χ 
+
+
+
+Xs(τ ), ˆθ(t), τ 
+
+
+
+ds, ∂∂τ ΦA(τ, s ) = ¯A(τ ) Φ A(τ, s ), ΦA(s, s ) = I2n.
+
+(51) Define the operators 
+
+W (τ ) ≜
+
+Z τt−T
+
+ΦA(τ, s ) B Φ′(X(s), ˆθ(t)) ds, (52) 
+
+d(τ ) ≜
+
+Z τt−T
+
+ΦA(τ, s ) B [R(s) + ε(X(s))] ds, (53) where R(s) ≜ Φ( X(s), θ ∗) − Φ( X(s), ˆθ(t)) − Φ′(X(s), ˆθ(t)) ˜θ(t) denotes the Taylor remainder, which satisfies ∥R(s)∥ ≤ 12 cθθ ˜θ(t) 2
+
+by the smoothness of Φ. Let S(τ ) ≜ ∂ ˆXp(τ ; t)/∂ ˆθ denote the sensitivity of the virtual trajectory, which satisfies S′ = ( ∂F/∂χ )( ˆXp) S + B Φ′( ˆXp, ˆθ) with 
+
+S(t − T ) = 0 . Since F ( ˆXp, ˆθ) − F (X, ˆθ) = ¯A e along the segment, the error dynamics are linear in e with forcing −B(Φ ′ ˜θ + R + ε), which yields the following representation. The constants in Equation (21) are d2 ≜ 12 cθθ κT , d0 ≜ κT ¯ε, we ≜ ¯w + d2 ¯˜θ, DS ≜
+
+T e LF T (cXθ + LF X T ¯υ),
+
+b1 ≜ T   ¯w d 2 + DS w2
+
+> e
+
+ , b2 ≜ 2 T D S we d0, b3 ≜ T d 0 ( ¯ w + DS d0) . (54) 
+
+Proof of Theorem 1. By Theorem 9, the segment X(τ ) + s e (τ ; t), s ∈ [0 , 1] , remains in Ω, so ¯A
+
+in Equation (51) is well defined with ¯A(τ ) ≤ LF , and by the fundamental theorem of calculus, 
+
+F ( ˆXp, ˆθ, τ ) − F (X, ˆθ, τ ) = ¯A(τ )e(τ ; t) exactly. Therefore 
+
+˙e = ¯A(τ )e − B
+
+
+
+Φ′(X(τ ), ˆθ)˜θ + R(τ ) + ε(X(τ )) 
+
+
+
+, (55) using Equation (37) and Equation (2), and variation of constants with e(t − T ; t) = 0 gives the exact representation e(τ ; t) = −
+
+
+
+W (τ )˜θ + d(τ )
+
+
+
+with W and d as in Equation (52)–Equation (53). Since ∥ΦA(τ, s )∥ ≤ eLF (τ −s),
+
+∥W (τ )∥ ≤ ¯υκ T = ¯ w, ∥d(τ )∥ ≤ κT
+
+ 
+
+> 12
+
+cθθ ˜θ 2
+
++ ¯ ε
+
+
+
+= d2 ˜θ 2
+
++ d0, (56) and consequently, using ˜θ ≤ ¯˜θ,
+
+∥e(τ ; t)∥ ≤ 
+
+
+
+¯w + d2 ¯˜θ
+
+ ˜θ + d0 = we ˜θ + d0. (57) Next, the exact sensitivity S and the operator W are compared. Let Av (τ ) ≜ ∂F ∂χ ( ˆXp(τ ), ˆθ, τ ) with transition matrix Φv (τ, s ), so that 
+
+S(τ ) = 
+
+Z τt−T
+
+Φv (τ, s )B Φ′( ˆXp(s), ˆθ) ds. 
+
+18 Preprint. Under review as a conference paper at ICLR 2027. Since Av and ¯A are evaluated at points within distance ∥e∥ of one another inside Ω, the bound on 
+
+∂2Φ/∂X∂θ and the definition of LF X give Av (τ ) − ¯A(τ ) ≤ LF X ∥e(τ ; t)∥. Writing D(τ, s ) ≜
+
+Φv (τ, s ) − ΦA(τ, s ), the difference satisfies ∂τ D = Av D + ( Av − ¯A)Φ A with D(s, s ) = 0 , so 
+
+∥D(τ, s )∥ ≤ 
+
+Z τs
+
+eLF (τ −r) LF X ∥e(r; t)∥ eLF (r−s) dr ≤ LF X T e LF T sup 
+
+> r
+
+∥e(r; t)∥ . (58) Similarly, Φ′( ˆXp(s), ˆθ) − Φ′(X(s), ˆθ) ≤ cXθ ∥e(s; t)∥. Combining, 
+
+∥S(τ ) − W (τ )∥ ≤ 
+
+Z τt−T
+
+ ∥D(τ, s )∥ ¯υ + eLF T cXθ ∥e(s; t)∥ ds ≤ DS sup 
+
+> r∈[t−T,t ]
+
+∥e(r; t)∥ , (59) with DS = T e LF T (cXθ + LF X T ¯υ).By Theorem 8 and Equation (47), the adjoint signal satisfies exactly 
+
+Ξa = −
+
+Z tt−T
+
+S(τ )⊤e(τ ; t) dτ =
+
+Z tt−T
+
+S(τ )⊤ 
+
+W (τ )˜θ + d(τ )
+
+
+
+dτ 
+
+= H ˜θ +
+
+Z tt−T
+
+h
+
+W ⊤d + ( S − W )⊤ 
+
+W ˜θ + d
+
+i 
+
+dτ, 
+
+(60) which is Equation (20) with ηa equal to the last integral. Using Equation (56), Equation (57), Equation (59), W ˜θ + d = ∥e∥, and ˜θ ≤ ¯˜θ to fold cubic and quartic powers, 
+
+∥ηa∥ ≤ T
+
+
+
+¯w
+
+
+
+d2 ˜θ 2
+
++ d0
+
+
+
++ DS
+
+
+
+we ˜θ + d0
+
+2
+
+≤ b1 ˜θ 2
+
++ b2 ˜θ + b3,
+
+(61) with b1, b 2, b 3 as in Equation (54). Finally, H is an integral of Gram matrices, hence positive semi-definite, with ∥H∥ ≤ T ¯w2. ■
+
+I PROOF OF THE ADJOINT -W INDOW GUARANTEE AND THE 
+
+WINDOW -L ENGTH CONDITION 
+
+This appendix proves Proposition 3 and the explicit window-length condition referenced in Sec-tion 3.2. The window-length corollary is stated first. 
+
+Corollary 10. Let LF T ≤ 1. Then the gain condition of Proposition 3 holds whenever T ≤
+
+(kσ /(2 α C b)) 1/3, where Cb is the computable constant defined in Section I, obtained by majorizing 
+
+κT ≤ e T and eLF T ≤ e in Equation (54) .
+
+Consider Va = 12 ˜θ⊤Γ−10 ˜θ, which satisfies 12¯λ ˜θ 2
+
+≤ Va ≤ 12λ ˜θ 2
+
+. Since Γ0 is constant, using the projection property Equation (11) with y = αΞa − kσ ˆθ and the decomposition Equation (20), 
+
+˙Va ≤ − α˜θ⊤H ˜θ − α˜θ⊤ηa + kσ ˜θ⊤θ∗ − kσ ˜θ 2
+
+≤ − α˜θ⊤H ˜θ − kσ ˜θ 2
+
++ kσ ˜θ⊤θ∗
+
++ α
+
+
+
+b1 ¯˜θ + b2
+
+ ˜θ 2
+
++ αb 3 ˜θ ,
+
+(62) using Equation (21) and ˜θ ≤ ¯˜θ. Applying Young’s inequality as in Section F, kσ ˜θ⊤θ∗ ≤ 
+
+> kσ
+> 4
+
+˜θ 2
+
++ kσ ¯θ2 and αb 3 ˜θ ≤ kσ 
+
+> 4
+
+˜θ 2
+
++ α2b23 
+
+> kσ
+
+. Dropping the non-positive term −α˜θ⊤H ˜θ yields 
+
+˙Va ≤ − k1a ˜θ 2
+
++ ca ≤ − λaVa + ca, (63) 19 Preprint. Under review as a conference paper at ICLR 2027. with k1a = kσ 
+
+> 2
+
+− α(b1 ¯˜θ + b2) > 0 by the gain condition of Proposition 3 and λa = 2 k1aλ. The comparison lemma and the sandwich inequality then give Equation (23). If WPE holds for H, that is H(t) ⪰ φaIp, the rate improves to 2( k1a + αφ a)λ by retaining the dropped term. ■
+
+Proof of Theorem 10. For LF T ≤ 1, the majorizations κT = ( eLF T − 1) /L F ≤ (e − 1) T < eT ,
+
+eLF T ≤ e, and T ≤ 1/L F hold, the first strictly for T > 0. Substituting into the definitions in Equation (54) gives ¯w ≤ e¯υT , d2 ≤ ec θθ  
+
+> 2
+
+T , d0 ≤ e¯εT , we ≤ e w 1T with w1 ≜ ¯υ + cθθ ¯˜θ 
+
+> 2
+
+, and 
+
+DS ≤ eM S T with MS ≜ cXθ + LF X ¯υ/L F . Substituting into Equation (54) yields 
+
+b1 ¯˜θ + b2 ≤ e2 ¯υc θθ ¯˜θ 
+
+> 2
+
+T 3 + e3MS w1
+
+¯˜θ w 1 + 2¯ ε
+
+
+
+T 4 ≤ Cb T 3, (64) where the factor T 4 was majorized by T 3/L F using T ≤ 1/L F , and 
+
+Cb ≜ e2 ¯υ c θθ ¯˜θ
+
+2 + e3 MS w1
+
+LF
+
+¯˜θ w 1 + 2¯ ε
+
+
+
+. (65) Since every term of b1 ¯˜θ + b2 contains at least one factor κT (through ¯w, d2, d0, or we), and 
+
+κT < eT strictly, b1 ¯˜θ + b2 < C bT 3 for T > 0. Hence the window bound in Theorem 10 im-plies 2α
+
+
+
+b1 ¯˜θ + b2
+
+
+
+< 2αC bT 3 ≤ kσ , which is the strict gain condition of Proposition 3. ■
+
+J STORED -S ET EXTENSION , G AUSS –N EWTON BOUND , AND PROOF OF THE 
+
+NODE-CL G UARANTEE 
+
+This appendix states and proves the stored-set extension of Proposition 2, the bound relating the Gauss–Newton matrix to the trajectory regressor, and Theorem 2. 
+
+Proposition 5. Let D(t) = {(Xj , ˆf (τj )) }Nj=1 be a set of N stored pairs recorded at times 
+
+τj ≤ t, with membership piecewise constant in t, and replace the integrals in Equation (6) ,Equation (8) , and Equation (10) by ΞD ≜ TN
+
+PNj=1 Φ′(Xj , ˆθ)⊤( ˆf (τj ) − Φ( Xj , ˆθ)) and ΨD ≜
+
+> TN
+
+PNj=1 Φ′(Xj , ˆθ)⊤Φ′(Xj , ˆθ). Suppose every admitted sample satisfies ˜f (τj ) ≤ δD , which holds with δD = ∥zo(t0)∥ e−ko(ta−t0) + ¯ zo when admission starts at ta ≥ t0. Let ts ≥ t1 denote the time at which the stored-set law is activated, with the stack non-empty, ˆθ(ts) ∈ Θϵ, and λI p ⪯
+
+Γ( ts) ⪯ ¯λI p. Then Proposition 1, Proposition 2, and Proposition 4 hold for t ≥ ts with t1 replaced by ts and with ¯fT (t) and ¯zo both replaced by δD , so that cd(t) = c∞ 
+
+> d
+
+= kσ ¯θ2 + α2 
+
+> kσ
+
+(cη2δD + cη3)2
+
+is constant. 
+
+A stored sample retains the observer error of its recording time, so the decaying window envelope becomes a uniform bound over admitted samples. The law of Hart et al. (2025a) is a stored-set drift law of this type, whereas fixing Γ recovers its constant-gain simplification, the DNN analogue of the stack of Chowdhary & Johnson (2011). The additions analyzed here are the certified gain interval, gain-metric projection, and excitation-free functional bound; the finite-excitation convergence result of Chowdhary & Johnson (2011) is complementary. 
+
+Proof of Proposition 5. The expansion in the proof of Proposition 1 is performed sample by sample, so replacing the integral over [t − T, t ] by the average over D(t) scaled by T gives ΞD = Ψ D ˜θ + ηD
+
+with ΨD ⪰ 0, ∥ΨD ∥ ≤ T ¯υ2, and ∥ηD ∥ ≤ cη1 ˜θ 2
+
++ cη2δD + cη3, since each stored ˆf (τj ) carries the observer error at its recording time and every admitted sample is bounded by δD ; the bound on 
+
+δD under an admission time follows from Equation (30). The proofs of Theorem 4, Proposition 2, and Proposition 4 use only positive semi-definiteness and boundedness of the regressor and the form of the perturbation bound, with the constant c∞ 
+
+> d
+
+in place of the nonincreasing cd(t), so they apply verbatim. Membership changes make ΨD piecewise continuous in t; V is continuous and the inequality on ˙V holds almost everywhere, so the comparison lemma applies unchanged. ■
+
+The computable Gauss–Newton matrix is related to the trajectory regressor by the following bound. 20 Preprint. Under review as a conference paper at ICLR 2027. 
+
+Lemma 11. Under the conditions of Theorem 1 at segment length Ts, ∥GS − HS ∥ ≤ g2 ˜θ 2
+
++
+
+g1 ˜θ + g0 with g2 ≜ TsD2 
+
+> S
+
+w2 
+
+> e
+
+, g1 ≜ 2TsDS we( ¯ w + DS d0), and g0 ≜ TsDS d0(2 ¯ w + DS d0),where ¯w, w e, d 0, D S are the constants of Section H at Ts.Proof of Theorem 11. By Equation (59) and Equation (57) applied to each segment at length Ts,
+
+∥Sj − Wj ∥ ≤ DS (we ˜θ + d0) =: ∆ , while ∥Wj ∥ ≤ ¯w and hence ∥Sj ∥ ≤ ¯w + ∆ . Hence 
+
+S⊤ 
+
+> j
+
+Sj − W ⊤ 
+
+> j
+
+Wj = (Sj − Wj )⊤Sj + W ⊤ 
+
+> j
+
+(Sj − Wj ) ≤ ∆(2 ¯ w + ∆) , and integrating over a segment of length Ts and averaging over segments gives ∥GS − HS ∥ ≤ Ts∆(2 ¯ w + ∆) ; expanding 
+
+∆ in powers of ˜θ yields the stated constants. ■
+
+Proof of Theorem 2. Theorem 4 holds because GS ⪰ 0 and its proof uses nothing else. With 
+
+V = 12 ˜θ⊤Γ−1 ˜θ and Equation (11), 
+
+˙V ≤ − α˜θ⊤HS ˜θ − α˜θ⊤ηS + kσ ˜θ⊤θ∗ − kσ ˜θ 2
+
++ 12 ςΓ ˜θ⊤HS ˜θ + 12 ςΓ ˜θ⊤(GS − HS )˜θ, 
+
+where the last two terms come from 12 ˜θ⊤ ddt (Γ −1)˜θ with the term − β0 
+
+> 2
+
+˜θ⊤(Γ −1 − ¯λ−1Ip)˜θ ≤ 0
+
+dropped. Since 0 ≤ ςΓ ≤ 1, the HS terms combine into −(α − 12 )˜θ⊤HS ˜θ, and Theorem 11 with 
+
+˜θ ≤ ¯˜θ bounds the mismatch term by 12 (g2 ¯˜θ2 + g1 ¯˜θ + g0) ˜θ 2
+
+. Bounding the remaining terms as in the proof of Proposition 3 and using HS ⪰ φsIp gives 
+
+˙V ≤ − ks(φs) ˜θ 2
+
++ ca ≤ − 2ks(φs)λV + ca = −λs(φs)V + ca.
+
+The comparison lemma and ˜θ 2
+
+/(2 ¯λ) ≤ V ≤ ˜θ 2
+
+/(2 λ) yield Equation (27). ■
+
+K SIMULATION DETAILS , A DDITIONAL ABLATIONS , AND VERIFICATION OF THE CERTIFIED INEQUALITIES 
+
+The diagnostic results are reported in Table 2 and Figures 3, 4 and 7 to 11; the full benchmark results in Table 3 and Figures 5 and 6. 
+
+Plants and excitation. In S1, the plant is ¨x = Φ( X, θ tr ) + u with n = m = 1 , where Φ is a single-hidden-layer tanh network with input X ∈ R2, six hidden neurons, and scalar output (p = 25 ), and θtr is drawn per seed with hidden weights and biases from N (0 , 1) and N (0 , 0.25) and output weights and bias from N (0 , 0.64) and N (0 , 0.04) . The input is u = P7 
+
+> k=1
+
+ak sin(2 πω kt +
+
+ϕk) − x − 1.5 ˙ x with ωk ∈ { 0.20 , 0.31 , 0.47 , 0.71 , 1.03 , 1.51 , 2.23 } Hz, amplitudes ak = 1 .1 ξk
+
+with ξk ∼ U [0 .5, 1] , and phases ϕk ∼ U [0 , 2π]. The estimate is initialized at ˆθ(t0) = θtr + δ with 
+
+δ Gaussian and rescaled to ∥δ∥ = 0 .4 ∥θtr ∥, and ¯θ = 2 ∥θtr ∥, ϵθ = 0 .5. In S2, the manipulator model is M (q)¨ q + C(q, ˙q) ˙ q + Fd ˙q = τ with M = [ p1 + 2 p3c2, p2 + p3c2; p2 + p3c2, p2],
+
+C = [ −p3s2 ˙q2, −p3s2( ˙ q1 + ˙ q2); p3s2 ˙q1, 0] , c2 = cos q2, s2 = sin q2, p1 = 3 .473 , p2 = 0 .196 ,
+
+p3 = 0 .242 , and Fd = diag(5 .3, 1.1) . The input is a five-component multisine per joint with frequencies {0.13 , 0.29 , 0.53 , 0.97 , 1.61 } Hz and {0.17 , 0.37 , 0.67 , 1.19 , 1.87 } Hz, amplitudes 4ξk
+
+and 2ξk, and the baseline −3q − 3 ˙ q. The network has input X ∈ R4, twelve hidden neurons, and two outputs ( p = 86 ), initialized with entries from N (0 , 0.0025) ; ¯θ = 40 and ϵθ = 2 . The held-out excitation uses a different draw of amplitudes and phases. 
+
+Gains and discretization (S1 and S2). The observer gains are αo = kf = 200 , the learning gains are α = 2 (drift, single-step, CL) and α = 6 (adjoint), and the gain matrix parameters of the windowed drift law are Γ0 = 5 Ip, ¯λ = 10 , λ = 0 .5, β0 = 0 .05 , and kσ = 10 −4 (the CL-LS and stored-segment gains are given under Stored-set methods below). The plant is integrated by fourth-order Runge-Kutta at ∆t = 1 ms. The observer is integrated by fourth-order Runge-Kutta over each sampling interval from the sampled velocity, with the velocity extrapolated within the interval as ˙x(tk) + ( ˆf (tk) + g(X(tk)) u(tk))( τ − tk) (predictive hold); the zero-order hold variant in Figure 11(b) uses ˙x(tk) throughout the interval. The drift-law, single-step, and CL updates are applied by forward Euler at 1 ms in S1 and 5 ms in S2, and the adjoint and Adam updates at 10 ms 21 Preprint. Under review as a conference paper at ICLR 2027. 0 20 40 60 80 100 120               
+
+> time (s)
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> ‖f − Φ‖ rms /‖f‖rms
+> (a) S1, teacher network
+> 020 40 60 80 100 120
+> time (s)
+> 10 −2
+> 10 −1
+> 10 0
+> (b) S2, two-link manipulator
+> single-step drift window (Alg. 1) adjoint window (Alg. 2) online Adam (adjoint) CL, kf= 200 CL, kf= 800 CL-LS (adapted), kf= 200 CL-LS (adapted), kf= 800 NODE-CL (proposed)
+
+Figure 3: Normalized functional error over time (three seeds, geometric mean with seed range) for (a) S1 and (b) S2. Table 2: Diagnostic studies S1 and S2 (three seeds, 120 s; these runs use the scalar bounded-gain forgetting of Slotine & Li (1989) in the least-squares laws): terminal normalized functional error (geometric mean, seed range); final parameter error ratio (S1); held-out 4 s prediction error (S2; initially 14 .3); update cost in ms on one CPU core, excluding stack selection. All rows except online Adam are sampled implementations of continuous-time laws covered by the analysis under its stated assumptions and gain conditions.                                                                                                         
+
+> S1 (teacher, p= 25 )S2 (manipulator, p= 86 )cost (ms) Method func. error [range] ˜θ(tf)/˜θ(0) func. error [range] pred. ( 4s) S1 S2 single-step 6.8e−2[3.1e−2,1.1e−1]0.89 3.2e−1[2.2e−1,5.1e−1]0.293 0.03 0.04
+> drift window (Alg. 1) 9.3e−3[3.7e−3,1.7e−2]0.80 7.8e−2[6.1e−2,1.1e−1]0.119 0.15 0.81
+> adjoint window (Alg. 2) 2.9e−2[6.8e−3,7.3e−2]0.85 8.9e−2[8.0e−2,9.9e−2]0.122 1.42.5
+> online Adam (adjoint) 2.4e−2[9.0e−3,7.7e−2]1.31 1.2e−1[9.4e−2,1.8e−1]0.157 1.42.5
+> CL, kf= 200 6.9e−3[2.6e−3,1.2e−2]0.83 2.3e−2[2.1e−2,2.6e−2]0.0375 0.06 0.14
+> CL, kf= 800 5.9e−3[2.1e−3,9.9e−3]0.83 1.4e−2[1.4e−2,1.5e−2]0.0399 0.06 0.14
+> CL-LS (adapted), kf= 200 3.7e−3[1.6e−3,6.0e−3]0.93 2.0e−2[1.8e−2,2.1e−2]0.0232 0.14 0.78
+> CL-LS (adapted), kf= 800 2.8e−3[1.2e−3,6.2e−3]0.92 7.1e−3[6.3e−3,7.7e−3]0.0249 0.14 0.78
+> NODE-CL (proposed) 3.4e−3[9.8e−4,6.6e−3]0.80 1.0e−2[9.9e−3,1.2e−2]0.0374 2.315
+> NODE-CL, equal memory 4.8e−3[1.7e−3,8.5e−3]0.80 1.7e−2[1.4e−2,2.1e−2]0.0279 0.98 5.1
+
+in both studies, with the gradient held constant between updates. The forward and backward solves of the adjoint use second-order integration on the 10 ms buffer grid. 
+
+Baselines (S1 and S2). The single-step baseline uses Ξ = T Φ′(X(t), ˆθ)⊤E(t; t) so that its gradient magnitude matches that of the windowed laws. CL stores up to 100 pairs (Xj , ˆf (τj )) ; a new pair is admitted when the relative change of the Jacobian Φ′(X, ˆθ) from the last stored point exceeds 
+
+0.1, and once the stack is full it replaces the stored point whose replacement most increases the minimum singular value of the stacked regressor, evaluated every 50 ms in S1 and 200 ms in S2 with the current ˆθ; its gradient is Ξ = ( T /N ) PNj=1 Φ′(Xj , ˆθ)⊤( ˆf (τj ) − Φ( Xj , ˆθ)) with a constant gain 
+
+Γ0, and the stack-selection check, which requires a singular value decomposition per stored point, is not included in its reported update cost. Online Adam uses β1 = 0 .9, β2 = 0 .999 , and learning rates 10 −2 (S1) and 3 × 10 −3 (S2), selected from {3 × 10 −4, 10 −3, 3 × 10 −3, 10 −2} on seed 0; the single-step gain α = 2 was selected on the pendulum tuning seed. 
+
+Evaluation (S1 and S2). The evaluation states are 400 samples, equally spaced in time, from the trajectory after t = 20 s ( 120 s runs) or 15 s ( 60 s runs). The excited subspace in Figure 8(b) is a diagnostic computed from the teacher Jacobian: the span of eigenvectors of the average of 
+
+Φ′(X, θ tr )⊤Φ′(X, θ tr ) over the evaluation states with eigenvalues above 10 −3 of the largest; its invariance under the adaptation is not established, and the distinction drawn is between excited and weakly excited directions rather than a strict rank deficiency. 
+
+Benchmark suite details. Domains and tasks are pendulum (swingup), cartpole (swingup), acrobot (swingup), and reacher (easy) from Tassa et al. (2018), integrated by MuJoCo at 1 ms with the suite’s models unchanged; all are contact free. State dimensions 2n are 2, 4, 4, and 4, with 1, 1, 1, and 2
+
+actuators; the network input has dimension 4, 6, 7, and 7 after the (cos , sin) features (only unlimited 22 Preprint. Under review as a conference paper at ICLR 2027. 10 −3 10 −2
+
+velocity noise std σv (0 plotted at 3 × 10 −4)
+
+10 −3
+
+10 −2
+
+10 −1
+
+10 0
+
+> ‖f − Φ‖ rms /‖f‖rms  (60 s)
+
+(a) S1       
+
+> drift window (Alg. 1) adjoint window (Alg. 2) online Adam (adjoint) CL, kf= 200 CL, kf= 800 CL-LS (adapted), kf= 200 NODE-CL (proposed)
+
+10 −3 10 −2
+
+velocity noise std σv (0 plotted at 3 × 10 −4)
+
+10 −2
+
+10 −1
+
+10 0
+
+(b) S2       
+
+> CL, kf= 200 CL, kf= 800 CL-LS (adapted), kf= 200 NODE-CL (proposed)
+
+Figure 4: Terminal normalized functional error after 60 s against the standard deviation of white velocity measurement noise (three seeds, geometric mean with seed range) for (a) S1 and (b) S2. Table 3: Benchmark suite, full results (five evaluation seeds, medians, 60 s): terminal normalized functional error on visited states, held-out 1 s error with seed range, held-out 4 s error, for clean (c) and noisy (n, σv = 3 × 10 −3) measurements; mean cost per update and amortized stack-selection cost per simulated second (ms, one CPU core, NumPy). The 10 −3 and 10 −2 levels are shown in Figure 2; the 10 −2 level was not run for the acrobot and reacher. 
+
+Domain Method func (c) 1 s (c) 4 s (c) func (n) 1 s (n) 4 s (n) upd ms sel ms/s pendulum single-step 1.0e + 00 1.643 [1.00, 2.05] 1.27 8.7e − 01 1.650 1.24 0.03 0
+
+pendulum CL 2.5e − 02 0.315 [0.17, 0.73] 0.29 1.3e − 01 0.609 0.70 0.09 44 
+
+pendulum CL-LS 2.3e − 02 0.195 [0.03, 0.25] 0.11 2.0e − 01 1.642 0.90 0.49 40 
+
+pendulum NODE-replay 5.0e − 03 0.183 [0.06, 0.26] 0.12 1.5e − 02 0.141 0.11 4.77 188 
+
+pendulum NODE-CL 2.7e − 03 0.035 [0.01, 0.04] 0.02 1.2e − 02 0.038 0.03 5.32 186 
+
+cartpole single-step 4.6e − 01 3.287 [1.65, 4.44] 7.50 4.5e − 01 3.145 8.28 0.04 0
+
+cartpole CL 7.0e − 02 0.623 [0.42, 0.95] 2.71 1.2e − 01 1.363 7.96 0.16 196 
+
+cartpole CL-LS 2.2e − 02 0.251 [0.21, 0.95] 1.11 1.1e − 01 1.984 28 .61 1.91 186 
+
+cartpole NODE-replay 1.6e − 02 0.311 [0.25, 0.49] 1.81 2.8e − 02 0.741 2.57 12 .29 495 
+
+cartpole NODE-CL 2.1e − 02 0.381 [0.29, 0.57] 1.95 1.7e − 02 0.302 2.09 13 .54 489 
+
+acrobot single-step 5.5e + 00 1.621 [0.56, 9.48] 4.79 3.9e + 00 1.232 2.72 0.04 0
+
+acrobot CL 6.4e − 01 3.615 [0.92, 5.63] 16 .24 5.4e − 01 4.385 19 .50 0.16 224 
+
+acrobot CL-LS 5.9e − 02 1.409 [1.21, 4.33] 7.04 2.4e − 01 2.015 7.64 2.34 225 
+
+acrobot NODE-replay 3.3e − 01 1.002 [0.75, 2.55] 3.79 3.3e − 01 2.129 6.15 14 .45 598 
+
+acrobot NODE-CL 1.5e − 01 1.545 [0.31, 1.79] 5.09 2.0e − 01 1.279 3.30 15 .95 596 
+
+reacher single-step 1.3e + 00 1.509 [0.89, 4.02] 1.78 1.3e + 00 1.516 1.78 0.04 0
+
+reacher CL 6.5e − 01 1.007 [0.83, 1.63] 0.90 6.4e − 01 0.976 0.98 0.16 236 
+
+reacher CL-LS 1.6e − 01 0.064 [0.05, 0.12] 0.24 3.6e − 01 0.215 0.60 2.36 230 
+
+reacher NODE-replay 2.4e − 01 0.077 [0.03, 0.12] 0.11 2.3e − 01 0.088 0.18 14 .43 604 
+
+reacher NODE-CL 2.4e − 01 0.069 [0.04, 0.08] 0.12 2.4e − 01 0.075 0.12 15 .94 589 0 25 50 
+
+time (s) 
+
+10 −2
+
+10 −1
+
+10 0
+
+10 1
+
+> normalized functional error (median)
+
+pendulum 
+
+0 25 50 
+
+time (s) 
+
+10 −2
+
+10 −1
+
+10 0
+
+cartpole 
+
+0 25 50 
+
+time (s) 
+
+10 −1
+
+10 0
+
+10 1
+
+acrobot 
+
+0 25 50 
+
+time (s) 
+
+10 −1
+
+10 0
+
+reacher 
+
+> single-step CL (const. gain) CL-LS (Hart et al.) NODE-replay NODE-CL (proposed)
+
+Figure 5: Benchmark suite learning curves: normalized functional error on the visited states against streaming time (five evaluation seeds, median with seed range, clean measurements). 23 Preprint. Under review as a conference paper at ICLR 2027. 1-step CL CL-LS replay NODE-CL  
+
+> 10 −2
+> 10 −1
+> 10 0
+> held-out 1 s error (median, range) pendulum
+> 1-step CL CL-LS replay NODE-CL
+> 10 0
+> 2 × 10 −1
+> 3 × 10 −1
+> 4 × 10 −1
+> 6 × 10 −1
+> 2 × 10 0
+> 3 × 10 0
+> 4 × 10 0
+> cartpole
+> 1-step CL CL-LS replay NODE-CL
+> 10 0
+> 10 1
+> acrobot
+> 1-step CL CL-LS replay NODE-CL
+> 10 −1
+> 10 0
+> reacher
+> clean
+> σv= 3 × 10 −3
+
+Figure 6: Held-out 1 s prediction error per domain (five evaluation seeds, median with seed range), clean (solid) and under velocity noise 3 × 10 −3 (hatched); the dotted line is the initial model. Learn-ing curves are given in Figure 5. hinges receive the feature), the hidden layer has 12 , 16 , 16 , and 16 tanh neurons, and p = 73 , 146 ,
+
+162 , and 162 . The excitation is a five-component multisine per actuator with frequencies uniform in 
+
+[0 .1, 1.5] Hz, random phases, and amplitudes of 0.45 , 0.5, 0.25 , and 0.6 of the actuator range, plus a velocity (and, for the cartpole slider, position) feedback baseline that keeps the trajectory bounded; the held-out record uses a separate excitation seed and 12 s, from which eight initial conditions spaced 1.2 s apart are used. The network is initialized from N (0 , 0.0025) with ¯θ = 60 , ϵθ = 3 .
+
+Benchmark suite gains. Observer gains are αo = kf = 200 with the predictive hold. Single-step uses α = 0 .1 at a 1 ms update (selected on the pendulum from {0.5, 0.1, 0.02 }; larger gains oscillate); CL uses α = 2 , Γ = 5 Ip, a stack of 100 pairs admitted at 0.2 s checks with relative-Jacobian tolerance 0.1, at a 5 ms update; CL-LS adds Equation (10) in information form with β0 =0.3, ¯λ = 10 3, λ = 10 −3, kσ = 10 −6; NODE-CL uses segments of 0.05 s ( 200 on the pendulum, 
+
+100 elsewhere), admission checks every 0.1 s, α = 2 , β0 = 0 .3, ¯λ = 10 6, λ = 10 −5, kσ = 10 −9,
+
+Γ0 = 10 4Ip, at a 20 ms update; NODE-replay uses the same stack and update interval with learning rate 3 × 10 −2 (selected on S2 from {10 −3, 3 × 10 −3, 10 −2, 3 × 10 −2}). The forgetting rate β0 =0.3 for both least-squares laws was selected on cartpole seed 0 from {0.1, 0.3, 1}; with the scalar forgetting of Slotine & Li (1989) the NODE-CL error on that seed was 0.109 against 0.037 with the direction-wise forgetting of Equation (10). 
+
+Benchmark suite memory and the swimmer. CL and CL-LS store 100 input-output pairs (100(2 n + m + n) scalars) plus a p × p gain for CL-LS; NODE-CL stores Ns segments of six samples ( 6Ns(2 n + m) scalars), a cache of Ns terminal sensitivities ( 2nN sp scalars), and the p × p
+
+gain. The swimmer (six links, 2n = 16 , m = 5 , p = 356 with 12 hidden neurons, translation coordinates excluded from the input) was run with 30 segments, 0.1 s updates, and 0.5 s admission checks; after 60 s every method, including NODE-CL, has normalized functional error above 1 and held-out error above the initial model, so the domain is not discriminating at this data budget and is reported only here. 
+
+Relation to the concurrent-learning law of Hart et al. (2025a). CL-LS is not claimed as a new algorithm; it is an adapted baseline. The prior law updates all DNN layers by 
+
+˙ˆθ = proj(Γ(Φ ′(X, ˆθ)⊤r − γ1
+
+PNi=1 Φ′(Xi, ˆθ)⊤(ui − ˆui) − γ2 ˆθ)) with ddt Γ−1 = −βΓ−1 +
+
+γ1
+
+PNi=1 Φ′(Xi, ˆθ)⊤Φ′(Xi, ˆθ) frozen outside an eigenvalue band, where ui − ˆui is the stored resid-ual between the applied input and its reconstruction from a state-derivative observer, and the stack is admitted after the observer settling time; its Lyapunov derivative bounds the gain-dynamics term by half the gradient term, as in the proof of Proposition 2. CL-LS in this paper restricts that mech-anism to identification (no tracking term), with the windowed or stored residual ˆf (τj ) − Φ( Xj , ˆθ)
+
+normalized by T /N , the direction-wise forgetting and Lipschitz gate of Equation (10) in place of the frozen band, which yields the certified bounds of Theorem 4, and the projection in the Γ metric with the inequality of Theorem 5; the constant-gain CL row is the same DNN stack with Γ fixed, i.e., the point-stack rule of Chowdhary & Johnson (2011) applied to the DNN Jacobian, which is a simplification of the law of Hart et al. (2025a) rather than a separate prior method. Neither law is new in its residual; the contributions of this paper on the drift side are the certified gain and pro-24 Preprint. Under review as a conference paper at ICLR 2027. gated ungated pure const.    
+
+> 10 2
+> 8 × 10 3
+> 9 × 10 3
+
+(a) gain-matrix variants          
+
+> functional error min min ( )
+> 246
+> multisine components
+> 10 2
+> 1.2 × 10 2
+> 1.4 × 10 2
+> 1.6 × 10 2
+> 1.8 × 10 2
+
+(b) excitation richness  
+
+> functional error excited dim.
+> -metric Euclidean 0.0000 0.0025 0.0050 0.0075 0.0100 0.0125
+
+(c) projection metric            
+
+> functional error violations (%)
+> 10 510 410 310 2
+> k(0 plotted at 10 5)
+> 10 1
+> 10 0
+
+(d) sigma modification           
+
+> functional error (tf) / (0)
+> 44 86 170
+> number of parameters p(S2)
+> 10 1
+> 9 × 10 2
+> 1.1 × 10 1
+> 1.2 × 10 1
+> 1.3 × 10 1
+
+(e) network width (S2)   
+
+> drift (Alg. 1) adjoint (Alg. 2)
+> 10 2
+> 10 1
+> 10 0
+> 6.5 7.0 7.5 8.0 8.5 9.0
+> 0.0 0.5 1.0 1.5 2.0 0.00% 1.89%
+
+Figure 7: Additional ablations (three seeds, 60 s; geometric means; violation rates and excited di-mensions are arithmetic means, and zero violations are drawn as zero). (a) Gain-matrix variants at α = 2 : terminal functional error and the smallest eigenvalue of Γ attained during the run. (b) Excitation richness: terminal functional error and the dimension of the excited subspace against the number of multisine components at equal total power. (c) Projection metric on a tight parameter set ( ¯θ = ∥θtr ∥, ϵθ = 0 .3): terminal functional error and the fraction of updates that violate Equa-tion (11). (d) Sigma-modification gain: functional and parameter error. (e) Network width in S2 for the drift and adjoint laws. jection properties and the excitation-free guarantee, and on the trajectory side the decomposition of Theorem 1 and the law of Theorem 2. 
+
+Stored-set methods (S1 and S2). The following describes the diagnostic studies; the benchmark-suite settings are given above. CL-LS uses the CL stack (the same admission rule, tolerance, and check interval) with the scalar bounded-gain forgetting variant of the least-squares update, ddt Γ−1 =
+
+ςΓΨD − βΓ−1 with β = β0(1 − λmax (Γ) /¯λ) (Slotine & Li, 1989), implemented by forward Euler at the update interval, with β0 = 1 , ¯λ = 10 3, λ = 10 −3, kσ = 10 −6, and Γ0 = 5 Ip. The stored-segment law uses Ns = 200 segments of Ts = 0 .05 s (six samples on the 10 ms buffer grid), or 100 segments of 0.03 s (four samples) in the equal-memory variant, rolled out in a batch with second-order integration of ˆXp,j and Sj and trapezoidal quadrature of Equation (24); candidates are the most recent Ts of the buffer, tested every 0.1 s ( 0.2 s for the equal-memory variant) by the singular-value maximizing rule on the stacked terminal sensitivities, evaluated on the Gram matrix with rank-2n updates; the gain uses α = 2 , β0 = 1 , ¯λ = 10 6, λ = 10 −5, kσ = 10 −9, Γ0 = 10 4Ip,and the update interval is 20 ms. The large ¯λ and small kσ reflect the T 3 
+
+> s
+
+scale of GS , on which 
+
+Γ ≈ βG −1 
+
+> S
+
+is correspondingly large; the leakage rate kσ λmax (Γ) is at most 10 −3 s−1 in all runs. The forward-sensitivity gradient agrees with the adjoint gradient of Theorem 8 to a relative error of 1.7 × 10 −3 on a 0.25 s segment, which is the discretization level. The observer gain kf = 800 
+
+runs use αo = kf = 800 with the predictive hold. Velocity measurement noise is white Gaussian noise added to each 1 ms velocity sample used by the algorithms; the plant itself is noise free. The excitation-richness ablation keeps the first K multisine components at equal total power, and the width ablation uses 6, 12 , and 24 hidden neurons in S2. 
+
+Ablations of the windowed laws. Figure 11 reports the ablations that bear on specific claims of the analysis. (a) The drift law improves slowly with longer windows, consistent with the linear 25 Preprint. Under review as a conference paper at ICLR 2027. 0 20 40 60 80 100 120 
+
+time (s) 
+
+10 −2
+
+10 0
+
+> ‖f − Φ‖ rms /‖f‖rms
+
+(a) normalized functional error 
+
+single-step drift (Alg. 1) adjoint (Alg. 2) concurrent learning online Adam (adjoint) 
+
+0 20 40 60 80 100 120 
+
+time (s) 
+
+10 0
+
+2 × 10 −13 × 10 −14 × 10 −16 × 10 −1
+
+2 × 10 0
+
+> normalized parameter error
+
+(b) parameter error       
+
+> drift, ‖̃ θ‖/‖̃ θ(0) ‖
+> drift, ‖PS̃θ‖/‖PS̃θ(0) ‖
+> online Adam, ‖̃ θ‖/‖̃ θ(0) ‖
+> CL, ‖̃ θ‖/‖̃ θ(0) ‖
+
+Figure 8: S1, five seeds, windowed laws and baselines. (a) Normalized functional error. (b) Param-eter error: drift law, total and projected onto the dominant excited subspace S; totals for CL and online Adam. The projected component contracts while the complementary component changes lit-tle; the total error of the unconstrained Adam flow grows. 0.0 2.5 5.0 7.5 10.0 12.5 15.0 17.5 20.0 
+
+time (s) 
+
+10 −5
+
+10 −3
+
+10 −1
+
+> ‖̃ f(t)‖
+
+(a) drift observer error 
+
+0 20 40 60 80 100 120 
+
+time (s) 
+
+10 0
+
+10 1
+
+> eigenvalues of  Γ
+
+(b) least-squares gain bounds 
+
+λmax (Γ)
+
+λmin (Γ)
+
+Figure 9: S1, representative seed, sampled predictive-hold observer. (a) Drift observer error 
+
+˜f (t) . (b) Extreme eigenvalues of Γ( t), which remain within the certified interval [λ, ¯λ] of Theo-rem 4 in every seed of both studies. 0.0 0.5 1.0 1.5 2.0 2.5        
+
+> time (s)
+> 0.0 0.5
+> q1 (rad)
+> true prediction, θ(t0)prediction, θ(tf)
+> 0.0 0.5 1.0 1.5 2.0 2.5
+> time (s)
+> −10
+> q2 (rad) open-loop prediction, held-out excitation
+
+Figure 10: S2, 2.5 s open-loop prediction on the held-out excitation under the initial and fi-nal drift-law parameters of seed 0.26 Preprint. Under review as a conference paper at ICLR 2027. 10 1 10 0    
+
+> window length T(s)
+> 10 2
+> 10 1
+> normalized functional error
+
+(a) window length       
+
+> drift (Alg. 1) adjoint (Alg. 2)
+> LFT= 1
+> 10 2
+> observer gain kf=o
+> 10 2
+> 10 1
+> 10 0
+
+(b) observer gain, hold             
+
+> zero-order hold: error zero-order hold: sup f
+> predictive hold: error predictive hold: sup f
+> df/2kfko, sampled df
+> 10 0
+> learning gain
+> 1.4 × 10 2
+> 1.6 × 10 2
+> 1.8 × 10 2
+> 2 × 10 2
+> 2.2 × 10 2
+> 2.4 × 10 2
+> 2.6 × 10 2
+
+(c) learning gain        
+
+> least-squares
+> constant
+> = 1/2
+> 10 310 2
+> v(0 at 3 × 10 4)
+> 10 2
+> 10 1
+> 10 0
+
+(d) velocity noise 
+
+> drift (Alg. 1) adjoint (Alg. 2) CL (const. gain) online Adam (adjoint)
+
+Figure 11: Ablations of the windowed laws (S1; three seeds, 60 s; geometric means). (a) Window length, with LF T = 1 at the measured LF . (b) Observer gain under a zero-order and a predictive hold: terminal error (solid), post-transient supremum of ˜f (dashed), and the residual formula 
+
+df /p2kf ko evaluated with the sampled df (dotted). (c) Learning gain with least-squares and con-stant gain matrices. (d) Velocity noise for the windowed laws, CL, and online Adam. growth of its perturbation constants in T , whereas the adjoint law improves up to T = 0 .4 s and then increases from 3.7 × 10 −2 to 1.4 × 10 −1 between 0.8 s and 1.6 s; the measured LF = 1 .45 places 
+
+LF T = 1 at T = 0 .69 s, where the exponential growth of the constants in Equation (21) predicts the degradation to begin, and the same scaling is why the stored-segment law uses segments of 0.05 swith a Gauss–Newton gain rather than long windows with a constant one. (b) Under a zero-order hold the observer gain traces a U-shaped tradeoff, since the residual formula ¯zo decreases as 1/k f
+
+while the hold error, amplified by kf , grows as kf ∆t; the predictive hold removes the first-order hold error, and the observed floor follows the 1/k f scaling up to kf ≈ 100 before saturating at the second-order residual that the continuous-time bound does not model. (c) The functional error decreases monotonically in α with no instability below α = 12 , so the condition is sufficient rather than necessary, and the least-squares gain improves on a constant gain at every α. Removing the gate lowers the error by a further 35 percent over 60 s but lets λmin (Γ) collapse to 5 × 10 −3, so the certified rate is lost; a Euclidean projection composed with the matrix gain violates Equation (11) in 1.9 percent of updates on a tight parameter set with no change in functional error here; and leakage above kσ = 10 −3 degrades both errors, the tradeoff that kσ ¯θ2 in Equation (14) expresses (Section K). 
+
+Additional ablations. Figure 7(a) compares the gain-matrix variants. The ungated and pure least-squares updates attain terminal errors of 8.2 × 10 −3 and 8.9 × 10 −3 against 1.3 × 10 −2 for the gated update and 1.8 × 10 −2 for a constant gain, but their smallest eigenvalue falls to 5 × 10 −3 within 60 sand continues to decrease, so the certified rate in Proposition 2 degrades without bound; the gate trades a modest loss in short-horizon accuracy for a uniform lower bound. Figure 7(b) shows that the terminal error and the excited dimension vary weakly and non-monotonically with the number of multisine components at equal total power (between 9.7 × 10 −3 and 1.8 × 10 −2, and between 
+
+6 and 9 dimensions), because fewer components at equal power produce larger excursions, which vary the Jacobian at least as much as additional frequencies do; the excited dimension is governed by the spatial extent of the trajectory rather than by the number of frequencies. Figure 7(c) reports the projection comparison discussed in Section 4. 
+
+Verification of the certified inequalities on simulated data. The following checks were performed on the code and the simulated signals. (i) The projection inequality in Equation (11) and the invari-ance of Θϵ were verified on 20 ,000 random draws of (ˆθ, θ ∗, y, Γ) , including 1,982 draws in the active region and 5,000 draws on the boundary, with no violations; on the simulated runs, the Γ-metric pro-jection produced no violation in any update of any run. (ii) The gate ς implemented in code equals 0
+
+at λmin (Γ) = λ, 1 at 2λ, and is linear in between. (iii) The analytic Jacobians Φ′ and ∂Φ/∂X agree 27 Preprint. Under review as a conference paper at ICLR 2027. with central finite differences to 10 −9, and the adjoint gradient agrees with central finite differences of the discretized Equation (16) with relative error 3 × 10 −4 (S1) and 5 × 10 −4 (S2) and cosine similarity 1.000000 . (iv) In every seed of both studies, λmin (Γ( t)) ≥ λ and λmax (Γ( t)) ≤ ¯λ hold at every logged instant. (v) On the logged S1 seed-0 trajectory after t = 5 s, the maximum sampled value of ˙f is 2.83 . Substitution into the continuous-time residual formula gives ¯zo ≈ 1.4 × 10 −2
+
+at kf = 200 , while the sampled predictive-hold observer has a post-transient supremum of ˜f of 
+
+2.3 × 10 −2. The sampled maximum is a diagnostic estimate rather than a certified bound over the full trajectory, and the sampled observer includes a hold residual not covered by the continuous-time result, as Figure 11(b) shows across gains. (vi) At t = 10 s in S1, the identity Ξf = Ψ ˜θ + ηf was evaluated with ˜θ known, and ∥ηf ∥ = 0 .42 lies within the bound of Equation (9) evaluated with the measured ¯υ, cθθ , and ¯fT , which equals 5.2; the factor of twelve is the expected looseness of a Lagrange remainder bound. (vii) Two runs with the same seed produce bitwise identical parameter trajectories, and the plant trajectory is identical across the five methods for a given seed. 28

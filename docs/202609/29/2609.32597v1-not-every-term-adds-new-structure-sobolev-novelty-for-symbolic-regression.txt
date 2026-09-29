@@ -1,0 +1,948 @@
+Title: Not Every Term Adds New Structure: Sobolev Novelty for Symbolic Regression
+
+URL Source: https://arxiv.org/pdf/2609.32597v1
+
+Published Time: Tue, 29 Sep 2026 01:03:58 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# NOT EVERY TERM ADDS NEW STRUCTURE :SOBOLEV NOVELTY FOR SYMBOLIC REGRESSION 
+
+Boxiao Wang 1 Kai Li 1,2,* Yuheng Jing 1 Tianyi Liu 3
+
+Chen Li 3 Yifan Zhang 1,2,4,* Jian Cheng 1,2,5  
+
+> 1
+
+C2DL, Institute of Automation, Chinese Academy of Sciences  
+
+> 2
+
+School of Artificial Intelligence, University of Chinese Academy of Sciences  
+
+> 3
+
+State Key Laboratory of Aerodynamics  
+
+> 4
+
+University of Chinese Academy of Sciences, Nanjing  
+
+> 5
+
+AiRiA  
+
+> *
+
+Corresponding authors 
+
+## ABSTRACT 
+
+Symbolic regression (SR) aims to discover compact and meaningful mathematical equations from data, but searching the vast combinatorial space of symbolic struc-tures remains challenging. Existing methods typically guide this process using expression-level objectives, such as fitting error, which assess a candidate equa-tion as a whole but provide little information about whether an individual term contributes genuinely new structure or is largely redundant with the rest of the expression. We introduce Sobolev Novelty , a term-level measure of structural independence for symbolic equations. For each term, we construct an empirical Sobolev signature from its function values and exact derivatives over the observed inputs, and quantify how much of this behavior cannot be reconstructed by the remaining terms. We further derive a theory-calibrated threshold, yielding a prin-cipled and tuning-free criterion for identifying structurally novel terms. Using this threshold, 92.6% of terms in benchmark ground-truth equations exhibit suf-ficient structural novelty, compared with only 38.3% on average for expressions produced by 15 SR methods, revealing a substantial gap between scientific equa-tions and current SR solutions. As a lightweight plug-in, Sobolev Novelty can be incorporated into diverse SR paradigms to support term pruning, search guid-ance, LLM feedback, and data selection, yielding consistent performance gains and demonstrating broad applicability. 
+
+## 1 INTRODUCTION 
+
+Symbolic regression (SR) aims to discover compact and interpretable mathematical equations di-rectly from observed data (Makke & Chawla, 2024). Unlike conventional regression, where the functional form is specified in advance, SR must search jointly over symbolic structures and nu-merical parameters. This flexibility makes SR particularly appealing for scientific discovery, where the goal is often not only to predict accurately but also to recover an interpretable mathematical relationship (Udrescu & Tegmark, 2020; Brunton et al., 2016; Rudy et al., 2017). At the same time, it creates a fundamental search challenge: the space of candidate equations grows combina-torially with expression length, operator choices, variables, and their compositions. A broad range of approaches—including genetic programming, reinforcement learning (Petersen et al., 2019), tree search (Sun et al., 2022), pretrained generative models (Biggio et al., 2021), and more recently LLM-based methods (Shojaee et al., 2025)—have been developed to navigate this space. Despite their different search mechanisms, existing SR methods are typically guided by objectives defined at the level of complete candidate equations, most notably fitting error. Such objectives are effective at answering whether a candidate equation fits the observations well, but provide much less information about the structural role of its individual terms. Consider an equation candidate 
+
+s(x) = Pmi=1 biϕi(x), where ϕi denotes a symbolic term and bi its numerical coefficient. The presence of ϕi in a fitted expression does not necessarily imply that ϕi represents an independently 1arXiv:2609.32597v1 [cs.LG] 26 Sep 2026 distinguishable component. Over the observed domain, its behavior may already be well reproduced by a combination of the remaining terms. In this case, multiple symbolic components participate in the fit while describing largely overlapping behavior. For scientific discovery, this distinction is more than a matter of expression redundancy. Individual terms in a discovered equation are often interpreted as distinct components of the underlying rela-tionship. If the observable behavior attributed to one term can already be reproduced by the remain-ing terms, however, the data provide limited support for interpreting that term as an independently supported structure. An accurate expression can therefore admit a symbolic decomposition that is less identifiable than its predictive performance might suggest. This motivates the central question of this work: How much behavior does an individual term contribute beyond what is already repre-sented by the rest of the expression? This requires addressing two questions: how to represent the behavior of a symbolic term over the observed domain, and how to quantify the component of that behavior not captured by the rest of the expression. We introduce Sobolev Novelty , a term-level measure of structural independence for symbolic equa-tions. For each term, we construct an empirical Sobolev representation from its function values and exact first-order derivatives over the observed inputs, capturing both its observed behavior and local variation. We then measure how much of this representation lies outside the span of the remaining terms. Concretely, Sobolev Novelty is the normalized leave-one-term-out reconstruction residual in this empirical Sobolev space. A low-novelty term is largely representable by the other terms, whereas a high-novelty term contributes a behavioral direction that cannot be readily reproduced through coefficient adjustment. Importantly, the measure is entirely candidate-internal: it depends only on the symbolic expression and the observed inputs, requiring neither target derivatives nor access to the ground-truth equation. We further derive a theory-calibrated threshold for Sobolev Novelty, providing a principled oper-ating point without algorithm- or dataset-specific threshold tuning. Using this threshold, we observe a pronounced difference between benchmark scientific equations and expressions discovered by ex-isting SR methods: 92.6% of terms in ground-truth equations exhibit sufficient structural novelty, compared with only 38.3% on average for expressions produced by 15 SR methods. This gap sug-gests that current SR systems can recover formulas with competitive predictive quality while pro-ducing symbolic decompositions whose constituent terms are substantially less distinguishable than those in the reference scientific equations. In other words, predictive accuracy alone does not guar-antee that the internal decomposition of a discovered equation is equally well supported by the data. This finding motivates using Sobolev Novelty not only as a diagnostic of discovered expressions, but also as an actionable signal for improving the SR process. Sobolev Novelty is a lightweight plug-in that can be integrated into diverse SR paradigms at dif-ferent stages of their pipelines. For example, search-based methods can use it to retain structurally informative terms and prune or deprioritize redundant ones. LLM-based SR can use term-level nov-elty as explicit feedback about which parts of a proposed expression add new behavior and which repeat what is already present. Pretrained generative SR models can use the metric to filter synthetic training equations with substantial term-level redundancy. Across representative SR paradigms, in-corporating Sobolev Novelty yields consistent performance improvements, supporting its use as a broadly applicable complement to conventional equation-level objectives. Taken together, our results suggest that predictive accuracy alone does not fully characterize the quality of a symbolic equation for scientific discovery. Beyond fitting the observations, it is also de-sirable to understand whether the constituent terms contribute distinguishable structural information over the observed domain. Sobolev Novelty provides a practical way to quantify and encourage this property, offering a complementary criterion for steering SR toward expressions that are not only accurate and compact, but also more structurally identifiable and scientifically interpretable. 
+
+## 2 PRELIMINARIES 
+
+In SR, the learning task starts with a dataset: D = {(xn, y n)}Nn=1 , x n ∈ Rd, yn ∈ R, where 
+
+xn denotes a d-dimensional input vector and yn is the corresponding scalar output. The goal is to discover an analytic expression s(·) such that s(xn) accurately approximates the targets yn, while generalizing well to unseen inputs. 2Most SR methods can be viewed as involving two coupled components: structure search and evalu-ation. Structure search explores the discrete space of expressions, determining the variables, opera-tors, and compositions that form a candidate equation. Different SR paradigms realize this process through, for example, genetic programming, reinforcement learning, tree search (Shojaee et al., 2023; Kamienny et al., 2023), pretrained generative models (Meidani et al., 2024), and LLM-based generation. Candidate structures may also contain numerical constants, which are typically opti-mized against the observed data after the symbolic structure is proposed. The resulting expression is then evaluated according to predictive quality, often together with other global criteria such as expression complexity (La Cava et al., 2021; Imai Aldeia et al., 2025; Yu et al., 2025a). These equation-level objectives provide the signal used to rank, select, or refine candidate expressions (Yu et al., 2025b). While effective for assessing the overall quality of a candidate, they do not directly characterize the structural contribution of its individual terms. Next, we introduce a term-level perspective and develop Sobolev Novelty as a complementary measure of structural independence. Further discussion of related work is provided in Appendix B. 
+
+## 3 METHOD 
+
+3.1 FROM TERM REPRESENTABILITY TO SOBOLEV NOVELTY 
+
+When does a term add new behavior? We define the structural contribution of a term relative to the current candidate: a term contributes new behavior to the extent that it cannot be reconstructed from the remaining terms. Consider a candidate equation s(x) = Pmi=1 biϕi(x). If ϕi is removed, the coefficients of the remaining terms can be refitted. Because these terms enter the expression through linear coefficients, any component of ϕi that can be reproduced by their linear combination can be absorbed through coefficient adjustment. The residual after the best such reconstruction is therefore the behavior of ϕi that is not already represented elsewhere in the candidate. This turns term-level novelty into a leave-one-term-out reconstruction problem. 
+
+How do we quantify term behavior? To make the preceding reconstruction problem computable, we require an empirical representation of the behavior contributed by each term over the observed inputs. Function values alone may be insufficient to distinguish terms that agree at the sampled points but exhibit different local variation. We therefore characterize this behavior along two com-plementary dimensions: function values and gradients. The value vector ϕi(X) records the outputs produced by the term at the observed inputs, while the input gradient ∇xϕi(X) characterizes how the term varies locally with respect to the inputs. Because candidate terms are explicit symbolic functions, both quantities can be evaluated directly at valid inputs, without estimating derivatives of the unknown target. This joint value-and-gradient characterization naturally induces an empirical first-order Sobolev geometry , in which differences between functions are measured through both their values and first derivatives (Czarnecki et al., 2017). This provides a more discriminative notion of term representability, since a term is considered redundant only when the remaining terms can reproduce not only its observed values but also its local variation. Specifically, we define the empirical Sobolev representation of ϕi as 
+
+ΨX (ϕi) = 1
+
+σs
+
+"r λ0
+
+N ϕi(X),
+
+r λ1
+
+N d vec( ∇xϕi(X)) 
+
+#
+
+, (1) where N = |X| is the number of observed inputs, d is the input dimension, and σ2 
+
+> s
+
+=
+
+N −1 PNn=1 s(xn)2. Specifically, ϕi(X) ∈ RN forms the value block, while ∇xϕi(X) ∈ RN ×d
+
+forms the gradient block, whose entries are stacked by vec into a vector in RN d . Hence, ΨX (ϕi) ∈
+
+RN (d+1) . The weights λ0 and λ1 control the relative contributions of the two blocks, and we use 
+
+λ0 = λ1 = 1 by default. All terms within a candidate share the same scale σs, placing their representations on a common candidate-level scale. Equation 1 induces the empirical Sobolev inner product ⟨f, g ⟩S,X = Ψ X (f )⊤ΨX (g), with the corresponding seminorm ∥f ∥S,X = ∥ΨX (f )∥2. The resulting representation turns the structural relation among symbolic terms into a finite-dimensional geometry that simultaneously captures their observed values and local trends. 3Definition of Sobolev Novelty. Throughout this work, we use the first-order representation by default; extending to higher-order Sobolev representations is straightforward by appending the cor-responding derivative blocks. In this representation space, a coherent reconstruction must use the same linear combination of the remaining terms to jointly reproduce both the value and gradient blocks of ϕi. The component that remains unmatched under this joint reconstruction defines its novelty. Specifically, let 
+
+Ψ−i = [Ψ X (ϕ1), . . . , ΨX (ϕi−1), ΨX (ϕi+1 ), . . . , ΨX (ϕm)] (2) collect the representations of all terms except ϕi. We define the Sobolev Novelty of ϕi as its normal-ized leave-one-term-out reconstruction residual: 
+
+νi = min 
+
+> c∈Rm−1
+
+∥ΨX (ϕi) − Ψ−ic∥2
+
+∥ΨX (ϕi)∥2
+
+= ∥(I − P−i)Ψ X (ϕi)∥2
+
+∥ΨX (ϕi)∥2
+
+, (3) where P−i = Ψ −iΨ+ 
+
+> −i
+
+denotes the orthogonal projection onto the span of the remaining term rep-resentations. In practice, Eq. 3 is computed using rank-revealing least squares without explicitly forming the projection matrix. The score satisfies 0 ≤ νi ≤ 1. Values near zero indicate that the remaining terms can reconstruct most of the value-and-derivative behavior of ϕi using a common coefficient vector. Larger values indicate a stronger component that remains outside the span of the other terms. Sobolev Novelty thus measures how much distinct empirical behavior a term adds to the current candidate. All quantities in Eq. 3 are determined by the symbolic terms and observed inputs, making the score candidate-internal and requiring no access to the ground-truth equation. 3.2 A T HEORY -C ALIBRATED THRESHOLD 
+
+Sobolev Novelty provides a continuous measure of structural independence, which raises a prac-tical question: how much novelty is sufficient for a term to constitute an independently iden-tifiable direction? To answer this question, we normalize each nonzero Sobolev signature as 
+
+ui = Ψ X (ϕi)/∥ΨX (ϕi)∥2, collect the normalized signatures in U = [ u1, . . . , u m], and define their Gram matrix as G = U ⊤U . Let S−i = span {ϕj : j̸ = i} denote the function space spanned by the remaining terms. We first interpret Sobolev Novelty from two complementary perspectives: the projection perspective and the explanation stability perspective, and build on these interpretations to derive a threshold for guiding SR. Specifically, for nonzero term signatures and a nonsingular normalized Gram matrix G, the two perspectives are connected by 
+
+ν2 
+
+> i
+
+= ∥ui∥22 − ∥ P−iui∥22
+
+| {z }
+
+> Projection Perspective
+
+= (G−1)−1
+
+> ii
+
+| {z }
+
+> Explanation Stability Perspective
+
+. (4) The detailed proof is provided in Appendix A. 
+
+Projection Perspective. How much new behavior does a term add beyond the remaining terms? 
+
+In the first equality of Eq. 4, the normalized Sobolev signature ui represents the term’s values and trends, while P−iui is the optimal linear combination of the remaining terms, representing the com-ponent they can explain. Because the projected component and the residual vector are orthogonal, subtracting the squared norm of the projected component from that of ui yields exactly ν2 
+
+> i
+
+, the squared norm of the residual vector that the remaining terms cannot represent. Higher novelty there-fore corresponds to a smaller projection norm, meaning that less of the term’s representation is captured by the remaining terms, leaving a larger residual; conversely, lower novelty corresponds to a smaller residual. When the projection is zero, νi = 1 , indicating that the term’s signature is orthogonal to the span of the remaining signatures. 
+
+Explanation Stability Perspective. Can a small change in overall behavior substantially change how its components are interpreted? An equation may accurately reproduce the observed behav-ior while having an unstable decomposition into individual contributions. When several terms have similar values and local trends, their contributions can change substantially through mutual compen-sation even while the equation’s overall behavior remains nearly unchanged. This makes it difficult 4to determine how much of that behavior should be attributed to each term. This resembles sep-arating similar sources from a mixed signal: the combined signal may be well determined while the individual contributions remain difficult to distinguish stably. The second equality asks whether we can still tell what role each term plays when the equation’s overall behavior barely changes. When several terms behave similarly, even a slight change in the equation’s output values and lo-cal trends can substantially change how much of that behavior is attributed to term i. Under the normalized representation above, we hold the functional forms of all terms fixed and examine how their refitted coefficients respond to small changes in the equation’s function values and gradients. For term i, the maximum amplification factor is the largest possible ratio of the magnitude of its coefficient change to the size of the overall change. The square of this factor is exactly (G−1)ii .Since (G−1)ii = 1 /ν 2 
+
+> i
+
+, lower Sobolev Novelty corresponds to a larger maximum amplification fac-tor, meaning that the term’s coefficient can change substantially even when the equation’s overall behavior changes only slightly. Building on these perspectives, we can limit this instability by controlling Sobolev Novelty. Specif-ically, we require the square of the maximum amplification factor to be no more than one order of magnitude above the orthogonal baseline of 1. This gives 1/ν 2 
+
+> i
+
+≤ 10 , or equivalently νi ≥ 1/√10 ,yielding the threshold τid = 1 /√10 .This threshold admits both geometric and explanation-stability interpretations. For any term meeting the threshold, the residual vector that cannot be reconstructed by the remaining terms has a squared norm of at least 10% of that of the term’s full representation. At the same time, coefficient changes induced by changes in the equation’s overall behavior are subject to the amplification bound above. The threshold therefore allows some behavioral overlap while flagging as low novelty those terms whose residuals are too small relative to their full representations and whose coefficient changes can be excessively amplified. Empirical statistics on scientific equations in Section 4.1 further validate the practical relevance of this criterion. 
+
+## 4 EXPERIMENTS 
+
+In this section, we evaluate Sobolev Novelty through a sequence of questions. We first examine whether benchmark ground-truth equations and expressions produced by existing SR methods ex-hibit a systematic gap in term-level structural novelty (Section 4.1). We then assess whether the same signal can guide symbolic search across evolutionary search, tree search, and LLM-guided tree search, using GP, MCTS, and IGSR as representative cases (Section 4.2). Next, we evaluate whether Sobolev Novelty can improve pretrained generative SR by filtering low-novelty synthetic formulas before training while leaving the model architecture and training pipeline unchanged (Section 4.3). Finally, we enter a real scientific setting and evaluate Sobolev Novelty in turbulence modeling, a core problem in fluid mechanics that underpins reliable prediction of complex flows across science and engineering (Section 4.4). 
+
+Datasets. We primarily evaluate on SRBench (La Cava et al., 2021) across our experiments. Our evaluation includes 133 white-box scientific equation tasks with analytic ground-truth expressions, comprising 119 Feynman tasks and 14 Strogatz tasks, as well as 122 black-box regression tasks for which no reference analytic expression is provided. 
+
+Evaluation metrics. We measure predictive accuracy using the standard coefficient of determina-tion on the test set, R2 = 1 − P
+
+> n
+
+(yn − ˆyn)2/ P
+
+> n
+
+(yn − ¯y)2. Expression complexity C is measured by the length of the parsed expression tree, defined as the total number of operator, variable, and constant nodes for each evaluated candidate expression. At the structural level, we report the mean term Sobolev Novelty and the proportion of terms satisfying νi > τ id .4.1 A S TRUCTURAL NOVELTY GAP IN EXISTING SR M ETHODS 
+
+Methods and experimental setup. To examine whether expressions discovered by existing SR methods exhibit term-level structural independence comparable to that of benchmark ground-truth equations, we analyze the outputs of 15 representative methods on the 133 SRBench white-box tasks. The selected methods span the major search and learning paradigms. Among population-based 5approaches, AFP (Schmidt & Lipson, 2010) uses age–fitness Pareto selection, AFP-FE (Schmidt & Lipson, 2008) augments it with co-evolved fitness estimates, EPLEX adopts ϵ-lexicase se-lection, and GP-GOMEA (Virgolin et al., 2021) applies gene-pool optimal mixing. GPlearn, Operon (Burlacu et al., 2020), PySR (Cranmer, 2023), and SBP-GP (Virgolin et al., 2019) per-form genetic-programming search with different variation, selection, semantic, and implementation strategies, while FEAT (La Cava et al., 2018) evolves nonlinear feature transformations that are combined through a linear model. BSR (Jin et al., 2019) performs Bayesian search over symbolic structures, and AIFeynman2 (Udrescu et al., 2020) decomposes problems using physics-inspired heuristics such as separability and symmetry. DSR (Petersen et al., 2019) and RSRM (Xu et al., 2023) construct expressions using learned reinforcement-learning policies, whereas the pretrained neural methods NeurSR (Biggio et al., 2021) and E2ESR (Kamienny et al., 2022) map numerical observations directly to symbolic expression sequences. 0 25 50 75 100 125      
+
+> Mean complexity
+> 20 30 40 50 60 70
+> Mean term Sobolev novelty (%)
+> Compact Complex
+> Redundant Independent
+> Search Generative
+> Ground Truth
+> AFP AFP-FE DSR EPLEX PySR RSRM GPlearn AIFeynman2 GP-GOMEA E2ESR BSR NeurSR Operon
+
+Figure 1: Mean complexity and term-level Sobolev Novelty across ground truth and SR methods. Using this broad comparison set, we retain only discov-ered candidates with test R2 ≥ 0.8 and compute Sobolev Novelty for the ground-truth equation and all retained expressions using the same input samples within each task. The ground-truth expressions serve solely as post-hoc structural references and are not used to guide or su-pervise any of the methods. Complete per-method counts and term qualification rates are provided in Appendix E.1. 
+
+Existing SR methods exhibit a substantial structural novelty gap. At the theory-calibrated threshold τid ,
+
+92 .6% of terms in the ground-truth equations satisfy the structural novelty criterion, compared with only 38 .3% 
+
+on average across the 15 SR methods, yielding a gap of 
+
+54 .3 percentage points. The high qualification rate among ground-truth terms indicates that this criterion is consis-tent with the empirical structure of most benchmark sci-entific equations, whereas the much lower rate among discovered expressions reveals a substantial gap in term-level structural novelty. 
+
+High fitting quality and compact expressions do not guarantee high term-level novelty. As shown in Fig. 1, among candidates with R2 ≥ 0.8, search-based methods still exhibit markedly different novelty–complexity profiles. AFP and AFP-FE (Schmidt & Lipson, 2008) are closest to the ground truth in mean term novelty, but the expressions they produce are substantially more complex than the ground-truth equations. DSR, RSRM, and PySR have mean expression complexity close to that of the ground-truth equations but exhibit intermediate novelty, whereas GP-GOMEA and Operon lie in lower-novelty regions. These contrasts show that satisfying the predictive-quality criterion, even with expression complexity comparable to that of the ground-truth equations, does not guarantee comparable term-level novelty. This motivates supplementing the original expression-level objectives with term-level feedback that directly evaluates whether a candidate term expands the current behavioral span. 
+
+Pretraining on random formulas can favor low-novelty expressions. NeurSR and E2ESR both occupy low-novelty regions, with E2ESR also showing substantially higher mean expression com-plexity than the ground-truth equations. These methods are pretrained on randomly generated for-mulas, yet random generation does not ensure structural independence among terms. The pretrain-ing corpus can therefore contain low-novelty structures, which models may learn to reproduce even when generating predictively accurate expressions. This motivates using Sobolev Novelty to filter formulas containing low-novelty terms before pretraining, shifting the training distribution toward formulas with more structurally independent terms. 4.2 SOBOLEV NOVELTY AS SEARCH GUIDANCE 
+
+Experimental setups. To examine whether Sobolev Novelty can provide reusable term-level guidance across different symbolic search mechanisms, we integrate it into GP, MCTS, and 60 3 6 9 12 15 18    
+
+> Rank of accuracy (Mean of R2)
+> 036912 15 18
+> Rank of complexity
+> White-Box Results (n=133)
+> Search Regression Generative
+> Tier 1 Tier 2 Tier 3 Tier 4 Tier 5 Tier 6
+
+(a) White-box results. 0 3 6 9 12 15 18 21 24 27   
+
+> Rank of accuracy (Mean of R2)
+> 036912 15 18 21 24 27
+> Rank of complexity
+> Black-Box Results (n=122)
+> Tier 1 Tier 2 Tier 3 Tier 4 Tier 5 Tier 6 Tier 7
+
+(b) Black-box results. 
+
+Figure 2: Accuracy–complexity rank comparisons on the SRBench white-box and black-box bench-marks. Lower is better on both axes. Dashed lines indicate Pareto tiers, and arrows connect each backbone with its Sobolev-guided variant. Accuracy ranks are computed from mean R2, and com-plexity ranks from mean expression complexity. IGSR (Saveliev et al., 2026) while retaining the original expression-level objective of each method. GP generates candidate expressions through crossover and mutation; we use Sobolev Novelty to screen these candidates and favor those containing more structurally independent terms. MCTS grows a search tree through node selection and expansion; during expansion, Sobolev Novelty reranks newly generated child nodes so that branches introducing new term behavior are explored first. IGSR combines LLM-generated proposals with MCTS; before node expansion, we trans-late the novelty profile of the current terms into natural-language feedback that guides the LLM away from structural directions already represented by the current expression. We evaluate GP and MCTS on the 133 white-box and 122 black-box SRBench tasks, whereas IGSR is evaluated only on the black-box tasks to mitigate potential contamination from publicly available scientific formulas in the LLM’s pretraining data. Full integration and implementation details are provided in Appendix D. 
+
+Sobolev Novelty improves accuracy and compactness on white-box tasks. As shown in Fig-ure 2a, both Sobolev-guided variants move toward the lower-left region of the accuracy–complexity plane, with a more pronounced shift for GP. We attribute this joint improvement to finer-grained structural feedback. In both backbones, the original predictive criterion first retains proposals that are competitive in fitting the data, after which Sobolev Novelty deprioritizes structures already cov-ered by the current expression and favors candidates with complementary value-and-derivative be-havior. This reduces the search and expression budgets spent on low-novelty terms and focuses the search on directions that expand the current behavioral span. Consequently, Sobolev Novelty di-rectly targets term-level structural independence, an objective distinct from the standard accuracy– complexity trade-off, yet it synergistically improves both metrics. Table 3 reports the complete nu-merical results. Both SN-GP and SN-MCTS achieve higher mean term Sobolev Novelty than their respective backbones, together with the accuracy and complexity results summarized in Figure 2a. 
+
+Sobolev guidance remains effective on black-box tasks, with backbone-dependent complexity effects. Figure 2b summarizes the results on 122 black-box tasks. SN-GP, SN-MCTS, and SN-IGSR all achieve higher mean R2 than their respective backbones, showing that term-level struc-tural feedback improves search performance across these three methods. SN-MCTS moves toward the lower-left region of the accuracy–complexity plane, improving both accuracy and compactness, whereas SN-GP gains accuracy with a modest increase in complexity. 
+
+Sobolev feedback improves LLM-guided search without enlarging expressions. IGSR already employs a drop-one influence score to assess whether a generated term is predictively useful for fitting the current target. We preserve this predictive selection mechanism and use Sobolev Novelty only to guide which structural directions the LLM should propose next. The two signals therefore play distinct roles: predictive influence determines which existing terms should be retained, whereas 7Sobolev Novelty identifies which behaviors are already represented and which directions remain to be explored. Under the same task set, random seed, and search budget, SN-IGSR moves substan-tially leftward along the accuracy axis in Figure 2(b), attaining a better accuracy rank while pre-serving the same complexity. This shows that the improvement is not obtained by generating more terms. More broadly, this result demonstrates that Sobolev Novelty need not be tied to a numerical reward: the same term-level structural signal can be translated into natural-language feedback and directly used to improve LLM-guided symbolic search. 4.3 SOBOLEV NOVELTY AS PRETRAINING GUIDANCE 0.350 0.497 0.712 0 10M 20M 30M 
+
+> #Sample
+> 0.0 0.2 0.4 0.6 0.8
+> Test  R2
+> Random Formulas SN-filtered Formulas PhyE2E Formulas
+
+Figure 3: Generalization performance of E2ESR under different pretraining formula distributions. Endpoint R2
+
+values are annotated on the right. Pretrained generative SR methods commonly rely on large-scale randomly generated formula–data pairs (Biggio et al., 2021; Kamienny et al., 2022; Meidani et al., 2024). Al-though random formula generators provide a continuous supply of diverse structures, they do not ensure that the ad-ditive terms within each formula contribute distinct func-tional behavior. Consequently, a random pretraining cor-pus may contain many terms that are syntactically different yet strongly overlap with one another in their function val-ues and local variation patterns. We address this problem through Sobolev Novelty-guided rejection sampling. Be-fore a generated formula enters pretraining, we filter out samples containing low-novelty terms, allowing the model to learn from formulas whose constituent terms provide more distinguishable structural behavior. 
+
+Experimental setups. We use Sobolev Novelty for rejection sampling at the entrance to the E2ESR pretraining pipeline. Each formula is decomposed into additive terms; single-term formu-las are accepted directly, whereas multi-term formulas are retained only when min i νi > τ id . The tokenizer, training objective, optimizer, and inference pipeline remain unchanged throughout the pretraining process. Under the same protocol, we compare Random, SN-filtered, and PhyE2E for-mulas. The PhyE2E formulas are taken from the pretraining corpus introduced by Ying et al. (2025). We train three independent runs for each setting and evaluate checkpoints from 1M to 35M accepted samples on the 133 SRBench white-box tasks using mean R2.
+
+Sobolev filtering improves pretraining generalization. Figure 3 shows the generalization per-formance of E2ESR under different pretraining formula distributions. Compared with Random and the PhyE2E-based baseline, models trained on SN-filtered formulas attain a substantially higher 
+
+R2 during the later stages of training and maintain a clear final-performance advantage under the same pretraining budget. At the final 35M checkpoint, SN-filtered, Random, and PhyE2E formulas achieve mean R2 values of 0.712 , 0.497 , and 0.350 , respectively. Relative to the 0.497 obtained with Random formulas under the same budget, this corresponds to an absolute improvement of 
+
+0.215 and a relative gain of 43 .3% . Because this experiment changes only the distribution of formu-las entering pretraining, without modifying the E2ESR architecture, training objective, or inference procedure, the results show that term-level pretraining guidance alone can substantially improve the final generalization performance of generative SR methods. 4.4 SOBOLEV NOVELTY ENABLES SCIENTIFIC DISCOVERY IN TURBULENCE MODELING 
+
+To assess Sobolev Novelty in a real scientific discovery setting, we apply it to turbulence modeling for periodic-hill flow. The task extends beyond isolated input–output fitting because the discovered constitutive equation must close the governing equations (Schmelzer et al., 2020). Periodic-hill flow presents a complex geometry in which adverse pressure gradients and streamline curvature generate separated shear layers, recirculation bubbles, and downstream reattachment, accompanied by pronounced non-equilibrium effects and Reynolds-stress anisotropy (Xiao et al., 2020). The final physical prediction is obtained only after the discovered closure is embedded in a RANS solver. In this coupled setting, closure errors can propagate and be amplified; a closure with high fitting accuracy can still yield an ill-conditioned coupled system or severely distorted flow-field predictions 8Method Reattachment Point (x/H )Max Recirculation Vel. (Ux, 10 −3 m/s)DNS 5.28 7.39 RANS 7.36 ( ∆ 2 .08 ) 5.81 ( ∆ 1 .58 )DSRRANS 7.19 ( ∆ 1 .91 ) 9.91 ( ∆ 2 .52 )SN-DSRRANS 4.75 (∆ 0 .53 ) 7.01 (∆ 0 .38 )MCTS 4.43 ( ∆ 0 .85 ) 9.20 ( ∆ 1 .81 )SN-MCTS 4.49 ( ∆ 0 .79 ) 8.10 ( ∆ 0 .71 )
+
+Table 1: Comparison of reattachment position and maximum recirculation-zone velocity in periodic-hill flow. 
+
+Figure 4: A posteriori streamwise velocity fields for periodic-hill flow obtained with DNS, RANS, DSRRANS, SN-DSRRANS, MCTS, and SN-MCTS. 
+
+(Wu et al., 2019). The evaluation tests whether a discovered equation can still produce accurate system-level physical predictions after it is integrated into the governing equations and exposed to the input distribution induced by solver feedback. 
+
+Experimental setups. We consider the basic MCTS framework introduced above and DSR-RANS (Tang et al., 2023), a domain-specific SR method for turbulence modeling. Conventional RANS serves as the fluid-mechanics baseline, and DNS provides the high-fidelity reference. Ap-pendix D.5 provides details of data processing, constitutive modeling, and solver configurations. 
+
+Sobolev Novelty substantially strengthens scientific discovery. We report two key physical quantities for the periodic-hill flow: the reattachment position and the maximum recirculation-zone velocity magnitude. These quantities characterize the downstream extent of the separation region and its recirculation strength, respectively. Accuracy is measured by the absolute deviation from DNS. As shown in Table 1, SN-DSRRANS achieves the closest agreement with DNS for both quantities. Relative to DSRRANS, it reduces the absolute reattachment-position error from 1.91 to 0.53 and the recirculation-velocity error from 2.52 × 10 −3 to 0.38 × 10 −3 m/s, corresponding to reductions of 72.3% and 84.9%, respectively. The MCTS framework exhibits the same pattern: SN-MCTS reduces the corresponding errors by 7.1% and 60.8%. Moreover, SN-MCTS is closer to DNS than both RANS and DSRRANS for both quantities. This is especially notable because MCTS con-tains no turbulence-specific inductive bias. With term-level structural novelty as the only additional guidance, this basic symbolic search framework discovers a constitutive relation whose a posteriori predictions surpass those of both a traditional turbulence model and a domain-specific SR method on the reported physical observables. These results provide direct evidence that Sobolev Novelty can endow even a basic symbolic search framework with strong scientific discovery capability. 
+
+Sobolev Novelty improves a posteriori velocity-field predictions. The streamwise velocity fields in Figure 4 corroborate the quantitative results. The DSRRANS prediction contains an abrupt and lo-cally concentrated high-velocity band in the upper channel that is absent from DNS. SN-DSRRANS suppresses this anomalous concentration and recovers a broader high-velocity region, a more contin-uous streamwise distribution, and a smoother transition toward the channel interior, while preserv-ing the morphology and vortical structures of the periodic-hill separation region. These fields are obtained after the constitutive relation is embedded into the RANS solver and coupled with the gov-erning equations. Their agreement with DNS consequently evaluates system-level physical fidelity under coupled simulation, beyond pointwise fitting of the training data. Together, the quantitative and field-level results show that Sobolev Novelty guides SR toward constitutive relations that close the governing equations and reproduce key turbulent-flow structures with high fidelity, providing direct evidence of scientific discovery capability in a high-fidelity physical modeling task. 
+
+## 5 CONCLUSION 
+
+We introduce Sobolev Novelty, a term-level measure of structural independence that jointly charac-terizes function values and derivatives to quantify the distinct behavior each term contributes beyond the remaining expression. We prove its connections to independent Sobolev energy, deletion-and-refit cost, and coefficient identifiability, establishing a theory-calibrated criterion for structural nov-elty. Empirical analysis reveals a substantial novelty gap between scientific equations and current SR solutions, validating the practical relevance of this perspective. Across a series of experiments, Sobolev Novelty consistently improves search-based and generative SR methods through search guidance and pretraining data selection, demonstrating broad applicability. Going further, we enter 9a real scientific setting through turbulence modeling in fluid mechanics. The discovered constitu-tive relations yield more accurate flow predictions in coupled physical simulations, demonstrating Sobolev Novelty’s ability to advance scientific discovery. Future work will explore higher-order Sobolev representations and extend this framework to a broader range of scientific discovery tasks. 
+
+## REFERENCES 
+
+Luca Biggio, Tommaso Bendinelli, Alexander Neitz, Aurelien Lucchi, and Giambattista Parascan-dolo. Neural symbolic regression that scales. In International conference on machine learning ,pp. 936–945. Pmlr, 2021. Steven L Brunton, Joshua L Proctor, and J Nathan Kutz. Discovering governing equations from data by sparse identification of nonlinear dynamical systems. Proceedings of the national academy of sciences , 113(15):3932–3937, 2016. Bogdan Burlacu, Gabriel Kronberger, and Michael Kommenda. Operon c++ an efficient genetic programming framework for symbolic regression. In Proceedings of the 2020 genetic and evolu-tionary computation conference companion , pp. 1562–1570, 2020. Miles Cranmer. Interpretable machine learning for science with pysr and symbolicregression. jl. 
+
+arXiv preprint arXiv:2305.01582 , 2023. Wojciech M Czarnecki, Simon Osindero, Max Jaderberg, Grzegorz Swirszcz, and Razvan Pascanu. Sobolev training for neural networks. Advances in neural information processing systems , 30, 2017. Guilherme Seidyo Imai Aldeia, Hengzhe Zhang, Geoffrey Bomarito, Miles Cranmer, Alcides Fon-seca, Bogdan Burlacu, William G La Cava, and Fabr´ ıcio Olivetti de Franc ¸a. Call for action: towards the next generation of symbolic regression benchmark. In Proceedings of the Genetic and Evolutionary Computation Conference Companion , pp. 2529–2538, 2025. Ying Jin, Weilin Fu, Jian Kang, Jiadong Guo, and Jian Guo. Bayesian symbolic regression. arXiv preprint arXiv:1910.08892 , 2019. Pierre-Alexandre Kamienny, St´ ephane d’Ascoli, Guillaume Lample, and Franc ¸ois Charton. End-to-end symbolic regression with transformers. Advances in Neural Information Processing Systems ,35:10269–10281, 2022. Pierre-Alexandre Kamienny, Guillaume Lample, Sylvain Lamprier, and Marco Virgolin. Deep gen-erative symbolic regression with monte-carlo-tree-search. In International Conference on Ma-chine Learning , pp. 15655–15668. PMLR, 2023. William La Cava, Tilak Raj Singh, James Taggart, Srinivas Suri, and Jason H Moore. Learn-ing concise representations for regression by evolving networks of trees. arXiv preprint arXiv:1807.00981 , 2018. William La Cava, Bogdan Burlacu, Marco Virgolin, Michael Kommenda, Patryk Orzechowski, Fabr´ ıcio Olivetti de Franc ¸a, Ying Jin, and Jason H Moore. Contemporary symbolic regression methods and their relative performance. Advances in neural information processing systems ,2021(DB1):1, 2021. Nour Makke and Sanjay Chawla. Interpretable scientific discovery with symbolic regression: a review. Artificial Intelligence Review , 57(1):2, 2024. Kazem Meidani, Parshin Shojaee, Chandan Reddy, and Amir Barati Farimani. Snip: Bridging mathematical symbolic and numeric realms with unified pre-training. In International Conference on Learning Representations , volume 2024, pp. 42359–42372, 2024. Brenden K Petersen, Mikel Landajuela, T Nathan Mundhenk, Claudio P Santiago, Soo K Kim, and Joanne T Kim. Deep symbolic regression: Recovering mathematical expressions from data via risk-seeking policy gradients. arXiv preprint arXiv:1912.04871 , 2019. 10 Samuel H Rudy, Steven L Brunton, Joshua L Proctor, and J Nathan Kutz. Data-driven discovery of partial differential equations. Science advances , 3(4):e1602614, 2017. Evgeny S Saveliev, Samuel Holt, Nabeel Seedat, David L Bentley, Jim Weatherall, and Mihaela van der Schaar. Influence-guided symbolic regression: Scientific discovery via llm-driven equa-tion search with granular feedback. arXiv preprint arXiv:2605.29184 , 2026. Martin Schmelzer, Richard P Dwight, and Paola Cinnella. Discovery of algebraic reynolds-stress models using sparse symbolic regression. Flow, Turbulence and Combustion , 104(2):579–603, 2020. Michael Schmidt and Hod Lipson. Age-fitness pareto optimization. In Genetic programming theory and practice VIII , pp. 129–146. Springer, 2010. Michael D Schmidt and Hod Lipson. Coevolution of fitness predictors. IEEE Transactions on Evolutionary Computation , 12(6):736–749, 2008. Parshin Shojaee, Kazem Meidani, Amir Barati Farimani, and Chandan Reddy. Transformer-based planning for symbolic regression. Advances in Neural Information Processing Systems , 36: 45907–45919, 2023. Parshin Shojaee, Kazem Meidani, Shashank Gupta, Amir Barati Farimani, and Chandan Reddy. Llm-sr: Scientific equation discovery via programming with large language models. In Interna-tional Conference on Learning Representations , volume 2025, pp. 16054–16085, 2025. Fangzheng Sun, Yang Liu, Jian-Xun Wang, and Hao Sun. Symbolic physics learner: Discovering governing equations via monte carlo tree search. arXiv preprint arXiv:2205.13134 , 2022. Hongwei Tang, Yan Wang, Tongguang Wang, and Linlin Tian. Discovering explicit reynolds-averaged turbulence closures for turbulent separated flows through deep learning-based symbolic regression with non-linear corrections. Physics of Fluids , 35(2), 2023. Silviu-Marian Udrescu and Max Tegmark. Ai feynman: A physics-inspired method for symbolic regression. Science advances , 6(16):eaay2631, 2020. Silviu-Marian Udrescu, Andrew Tan, Jiahai Feng, Orisvaldo Neto, Tailin Wu, and Max Tegmark. Ai feynman 2.0: Pareto-optimal symbolic regression exploiting graph modularity. Advances in neural information processing systems , 33:4860–4871, 2020. Marco Virgolin, Tanja Alderliesten, and Peter AN Bosman. Linear scaling with and within seman-tic backpropagation-based genetic programming for symbolic regression. In Proceedings of the genetic and evolutionary computation conference , pp. 1084–1092, 2019. Marco Virgolin, Tanja Alderliesten, Cees Witteveen, and Peter AN Bosman. Improving model-based genetic programming for symbolic regression of small expressions. Evolutionary computation ,29(2):211–237, 2021. Boxiao Wang, Kai Li, Tianyi Liu, Chen Li, Junzhe Wang, Yifan Zhang, and Jian Cheng. Llm-based scientific equation discovery via physics-informed token-regularized policy optimization. In Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V. 2 , pp. 12195–12206, 2026. Jinlong Wu, Heng Xiao, Rui Sun, and Qiqi Wang. Reynolds-averaged navier–stokes equations with explicit data-driven reynolds stress closure can be ill-conditioned. Journal of Fluid Mechanics ,869:553–586, 2019. Heng Xiao, Jin-Long Wu, Sylvain Laizet, and Lian Duan. Flows over periodic hills of parameterized geometries: A dataset for data-driven turbulence modeling from direct simulations. Computers & Fluids , 200:104431, 2020. Yilong Xu, Yang Liu, and Hao Sun. Rsrm: Reinforcement symbolic regression machine. arXiv preprint arXiv:2305.14656 , 2023. 11 Jie Ying, Haowei Lin, Chao Yue, Yajie Chen, Chao Xiao, Quanqi Shi, Yitao Liang, Shing-Tung Yau, Yuan Zhou, and Jianzhu Ma. A neural symbolic model for space physics. Nature Machine Intelligence , 7(10):1726–1741, 2025. Zihan Yu, Jingtao Ding, Yong Li, and Depeng Jin. Symbolic regression via mdlformer-guided search: from minimizing prediction error to minimizing description length. In International Con-ference on Learning Representations , volume 2025, pp. 65306–65333, 2025a. Zihan Yu, Guanren Wang, Jingtao Ding, Huandong Wang, and Yong Li. Beyond accuracy and complexity: The effective information criterion for structurally stable symbolic regression. arXiv preprint arXiv:2509.21780 , 2025b. 
+
+## A THEORETICAL FOUNDATIONS AND COMPLETE PROOFS 
+
+This appendix provides the complete derivation of the Projection Perspective and the Explanation Stability Perspective, and establishes the resulting theory-calibrated threshold. We then prove the exact deletion-and-refit characterization stated in the main text. A.1 PROBLEM SETTING AND EMPIRICAL SOBOLEV GEOMETRY 
+
+Let X = {xn}Nn=1 be the observed inputs, where N, d ≥ 1 are integers, xn ∈ Ω ⊂ Rd, and Ω is open. Fix a candidate expression and its additive decomposition 
+
+s(x) = 
+
+> m
+
+X
+
+> j=1
+
+bj ϕj (x), bj ∈ R, ϕj ∈ C1(Ω) , m ≥ 1. (A.1) The terms, including their internal parameters, are fixed throughout the analysis. Only their outer linear coefficients are varied in reconstruction and refitting. All signatures use the same input sam-ples, input coordinates, and positive weights λ0, λ 1. As in the main text, define 
+
+σs = 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+s(xn)2
+
+!1/2
+
+> 0. (A.2) This scale is fixed by the original candidate s and is used for every function compared below; it is not recomputed when coefficients change. 
+
+Definition A.1 (Empirical Sobolev signature) . For f ∈ C1(Ω) , define the column vector 
+
+ΨX (f ) = 1
+
+σs
+
+" pλ0/N f (X)
+
+pλ1/(N d ) vec( ∇xf (X)) 
+
+#
+
+∈ Rp, p = N (d + 1) , (A.3) where f (X) = ( f (x1), . . . , f (xN )) ⊤ and ∇xf (X) ∈ RN ×d. The vectorization order is fixed across all functions. Define 
+
+⟨f, g ⟩S,X = Ψ X (f )⊤ΨX (g), ∥f ∥S,X = ∥ΨX (f )∥2. (A.4) 
+
+Lemma A.2 (Linearity and the induced seminorm) . The map ΨX is linear. The form ⟨· , ·⟩ S,X is symmetric, bilinear, and positive semidefinite, and ∥ · ∥ S,X is a seminorm. Proof. Function evaluation and differentiation are linear. Since the weights and scale are fixed, for any a, b ∈ R and f, g ∈ C1(Ω) ,
+
+ΨX (af + bg ) = aΨX (f ) + bΨX (g).
+
+The assertions about the bilinear form follow from the Euclidean inner product. Absolute homo-geneity and the triangle inequality follow from the Euclidean norm. Finite samples of values and derivatives need not distinguish distinct functions, so positive definiteness on C1(Ω) is not guaran-teed. All orthogonal projections below are taken in the finite-dimensional signature space with its Eu-clidean inner product. This remains well-defined even though the induced function-space quantity is only a seminorm. We assume ΨX (ϕj )̸ = 0 for each term to be normalized. Neither target values nor target derivatives are needed to construct these signatures or to compute novelty. 12 A.2 SOBOLEV NOVELTY AND THE PROJECTION PERSPECTIVE 
+
+Write 
+
+ψj = Ψ X (ϕj ), ℓj = ∥ψj ∥2 > 0, uj = ψj /ℓ j ,U = [ u1, . . . , u m], G = U ⊤U. (A.5) For a fixed index i, let Ψ−i and U−i be the matrices obtained by removing the ith columns from 
+
+[ψ1, . . . , ψ m] and U , respectively. Define 
+
+W−i = span {uj : j̸ = i} = range(Ψ −i), P−i = Ψ −iΨ+
+
+> −i
+
+, (A.6) where + denotes the Moore–Penrose pseudoinverse. The Moore–Penrose identities give P ⊤−i =
+
+P−i, P 2 
+
+> −i
+
+= P−i, and range( P−i) = W−i; thus P−i is the orthogonal projection onto W−i. For 
+
+m = 1 , the reference space is {0} and P−i = 0 .
+
+Definition A.3 (Sobolev Novelty) . The Sobolev Novelty of term ϕi relative to the remaining terms is 
+
+νi = min 
+
+> c∈Rm−1
+
+∥ψi − Ψ−ic∥2
+
+ℓi
+
+. (A.7) The same coefficient vector c acts on both the value and gradient blocks. Let ri = ( I − P−i)ui
+
+denote the residual vector of the normalized signature. 
+
+Proposition A.4 (Projection residual and independent energy) . Without requiring U to have full column rank, 
+
+νi = ∥ri∥2, ν2 
+
+> i
+
+= ∥ui∥22 − ∥ P−iui∥22 = 1 − ∥ P−iui∥22. (A.8) 
+
+Consequently, 0 ≤ νi ≤ 1; νi = 0 if and only if ui ∈ W−i, and νi = 1 if and only if ui ⊥ W−i. In particular, a nonzero single-term signature has novelty 1.Proof. For any c, the two vectors in the decomposition 
+
+ψi − Ψ−ic = ( I − P−i)ψi + ( P−iψi − Ψ−ic)
+
+are orthogonal. Hence 
+
+∥ψi − Ψ−ic∥22 = ∥(I − P−i)ψi∥22 + ∥P−iψi − Ψ−ic∥22.
+
+Because P−iψi ∈ range(Ψ −i), the second term can be made zero. Dividing the minimum residual norm by ℓi gives νi = ∥(I − P−i)ui∥2. The orthogonal decomposition ui = P−iui + ri and 
+
+∥ui∥2 = 1 imply equation A.8. The range and endpoint characterizations follow immediately. Here, energy means the squared Euclidean norm of a Sobolev signature. Thus ν2 
+
+> i
+
+is exactly the frac-tion of the term’s empirical value-and-gradient energy that cannot be reconstructed by the remaining terms. Increasing novelty decreases the projected energy and increases the residual energy. A.3 TERM IDENTIFIABILITY AND THE EXPLANATION STABILITY PERSPECTIVE 
+
+In this subsection and the threshold derivation below, assume that U has full column rank, equiv-alently that G is nonsingular, as in the main text. To formalize attribution of overall behavior to individual terms, keep U fixed and consider, for v ∈ Rp,
+
+bα(v) = arg min 
+
+> α∈Rm
+
+∥v − U α ∥22. (A.9) Since G is positive definite, this least-squares problem has a unique minimizer. Define the contribu-tion attributed to term i as 
+
+qi(v) = bαi(v)ui. (A.10) For the original candidate, ΨX (s) = P 
+
+> j
+
+bj ℓj uj , so uniqueness gives qi(Ψ X (s)) = biΨX (ϕi). Thus 
+
+qi describes the contribution of term i to the candidate’s value-and-gradient behavior. 13 Theorem A.5 (Exact attribution sensitivity) . Under the full-column-rank assumption above, νi > 0
+
+for every term i, and 
+
+bαi(v) = r⊤ 
+
+> i
+
+vν2
+
+> i
+
+. (A.11) 
+
+The worst-case attribution sensitivity satisfies 
+
+κi := sup 
+
+> h∈Rp\{ 0}
+
+∥qi(v + h) − qi(v)∥2
+
+∥h∥2
+
+= 1
+
+νi
+
+. (A.12) 
+
+The supremum is attained by h = tr i for any t̸ = 0 .Proof. Full column rank implies ui /∈ W−i, so Proposition A.4 gives νi > 0. Fix the ith coefficient at a ∈ R and minimize over the others. Orthogonal projection gives 
+
+min  
+
+> c∈Rm−1
+
+∥v − au i − U−ic∥22 = ∥(I − P−i)( v − au i)∥22
+
+= ∥(I − P−i)v − ar i∥22. (A.13) Since ri ⊥ W−i, the final expression equals 
+
+∥(I − P−i)v∥22 − 2ar ⊤ 
+
+> i
+
+v + a2ν2 
+
+> i
+
+.
+
+This quadratic is strictly convex in a, and its unique minimizer is a = r⊤ 
+
+> i
+
+v/ν 2 
+
+> i
+
+. The inner minimiza-tion is attained for every a, so this is the ith coordinate of the joint minimizer, proving equation A.11. Consequently, 
+
+qi(v + h) − qi(v) = r⊤ 
+
+> i
+
+hν2
+
+> i
+
+ui.
+
+Using ∥ui∥2 = 1 and the Cauchy–Schwarz inequality, 
+
+∥qi(v + h) − qi(v)∥2 = |r⊤ 
+
+> i
+
+h|
+
+ν2
+
+> i
+
+≤ ∥ri∥2∥h∥2
+
+ν2
+
+> i
+
+= ∥h∥2
+
+νi
+
+.
+
+Equality holds for every nonzero scalar multiple of ri. Since ri = ui − P−iui ∈ range( U ), equality is also attainable by changing only the coefficients of the fixed terms. 
+
+Corollary A.6 (Normalized Gram-matrix characterization) . Under the same full-column-rank as-sumption, for every term i,
+
+ν2 
+
+> i
+
+= 1 − ∥ P−iui∥22 = 1(G−1)ii 
+
+, κ2 
+
+> i
+
+= ( G−1)ii . (A.14) 
+
+Proof. For m = 1 , G = [1] and νi = 1 , so the result is immediate. For m ≥ 2, reorder the columns so that term i is last and write 
+
+G =
+
+ A gg⊤ 1
+
+
+
+, A = U ⊤−iU−i, g = U ⊤−iui.
+
+Full column rank implies that A is positive definite and ui /∈ W−i. Hence P−i = U−iA−1U ⊤−i, and 
+
+ν2 
+
+> i
+
+= 1 − u⊤ 
+
+> i
+
+P−iui = 1 − g⊤A−1g > 0.
+
+To obtain the corresponding diagonal entry of G−1, solve 
+
+ A gg⊤ 1
+
+  wt
+
+
+
+=
+
+01
+
+
+
+.
+
+The first block equation yields w = −A−1gt , and the second gives (1 − g⊤A−1g)t = 1 . Thus 
+
+(G−1)ii = t = 1 /ν 2 
+
+> i
+
+. Combining this identity with Proposition A.4 and Theorem A.5 proves the claim. Because ui has unit norm, ∥qi(v + h) − qi(v)∥2 = |bαi(v + h) − bαi(v)|. Thus the coefficient-sensitivity characterization is exactly an attribution-sensitivity characterization in the normalized signature representation. 14 A.4 DERIVATION OF THE THEORY -C ALIBRATED THRESHOLD 
+
+Under the full-column-rank assumption of Appendix A.3, Theorem A.5 gives κ2 
+
+> i
+
+= 1 /ν 2 
+
+> i
+
+. If ui is orthogonal to the remaining term span, then νi = 1 and κi = 1 . Hence the squared attribution-sensitivity inflation relative to this orthogonal case is 
+
+Ai = κ2 
+
+> i
+
+= 1
+
+ν2
+
+> i
+
+. (A.15) We adopt the criterion stated in the main text: the squared attribution sensitivity of a retained term should remain within one order of magnitude of the orthogonal case, namely Ai ≤ 10 .
+
+Corollary A.7 (Theory-calibrated threshold) . Under the preceding assumptions, the criterion Ai ≤
+
+10 is equivalent to 
+
+νi ≥ τid , τid = 1
+
+√10 . (A.16) 
+
+It is also equivalent to retaining at least 10% of the term’s signature energy outside the span of the remaining terms. Proof. Since νi > 0, equation equation A.15 gives 
+
+Ai ≤ 10 ⇐⇒ 1
+
+ν2
+
+> i
+
+≤ 10 ⇐⇒ ν2 
+
+> i
+
+≥ 110 ⇐⇒ νi ≥ 1
+
+√10 . (A.17) By Proposition A.4, ν2 
+
+> i
+
+is precisely the fraction of signature energy outside the remaining term span. This proves both assertions. At the threshold boundary, the residual contains exactly 10% of the term’s full signature energy, whereas its norm is 1/√10 of the full signature norm. The worst-case attribution sensitivity is √10 
+
+times the orthogonal value, and its square is one order of magnitude larger. The main text uses the strict qualification rule νi > τ id , equivalently Ai < 10 and ν2 
+
+> i
+
+> 0.1.This excludes equality at the boundary and implies the non-strict stability requirement above. The threshold follows from the stated one-order-of-magnitude criterion, not from algorithm- or dataset-specific threshold optimization. A.5 OPTIMAL DELETION AND COEFFICIENT REFITTING 
+
+Let S−i = span {ϕj : j̸ = i}, as in the main text. The following refitting problem approximates the original candidate s in the fixed empirical Sobolev geometry. It allows arbitrary real outer coeffi-cients on the remaining fixed terms; it is not a refit of their internal parameters or a minimization of target-label error. 
+
+Theorem A.8 (Exact deletion-and-refit cost) . Without requiring U to have full column rank, 
+
+min 
+
+> es∈S −i
+
+∥s − es∥S,X = |bi| ℓiνi = |bi| ∥ ϕi∥S,X νi. (A.18) 
+
+The minimum is attained. If bi̸ = 0 , then 
+
+min 
+
+> es∈S −i
+
+∥s − es∥2
+
+> S,X
+
+b2 
+
+> i
+
+∥ϕi∥2
+
+> S,X
+
+= ν2 
+
+> i
+
+. (A.19) 
+
+Proof. Write s = s−i + biϕi, where s−i ∈ S −i. By linearity, ΨX (S−i) = W−i and ΨX (s−i) ∈
+
+W−i. Consequently, 
+
+min 
+
+> es∈S −i
+
+∥s − es∥S,X = min 
+
+> w∈W−i
+
+∥ΨX (s) − w∥2
+
+= ∥(I − P−i)Ψ X (s)∥2
+
+= |bi| ∥ (I − P−i)ψi∥2 = |bi| ℓiνi.
+
+The projection P−iΨX (s) belongs to ΨX (S−i), so at least one es attains this distance. For bi̸ = 0 ,squaring and dividing by b2 
+
+> i
+
+ℓ2 
+
+> i
+
+> 0 gives equation A.19. Thus novelty measures relative reconstructability, while the absolute Sobolev deletion cost also depends on |bi|∥ ϕi∥S,X .15 B RELATED WORK 
+
+Heuristic search-based SR methods. Genetic programming (Burlacu et al., 2020; Cranmer, 2023) and Monte Carlo tree search (Sun et al., 2022) are widely used heuristic approaches to SR. More recent methods employ pretrained neural networks (Shojaee et al., 2023; Kamienny et al., 2023), deep reinforcement learning policies trained online (Petersen et al., 2019; Xu et al., 2023), and large language models (Shojaee et al., 2025) to guide the generation and exploration of candi-date expressions. Other methods use neural networks to identify symmetries and separable structures in the data, thereby narrowing the search space (Udrescu & Tegmark, 2020; Udrescu et al., 2020). However, advances in search mechanisms do not by themselves ensure that the terms within a candi-date exhibit distinguishable behavior. We use Sobolev Novelty to provide complementary term-level structural feedback, guiding the search toward terms that contribute new behavior. 
+
+Generative SR methods. Generative SR methods pretrain Transformers on large-scale synthetic formula–data pairs to learn the correspondence between numerical observations and symbolic ex-pressions (Biggio et al., 2021; Kamienny et al., 2022). These models can generate formulas directly or be integrated with symbolic search to guide candidate generation and search planning (Shojaee et al., 2023; Kamienny et al., 2023). However, random formula generation does not ensure that the constituent terms exhibit independent functional behavior. We therefore use Sobolev Novelty to filter out pretraining formulas containing low-novelty terms, reducing term-level behavioral redun-dancy in the training data. 
+
+Evaluation metrics and constraints in SR. Benchmarks such as SRBench primarily evaluate SR solutions in terms of predictive accuracy and expression complexity (La Cava et al., 2021). Metrics such as R2 and RMSE assess overall predictive performance, while expression length and depth characterize overall size, but these measures do not directly capture behavioral relationships among terms. Existing work also introduces structural evaluation and term-level feedback. EIC assesses computational structural stability through the propagation and amplification of rounding errors (Yu et al., 2025b). IGSR measures predictive influence using the change in validation MSE, 
+
+∆MSE , caused by removing an individual term (Saveliev et al., 2026). PiT-PO (Wang et al., 2026) identifies potentially redundant terms from the relative magnitudes of fitted coefficients and applies token-level penalties. However, these criteria do not directly quantify the independent structural in-formation each term contributes relative to the remaining terms. Sobolev Novelty addresses this gap by quantifying how much of each term’s behavior cannot be jointly reconstructed by the remaining terms in an empirical Sobolev space, complementing expression-level evaluation. 
+
+## C DATASETS AND EVALUATION PROTOCOLS 
+
+C.1 WHITE -B OX TASKS 
+
+Our SRBench white-box evaluation set comprises 133 scientific equation tasks, including 119 Feyn-man tasks and 14 Strogatz tasks, each with an analytic ground-truth expression. This set is used for the structural analysis in Section 4.1, the evaluation of GP, MCTS, and their Sobolev-guided variants in Section 4.2, and the testing of pretrained models in Section 4.3. C.2 BLACK -B OX TASKS 
+
+The black-box evaluation set comprises 122 regression tasks for which no reference analytic expres-sion is provided. This set is used to evaluate GP, MCTS, IGSR, and their Sobolev-guided variants. IGSR and SN-IGSR are evaluated only on the black-box tasks. C.3 PRETRAINING CORPORA 
+
+Section 4.3 compares three formula corpora for E2ESR pretraining. Random uses randomly gen-erated formulas. SN-filtered applies Sobolev Novelty filtering to randomly generated formulas: single-term formulas are accepted directly, whereas multi-term formulas are retained only when 
+
+min i νi > τ id . PhyE2E formulas are taken from the pretraining corpus introduced by Ying et al. (2025). All three settings use the same E2ESR architecture, tokenizer, training objective, optimizer, 16 and inference pipeline. We conduct three independent runs per setting and evaluate checkpoints from 1M to 35M accepted samples using mean R2 across the 133 white-box tasks. C.4 PERIODIC -H ILL FLOW 
+
+Section 4.4 considers turbulence modeling for periodic-hill flow. The constitutive relations discov-ered by MCTS, DSRRANS, and their Sobolev-guided variants are embedded in a RANS solver for a posteriori evaluation. Conventional RANS serves as the baseline, and DNS provides the reference. Evaluation considers the reattachment position x/H , the maximum recirculation-zone velocity mag-nitude (in m/s), and the streamwise velocity field. For the first two quantities, prediction errors are computed as absolute deviations from DNS. C.5 EVALUATION METRICS AND REPORTING CONVENTIONS 
+
+Predictive accuracy and expression complexity. Predictive accuracy is measured by the coeffi-cient of determination R2 on the test set. Expression complexity C is defined as the total number of nodes in the parsed expression tree, including operator, variable, and constant nodes. In Figure 2, ac-curacy ranks are computed from mean R2, and complexity ranks from mean expression complexity. Higher mean R2 and lower mean complexity correspond to better accuracy and complexity ranks, respectively. 
+
+Structural evaluation. We report the mean term Sobolev Novelty and the proportion of terms sat-isfying νi > τ id , where τid = 1 /√10 . The structural analysis in Section 4.1 retains only discovered expressions with test R2 ≥ 0.8. Within each task, Sobolev Novelty is computed for the ground-truth equation and all retained expressions using the same input samples. Ground-truth expressions serve solely as post-hoc structural references and are not used to guide or supervise the methods. 
+
+## D METHOD INTEGRATION AND IMPLEMENTATION DETAILS 
+
+D.1 INTEGRATION WITH GENETIC PROGRAMMING 
+
+Original workflow. GP represents candidate expressions as trees and performs population-based search over successive generations. In each generation, the coefficients of candidate expressions are fitted, and parents are selected according to an accuracy–complexity score. Crossover and mutation produce new expressions, which are fitted and evaluated before the population is updated. Elitism retains high-scoring candidates for subsequent generations. 
+
+Integration of Sobolev Novelty. We augment this workflow with structural screening and reuse. After fitting and evaluating the candidates in each generation, we extract symbolic terms from dis-tinct high-scoring expressions, remove duplicates, and store the terms in a structural archive main-tained across generations. Within the archive capacity limit, we prioritize terms according to their Sobolev projection residuals relative to the span of the retained term representations. This favors structures with complementary function-value and gradient behavior. Starting from the current partial expression, we construct additional candidates using the retained terms. For each new term, we assess its ability to explain the fitting residual and its structural com-plementarity to existing terms. These assessments yield fit-guided and Sobolev-guided candidate sets, which we merge and deduplicate. Candidate construction also includes bounded structural proposals involving products, rational expressions, trigonometric combinations, and radicals. We fit and score all additional candidates using the original numerical fitting routine. The final expression is selected from the stored complete candidates according to the original GP accuracy– complexity score, without an additional novelty penalty. Sobolev Novelty enhances GP search by guiding the retention and recombination of candidate structures. D.2 INTEGRATION WITH MONTE CARLO TREE SEARCH 
+
+Original workflow. MCTS searches for expressions through node selection, expansion, simula-tion, and reward backpropagation. Node selection determines which branch to explore, expansion 17 generates successor structures, and simulation produces complete candidates for numerical evalu-ation. After coefficient fitting, candidates are evaluated using an accuracy–complexity score. The resulting rewards are backpropagated through the search tree to inform subsequent node selection. 
+
+Integration of Sobolev Novelty. We introduce structural screening into candidate evaluation in each round of expansion and simulation. Complete candidates obtained from the current expansion state and subsequent simulations are collected into a common pool. We first retain at most 64 candidates according to the original accuracy–complexity score Rbase , then rerank them using the Sobolev Novelty of their constituent terms. The structurally guided score is defined as 
+
+RSN (s) = Rbase (s) − 0.01 
+
+m
+
+> m
+
+X
+
+> i=1
+
+
+
+max 
+
+
+
+0, 1 − νi
+
+τid 
+
+ 2
+
+, (D.1) where m is the number of terms in the candidate. The original score identifies candidates with fa-vorable accuracy–complexity trade-offs, and the additional penalty lowers the priority of candidates containing low-novelty terms. For the top-ranked candidate, we attempt at most one term deletion followed by coefficient refitting. Among the terms satisfying νi < τ id , we remove the term with the smallest independent contribution 
+
+|bi|νi∥ΨX (ϕi)∥2 and refit the remaining coefficients. We accept the modification only if the original accuracy–complexity score does not decrease; otherwise, we retain the original expression. Finally, we rerank the candidate pool and backpropagate the score RSN of the selected candidate through the search tree. The original node-selection rule remains unchanged, and Sobolev Novelty influences subsequent exploration through candidate evaluation and reward backpropagation. D.3 INTEGRATION WITH IGSR 
+
+Original workflow. IGSR combines LLM-based symbolic term generation with MCTS. Tree search selects a candidate for expansion, and the LLM proposes new symbolic terms that are com-bined with existing terms to form an additive model. After numerical coefficient fitting, the original term-wise influence mechanism screens terms based on the change in validation error caused by removing each term. The resulting candidate is refitted, and its validation score guides subsequent node selection and expansion. 
+
+Integration of Sobolev Novelty. We perform structural diagnosis before the LLM proposes new terms. We compute the term-wise Sobolev Novelty of the parent candidate on a fixed set of training samples used during search. Terms satisfying νi ≤ τid are flagged as low-novelty terms. The resulting feedback lists at most three low-novelty terms and two high-novelty reference terms and is appended to the prompt for the next round of term generation. The feedback identifies terms whose function values and local variation can be jointly approximated by the remaining terms and guides the LLM to propose structures with complementary variation patterns. When the parent candidate is empty, diagnosis fails, or no low-novelty terms are identified, we retain the original prompt without adding this feedback. After term generation, the original IGSR workflow continues with influence-based screening, coeffi-cient fitting, validation evaluation, and tree-search updates. To keep modifications to IGSR minimal, we introduce Sobolev Novelty only through term-generation feedback. The validation objective and tree-search scoring remain unchanged, and no additional term deletion or sibling-candidate rerank-ing is performed. Both settings use the same LLM and logical token budget, with the additional feedback text included in this budget. D.4 INTEGRATION WITH E2ESR 
+
+Original workflow. E2ESR is pretrained on large-scale synthetic formula–data pairs to learn a mapping from numerical observations to symbolic expressions. Pretraining comprises random for-mula generation, numerical sample construction, sequence encoding, and model updates. The gen-erator constructs expressions online using variables, constants, and operators. For each expression, it samples input points and computes the corresponding outputs, pairing these observations with the 18 symbolic sequence to form a training example. At inference time, the model generates candidate expressions from the given observations. These candidates undergo numerical constant optimization and scoring to select the final output. 
+
+Integration of Sobolev Novelty. We introduce formula-level rejection sampling between numeri-cal sample generation and model training. For each randomly generated expression, we extract the top-level additive terms by distributing multiplication over addition. Powers and expressions within functions are left unexpanded, and no trigonometric identities are applied. We evaluate the function values and first-order input gradients of each term at the points sampled for the corresponding formula, using all available points up to a maximum of 200. Gradients are computed analytically using the chain rule on the expression tree and converted to derivatives with respect to standardized input coordinates. Structural evaluation is restricted to a common subset of points at which all terms have finite function values and gradients. All term representations share a candidate-level output scale and use weights λ0 = λ1 = 1 . Formulas are rejected if fewer than 32 valid samples remain or valid representations cannot be constructed. Following the definition in Section 3, we compute the leave-one-term-out Sobolev Novelty of each term relative to the remaining terms. Among formulas that pass the numerical validity checks, single-term formulas are accepted with ν1 = 1 , and multi-term formulas are accepted only if 
+
+min i νi > τ id , where τid = 1 /√10 . If any term fails to exceed the threshold, the entire formula is rejected without term deletion or refitting, and the generator proceeds to the next candidate. Accepted samples enter the original pipeline for encoding, batch construction, and model updates. The E2ESR architecture, tokenizer, training objective, optimizer, and inference-time procedures for constant optimization and candidate ranking remain unchanged. No additional Sobolev loss or inference-time reranking is introduced. The training budget counts only accepted samples used for model updates. Sobolev Novelty improves the final performance of E2ESR through pretraining data selection alone. D.5 TURBULENCE CLOSURE MODELING FOR PERIODIC -H ILL FLOW 
+
+D.5.1 BACKGROUND OF THE TURBULENCE MODELING TASK 
+
+Physical background. The Reynolds-averaged Navier–Stokes (RANS) approach predicts mean flow quantities, such as velocity and pressure, by solving averaged flow equations. Reynolds de-composition of the instantaneous velocity and averaging of the momentum equations introduce the Reynolds stress tensor 
+
+τij = u′
+
+> i
+
+u′ 
+
+> j
+
+, (D.2) where u′ 
+
+> i
+
+denotes the velocity fluctuation in the ith direction and the overbar denotes statistical averaging. Reynolds stresses represent the contribution of turbulent fluctuations to mean momentum transport. An additional constitutive relation is required to determine these stresses and close the mean flow equations. Direct numerical simulation (DNS) provides high-fidelity reference statistics for learning and evaluating closure relations. Conventional linear eddy-viscosity models express the anisotropic part of the Reynolds stress as proportional to the mean strain rate: 
+
+τ = 23 kI − νt
+
+h
+
+∇u + ( ∇u)⊤i
+
+, (D.3) where k is the turbulent kinetic energy, νt is the eddy viscosity, and I is the identity tensor. This re-stricted stress–strain relationship can lead to substantial errors in flows with pronounced separation, streamline curvature, and stress anisotropy. DSRRANS retains the linear eddy-viscosity contribu-tion and adds a nonlinear stress correction represented by explicit symbolic expressions. 
+
+Periodic-hill flow and case configuration. Periodic-hill flow develops in a channel with a flat upper wall and a periodically undulating lower wall. Downstream of a hill crest, an adverse pressure gradient decelerates the near-wall flow, producing a separated shear layer and a recirculation region. The flow subsequently reattaches downstream. The extent of the recirculation region, the reattach-ment position, and the velocity distribution reflect how well a closure model represents stress and momentum transport in separated flows. DSRRANS also uses this flow for turbulence modeling. 19 For tensor regression, we use the publicly available DSRRANS data with geometry parameter α =0.8 and Reynolds number 
+
+Re H = UbHν = 5600 , (D.4) where H is the hill height, Ub is the volume-averaged velocity, and ν is the kinematic viscosity. The parameter α scales the hills horizontally, controlling their steepness and the streamwise period length. Periodic boundary conditions are imposed in the streamwise direction, and no-slip conditions are applied at both walls. The configuration has a statistically two-dimensional mean flow, while the Reynolds stress is represented by a three-dimensional tensor that includes the spanwise normal-stress component. 
+
+Local flow representation. In the publicly available training data, the input features and tensor bases are derived from a standard k–ε RANS solution, where ε is the turbulent kinetic energy dis-sipation rate. Following the notation of DSRRANS, we use the timescale k/ε to define the dimen-sionless strain-rate and rotation-rate tensors: 
+
+S = k
+
+2ε
+
+h
+
+∇u + ( ∇u)⊤i
+
+,
+
+R = k
+
+2ε
+
+h
+
+∇u − (∇u)⊤i
+
+.
+
+(D.5) The corresponding scalar invariants are 
+
+I1 = tr( S2), I2 = tr( R2). (D.6) Before symbolic regression, we transform these invariants as 
+
+x1 = tanh( I1/2) , x2 = tanh( I2/2) , (D.7) to compress their numerical ranges. The transformed flow invariants x1 and x2 serve as the regres-sion inputs, and the tensor-basis values are taken directly from the dataset. 
+
+Regression target and data composition. We follow the dimensionless stress definition used in the DSRRANS data: 
+
+b = τ
+
+k − 23 I,
+
+b∥ = −2CμS,
+
+b⊥ = b − b∥,
+
+(D.8) where Cμ = 0 .09 . The regression target b⊥ is the stress correction relative to the linear eddy-viscosity contribution. The DSRRANS data preparation pipeline interpolates DNS results onto the RANS mesh to construct the nonlinear stress-correction targets. We use the publicly available arrays of invariants, tensor bases, and correction targets, comprising 9,600 local samples. Each sample contains two regression invariants, three 3 × 3 tensor bases, and one 3 × 3 target tensor. The three coefficient functions are fitted jointly by minimizing the prediction error of the assembled tensor over its 11 , 12 , 22 , and 33 
+
+components. 
+
+Closure modeling and flow-field evaluation. Stress regression evaluates the fit of the symbolic model to the stress corrections at the given samples. A posteriori flow-field evaluation assesses mean-flow predictions after the learned closure is incorporated into the RANS equations. Sec-tion 4.4 reports a posteriori comparisons with DNS for the reattachment position x/H , the maximum recirculation-zone velocity magnitude, and the streamwise velocity field. The reattachment position characterizes the downstream extent of the separation region, and the velocity magnitude charac-terizes recirculation strength. For both scalar quantities, errors are measured as absolute deviations from the DNS reference. D.5.2 CLOSURE SEARCH USING THE DSRRANS T ENSOR REPRESENTATION 
+
+Original method and tensor representation. DSRRANS constructs turbulence closures by learn-ing symbolic coefficient functions in a tensor-basis expansion. The original search procedure uses 20 an LSTM to generate candidate expressions for these functions and optimizes their numerical con-stants. Rewards computed from tensor-prediction errors then guide updates to the generation policy through risk-seeking policy gradients. For the statistically two-dimensional flow considered here, the three tensor bases are T1 = S,
+
+T2 = SR − RS ,
+
+T3 = S2 − 13 I tr( S2).
+
+(D.9) The nonlinear closure term is expressed as 
+
+bb⊥ =
+
+> 3
+
+X
+
+> k=1
+
+Gk(x1, x 2)Tk, (D.10) where Gk denotes a scalar coefficient function to be identified and x1, x 2 are the transformed invari-ants defined above. 
+
+Forward-selection workflow. The offline search implementation described here uses this tensor representation with forward selection over a bounded monomial dictionary. The dictionary contains bivariate monomials of total degree at most 12. Each candidate term is multiplied by the tensor basis associated with its coefficient channel to form a tensor contribution. The baseline without Sobolev guidance evaluates each candidate by the reduction in training squared error obtained after adding that candidate and jointly refitting all coefficients. It selects the term with the largest reduction and then jointly refits the coefficients of all selected terms. 
+
+Integration of Sobolev Novelty. We incorporate Sobolev Novelty into next-term selection after computing candidate gains with the baseline procedure. Among candidates whose error reduction is at least 94% of the largest reduction at the current step, we select the term with the highest conditional Sobolev Novelty. We then jointly refit the coefficients of all selected terms. This rule uses Sobolev Novelty to guide selection among candidates with comparable fitting gains. Structural evaluation uses the tensor contribution ϕ(x1, x 2)Tk of each candidate. The reference space is spanned only by the representations of previously selected terms in the same coefficient channel. The value block records the tensor contribution at the sampled inputs. To construct the gra-dient block, we differentiate the coefficient function with respect to the input invariants and multiply these derivatives by the tensor basis, which remains fixed during differentiation. Conditional novelty is the normalized projection residual of the candidate representation relative to this reference space and serves as a continuous ranking score. When further model compression is required, both settings use the same backward term-deletion rule, guided by training error alone, and jointly refit the coefficients after each deletion. 
+
+## E DETAILED EXPERIMENTAL RESULTS 
+
+E.1 PER -M ETHOD TERM QUALIFICATION STATISTICS 
+
+Table 2 reports the complete per-method term qualification statistics used in Section 4.1. We con-sider only multi-term expressions, since a single-term expression has no remaining-term reference space and is assigned a novelty of one by convention. For discovered expressions, we retain can-didates with test R2 ≥ 0.8, following the protocol in the main text. A term is qualified when 
+
+νi > τ id = 1 /√10 .Under this criterion, 87 of the 94 ground-truth terms are qualified, corresponding to a qualification rate of 92 .6% . Across the 15 SR methods, the macro-average qualification rate is 38 .3% , yielding a difference of 54 .3 percentage points from the ground truth. Per-method counts and qualification rates are reported in Table 2. E.2 SOBOLEV NOVELTY AS SEARCH GUIDANCE 
+
+Corresponding to Figure 2 in the main text, Tables 3 and 4 provide the complete experimental results on the white-box and black-box tasks, respectively. The tables report the mean R2, mean expression 21 Table 2: Per-method term qualification statistics at the theory-calibrated threshold τid = 1 /√10 . A term is qualified when νi > τ id .
+
+Method Multi-term Expressions Total Terms Qualified Terms Qualification Rate (%) 
+
+Ground Truth 41 94 87 92.6 
+
+AFP 451 1,496 1,039 69.5 AFP-FE 563 1,814 1,295 71.4 AIFeynman2 388 6,130 448 7.3 BSR 524 4,335 1,657 38.2 DSR 339 990 677 68.4 E2ESR 672 5,508 646 11.7 EPLEX 434 1,810 969 53.5 FEAT 838 12,516 1,534 12.3 GP-GOMEA 737 4,815 1,434 29.8 GPlearn 459 2,871 1,253 43.6 NeurSR 318 1,325 428 32.3 Operon 964 12,223 1,280 10.5 PySR 690 2,635 1,475 56.0 RSRM 426 1,374 844 61.4 SBP-GP 560 19,072 1,524 8.0 
+
+Mean over 15 SR methods – – – 38.3 
+
+Note. The mean over SR methods is the unweighted macro-average of the 15 method-level qualification rates, rather than a pooled average over all terms. 
+
+Table 3: White-box results under noise-free conditions. 
+
+Type Algorithm Mean R2 ↑ Complexity ↓ SN ↑
+
+Regression FEAT 0.9192 195.300 0.1686 Generative E2ESR 0.8194 89.630 0.3675 
+
+NeurSR 0.4090 31.420 0.4348 Search 
+
+AFP 0.9553 37.010 0.8185 
+
+AFP-FE 0.9767 40.630 0.8197 
+
+AIFeynman2 0.9000 113.200 0.7781 
+
+BSR 0.6807 26.950 0.3684 
+
+DSR 0.8351 14.940 0.8043 
+
+EPLEX 0.9682 52.640 0.7882 
+
+GP-GOMEA 0.9953 34.770 0.5126 
+
+GPlearn 0.8688 67.710 0.7285 
+
+Operon 0.9888 68.730 0.3700 
+
+PySR 0.9587 9.219 0.3535 
+
+RSRM 0.7750 13.400 0.7286 
+
+SBP-GP 0.9930 513.400 0.2124 
+
+GP 0.9652 18.421 0.6647 
+
+SN-GP 0.9960 16.485 0.7790 
+
+∆ (%) +3 .19% −10 .51% +17 .20% 
+
+MCTS 0.9229 18.109 0.7790 
+
+SN-MCTS 0.9356 17.549 0.7845 
+
+∆ (%) +1 .38% −3.09% +0 .71% 
+
+SN denotes Sobolev Novelty. ∆ = 100( xSN − xbase )/x base denotes the relative change computed from the displayed values. 
+
+complexity, and mean Sobolev Novelty of each method, together with the relative changes between GP, MCTS, and IGSR and their Sobolev-guided variants. 22 Table 4: Black-box results.                                                                                             
+
+> Type Algorithm Mean R2↑Complexity ↓SN ↑
+> Regression FEAT 0.7621 82.489 0.6555 Generative E2ESR 0.3612 61.094 0.6331
+> NeurSR 0.1228 13.333 0.6590 Search
+> AFP 0.6333 34.894 0.7094
+> AFP-FE 0.6400 36.039 0.7078
+> AIFeynman2 0.2110 2239.752 0.4286
+> BSR 0.2725 22.521 0.6740
+> DSR 0.5625 9.465 0.7467
+> EPLEX 0.7372 53.142 0.6592
+> FFX 0.5575 1561.893 0.1549
+> GP-GOMEA 0.7381 30.266 0.5184
+> GPlearn 0.5390 19.058 0.7591
+> ITEA 0.6295 116.692 0.7147
+> MRGP 0.5300 10802.169 N/A
+> Operon 0.7945 65.689 0.3210
+> SBP-GP 0.7869 634.019 0.2915
+> GP 0.7194 33.733 0.5269
+> SN-GP 0.7298 35.440 0.5907
+> ∆(%) +1 .45% +5 .06% +12 .11%
+> MCTS 0.5457 38.301 0.5677
+> SN-MCTS 0.5833 37.060 0.5796
+> ∆(%) +6 .89% −3.24% +2 .10%
+> IGSR 0.5640 6.000 0.1908
+> SN-IGSR 0.6474 5.992 0.4218
+> ∆(%) +14 .79% −0.13% +121 .07%
+> SN denotes Sobolev Novelty. ∆ = 100( xSN −xbase )/x base denotes the relative change computed from the displayed values. N/A denotes an unavailable value.
+
+## F ABLATION OF FIRST -O RDER DERIVATIVES 
+
+Experimental setup. We assess the contribution of first-order derivatives to search accuracy and evaluation throughput under the same wall-clock search budget. We compare the complete SN-MCTS with w/o first derivatives , which removes the gradient block from the term representation while retaining the function-value block and term-level projection guidance. The remaining search procedure follows the SN-MCTS integration in Appendix D.2. This comparison evaluates the benefit of derivative information beyond value-only guidance and its practical computational impact. We report mean test NMSE and the mean number of SN calls per run, with the latter measuring how many novelty evaluations are completed within the fixed time budget. 
+
+Results. As shown in Figure 5, removing first-order derivatives increases mean NMSE from 
+
+0.0644 to 0.0723 , a relative increase of 12 .3% . Under the same time budget, the complete SN-MCTS performs 5229 .4 SN calls per run on average, compared with 5766 .5 for the ablated variant. The complete method therefore retains 90 .7% of the SN call count, corresponding to a 9.3% re-duction. Although derivative evaluation introduces additional computation, its observed impact on the number of SN evaluations completed within the fixed budget is modest. The complete method achieves lower prediction error while preserving most of the evaluation throughput, supporting the practical value of first-order information for term-level search guidance. 23 Mean NMSE SN calls 
+
+> 0.00 0.02 0.04 0.06 0.08
+> Mean test NMSE
+
+0.0644 
+
+0.0723 
+
+> 01,500 3,000 4,500 6,000
+> Mean SN calls / run
+
+5,229.4 5,766.5 
+
+SN-MCTS w/o first derivatives Figure 5: Mean test NMSE (left group, left axis) and mean SN calls per run (right group, right axis) under the same time budget. 24

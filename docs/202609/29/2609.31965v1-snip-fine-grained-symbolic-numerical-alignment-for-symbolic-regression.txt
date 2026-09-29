@@ -1,0 +1,999 @@
+Title: SNIP++: Fine-Grained Symbolic-Numerical Alignment for Symbolic Regression
+
+URL Source: https://arxiv.org/pdf/2609.31965v1
+
+Published Time: Tue, 29 Sep 2026 00:18:35 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# SNIP++: Fine-Grained Symbolic–Numerical Alignment for Symbolic Regression 
+
+## Benjamin Léger 1,2 , Shubham Gupta 1,2 , Samy Mammeri 1,2 , Kazem Meidani 3, Cem Subakan 1,2 ,Christian Gagné 1,2,4 
+
+> 1
+
+Université Laval 2Mila 3Department of Mechanical Engineering, Carnegie Mellon University 4Canada CIFAR AI Chair 
+
+benjamin.leger.1@ulaval.ca 
+
+Abstract 
+
+Mathematical expressions and the numerical behavior they produce are two views of the same underlying function, and connecting them is central to scientific discovery. Symbolic Regression (SR) relies on this connection directly: it searches for an expression that reproduces a given behavior. Recent multi-modal models learn this connection by embedding sym-bolic expressions and their numerical behavior in a shared rep-resentation space. We show that this embedding space is only globally aligned: complete expressions correspond to com-plete behaviors, but the contribution of individual parts of an expression is not represented. This granularity gap leaves the model unable to tell how a local edit to an expression changes its behavior, the central operation in SR. We introduce a com-positional alignment method that closes this gap: a structural positional encoding exposes the substructure of an expression to the encoder, and a multi-granularity contrastive objective grounds each subexpression in the behavior it produces before propagating this grounding to the full expression. The result-ing representations close much of the modality gap between symbolic and numerical embeddings, reliably distinguish the effects of local edits that the original alignment cannot, and transfer to external SR corpora. 
+
+## 1 Introduction 
+
+Symbolic regression (SR) seeks to recover symbolic ex-pressions from numerical observations, connecting two fun-damentally different representations of the same function: its mathematical form and its observed behavior (La Cava et al. 2021). These two representations live in very different spaces: symbolic expressions are discrete, compositional ob-jects, built from operators and variables according to a tree structure, while numerical behavior is a continuous signal observed at a finite set of points. Recent work has approached this through multi-modal learning, most notably SNIP (Meidani et al. 2024), which embeds symbolic expressions and their numerical behavior in a shared representation space using contrastive learning. Beyond its use within a particular regression pipeline (Mei-dani et al. 2024; Li et al. 2026, 2025; Yu et al. 2025), such an alignment holds the promise of a general-purpose repre-sentation of the correspondence between symbolic structure and numerical behavior. However, the relationship between the two is also far from simple: a small change to an expression can leave its behav-ior essentially unchanged, or alter it completely, so structural similarity in one space does not translate into proximity in the other (Krawiec 2011). Also, while mapping a symbolic expression to its numerical behavior is explicit (evaluating it on a fixed set of inputs uniquely determines the correspond-ing outputs), the difficulty of bridging the symbolic and nu-merical modalities lies primarily in learning the inverse and relational structure of this correspondence: identifying which symbolic structures are compatible with an observed behav-ior, and how changes in those structures affect it. This is a central theme in SR (Kim et al. 2014; Krawiec 2011). In addition to being poorly localized—with small symbolic al-terations potentially inducing large numerical changes—the correspondence is non-unique: distinct symbolic forms can induce the same behavior, especially over a finite set of ob-servations. Hence, a truly useful shared space must organize sym-bolic forms by their functional meaning—remaining invari-ant to equivalent rewritings while sharply distinguishing lo-cal, behavior-altering changes (Allamanis et al. 2017; Zheng et al. 2025; Liskowski et al. 2020). This requires fine-grained, compositional grounding of an expression’s internal struc-ture. Because SNIP serializes expressions as prefix token sequences and relies on a global contrastive objective over pooled representations, it captures only coarse cross-modal compatibility. Empirically, it cannot reliably discriminate closely related symbolic variants (Léger, Meidani, and Gagné 2026). We refer to this failure to resolve how fine-grained symbolic structure relates to numerical behavior as the gran-ularity gap .We introduce SNIP++ , a compositional alignment method that addresses this granularity gap by grounding the shared representation at the level of an expression’s parts. First, a tree-structural positional encoding exposes parent-child relations and subtree membership directly to the symbolic encoder. Second, a multi-granularity contrastive objective grounds each subtree—both contextually within its parent and as a standalone expression—in the specific numerical behavior it produces. This shared target encourages a con-sistent functional representation across contexts and helps resolve ambiguity in the numerical-to-symbolic direction. Inspired by fine-grained vision–language alignment meth-ods such as FG-CLIP (Xie et al. 2025), we complement this local supervision with controlled symbolic perturbations that arXiv:2609.31965v1 [cs.NE] 25 Sep 2026 teach the model which structural changes alter behavior. To-gether, these components organize the shared space around functional structure rather than whole-expression similarity, closing SNIP’s granularity gap. 
+
+Contributions. Our main contributions are: 
+
+• We introduce SNIP++, a fine-grained symbolic– numerical alignment method that combines tree-structural positional encoding with multi-granularity be-havioral supervision. 
+
+• We show that SNIP++ substantially improves global symbolic–numerical alignment and fine-grained local discrimination, while also reducing the modality gap be-tween symbolic and numerical representations. 
+
+• We show that these gains extend beyond the training distri-bution: SNIP++ substantially outperforms SNIP on held-out edit families and external, independently curated SR benchmarks, while yielding a more functionally mean-ingful representation space. 
+
+## 2 Related Work 
+
+Neural and multimodal symbolic regression. Pretrained Transformers have been used to generate symbolic expres-sions directly from numerical observations, either in a zero-shot manner (Biggio et al. 2021; Kamienny et al. 2022; Vastl et al. 2024; Li et al. 2022) or by planning symbolic search at inference time (Voigt et al. 2025; Shojaee et al. 2023). These approaches primarily encode numerical data and de-code symbolic solutions. In contrast, Meidani et al. (2024), drawing on CLIP (Radford et al. 2021), learn a shared rep-resentation of symbolic expressions and their numerical be-havior, supporting property retrieval and generative symbolic regression when paired with a decoder. Subsequent methods use related multimodal representations primarily for expres-sion generation or latent-space search (Li et al. 2025, 2026). Our focus is complementary: rather than introducing a de-coder or search procedure, we improve the alignment itself so that it captures local symbolic changes and can support candidate comparison, evaluation, and search guidance. 
+
+Fine-grained and structure-aware representations. 
+
+Global multimodal contrastive models often struggle with fine-grained semantic changes and compositional relations, and may organize their modalities into separated subspaces (Liang et al. 2022; Wang et al. 2023; Lewis et al. 2024; Xie et al. 2025). Fine-grained methods address these limitations using local contrasts and token–region alignment (Zhong et al. 2022; Jing et al. 2024; Xie et al. 2025). In the context of symbolic regression, symbolic-only embedding models learn representations that preserve semantic equivalence de-spite syntactic variation (Allamanis et al. 2017; Zheng et al. 2025). In parallel, structure-aware Transformers introduce positional representations derived from tree paths or node re-lations, making hierarchical structure explicit when trees are linearized as token sequences (Shiv and Quirk 2019; Peng et al. 2021). We combine these directions cross-modally: tree-structural positions expose the compositional organiza-tion of an expression, while computational subtrees serve as exact local units whose contextual and standalone represen-tations can be grounded in numerical behaviors evaluated directly. 
+
+Locality and compositional search. The relationship be-tween symbolic changes and their numerical consequences has long been studied in Genetic Programming through semantic locality, genotype–phenotype mappings, modular representations, and compositional search operators (Kim et al. 2014; Krawiec and Pawlak 2013; Moraglio and Kraw-iec 2015; Krawiec and Kossiński 2022). These methods seek components that produce desired intermediate behaviors or identify behaviors needed locally to reach a target. RAG-SR (Zhang et al. 2025) extends a related component-retrieval perspective to neural symbolic regression. Our method in-stead learns a bidirectional symbolic–numerical represen-tation of such components, providing a reusable semantic signal without prescribing a particular search heuristic. 
+
+## 3 Background and Problem Formulation 
+
+3.1 SNIP 
+
+SNIP (Meidani et al. 2024) learns a shared representation space between symbolic expressions and the numerical be-haviors they generate. Given an expression f and inputs X,let Df = ( X, f (X)) . A symbolic encoder enc S and nu-merical encoder enc V produce zS = pool(enc S (f )) and 
+
+zV = enc V (Df ). A bidirectional InfoNCE objective (Eq. 1) aligns matched expression–behavior pairs while separat-ing mismatched pairs, supporting both symbolic-numerical (f → y) and numerical-symbolic ( y → f ) alignment. On the symbolic side, SNIP serializes each expression tree in prefix order, adds sequential positional embeddings, and pools the token representations into a single expression embedding. Its dual-encoder formulation exposes both direc-tions of the learned correspondence directly: from symbolic expressions to numerical behaviors and from numerical ob-servations to symbolic candidates. These directions support complementary symbolic-regression operations, including comparing candidates through their behavior and recovering symbolic expressions from numerical observations (Kraw-iec 2011; La Cava et al. 2021; Meidani et al. 2024). SNIP therefore provides a natural setting and controlled backbone for studying the quality of symbolic–numerical alignment independently of any particular decoder or search procedure. 
+
+3.2 Alignment Requirements 
+
+A symbolic–numerical representation maps an expression f
+
+and its numerical behavior Df = ( X, f (X)) into a shared space. For this representation to support SR, it should cap-ture functional correspondence at both the level of complete expressions and the level of their constituent components. 
+
+Complete-expression correspondence : the representa-tion of an expression should agree with the representation of the behavior it generates, and distinguish it from behaviors produced by other functions. This establishes the symbolic– numerical correspondence at the scale of the complete ex-pression, but places no constraint on how its internal structure is represented. Fine-grained alignment requires three additional prop-erties. First, component grounding : because subtrees are meaningful compositional units, each subtree s should be represented as a distinct structural component, preserving its boundaries and position within the expression, and associ-ated with the intermediate behavior s(X) that it computes. Second, functional sensitivity : because symbolic similarity does not reliably imply behavioral similarity, nearby expres-sions should separate when a small edit changes their behav-ior, while syntactically different expressions should remain close when they represent the same function. Third, context-dependent contribution : because the operations above a subtree transform its output, the same local change can have different effects depending on where and how it is composed. A representation should therefore capture not only what a component computes, but also how its behavior contributes to the complete function. 
+
+3.3 Granularity Gap 
+
+The problem is therefore to learn a shared representation that preserves complete-expression correspondence while also capturing local and compositional functional structure. A global alignment objective, as in SNIP, constrains only pooled complete-expression representations and does not directly supervise individual subtrees or the consequences of modifying them. Moreover, because SNIP represents ex-pression trees as prefix sequences with sequential positional embeddings, parent–child relations and subtree membership are not explicitly available to the encoder. Consistent with these limitations, Léger, Meidani, and Gagné (2026) find that SNIP’s alignment cannot reliably distinguish an expres-sion from closely perturbed symbolic alternatives. We refer to this underdetermination of local functional structure by global supervision as the granularity gap .
+
+## 4 Proposed Method 
+
+SNIP aligns a pooled symbolic representation of a com-plete expression with its numerical behavior, but it neither (a) explicitly represents expression-tree structure nor (b) su-pervises the representations of individual subexpressions. SNIP++ addresses these limitations through two complemen-tary modifications. First, a tree-structural positional encoding makes parent–child relations and subtree membership avail-able to the symbolic encoder. Second, a multi-granularity contrastive objective grounds subtrees in the behaviors they compute and propagates the effects of controlled subtree perturbations to the representations of complete expressions. The numerical encoder, tokenizer, and pooling operation re-main unchanged. See Figure 1 for an overview of the objec-tive function and tree-structural position encoding. 
+
+4.1 Tree-Structural Positional Encoding 
+
+SNIP linearizes each expression tree in prefix order and adds standard sequential positional embeddings. These preserve token order but not tree structure: nodes that are adjacent in the tree may be far apart in the sequence, while consecutive tokens may belong to different branches. Following prior tree positional encodings (Shiv and Quirk 2019; Peng et al. 
+
+Figure 1: Overview of SNIP++. A controlled edit replaces the subtree s = sin( x) with ˜s = cos( x), producing the perturbed parent expression ˜f . From f and s, the symbolic encoder yields the complete-expression embedding gS , the subtree span pooled in context c, and the standalone sub-tree embedding o; ˜gS , ˜c, and ˜o denote the corresponding representations of ˜f and ˜s. The numerical encoder simi-larly maps their full-expression and subtree behaviors on shared inputs X to gV , ˜gV and p, ˜p. Original and perturbed pairs are aligned symmetrically through the local losses 
+
+Cτs (C, P ) and Cτs (O, P ), and the expanded global loss 
+
+Cτg (GS, +, G V, +), where + denotes augmenting SNIP’s orig-inal complete-expression objective with perturbed parent– behavior pairs. Tree-structural position encoding (inset) :Each token records its nearest L branch choices (first vs. sec-ond child) on the path to the root ( L = 2 here). In channel 
+
+c, choice k (k = 0 nearest) is weighted by learned ρkc , with 
+
+|ρc| < 1; all codes are concatenated so that 2CL = dmodel .2021), we therefore augment each token with an encoding of its location in the expression tree. The inset of Figure 1 illustrates this construction. For a node v, we record the branch taken at each step toward the root: sk(v) = (1 , 0) for the first child, sk(v) = (0 , 1) for the second, and sk(v) = (0 , 0) for padding. Unary operators use the first-child branch. We retain the nearest L
+
+steps, indexed from the node upward, with k = 0 denoting the nearest relation. In Figure 1, b is the first child of +,while + is the second child of ×, giving s0(b) = (1 , 0) and 
+
+s1(b) = (0 , 1) . In channel c, these become [s0(b), ρ cs1(b)] = [1 , 0, 0, ρ c]. With the L = 2 and C = 2 channels shown, concatenation yields the eight-dimensional encoding rb =[1 , 0, 0, ρ 1, 1, 0, 0, ρ 2].More generally, channel c weights relation k by ρkc , where 
+
+ρc = tanh( θc) is learned. The tanh parameterization en-sures |ρc| < 1, so farther relations decrease in magnitude; different channels can therefore emphasize different ances-tral ranges. Concatenating all channels gives rv ∈ R2CL ,with 2CL = dmodel .For token i, the structural encoding is added to the token and sequential position embeddings as h(0)  
+
+> i
+
+= ei +qi +rv(i),where v(i) is its corresponding tree node. Thus, the en-coder retains SNIP’s sequential representation while receiv-ing an explicit description of each token’s tree location. Full construction and initialization details are provided in Ap-pendix B. This modification changes what the symbolic en-coder can represent but introduces no additional training supervision. 
+
+4.2 Fine-Grained Subtree Alignment 
+
+Tree-structural positions make subexpressions identifiable to the encoder, but identifiability is not the same as grounding: nothing in SNIP’s original objective requires the encoder to use this structure, since supervision is still applied only after pooling the complete expression. We close this gap directly, by supervising sampled subtrees with the numerical behav-ior they compute. This gives the encoder training signal for exactly the properties identified in Section 3.2: component grounding, by tying a subtree’s representation to what it com-putes, and context-dependent contribution, by representing the same subtree both within its parent and on its own. For each training expression fi evaluated on inputs Xi,we sample a non-trivial subtree si0 and generate valid per-turbations si1, . . . , s iK . Each perturbation applies one of the training-time edits in Table 2 while leaving the rest of the sub-tree unchanged. We write fik = fi[si0 ← sik ] for the parent expression containing the original or perturbed subtree, and evaluate all variants on the same inputs Xi.For each sik , we construct a contextual symbolic repre-sentation cik = pool(enc S (fik )[span( sik )]) , a standalone symbolic representation oik = pool(enc S (sik )) , and a nu-merical representation pik = enc V (Xi, s ik (Xi)) . Thus, cik 
+
+captures the subtree within its parent, oik captures it indepen-dently, and pik captures the behavior it computes (Figure 1). The local objective aligns each subtree behavior pik with two symbolic views: its contextual representation cik within the parent expression and its standalone representation oik .Original and perturbed subtrees are treated symmetrically, so each perturbation is both a hard alternative to the original and a positive pair for its own numerical behavior. Let C,
+
+O, and P collect these representations over the batch. The local objective is Llocal = Cτs (C, P ) + Cτs (O, P ), where 
+
+Cτ denotes the bidirectional contrastive loss and τs is the subtree-level temperature:                  
+
+> Cτ(A, B ) = −12M
+> MX
+> i=1
+> "
+> log exp( a⊤
+> ibi/τ )
+> PMj=1 exp( a⊤
+> ibj/τ ) + log exp( b⊤
+> iai/τ )
+> PMj=1 exp( b⊤
+> iaj/τ )
+> #
+
+(1) This grounds each subtree in both what it computes and how it is represented within its parent. Perturbation and objective details are provided in Appendices G and C. 
+
+4.3 Complete-Expression Alignment 
+
+Subtree-level supervision constrains the modified compo-nent, but does not directly require the pooled parent repre-sentation to capture its effect on the complete function. For each original or perturbed parent fik , we therefore form a symbolic representation gSik = pool(enc S (fik )) and a nu-merical representation gVik = enc V (Xi, f ik (Xi)) .Let GS and GV collect these complete-expression pairs over the batch. We define L+global = Cτg (GS , G V ), where τg
+
+is the complete-expression temperature. The superscript +
+
+indicates that SNIP’s original global objective is expanded with perturbed parent-expression pairs, so each local edit also supervises how its numerical effect is represented after pooling the complete expression (see Figure 1). The final objective combines both granularities: Lfull =
+
+L+global + Llocal . Tree PE makes compositional structure available, the local objective grounds individual subtrees and their perturbations, and the expanded global objective propagates these distinctions to complete-expression repre-sentations. 
+
+Architecture and training. SNIP++ does not modify SNIP’s numerical encoder, tokenizer, or pooling operation. Both the symbolic and numerical encoders are Transformers with the same architecture as SNIP’s; we refer to Meidani et al. (2024) for full architectural detail. Numerical inputs are tokenized using the same sign–mantissa–exponent encoding as SNIP, adapted from Charton (2022). The only architec-tural addition is the tree-structural positional encoding of Section 4.1, which introduces a small number of additional parameters θc and otherwise leaves the encoders unchanged. Training proceeds in a single stage: for each batch, we sam-ple expressions, a subtree and its perturbations per expres-sion, and compute the contextual, standalone, and complete-expression representations described above, all produced by the same two encoders. Lfull is optimized jointly by gradient descent. At inference, the encoders are used exactly as in SNIP, and all evaluations in Section 5 use frozen encoder representations. 
+
+## 5 Experimental Evaluation 
+
+We evaluate the learned symbolic–numerical alignment di-rectly using frozen encoder representations and cosine simi-larity. This isolates the shared representation from the induc-tive biases and errors of any particular decoder or symbolic-search procedure, allowing improvements to be attributed directly to our method. Because this alignment underlies candidate comparison, retrieval, search guidance, and down-stream generation, its quality provides a common foundation for a broad range of symbolic regression systems. Our evaluation proceeds from global correspondence to increasingly fine-grained functional structure. We first mea-sure global symbolic–numerical alignment , testing whether complete expressions and their numerical behaviors identify one another among 100 ,000 held-out expression–behavior pairs. We then evaluate fine-grained symbolic discrimina-tion , testing whether the shared embedding space separates closely related symbolic variants according to their numer-ical consequences. We first test generalization to external expression distributions and use controlled probes to deter-mine whether the representations track functional differences while remaining invariant to equivalent symbolic forms. We then use a cumulative ablation to isolate the contribution of each proposed component. 5.1 Experimental Setup 
+
+Data and comparisons. For an expression f , we sample inputs X and define its numerical view as Df = ( X, f (X)) .Unless stated otherwise, evaluation expressions are sampled independently from the SNIP generator using random seeds not used during training, and all symbolic variants of an expression are evaluated on the same inputs. We compare SNIP++ with a SNIP baseline trained under identical con-ditions, and use the component analysis to trace how the successive changes from SNIP to SNIP++ affect the learned alignment. Model architecture, optimization, training, and evaluation details are provided in Appendix H. 
+
+Metrics. We evaluate global symbolic–numerical align-ment in both the f → y and y → f directions using Recall@10 and nDCG@10, and measure the modality gap as the Eu-clidean distance between the centroids of the ℓ2-normalized symbolic and numerical embeddings. Unless stated other-wise, 95% confidence intervals are obtained by bootstrapping evaluation expressions. 
+
+5.2 Global Symbolic–Numerical Alignment 
+
+We begin by evaluating global correspondence at the level of complete expressions. For each of the 100 ,000 held-out expression–behavior pairs (f, D f ), we use cosine similarity in the shared embedding space to rank all candidates from the opposite modality. In the f → y direction, the symbolic rep-resentation of an expression must identify its corresponding numerical behavior; in the y → f direction, the numerical representation must identify the expression that generated it. The latter direction is particularly relevant to the inverse problem underlying symbolic regression, where numerical observations are given and a corresponding symbolic expres-sion must be identified (La Cava et al. 2021; Koza 1994). Table 1 shows that SNIP++ substantially improves global symbolic–numerical alignment in both directions. nDCG@10 increases from 47 .8% to 87 .3% for f → y and from 31 .3% to 82 .6% for y → f , while Recall@10 follows the same trend. The alignment also becomes more balanced: the nDCG@10 gap between the two directions decreases from 16 .5 to 4.7 points. Figure 2 shows the same geometric improvement: SNIP separates symbolic and numerical rep-resentations, whereas SNIP++ substantially interleaves them and reduces the centroid distance from approximately 1.2 to 
+
+0.3. Together, these results show that SNIP++ establishes a more accurate and balanced correspondence between com-plete expressions and their numerical behaviors in the shared embedding space. 
+
+5.3 Fine-Grained Symbolic Discrimination 
+
+Global symbolic–numerical alignment tests whether the model can associate an expression with its numerical behav-ior among a large set of independently sampled expressions. It does not, however, establish whether the shared embedding space can distinguish closely related symbolic variants ac-cording to their numerical consequences. This fine-grained sensitivity is important in symbolic regression, where can-didate expressions often differ by small symbolic changes                  
+
+> f→yy→f
+> Model R@10 ↑nDCG@10 ↑R@10 ↑nDCG@10 ↑
+> SNIP 70.2 47.8 53.2 31.3
+> SNIP++ (ours) 97.2 87.3 94.0 82.6
+
+Table 1: Global symbolic–numerical alignment. Re-call@10 and nDCG@10 in both alignment directions over 
+
+100 ,000 held-out expression–behavior pairs. SNIP++ sub-stantially improves both directions, with the largest gains for 
+
+y → f . All values are percentages. SNIP SNIP++  
+
+> fy
+
+Figure 2: Joint symbolic–numerical embedding geometry. 
+
+PCA projections of symbolic ( f ) and numerical ( y) repre-sentations for 800 held-out expression–behavior pairs. SNIP separates the two modalities, whereas SNIP++ substantially interleaves them and reduces the modality gap from approx-imately 1.2 to 0.3.that can induce large behavioral differences (Krawiec 2011; Moraglio and Krawiec 2015). To test fine-grained alignment, we extend the protocol of Léger, Meidani, and Gagné (2026) and form a local candi-date set around each held-out expression. Starting from an expression f , we generate controlled symbolic variants { efj }
+
+using the six edit types in Table 2. We then evaluate the original and all variants on the same inputs X, producing the paired behaviors f (X) and { efj (X)}. The model must distinguish the correct expression–behavior pairing from the nearby alternatives: in the f → y direction, f must identify 
+
+f (X) among the perturbed behaviors, while in the y → f di-rection, f (X) must identify f among the perturbed symbolic forms. We apply this protocol to 128 held-out expressions, gener-ating valid variants across all six edit types. Variants that are invalid, non-finite, or numerically indistinguishable from the original are discarded (details in Appendix D). We report the percentile rank of the correct pairing, defined as the fraction of perturbed alternatives assigned a lower cosine similarity. A value of 1 indicates perfect discrimination, while .5 is expected under random ranking. Figure 3 shows that SNIP++ more reliably distinguishes closely related expression–behavior pairs in both alignment directions. Averaged across edit types, SNIP++ reaches per-centile ranks of .73 for f → y and .79 for y → f , compared with .48 and .69 for SNIP. Thus, the gains observed in global alignment carry over to the more fine-grained setting of dis-tinguishing nearby candidate expressions. Importantly, the improvement is not confined to edit types represented dur-Edit type Example Seen in training                                   
+
+> Unary swap sin( a)→cos( a)
+> Variable substitution x0→x1
+> Binary swap a+b→a×b
+> Held out
+> Tree reshaping (a−b)−c→a−(b−c)
+> Operand reordering a−b→b−a
+> Full-subtree rewrite s→es
+
+Table 2: Controlled symbolic edits. The first three edit types are used during training; the final three test generalization to unseen transformations. All evaluation expressions and individual edits are held out. 0.3 0.5 0.7 0.9     
+
+> Unary swap Var. substitution Binary swap
+> Seen avg.
+> Tree reshape Operand order Full rewrite
+> Held-out avg.
+> f→y
+> 0.3 0.5 0.7 0.9
+> y→f
+> Percentile rank
+> SNIP SNIP++
+
+Figure 3: Fine-grained symbolic discrimination. Percentile rank of the correct complete-expression pairing across six edit types and both alignment directions. The red dashed line marks chance ( .5); shaded rows average the training-represented and held-out edits. ing training. It persists across the three held-out transforma-tion types, including tree reshaping and operand reordering, which modify structural relationships while preserving the constituent symbols. Overall, SNIP++ obtains a higher point estimate in 11 of the 12 edit-type–direction settings; the sole reversal occurs for y → f under full-subtree rewriting. In Appendix E, we also apply the same evaluation to subtrees represented within their parent expressions, directly testing the local representations targeted by our objective. 
+
+5.4 Out-of-Domain Generalization 
+
+We next test whether the learned alignment transfers be-yond expressions sampled from the training generator. We evaluate on three external symbolic-regression corpora — Feynman, Classic, Strogatz (La Cava et al. 2021; Udrescu and Tegmark 2020; White et al. 2013; Strogatz 1994), as well as their pooled union, using two protocols that mirror our main evaluation. First, following Section 5.2, we pool all expression–behavior pairs within each corpus and test whether symbolic and numerical queries retrieve their true cross-modal counterparts. Second, we repeat the expression-level fine-grained discrimination analysis from Section 5.3, where each query is instead ranked only against the small set of controlled perturbations of its own matching expression. Figure 4 shows consistent transfer under both protocols. Feynman Classic Strogatz Pooled 0.3 0.4 0.5 0.6 0.7 0.8 0.9          
+
+> Percentile rank  (a)
+> Feynman Classic Strogatz Pooled
+> (b)
+> f→yy→fSNIP SNIP++
+
+Figure 4: Out-of-domain generalization. Percentile rank of the correct pairing on Feynman, Classic, Strogatz and Pooled over all three for (a) within-corpus global symbolic– numerical alignment and (b) expression-level fine-grained discrimination, evaluated in both alignment directions. The dashed line marks chance ( .5). 0.5 1 2 3 4 5                   
+
+> Frequency coefficient c
+> 0.00 0.25 0.50 0.75 1.00
+> Cosine to sin(0.5 x) anchor (a)
+> Preserves behavior Changes behavior 0.6 0.7 0.8 0.9 1.0
+> Pair cosine
+> (b)
+> 0.5 0.6 0.7 0.8 0.9 1.0
+> Percentile rank
+> Binomial Cube Diff. squares Distribution Double angle Factoring Log square
+> Mean
+> (c)
+> 0.0 0.2 0.4 0.6 0.8
+> Cross-modal cosine
+> sin x
+> cos xex
+> log(1 + x)1/(1 − x)1/(1 + x)1/(1 + x2)
+> √1 + xe−x2
+> Mean
+> (d)
+> SNIP SNIP++
+
+Figure 5: Functional structure in the learned space. (a) continuous functional change, (b) behavior-preserving ver-sus behavior-changing edits, (c) equivalent rewritings versus near-miss alternatives, and (d) cross-modal similarity to Tay-lor approximations. For global, corpus-wide alignment, SNIP++ reaches an av-erage percentile rank of .79 , compared with .47 for SNIP, and remains reliably above chance in every corpus and di-rection; SNIP does not in any. For fine-grained, expression-level discrimination, SNIP++ reaches .69 , compared with 
+
+.48 , and is likewise reliably above chance across all corpora, in both directions. Thus, the improved alignment transfers both globally and locally, to nearby symbolic variants of the same expression. 
+
+5.5 Functional Structure in the Learned Space 
+
+The preceding evaluations show that SNIP++ improves both global symbolic–numerical alignment and fine-grained dis-crimination. We next ask whether these gains produce a functionally meaningful geometry: similar behavior should induce proximity despite symbolic differences, while sim-ilar symbolic forms should separate when their behaviors diverge. We examine this geometry through four controlled probes using frozen encoders. All embeddings are pooled where applicable, ℓ2-normalized, and compared using cosine similarity. Figures 5(a)–(c) compare pairs of symbolic ex-pression embeddings, whereas Figure 5(d) compares numer-S0 S1 S2 S3 S4 S5          
+
+> 20 40 60 80
+> nDCG@10 (%)  (a)
+> S0 S1 S2 S3 S4 S5
+> 0.0 0.3 0.6 0.9 1.2
+> Modality gap  (b)
+> S0 S1 S2 S3 S4 S5
+> 0.5 0.6 0.7 0.8
+> Percentile rank  (c)
+> S0 S1 S2 S3 S4 S5
+> 0.5 0.6 0.7 0.8 0.9
+> Percentile rank  (d)
+> S0 : SNIP |S1 : + Tree PE |S2 : + Contextual subtree alignment
+> S3 : + Standalone subtree alignment |S4 : + Edited subtree pairs |S5 : + Edited parent pairs
+> f→yy→f
+
+Figure 6: Cumulative ablation from SNIP to SNIP++. 
+
+(A) global symbolic–numerical alignment, measured by nDCG@10 in both directions; (B) modality gap, measured as the distance between the symbolic and numerical embedding centroids; (C) fine-grained expression-level discrimination; and (D) fine-grained subtree-level discrimination, both mea-sured by percentile rank of the correct pairing. The largest gains come from adding fine-grained subtree supervision, while the later stages further improve balance across direc-tions and recover the full SNIP++ performance. ical and symbolic embeddings. Continuous variation (Fig-ure 5(a)) measures how symbolic similarity changes within the family sin( cx ) as c ∈ [0 .5, 5] moves away from the an-chor c = 0 .5. Edit consequences (Figure 5(b)) compares each expression with an edited version and groups pairs by whether the edit preserves behavior, as in a + b → b + a,or changes it, as in a − b → b − a. Equivalent rewrit-ings (Figure 5(c)) rank a correct algebraic rewrite against ap-proximately 35 minimally edited but behaviorally incorrect alternatives across seven identity families. Finally, Symbolic approximations (Figure 5(d)) measure the cross-modal sim-ilarity between the numerical behavior of nine closed-form functions and their Taylor truncations of orders K = 2 –4.Figure 5 shows a consistent shift toward functional geom-etry. Under continuous variation , SNIP still assigns sim-ilarity .94 to sin(5 x) and sin(0 .5x), whereas SNIP++ de-creases smoothly to .06 . For edit consequences , SNIP treats behavior-preserving and behavior-changing edits similarly, while SNIP++ keeps the former close and separates the lat-ter. On equivalent rewritings , SNIP++ raises the mean per-centile rank from .72 to .90 and outperforms SNIP on six of seven identity families. For symbolic approximations ,SNIP++ yields higher similarity for all nine functions and increases the overall mean from .24 to .45 . Together, these results show that SNIP++ separates superficially similar ex-pressions with different behaviors, while preserving proxim-ity across equivalent and approximate forms. 
+
+5.6 Cumulative Component Analysis 
+
+We trace the architectural and objective changes that turn SNIP into SNIP++ and close the granularity gap through six cumulative variants, each building on the previous one: 
+
+• S0: SNIP, the original baseline. 
+
+• S1: +tree-structural positional encoding , giving the symbolic encoder the capacity to represent expression structure (Section 4.1), without any new supervision. 
+
+• S2: +contextual subtree alignment : a subtree represen-tation, pooled from within its parent expression, is aligned with the numerical behavior it computes. Other subtrees’ behaviors in the batch serve as easy negatives, and be-haviors from training-time perturbations serve as hard negatives. 
+
+• S3: +standalone subtree alignment : the same numerical behavior is also aligned with the subtree encoded inde-pendently of its parent, giving each subtree behavior two symbolic anchors. 
+
+• S4: +symmetric perturbation supervision : each per-turbed subtree is itself encoded symbolically, contextu-ally and standalone, and aligned with its own numerical behavior, rather than serving only as a negative. 
+
+• S5: +complete-expression propagation : each subtree perturbation is spliced back into its parent expression, and the resulting symbolic–numerical pair is added to the global objective, yielding the full SNIP++. We evaluate each stage using global alignment (Sec. 5.2), modality gap, and expression-level fine-grained discrimina-tion (Sec. 5.3). We also repeat the fine-grained analysis at the subtree level, matching subtree spans pooled from the parent encoding to their numerical behaviors (App. E). Figure 6 reveals a clear progression. Tree PE alone changes little, showing that structural information is not sufficient without behavioral supervision. Contextual subtree align-ment ( S2 ) produces the largest jump in fine-grained discrim-ination, especially at the directly supervised subtree level, but leaves a substantial directional imbalance. Standalone sub-tree alignment ( S3 ) restores reverse-direction global align-ment, while symmetric supervision of perturbed subtrees (S4 ) further balances the two directions. Extending this su-pervision to perturbed parent expressions ( S5 ) carries the gains to expression-level representations. The full SNIP++ is best or near-best across all measures and reduces the modal-ity gap from approximately 1.2 to 0.3.
+
+## 6 Conclusion and Future Work 
+
+We introduced SNIP++, a fine-grained symbolic–numerical alignment method combining tree-structural positional en-coding with multi-granularity behavioral supervision. It yields substantial gains in global alignment and fine-grained discrimination, markedly narrows the modality gap, and transfers to external SR corpora. Our ablation clarifies these gains. Exposing expression-tree structure alone is insufficient; the largest improvements arise when subtrees are aligned with the behaviors they com-pute. Encoding each subtree both within its parent and in-dependently is especially helpful for numerical-to-symbolic alignment, where multiple symbolic forms can express the same behavior. This paper focuses on the representation itself rather than embedding SNIP++ inside a complete symbolic-regression system. We therefore leave it to future work to test how these gains affect end-to-end generation and search. Promising di-rections include using the subtree representations to guide symbolic search, adapting the encoders for generative SR, and developing a reference-free score for comparing candi-date expressions against observed numerical behavior. References 
+
+Allamanis, M.; Chanthirasegaran, P.; Kohli, P.; and Sutton, C. 2017. Learning Continuous Semantic Representations of Symbolic Expressions. In International Conference on Machine Learning (ICML) , 80–88. Biggio, L.; Bendinelli, T.; Neitz, A.; Lucchi, A.; and Paras-candolo, G. 2021. Neural Symbolic Regression that Scales. In International Conference on Machine Learning (ICML) ,936–945. Charton, F. 2022. Linear Algebra with Transformers. Trans-actions on Machine Learning Research . ArXiv:2112.01898. Jing, D.; He, X.; Luo, Y.; Fei, N.; Yang, G.; Wei, W.; Zhao, H.; and Lu, Z. 2024. Fineclip: Self-distilled region-based clip for better fine-grained understanding. Advances in Neural Information Processing Systems , 37: 27896–27918. Kamienny, P.-A.; d’Ascoli, S.; Lample, G.; and Charton, F. 2022. End-to-end Symbolic Regression with Transform-ers. In Advances in Neural Information Processing Systems (NeurIPS) , volume 35, 10269–10281. Kim, K.; Shan, Y.; Nguyen, X. H.; and McKay, R. I. 2014. Probabilistic model building in genetic programming: a crit-ical review. Genetic Programming and Evolvable Machines ,15(2): 115–167. Koza, J. R. 1994. Genetic programming as a means for programming computers by natural selection. Statistics and computing , 4(2): 87–112. Krawiec, K. 2011. Learnable embeddings of program spaces. In European Conference on Genetic Programming , 166–177. Springer. Krawiec, K.; and Kossiński, D. 2022. Compositional ge-netic programming for symbolic regression. In Proceedings of the Genetic and Evolutionary Computation Conference Companion , 570–573. Krawiec, K.; and Pawlak, T. 2013. Approximating geomet-ric crossover by semantic backpropagation. In Proceedings of the 15th annual conference on Genetic and evolutionary computation , 941–948. La Cava, W.; Orzechowski, P.; Burlacu, B.; de França, F. O.; Virgolin, M.; Jin, Y.; Kommenda, M.; and Moore, J. H. 2021. Contemporary Symbolic Regression Methods and their Rel-ative Performance. In Advances in Neural Information Pro-cessing Systems (NeurIPS), Datasets and Benchmarks Track .Léger, B.; Meidani, K.; and Gagné, C. 2026. Multi-Modal Learning meets Genetic Programming: Analyzing Align-ment in Latent Space Optimization. In Parallel Problem Solving from Nature (PPSN) .Lewis, M.; Nayak, N.; Yu, P.; Merullo, J.; Yu, Q.; Bach, S.; and Pavlick, E. 2024. Does clip bind concepts? prob-ing compositionality in large image models. In Findings of the Association for Computational Linguistics: EACL 2024 ,1487–1500. Li, Q.; Hu, Y.; Liu, J.; and Chen, Y. 2026. GenSR: Sym-bolic regression based on equation generative space. In The Fourteenth International Conference on Learning Represen-tations .Li, W.; Li, W.; Sun, L.; Wu, M.; Yu, L.; Liu, J.; Li, Y.; and Tian, S. 2022. Transformer-based model for symbolic regression via joint supervised learning. In The eleventh international conference on learning representations .Li, Y.; Liu, J.; Wu, M.; Yu, L.; Li, W.; Ning, X.; Li, W.; Hao, M.; Deng, Y.; and Wei, S. 2025. MMSR: symbolic regres-sion is a multi-modal information fusion task. Information Fusion , 114: 102681. Liang, W.; Zhang, Y.; Kwon, Y.; Yeung, S.; and Zou, J. 2022. Mind the gap: understanding the modality gap in multi-modal contrastive representation learning. In Proceedings of the 36th International Conference on Neural Information Processing Systems , 17612–17625. Liskowski, P.; Krawiec, K.; Toklu, N. E.; and Swan, J. 2020. Program synthesis as latent continuous optimization: Evolu-tionary search in neural embeddings. In Proceedings of the 2020 Genetic and Evolutionary Computation Conference ,359–367. Meidani, K.; Shojaee, P.; Reddy, C. K.; and Barati Farimani, A. 2024. SNIP: Bridging Mathematical Symbolic and Nu-meric Realms with Unified Pre-training. In International Conference on Learning Representations (ICLR) .Moraglio, A.; and Krawiec, K. 2015. Semantic genetic pro-gramming. In Proceedings of the Companion Publication of the 2015 Annual Conference on Genetic and Evolutionary Computation , 603–627. Peng, H.; Li, G.; Wang, W.; Zhao, Y.; and Jin, Z. 2021. Integrating Tree Path in Transformer for Code Representa-tion. In Advances in Neural Information Processing Systems (NeurIPS) , volume 34. Radford, A.; Kim, J. W.; Hallacy, C.; Ramesh, A.; Goh, G.; Agarwal, S.; Sastry, G.; Askell, A.; Mishkin, P.; Clark, J.; et al. 2021. Learning Transferable Visual Models From Natural Language Supervision. In International Conference on Machine Learning (ICML) , 8748–8763. Shiv, V. L.; and Quirk, C. 2019. Novel Positional Encodings to Enable Tree-Based Transformers. In Advances in Neural Information Processing Systems (NeurIPS) , volume 32. Shojaee, P.; Meidani, K.; Barati Farimani, A.; and Reddy, C. K. 2023. Transformer-based Planning for Symbolic Re-gression. In Advances in Neural Information Processing Systems (NeurIPS) , volume 36. Strogatz, S. H. 1994. Nonlinear Dynamics and Chaos: With Applications to Physics, Biology, Chemistry, and Engineer-ing . Perseus Books. Udrescu, S.-M.; and Tegmark, M. 2020. AI Feynman: A Physics-Inspired Method for Symbolic Regression. Science Advances , 6(16): eaay2631. Vastl, M.; Kulhánek, J.; Kubalík, J.; Derner, E.; and Babuška, R. 2024. Symformer: End-to-end symbolic regression using transformer-based architecture. IEEE Access , 12: 37840– 37849. Voigt, H.; Kahlmeyer, P.; Lawonn, K.; Habeck, M.; and Giesen, J. 2025. Analyzing Generalization in Pre-trained Symbolic Regression. arXiv preprint arXiv:2509.19849 .Wang, T.; Lin, K.; Li, L.; Lin, C.-C.; Yang, Z.; Zhang, H.; Liu, Z.; and Wang, L. 2023. Equivariant similarity for vision-language foundation models. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,11998–12008. White, D. R.; McDermott, J.; Castelli, M.; Manzoni, L.; Goldman, B. W.; Kronberger, G.; Jaśkowski, W.; O’Reilly, U.-M.; and Luke, S. 2013. Better GP benchmarks: commu-nity survey results and proposals. Genetic programming and evolvable machines , 14(1): 3–29. Xie, C.; Wang, B.; Kong, F.; Li, J.; Liang, D.; Zhang, G.; Leng, D.; and Yin, Y. 2025. FG-CLIP: Fine-Grained Vi-sual and Textual Alignment. In International Conference on Machine Learning , 68777–68793. PMLR. Yu, Z.; Ding, J.; Li, Y.; and Jin, D. 2025. Symbolic re-gression via MDLformer-guided search: from minimizing prediction error to minimizing description length. In Inter-national Conference on Learning Representations , volume 2025, 65306–65333. Zhang, H.; Chen, Q.; Xue, B.; Banzhaf, W.; and Zhang, M. 2025. RAG-SR: Retrieval-augmented generation for neural symbolic regression. In International Conference on Learn-ing Representations , volume 2025, 9176–9204. Zheng, H.; Wang, S.; Gangwar, N.; and Kani, N. 2025. E-Gen: Leveraging E-Graphs to Improve Continuous Repre-sentations of Symbolic Expressions. In Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Lan-guage Technologies (Volume 1: Long Papers) , 11772–11788. Zhong, Y.; Yang, J.; Zhang, P.; Li, C.; Codella, N.; Li, L. H.; Zhou, L.; Dai, X.; Yuan, L.; Li, J.; and Gao, J. 2022. Re-gionCLIP: Region-based Language-Image Pretraining. In 
+
+IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 16793–16803. A PCA Geometry and Variance Spectrum 
+
+Figure 2 visualizes the joint symbolic–numerical geometry of SNIP and SNIP++. For both models, we use the same 800 
+
+held-out expression–behavior pairs: the first 800 examples from the deterministic held-out generator stream used for the 100 ,000 -pair global retrieval evaluation in Table 1. The evaluation set is therefore identical across models. For each model separately, we concatenate the 800 sym-bolic and 800 numerical embeddings into a 1600 × 512 ma-trix. Each embedding is individually ℓ2-normalized, after which the joint matrix is mean-centered and PCA is fit using singular-value decomposition. We apply no feature standard-ization or whitening, and all 800 pairs are displayed in each panel. For SNIP, the first principal component explains 35 .0% 
+
+of the variance and the second explains 6.6% , for a total of 41 .6% . The dominant first component closely follows the separation between the symbolic and numerical modalities. For SNIP++, the first two components explain 6.5% and 
+
+5.9% , respectively, for a total of 12 .4% . Their compara-ble contributions show that modality separation no longer dominates the leading direction and that the geometry is dis-tributed more evenly across dimensions. The complete variance spectrum reinforces this interpre-tation. SNIP reaches 50% cumulative variance in four di-mensions, reflecting its heavy leading components, whereas SNIP++ uses 11 . The models require similar dimensionality to capture 90% and 95% of the variance: 26 and 35 dimen-sions for SNIP, compared with 30 and 37 for SNIP++. At 
+
+99% , however, SNIP++ requires only 48 dimensions, com-pared with 91 for SNIP. Thus, SNIP++ has both a flatter leading spectrum and a shorter tail: its variance is less domi-nated by a modality-separating axis while remaining compact overall. The PCA visualization complements the quantitative mea-surements in the original embedding space. As reported in Table 1, SNIP++ substantially improves bidirectional re-trieval, while the distance between the symbolic and nu-merical centroids decreases from 1.18 for SNIP to 0.31 for SNIP++. 
+
+## B Tree-Structural Positional Encoding 
+
+This appendix details the tree-structural positional encoding introduced in Section 4.1. 
+
+B.1 Overview 
+
+SNIP represents an expression using a prefix token sequence and adds a learned sequential positional embedding to each token. We retain this representation and augment each sym-bolic token with a structural vector derived from the position of its corresponding node in the expression tree. Let v(i) denote the tree node associated with token i. The input to the symbolic Transformer is 
+
+h(0)  
+
+> i
+
+= ei + qi + rv(i), (2) where ei is the token embedding, qi is SNIP’s sequential po-sitional embedding, and rv(i) is the tree-structural positional encoding. The structural vector has the same dimension as the token representation: 
+
+rv ∈ Rdmodel . (3) We construct it using C channels, each of which represents the nearest L parent–child relations along the path from node 
+
+v toward the root. Each relation is represented by two coor-dinates, corresponding to the first and second child slots. Consequently, we choose 
+
+2CL = dmodel . (4) In all experiments, we use L = 64 and C = 4 channels. 
+
+B.2 Constructing the Structural Vector 
+
+We construct rv in three steps: identify the branch relations along the node-to-root path, weight them within each decay channel, and concatenate the resulting channel representa-tions. 
+
+1. Node-to-root branch relations. We number the chil-dren of each node according to their argument position. The first child is assigned slot 1, the second child is assigned slot 
+
+2, and the single child of a unary operator is assigned slot 1.For a node v at depth d, let 
+
+a(v) = ( a1, . . . , a d), aj ∈ { 1, 2}, (5) denote the sequence of child slots encountered when travers-ing from the root to v. The root has the empty path. We read this path in the reverse direction, beginning with the relation between v and its parent. Child slots are repre-sented using the fixed basis 
+
+b(1) = (1 , 0) , b(2) = (0 , 1) , b(∅) = (0 , 0) , (6) where ∅ represents padding. The relation k levels above node v is 
+
+sk(v) = 
+
+b(ad−k), k < min( d, L ),b(∅), otherwise , k = 0 , . . . , L −1.
+
+(7) Thus, s0(v) describes whether v is the first or second child of its parent, s1(v) describes the corresponding relation of its parent, and so forth. If the path is longer than L, only the nearest L relations are retained. If it is shorter than L,the remaining entries are padded with zero vectors. The root therefore receives only zero relations. 
+
+2. Decay within each channel. Each channel c has one learned decay parameter 
+
+ρc = tanh( θc), ρc ∈ (−1, 1) . (8) We initialize 
+
+θc = artanh(0 .5) , (9) so that ρc = 0 .5 at the beginning of training. Within channel c, the relation k levels above the node is weighted by ρkc . The channel representation is therefore 
+
+r(c) 
+
+> v
+
+= s0(v); ρcs1(v); . . . ; ρL−1 
+
+> c
+
+sL−1(v) ∈ R2L. (10) The nearest relation receives weight one, while relations far-ther from the node receive progressively decayed weights. Different channels can learn different effective structural ranges: smaller |ρc| values emphasize nearby parent–child relations, while values closer to one preserve information from more distant ancestors. f (x0, x 1) = sin( x0 + 2 .1 x1)sin +                                  
+
+> x0×
+> 2.1x1
+> 11212Node Root-to-node path Node-to-root slots
+> sin () (∅,∅, . . . )+(1) (1 ,∅, . . . )
+> x0(1 ,1) (1 ,1,∅, . . . )
+> ×(1 ,2) (2 ,1,∅, . . . )2.1(1 ,2,1) (1 ,2,1,∅, . . . )
+> x1(1 ,2,2) (2 ,2,1,∅, . . . )
+
+Table 3: Expression tree and corresponding root-to-node and node-to-root child-slot paths for f (x0, x 1) = sin( x0 +2.1 x1).
+
+3. Channel concatenation. The final structural vector is obtained by concatenating the C channel representations: 
+
+rv =
+
+h
+
+r(1)  
+
+> v
+
+; . . . ; r(C)
+
+> v
+
+i
+
+∈ R2CL = Rdmodel . (11) The dimensions are ordered first by channel and then, within each channel, from the nearest relation to the farthest. Each relation stores the first-child coordinate followed by the second-child coordinate. The learned parameters {θc}Cc=1 are the only additional parameters introduced by Tree PE. No learned projection, gate, or additional scaling is applied before adding rv to the token representation. 
+
+B.3 Token Assignment 
+
+Each token in the prefix serialization is associated with the expression-tree node it represents and receives that node’s structural vector. A node may produce multiple tokenizer pieces, particularly when representing a numerical constant. All pieces belonging to the same node receive the same structural encoding. Beginning-of-sequence, end-of-sequence, and padding to-kens receive the zero structural vector. Tree PE is applied only to the symbolic encoder; the numerical encoder, Transformer layers, attention mechanism, normalization, and pooling op-eration remain unchanged from SNIP. 
+
+B.4 Worked Example 
+
+Consider 
+
+f (x0, x 1) = sin( x0 + 2 .1 x1) . (12) The root-to-node paths and their nearest-first ordering are shown in Table 3. For example, x1 has root-to-node path (1 , 2, 2) : the addi-tion is the first child of sin , the multiplication is the second child of the addition, and x1 is the second child of the multi-plication. Reading these relations from the node toward the root gives (2 , 2, 1) and hence 
+
+s0(x1) = (0 , 1) , s1(x1) = (0 , 1) , s2(x1) = (1 , 0) .
+
+(13) At initialization, where ρc = 0 .5, the representation of x1
+
+in one channel is 
+
+r(c) 
+
+> x1
+
+= [(0 , 1); (0 , 0.5); (0 .25 , 0); (0 , 0); . . . ] . (14) Original expression tree                        
+
+> fi= sin( x0+ 2 .1x1)Perturbed subtree variants Resulting parent expressions
+> fik =fi[si0←sik ]
+> sin +
+> x0×
+> 2.1x1
+> selected subtree si0
+> = 2 .1x1
+> si1+2.1x1
+> fi1= sin( x0+ 2 .1 + x1)
+> si2÷
+> 2.1x1
+> fi2= sin( x0+ 2 .1/x 1)
+> si3×
+> 2.1x0
+> fi3= sin( x0+ 2 .1x0)
+
+Figure 7: Construction of perturbed training examples. Given a parent expression fi, we select a subtree si0 and construct variants si1, . . . , s iK i . Each variant is inserted at the original subtree location to obtain fik = fi[si0 ← sik ]. The parent expression and all of its variants are evaluated on the same input set Xi. Colored nodes indicate the modified subtree. The first pair represents the position of x1 below the multi-plication node, the second represents the position of the mul-tiplication below the addition, and the third represents the position of the addition below sin . Concatenating this rep-resentation across all C channels produces the final dmodel -dimensional vector rx1 .If the constant 2.1 is split into multiple tokenizer pieces, every piece receives the structural vector associated with the node path (1 , 2, 1) .
+
+## C Detailed Contrastive Objectives 
+
+Sections 4.2 and 4.3 introduce the subtree-level and complete-expression objectives used by SNIP++. This ap-pendix defines the representations and contrastive losses in detail, and then describes the cumulative objectives evaluated in the component analysis of Section 5.6. 
+
+C.1 Training Examples and Representations 
+
+For each training expression fi, let Xi denote its sampled in-put points. We select an original subtree si0 and construct Ki
+
+valid perturbed variants si1, . . . , s iK i . Replacing the original subtree with variant sik gives 
+
+fik = fi[si0 ← sik ], k = 0 , . . . , K i, (15) where fi0 = fi. The original expression and all of its variants are evaluated on the same inputs Xi. Figure 7 illustrates this construction: a subtree si0 is selected from the parent expression fi, modified to produce variants sik , and spliced back into the same location to form the corresponding parent expressions fik .For each original or perturbed subtree, we compute three representations: 
+
+cik = pool(enc S (fik )[span( sik )]) ,oik = pool(enc S (sik )) ,pik = enc V (Xi, s ik (Xi)) .
+
+(16) Here, cik is the contextual representation of the subtree within its parent, oik is its standalone symbolic representation, and 
+
+pik represents the numerical behavior computed by the sub-tree. We also compute complete-expression representations: 
+
+gSik = pool(enc S (fik )) ,gVik = enc V (Xi, f ik (Xi)) . (17) Collections marked with a subscript 0 contain only the original examples ( B is the batch size): 
+
+C0 = {ci0}Bi=1 , O0 = {oi0}Bi=1 , P0 = {pi0}Bi=1 ,GS 
+
+> 0
+
+= {gSi0}Bi=1 , GV 
+
+> 0
+
+= {gVi0}Bi=1 .
+
+(18) Collections marked with + contain both original and per-turbed examples: 
+
+C+ = {cik }i,k , O+ = {oik }i,k , P+ = {pik }i,k ,GS 
+
+> +
+
+= {gSik }i,k , GV 
+
+> +
+
+= {gVik }i,k . (19) All expanded collections use the same ordering over retained indices (i, k ), so representations with the same index form a matched pair. 
+
+C.2 Contrastive Loss 
+
+Let A = {am}Mm=1 and B = {bm}Mm=1 be paired collec-tions, ordered so that am and bm form a positive pair. We use the inner product as similarity. The one-direction InfoNCE loss is 
+
+I(A → B; τ ) = − 1
+
+M
+
+> M
+
+X
+
+> m=1
+
+log exp( a⊤
+
+> m
+
+bm/τ )
+
+PMn=1 exp( a⊤
+
+> m
+
+bn/τ ) . (20) The bidirectional contrastive loss averages the two re-trieval directions: 
+
+C(A, B ; τ ) = 12 [I(A → B; τ ) + I(B → A; τ )] . (21) 
+
+C.3 Complete-Expression and Subtree Objectives 
+
+Using the expanded collections, the complete-expression ob-jective is 
+
+L+global = C  GS
+
+> +
+
+, G V 
+
+> +
+
+; τg
+
+ . (22) The subtree objective aligns each numerical subtree rep-resentation with both of its symbolic views: 
+
+Llocal = C (C+, P +; τs) + C (O+, P +; τs) . (23) The full objective is 
+
+LSNIP++ = L+global + Llocal . (24) We use temperature τg = 1 for complete-expression align-ment and τs = 0 .1 for subtree alignment. 
+
+C.4 Cumulative Objectives 
+
+The component analysis in Section 5.6 evaluates six cumu-lative variants. Each stage retains the architecture and su-pervision introduced by the preceding stages. We denote the global complete-expression objective over the original train-ing pairs by 
+
+L0global = C  GS 
+
+> 0
+
+, G V 
+
+> 0
+
+; τg
+
+ , (25) where τg = 1 .
+
+S0: SNIP. The baseline uses SNIP’s original complete-expression contrastive objective: 
+
+LS0 = L0global . (26) 
+
+S1: Tree-structural positional encoding. S1 augments the symbolic encoder with the tree-structural positional en-coding of Appendix B. The objective is unchanged: 
+
+LS1 = L0global . (27) The distinction from S0 is therefore architectural rather than objective-level. 
+
+S2: Contextual subtree alignment. For each original con-textual subtree representation ci0, the matching numerical behavior pi0 is the positive example. Numerical behaviors from other expressions in the batch act as in-batch negatives, while the behaviors of perturbed subtrees from the same parent act as hard negatives. For each contextual anchor ci0, define the normalizing term 
+
+Zctx  
+
+> i
+
+=
+
+> B
+
+X
+
+> j=1
+
+exp  c⊤
+
+> i0
+
+pj0/τ s
+
+
+
++
+
+> Ki
+
+X
+
+> k=1
+
+exp  c⊤
+
+> i0
+
+pik /τ s
+
+ .
+
+(28) The symbolic-to-numerical contextual loss is then 
+
+IS→V 
+
+> ctx
+
+= − 1
+
+B
+
+> B
+
+X
+
+> i=1
+
+log exp  c⊤
+
+> i0
+
+pi0/τ s
+
+
+
+Zctx 
+
+> i
+
+. (29) At this stage, the perturbed subtrees are used only as nu-merical hard negatives and are not yet encoded as matched symbolic examples. The numerical-to-symbolic direction therefore uses only the original pairs: 
+
+IV →S 
+
+> ctx
+
+= − 1
+
+B
+
+> B
+
+X
+
+> i=1
+
+log exp  p⊤
+
+> i0
+
+ci0/τ s
+
+
+
+> B
+
+X
+
+> j=1
+
+exp  p⊤
+
+> i0
+
+cj0/τ s
+
+ . (30) The bidirectional contextual subtree loss is 
+
+L0ctx = 12
+
+IS→V 
+
+> ctx
+
++ IV →S
+
+> ctx
+
+ . (31) The S2 objective is 
+
+LS2 = L0global + L0ctx . (32) 
+
+S3: Standalone subtree alignment. S3 additionally en-codes each original subtree independently of its parent. The standalone loss mirrors the contextual loss from S2, replac-ing the contextual symbolic representation ci0 with the stan-dalone representation oi0.For each contextual anchor ci0, define the normalizing term 
+
+Zstand  
+
+> i
+
+=
+
+> B
+
+X
+
+> j=1
+
+exp  o⊤
+
+> i0
+
+pj0/τ s
+
+
+
++
+
+> Ki
+
+X
+
+> k=1
+
+exp  o⊤
+
+> i0
+
+pik /τ s
+
+ ,
+
+(33) The symbolic-to-numerical contextual loss is then 
+
+IS→V 
+
+> stand
+
+= − 1
+
+B
+
+> B
+
+X
+
+> i=1
+
+log exp  o⊤
+
+> i0
+
+pi0/τ s
+
+
+
+Zstand 
+
+> i
+
+. (34) The numerical-to-symbolic term uses the original matched pairs: 
+
+IV →S 
+
+> stand
+
+= − 1
+
+B
+
+> B
+
+X
+
+> i=1
+
+log exp  p⊤
+
+> i0
+
+oi0/τ s
+
+
+
+> B
+
+X
+
+> j=1
+
+exp  p⊤
+
+> i0
+
+oj0/τ s
+
+ . (35) The bidirectional standalone loss is 
+
+L0stand = 12
+
+IS→V 
+
+> stand
+
++ IV →S
+
+> stand
+
+ . (36) The cumulative S3 objective is 
+
+LS3 = L0global + L0ctx + L0stand . (37) 
+
+S4: Symmetric perturbed-subtree alignment. S4 addi-tionally encodes every retained perturbed subtree symboli-cally. For each original or perturbed index (i, k ), the con-textual representation cik and standalone representation oik 
+
+are paired with the corresponding numerical behavior pik .Thus, each perturbation becomes a positive example in both retrieval directions, rather than appearing only as a numerical hard negative. Let C+ = {cik }i,k ,O+ = {oik }i,k ,P+ = {pik }i,k ,
+
+(38) where the three collections use the same ordering over all re-tained original and perturbed indices (i, k ). Representations with the same index therefore form a positive pair. The expanded local objective is 
+
+Llocal = C(C+, P +; τs) + C(O+, P +; τs), τs = 0 .1.
+
+(39) The S4 objective is 
+
+LS4 = L0global + Llocal . (40) Equation (39) replaces the original-only contextual and standalone losses used in S3. It does not add a second copy of those losses: the original pairs (i, 0) are already included in C+, O+, and P+.
+
+S5: Perturbed complete-expression alignment. Finally, each original or perturbed subtree sik is spliced into its par-ent expression to form fik . We compute the corresponding complete-expression representations 
+
+gSik = pool(enc S (fik )) ,gVik = enc V (Xi, f ik (Xi)) . (41) Let 
+
+GS 
+
+> +
+
+= {gSik }i,k , GV 
+
+> +
+
+= {gVik }i,k , (42) where both collections use the same ordering over all retained original and perturbed indices (i, k ). Representations with the same index therefore form a positive complete-expression pair. The expanded global objective is 
+
+L+global = C  GS
+
+> +
+
+, G V 
+
+> +
+
+; τg
+
+ , τg = 1 . (43) The full SNIP++ objective is 
+
+LS5 = L+global + Llocal . (44) Here, Llocal is the expanded contextual and standalone subtree objective introduced in S4. 
+
+## D Controlled-Edit Evaluation Details 
+
+This appendix provides the construction and filtering details for the fine-grained complete-expression evaluation in Sec-tion 5.3. 
+
+D.1 Targets and Input Samples 
+
+We sample 128 target expressions from a held-out stream of the SNIP expression generator. Each target expression fi is associated with its own input set Xi of 200 sampled points. The original expression and all variants derived from it are evaluated on the same Xi:
+
+yi = fi(Xi), eyij = efij (Xi). (45) Thus, differences between yi and eyij arise from the symbolic edit rather than from different input samples. An expression is retained as an evaluation target only when its output is finite at every point in Xi and has variance of at least 10 −10 . After filtering, 127 complete-expression targets remain. 
+
+D.2 Controlled Edit Families 
+
+For each target expression, we construct variants using the six edit families in Table 2. The first three families overlap with edits used during training, while the final three are held out. All target expressions and individual edit instances remain unseen during training. 
+
+Unary operator swap. One supported unary operator is replaced by another operator from the same group: 
+
+{sin , cos , tan }, {(·)2, (·)3, √·} , {exp , log }.
+
+This edit is unavailable when the expression contains no supported unary operator. 
+
+Variable substitution. One variable is replaced consis-tently by a different variable already used in the expression. All occurrences of the selected source variable are replaced. This edit is unavailable when fewer than two distinct vari-ables occur. 
+
+Binary operator swap. One occurrence of an operator in 
+
+{+, −, ×, ÷} 
+
+is replaced by one of the other three operators, while its operands and the remainder of the tree remain unchanged. Tree reshaping. A local binary chain is re-associated by a tree rotation. For example, 
+
+op  op ′(a, b ), c  −→ op ′ a, op( b, c ). (46) The symbols are preserved, but their tree relationships change. This edit is unavailable when no binary node has a binary child. 
+
+Operand reordering. The two operands of a subtraction or division node are exchanged: 
+
+a − b −→ b − a, a/b −→ b/a. 
+
+This edit is unavailable when the expression contains neither subtraction nor division. 
+
+Full-subtree rewriting. A node is selected and the com-plete subtree rooted at that node is replaced by a newly gen-erated subtree. The replacement is sampled from the same symbolic grammar as the training expressions and contains at most two binary operators. The root may be selected, in which case the entire expression is rewritten. 
+
+D.3 Variant Generation and Filtering 
+
+For each target expression fi and each applicable edit family, we generate up to 64 candidate variants. An edit family is skipped for a target when its required structure is absent; for example, operand reordering requires a subtraction or division node. Every candidate variant efij is evaluated on the same input set Xi as its original expression: 
+
+yi = fi(Xi), eyij = efij (Xi). (47) Using the same inputs ensures that any numerical difference is caused by the symbolic edit. A candidate is retained only if it passes the following checks: 1. Valid expression. The edit must produce a well-formed expression tree that can be serialized and evaluated. 2. Finite behavior. Every value in eyij must be finite. We discard a candidate if it produces any NaN or infinite output on Xi.3. Behavior differs from the original. We discard the can-didate when eyij is identical to the original output yi.4. Behavior differs from previously retained variants. We also discard the candidate when its output is identical to that of an already retained variant from the same target and edit family. For the final two checks, output vectors are converted to 
+
+float32 and compared exactly. Thus, two expressions are called numerically indistinguishable when they produce bit-identical float32 output vectors on the shared 200 input points. All candidates that pass these checks are retained. Consequently, the number of retained variants may differ across targets and edit families. A target contributes to a family-specific result only when at least one variant from that family is retained.                      
+
+> Edit family Targets Mean Median
+> Unary swap 81 2.1 2Variable substitution 119 26.5 27 Binary swap 127 8.5 9Tree reshaping 127 10.7 11 Operand reordering 90 1.8 2Full-subtree rewriting 127 57.6 59
+
+Table 4: Complete-expression controlled-edit pool. Targets denotes the number of held-out expressions with at least one retained variant. Mean and median give the number of retained variants per contributing target. 
+
+D.4 Evaluation-Pool Statistics 
+
+Table 4 summarizes the resulting complete-expression eval-uation pool. A target contributes to a family only when at least one valid variant of that family is retained. 
+
+D.5 Percentile Rank and Aggregation 
+
+All representations are ℓ2-normalized for evaluation, and similarity is measured using cosine similarity. For one tar-get, edit family, and alignment direction, let s+ 
+
+> i
+
+denote the similarity of the correct expression–behavior pair and let 
+
+s−
+
+> i1
+
+, . . . , s − 
+
+> iV i
+
+denote the similarities to its retained edited al-ternatives. We define 
+
+PR i = 1
+
+ViViX
+
+> j=1
+
+I s+ 
+
+> i
+
+> s −
+
+> ij
+
+ . (48) A score of 1 means that the correct pairing outranks every edited alternative, while .5 is expected under random pair-wise ranking. We use a strict inequality, so ties do not count as successful comparisons. In the f → y direction, the original symbolic expression is the query and ranks its true behavior against the behaviors of its edited variants. In the y → f direction, the original numerical behavior ranks its true symbolic expression against the edited symbolic variants. For each family and direction, we average PR i uniformly over contributing target expressions. Averages over the three training-represented or three held-out families are computed as means of their family-level scores. Confidence intervals are obtained from 1,000 bootstrap resamples of the target expressions. 
+
+## E Contextual-Subtree Discrimination 
+
+Section 5.3 evaluates whether complete-expression represen-tations distinguish an expression from closely related sym-bolic variants. Here, we repeat the same evaluation at the subtree level to test the contextual representations directly targeted by our local training objective. 
+
+Protocol. For each of the 128 held-out parent expressions 
+
+fi, we select up to eight non-trivial subtrees. A non-trivial subtree is a strict descendant of the root that is not a single leaf. When more than eight are available, we sample eight without replacement using the fixed evaluation seed. Let si0 denote a selected original subtree and let sij , j =1, . . . , V i, denote its retained edited variants. We generate the variants using the same six edit families and validity filters described in Appendix D. Each edited subtree is inserted at the original tree position: 
+
+fij = fi [si0 ← sij ] , fi0 = fi. (49) The original subtree and all of its variants are evaluated on the same input set Xi. For each index j, we construct a contextual symbolic representation and a numerical repre-sentation: 
+
+cij = pool (enc S (fij )[span( sij )]) ,pij = enc V (Xi, s ij (Xi)) . (50) Thus, every symbolic candidate is represented at the same location within the same surrounding parent structure. Only the selected subtree changes. 
+
+Scoring and aggregation. In the f → y direction, the orig-inal contextual representation ci0 ranks its matching behavior 
+
+pi0 against the behaviors {pij }Vi 
+
+> j=1
+
+of the edited subtrees. In the y → f direction, pi0 ranks ci0 against the contextual representations {cij }Vi
+
+> j=1
+
+.We use the percentile-rank metric defined in Appendix D. For each edit family and direction, we first average scores across subtrees from the same parent and then across parents, so each parent contributes equally. Confidence intervals and paired model comparisons follow Appendix D, using 1,000 
+
+bootstrap resamples of parent expressions; all subtrees and variants from a parent are kept together. 
+
+Results. Figure 8 shows that SNIP++ substantially im-proves contextual-subtree discrimination in both directions. Averaged over the six edit families, its percentile rank reaches 
+
+.87 for f → y and .92 for y → f , compared with .47 and .61 
+
+for SNIP, respectively. The gains occur across all six families, including tree reshaping, operand reordering, and full-subtree rewriting, which are held out during training. Across the 12 edit-family– direction settings, SNIP++ is significantly better in all 12 ,with no statistically indistinguishable settings or reversals. These results show that the improved alignment is present within contextualized local components, rather than arising only after pooling the complete expression. 
+
+## F Out-of-Domain Evaluation Details 
+
+Section 5.4 evaluates transfer to three external symbolic-regression corpora: Feynman, Classic, and Strogatz. We ad-ditionally report their pooled union. 
+
+Protocol. For each expression, every input feature is stan-dardized before numerical encoding. The same standardized inputs are used for SNIP and SNIP++. We use the two proto-cols from Section 5.4: pooled cross-modal retrieval and fine-grained discrimination against controlled symbolic variants. Both are evaluated in the f → y and y → f directions. For contextual-subtree evaluation, we pool the subtree span from its parent encoding and match it to the numerical behavior computed by that subtree, following Appendix E. 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0   
+
+> Percentile rank
+> Unary swap Variable substitution Binary swap
+> Seen average
+> Tree reshaping Operand order Full rewrite
+> Held-out average
+> fy
+> yf
+> SNIP SNIP++
+
+Figure 8: Contextual-subtree discrimination. Percentile rank of the correct subtree–behavior pairing across the six controlled edit families. The red dashed line marks chance (.5), and shaded rows report averages over the three training-represented and three held-out edit families. Error bars show 
+
+95% bootstrap confidence intervals over parent expressions. Scores are averaged first within each parent expression and then across parents. Confidence intervals are obtained from 
+
+1,000 bootstrap resamples of parent expressions. 
+
+Contextual-subtree transfer. The local representations learned by SNIP++ also transfer beyond the training gen-erator. In fine-grained discrimination, its contextual-subtree representations obtain an average percentile rank of .68 , com-pared with .47 for SNIP. In pooled contextual-subtree re-trieval, SNIP++ reaches .78 , compared with .48 for SNIP. These results closely track the corresponding complete-expression scores of .69 and .79 , showing that the transferred alignment is present both within local components and after pooling the complete expression. At the family level, transfer is strongest for variable sub-stitutions and operator swaps, but improvements also extend to several structural edit families held out during training. 
+
+## G Training-Time Perturbation Construction 
+
+This appendix describes the controlled subtree perturbations used during training in Section 4.2. The evaluation protocol in Appendix D includes these same three edit families, to-gether with three additional families held out from training. All evaluation expressions and individual edit instances are independently generated and unseen during training. Evaluation set Complete expressions Subtree parents         
+
+> Feynman 81 79 Classic 35 30 Strogatz 13 12 Pooled union 129 121
+
+Table 5: Out-of-domain evaluation pools. Counts are re-ported after validity filtering. 
+
+Perturbation families. For each training expression fi,we sample one non-trivial subtree si0 and construct nearby symbolic variants using three edit families: 
+
+• Unary-operator swap. One unary operator is replaced by another operator from the same compatible group: 
+
+{sin , cos , tan }, {(·)2, (·)3, √·} , {exp , log }.
+
+This edit is unavailable when the subtree contains no supported unary operator. 
+
+• Variable substitution. One variable is replaced by a dif-ferent variable already present in the subtree. All occur-rences of the selected source variable are replaced con-sistently. This edit is unavailable when fewer than two distinct variables occur. 
+
+• Binary-operator swap. One occurrence of an operator in 
+
+{+, −, ×, ÷} 
+
+is replaced by one of the other three operators, while its operands and the remainder of the subtree are unchanged. Each edit changes one controlled symbolic choice while leaving the remaining subtree structure unchanged. 
+
+Sampling and validity checks. We make two perturbation attempts for each sampled subtree. For each attempt, we sample an applicable edit family, an eligible location, and a replacement. An attempted edit is discarded if it does not produce a well-formed expression or cannot be evaluated. Let si1, . . . , s iK i denote the retained variants, where Ki ≤
+
+2. The original subtree and all retained variants are evaluated on the same input set Xi:
+
+yik = sik (Xi), k = 0 , . . . , K i. (51) A candidate is retained only when every value in yik is finite and its output vector is not an exact duplicate of the original or of a previously retained variant. Exact behavioral duplicates are removed by hashing the output vectors. 
+
+Role in the training objective. In the initial contextual and standalone subtree objectives, the retained perturbed be-haviors act as hard numerical alternatives to the original subtree. In the symmetric objective, each retained perturba-tion is also encoded symbolically—both within its parent and independently—and paired with its own numerical behavior. Finally, the perturbation is inserted into the parent expression to provide an additional complete-expression training pair. 
+
+## H Implementation Details 
+
+Data generation. Training expressions are generated on-line using the SNIP expression generator, rather than drawn from a fixed corpus. The maximum input dimensionality is 
+
+10 .
+
+Architecture. All experiments use the SNIP backbone. The symbolic and numerical encoders each contain eight Transformer layers with model dimension 512 , feed-forward dimension 2048 , and 16 attention heads. Both modalities are projected to a shared 512 -dimensional latent space. SNIP++ retains SNIP’s numerical encoder, tokenizer, pooling operations, and projection heads. Its only addi-tional architectural parameters are the four learned tree-decay scalars {θc}4 
+
+> c=1
+
+introduced by the tree-structural positional encoding. The symbolic encoder, numerical encoder, numer-ical embedder, and projection bottleneck contains approxi-mately 67 .2M parameters for SNIP and 67 .2M plus four scalars for SNIP++. 
+
+Optimization. Each model is trained for 100 epochs with 
+
+1,000 optimizer updates per epoch, for a total of 10 5 updates. We train on four NVIDIA H100-80GB GPUs with a global batch size of 64 . Optimization uses Adam with β1 = 0 .9,
+
+β2 = 0 .999 , and ϵ = 10 −8. The learning rate is linearly warmed up for the first 10 ,000 updates to a peak value of 4 ×
+
+10 −5 and subsequently follows an inverse-square-root decay. Weight decay is zero, gradients are clipped to a maximum norm of 0.5, and training uses automatic mixed precision with FP16. 
+
+Hyperparameter selection. We evaluate subtree-loss weights λsub ∈ {0, 0.5, 1.0} and subtree temperatures 
+
+τs ∈ { 1.0, 0.1}. The final configuration uses λsub = 1 .0
+
+and τs = 0 .1, selected using held-out fine-grained alignment subject to no regression in global retrieval. All variants are trained from scratch with training seed 0.Confidence intervals and paired comparisons are obtained by bootstrapping target-expression clusters, keeping all subtrees and controlled variants associated with a target together. A complete SNIP++ training run takes approximately 21 .4
+
+hours on four NVIDIA H100-80GB GPUs, corresponding to roughly 86 GPU-hours. Evaluation jobs use one H100-80GB GPU, eight CPU cores, and 64 GB of system memory. The corresponding SNIP training run takes 11 .4 hours on a single H100-80GB GPU. All evaluations use frozen encoders.

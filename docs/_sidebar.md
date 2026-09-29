@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-09-29 <!--dpr-date:20260929-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/29/2609.30819v1-learning-provable-neural-network-observer-for-uncertain-dynamical-systems" data-sidebar-item="{&quot;title&quot;: &quot;Learning Provable Neural Network Observer for Uncertain Dynamical Systems&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.30819v1-learning-provable-neural-network-observer-for-uncertain-dynamical-systems&quot;, &quot;score&quot;: &quot;7.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;用李雅普诺夫稳定性与LMI约束的神经网络观测器&quot;}">Learning Provable Neural Network Observer for Uncertain Dynamical Systems</a>
   * 2026-09-25 <!--dpr-date:20260925-->
     * 速读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202609/25/2609.22491v1-a-candidate-counterexample-to-a-conjecture-on-iss-for-time-delay-systems" data-sidebar-item="{&quot;title&quot;: &quot;A Candidate Counterexample to a Conjecture on ISS for Time-Delay Systems&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2609.22491v1-a-candidate-counterexample-to-a-conjecture-on-iss-for-time-delay-systems&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;lyapunov-ai&quot;}], &quot;evidence&quot;: &quot;时滞系统的李雅普诺夫-克拉索夫斯基泛函与输入-状态稳定性&quot;}">A Candidate Counterexample to a Conjecture on ISS for Time-Delay Systems</a>

@@ -1,0 +1,1830 @@
+Title: SMORE: Stability-Promoting Mesh-Agnostic Model Reduction for Time-Dependent PDEs
+
+URL Source: https://arxiv.org/pdf/2609.33205v1
+
+Published Time: Tue, 29 Sep 2026 02:22:31 GMT
+
+Number of Pages: 52
+
+Markdown Content:
+# SMORE: Stability-Promoting Mesh-Agnostic Model Reduction for Time-Dependent PDEs 
+
+Yangyuan Li, Weichao Li, Shaowu Pan *
+
+> Department of Mechanical, Aerospace and Nuclear Engineering, Rensselaer Polytechnic Institute 110 8th Street, Troy, NY 12180, USA
+
+Abstract 
+
+High-fidelity simulations of time-dependent partial differential equations (PDE) are compu-tationally expensive, motivating data-driven reduced-order surrogates for many-query tasks such as uncertainty quantification, design optimization, data assimilation, and optimal control. However, existing surrogate models often exhibit poor temporal stability, which can lead to unstable rollouts and exploding gradients during backpropagation, especially in multistep long-horizon forecasting. To address this, we propose SMORE, a mesh-agnostic framework for model order reduction of time-dependent PDEs. Its latent dynamics are trained with Lyapunov-guided stability regularization, which promotes stable long-horizon rollouts. We provide theoretical guarantees under the stated structural assumptions. Beyond forecasting PDE evolution, the learned latent dynamics, which are interpretable and linear or linear-quadratic, could bring benefits for downstream tasks such as data assimilation and optimal control. Moreover, our framework is capable of predicting continuous PDE solution fields from sparse measurements of the initial condition. We evaluate SMORE on a range of problems, including wave propagation, the Navier–Stokes equations, and the shallow water equations. Our results shows it improves long-horizon rollout generalization and empirical robustness, and achieves competitive accuracy at comparable parameter budgets, relative to competitive baselines including DINo, FNO, CNO, and Transolver. 
+
+Keywords– reduced-order modeling, stability regularization, partial differential equation 
+
+# 1 Introduction 
+
+Many practical engineering problems involve high-fidelity numerical simulation of partial differen-tial equations, so-called “inner loop” computations. Such simulations typically require memory-intensive spatial discretizations and small time steps to satisfy stability and accuracy requirements. Hence, it is desirable to develop data-driven surrogate models that exploit existing simulation data to improve the computational efficiency of forward simulations by orders of magnitude. Such surrogates are particularly valuable for many-query tasks such as uncertainty quantification (UQ) [1, 2], design optimization [3], data assimilation [4–6], and optimal control [7]. A typical data-driven surrogate first reduces the dimensionality of the high-fidelity state [8] and then models the evolution of the resulting reduced states [9–13]. The choice of dimensionality reduction therefore de-termines which spatial discretizations the surrogate can handle. In practice, however, most existing approaches are tied to a specific discretization. Convolutional neural network (CNN)-based meth-ods [14, 15] require uniform Cartesian grids, while proper orthogonal decomposition (POD) [16] requires the spatial discretization to remain fixed across snapshots. As a result, such surrogates cannot generalize to a different spatial discretization of the domain. To address this limitation, mesh-agnostic methods such as deep operator network (DeepONet) [17] and its extension [18] have been recently developed. Moreover, neural operators [12, 19, 20] provide an alternative perspective by learning the forcing-to-solution operator via carefully designed neural networks. Fourier Neural 
+
+> *Corresponding author. Email: pans2@rpi.edu.
+
+1arXiv:2609.33205v1 [cs.LG] 27 Sep 2026 Operator (FNO) [19] utilizes Green’s function and convolution theorem to parameterize the integral kernel. For time-dependent PDEs, FNO can learn the mapping between an initial condition and the solution at a fixed later time. The Convolutional Neural Operator (CNO) [20] instead adopts a convolutional architecture that operates in physical space. It is designed to preserve the corre-spondence between continuous functions and their discrete representations, thereby mitigating aliasing errors. However, CNO and FNO rely on CNNs and/or fast Fourier transforms, which limits their applicability mainly to PDE data on uniformly structured meshes. In practice, many engineering problems are discretized on non-uniform unstructured meshes. A straightforward way to extend data-driven surrogate models to such meshes is to use graph neural networks. For example, MeshGraphNet [21] treats the PDE solution at each cell as node features on a graph and uses message passing within an encoder-decoder framework to learn the evolution of a PDE over time. Beyond graph-based frameworks [22], several works have extended neural operators to unstructured meshes [23, 24]. Li et al. [23] transformed the irregular physical space into uniformly structured computational space in order to perform FFT in FNO. Similarly, Liu et al. [24] developed a non-uniform neural operator to map nonuniform inputs to a uniform grid. However, these methods could face scalability issues for 3D problems due to the use of convolutional layers and challenges in handling moving meshes [12]. More recently, attention-based PDE solvers have been developed to overcome the limitations of convolutional or Fourier-based backbones. For example, Transolver [25] introduces a Physics-Attention mechanism that groups discretized mesh points into learnable physical-state slices and performs attention over the resulting physics-aware tokens, enabling efficient modeling on general geometries. Nevertheless, such models still operate as high-capacity neural PDE solvers in the physical discretization space, rather than learning a reduced latent dynamical system with explicit stability-oriented structure for long-horizon prediction. To address the above challenges, the idea of implicit neural representations [12, 18, 26] can be used to reduce dimensionality [27]. Implicit neural representations were initially developed for image and video processing [28, 29] and geometric shape representation [30, 31], where most of these problems only need spatial representation. To adapt them to time-dependent PDEs, one approach is to parameterize the weights of the neural network by another function of time t [27] or model the latent state using a nonlinear autonomous system. To our knowledge, the closest related work is DINo, proposed by Yin et al. [32]. It uses MFN and shift modulation to decode latent representations at queried spatial coordinates. The latent codes are inferred through autodecoding and then evolved by a standard NeuralODE [11]. A follow-up work is the coordinate-based model for operator learning (CORAL) [12] using SIREN and shift and scale modulation for autodecoding. Very recently, CoNFiLD [33] combines SIREN and modulation, but employs the diffusion model [34] for the dynamics of latent space. Despite these successes, the frameworks above lack explicit stability guarantees for the reduced latent dynamics, which are crucial for long-term autoregressive prediction [12, 19, 32, 33]. To address this issue, we propose SMORE, a stability-promoting and mesh-agnostic model reduction framework for time-dependent PDEs. SMORE combines an Implicit neural representation (INR) autodecoder with either a Koopman-inspired linear latent-dynamics model, referred to as SMORE-Koopman , or a Low-Rank Linear-Quadratic (LRLQ) latent-dynamics model, referred to as SMORE-LRLQ . Koopman operator theory [35] provides a formalism to search for intrinsic coordinates that can globally linearize the nonlinear dynamics [36]. For systems that do not admit a reduced set of linear dynamics, we utilize linear-quadratic dynamics, since such models naturally arise in the reduced-order formulation of discretized fluid mechanical models [37, 38], allowing for a more accurate representation. In contrast to mesh-agnostic learning frameworks that use black-box dynamics, such as NeuralODE [11, 32] or diffusion models [33], we equip these structured latent dynamics with Lyapunov-guided stability regularization. The theoretical derivation establishes sufficient conditions for latent dynamics stability, transfers latent-state 2bounds and errors to decoded fields, and characterizes prediction from sparse initial measurements under additional observability assumptions. We further introduce pointwise minibatching (PM), which partitions the spatial samples evaluated by the pointwise decoder into smaller chunks during training. Each chunk contributes to the reconstruction loss using a common normalization over the full batch, and gradients are accumulated across chunks before parameter updates. This reduces peak training memory while preserving the reconstruction loss and its gradients up to floating-point round-off. We conducted numerical experiments to assess prediction accuracy and training robustness across different dynamics models, mechanism configurations, and initial-observation densities. We further evaluated the proposed pointwise minibatching mechanism by examining the extent to which it increases the maximum feasible spatial resolution under a fixed GPU-memory budget and by quantifying the resulting trade-offs among memory, computation time, and accuracy at a fixed resolution. The paper is organized as follows. Section 2 describes the setup of the problem. Section 3 first discusses implicit neural representations for mesh-agnostic reduced-order modeling. It then turns to latent dynamics modeling, with particular emphasis on stability-oriented linear and linear-quadratic approaches. Section 4 presents the proposed SMORE framework, including the INR-based latent representation and decoder, the SMORE-Koopman and SMORE-LRLQ latent-dynamics models, Lyapunov-guided stability regularization, theoretical boundedness and sparse-inference results, scheduled sampling, a pointwise decoder minibatching mechanism for memory-efficient training, and the overall training and evaluation workflow. Section 5 presents the numerical experiment setup, long-horizon rollout comparisons with baseline models, stability ablation study, sparse-observation inference, and spatial-resolution and memory-efficiency studies. Finally, conclu-sions are given in Section 6. 
+
+# 2 Problem Setup 
+
+This section formulates the learning problem for data-driven reduced-order modeling of time-dependent PDEs. We consider a time-dependent partial differential equation (PDE) with initial and boundary conditions, 
+
+F(u)( t, x) = 0 , (t, x) ∈ T × Ω,
+
+B(u)( t, x) = 0 , (t, x) ∈ T × ∂Ω,u(0 , x) = u0(x), x ∈ Ω.
+
+(1) Here, Ω ⊆ Rd is the spatial domain, T := [0 , ∞) is the time domain, u : T × Ω → Rc is the solution field with c components, and u0 ∈ L2(Ω; Rc) is the initial condition. The operators F and B specify the governing PDE and boundary conditions, respectively, and may be nonlinear. For the initial conditions and time horizons considered, we assume that the solution exists, is unique, and can be evaluated at the sampling locations. We denote the solution map by 
+
+S(t)u0 = u(t, ·). (2) To formulate the learning problem, let μ be a Borel probability measure on L2(Ω; Rc), and draw 
+
+M initial conditions independently from μ,
+
+u0,i i.i.d.
+
+∼ μ, i = 1 , . . . , M. 
+
+The prediction benchmarks in this work use trajectories generated by numerical PDE solvers. All trajectories are sampled on the time grid 
+
+0 = t1 < t 2 < · · · < t Ntrain +Nextra ,
+
+3which we split into the training times and the extrapolation times, 
+
+Ttrain := {tj }Ntrain  
+
+> j=1
+
+, Textra := {tj }Ntrain +Nextra  
+
+> j=Ntrain +1
+
+,
+
+and on the spatial sample points 
+
+ΩNx := {xk}Nx 
+
+> k=1
+
+⊂ Ω.
+
+Here, Ntrain and Nextra are the numbers of snapshots inside and beyond the training window 
+
+[0 , t Ntrain ], and Nx is the number of spatial sample points. For each training initial condition u0,i ,the solution is observed only at the training times, giving the training dataset 
+
+Dtr =
+
+
+
+{(tj , xk, [S(tj )u0,i ]( xk)) }1≤j≤Ntrain 
+
+> 1≤k≤Nx
+
+Mi=1 
+
+. (3) For a fixed initial condition, these spatiotemporal samples constitute a trajectory [39]. Our objective is to learn a reduced-order surrogate for the solution map from these trajectories. At test time, the surrogate receives the initial state only on an initial observation set Ωinit  
+
+> Nx
+
+⊆ ΩNx
+
+and predicts u(t, x) at queried spatial coordinates over a prescribed time horizon. We refer to the case Ωinit  
+
+> Nx
+
+= Ω Nx as full initialization and to the case Ωinit  
+
+> Nx
+
+⊊ ΩNx as sparse initialization. Since the initial latent state is inferred by autodecoding with the trained networks frozen, Ωinit  
+
+> Nx
+
+can be chosen at test time without retraining; in particular, a model trained on the fully observed data in Eq. (3) can be initialized from sparse measurements. The surrogate is required to generalize to unseen initial conditions drawn from μ, both within the training window ( in-horizon prediction ) and at the extrapolation times Textra (extrapolation ). 
+
+# 3 Reduced-Order Modeling with Implicit Neural Representations 
+
+3.1 Implicit Neural Representation 
+
+INR [28, 40, 41] is a class of feedforward neural networks with the spatial coordinate x ∈ Ω
+
+as input to describe an arbitrary function Dϕ(x) implicitly via parameter ϕ. Unlike traditional pixelized approaches that describe a function directly as a vector at fixed sampling points over 
+
+Ω [42], INR allows a mesh-agnostic approximation that can be queried at any point in Ω. This in turn permits spatial queries to be partitioned into smaller batches to reduce decoder memory use [27]. This is sometimes described as learning a continuous vector field, as opposed to already-discretized vector fields [26], on which traditional methods such as POD are built on, e.g., POD. Since the solution of a PDE is most often a continuous function in space, INR has been recently introduced to the community of machine learning for PDE [27, 43–45]. Pan et al. [27] demonstrated the effectiveness of a hypernetwork [46] built on top of SIREN [28] for reduced-order models of complex multi-scale PDE data in a mesh-agnostic fashion. Duvall and Duraisamy [43] employed coordinate-based networks with hypernetwork modulation to build discretization-independent surrogates of physical fields around variable geometries and non-parametric meshes, albeit for steady-state fields without temporal evolution. Chen et al. [44, 45] solved the known PDE by integrating the projected governing equation of the reduced latent state from INR, using either a Lagrangian or an Eulerian method. In contrast, several other concurrent works [47–49] took the 
+
+whole neural network parameters as the latent space. Yin et al. [32] utilized an INR autodecoder of multiplicative filter network (MFN) together with NeuralODE [11] to learn the latent representation of the PDE system. Berman and Peherstorfer [10] combined LoRA [50] with INR for both intrusive and non-intrusive ROMs. 43.2 Modeling Temporal Evolution of Latent Variable 
+
+Propagating latent variables forward in time plays an important role in reducing computational and memory requirements as compared to full-order models [9, 51, 52]. One straightforward approach is to use tools from the time-series and sequence-modeling community, such as ARIMA [53], LSTM [54, 55], TCN [56, 57], echo-state networks [58], and Transformers [59, 60]. Alternatively, one could also choose a system-theoretic approach via Koopman operator [61, 62], polynomial nonlinear dynamics [37, 63], neural ODE [11]. The key advantage of using system-theoretic approaches is the possibility of ensuring stability and direct integration with well-established techniques from system identification, control, and state estimation communities. To ensure the stability of the learned model, one would typically need to work with certain simplified system dynamics. For linear models, Pan et al. [62] built a stable Koopman operator by constructing a special tri-block diagonal matrix. For linear-quadratic models, Kaptanoglu et al. [64] proposed a stability criterion that can be utilized to promote the global stability of learned models. Kramer [65] presented an optimization-based method to estimate the stability domain of quadratic-bilinear ROMs, offering a more scalable and less conservative approach than traditional analytical methods. Goyal et al. [66] developed inference formulations designed to construct quadratic models with built-in stability. Ouala et al. [67] adopted the linear–quadratic dynamics and imposed a global boundedness constraint, enhancing the generalization of the learned low-dimensional ODE dynamics to arbitrary initial conditions. Yin et al. [32] proposed DINo where spatial measurements are encoded through an INR autodecoder with Feature-wise Linear Modulation (FiLM) modulation [68] and evolved through a learned neural ODE [11]. However, temporal stability, which is crucial for long-horizon rollout, is not guaranteed by a generic neural ODE parameterization. In fact, ensuring the temporal stability of data-driven models for dynamical systems is a well-known long-standing issue [39]. In contrast to existing INR-based frameworks [10, 32, 44, 45], we combine coordinate-based autodecoding with structured latent dynamics and stability-promoting regularization. The analysis provides explicit latent-space stability certificates under stated spectral and conservation conditions, while retaining the mesh-agnostic and memory-efficient advantages of INR representations [27]. 
+
+# 4 Proposed Framework 
+
+We now present our framework SMORE in detail. As summarized in Fig. 1, it consists of an INR-based decoder Dϕ : Ω → R and a dynamics model for the latent state α ∈ Rr. The dependence of the decoded field on αt is realized through FiLM [68], while the temporal evolution of αt is governed by a structured latent dynamics model with Lyapunov-guided stability regularization. Its two variants differ only in the latent dynamics. SMORE-Koopman uses linear dynamics (Eq. (7)), whereas SMORE-LRLQ uses linear-quadratic dynamics with a low-rank factorization of the quadratic tensor (Eqs. (8) and (22)). This section is organized as follows. We first introduce the INR-based spatial representation and the structured latent dynamics models with their stability regularization, and show how bounded latent states yield bounded reconstructed solution fields. We then describe inference from sparse initial observations and the overall training and evaluation workflow, including scheduled sampling and pointwise minibatching. 
+
+4.1 Latent Representation and Modulated Implicit Neural Decoding 
+
+Instead of learning an explicit encoder, we adopt an autodecoding approach, in which the latent state of each snapshot is obtained by optimization (Eq. (6)). Although the components of the PDE state are generally dependent (in fluid systems, for example, different directional velocity 5(a) 
+
+> (b)
+> (c)
+
+Figure 1: Overview of SMORE. (a) Overall SMORE workflow. An INR autodecoder fits compact latent states to observed field values. The latent dynamics advances these states in time, and the coordinate decoder reconstructs the corresponding solution fields. Training uses scheduled sampling, whereas testing rolls out from the inferred initial state. (b) SMORE-Koopman latent dynamics (left) and SMORE-LRLQ latent dynamics (right). (c) Lyapunov-guided stability regularization and coordinate decoding. Stability is promoted by augmenting the dynamics loss Lα with Lyapunov-guided regularizers (left). The eigenvalue term Lreg,eig penalizes positive eigenvalues of the symmetric part Ws of the linear operator and is used by both SMORE-Koopman and SMORE-LRLQ, while the conservation term Lreg,cons , which encourages the energy-preserving structure of the quadratic tensor Q, is used only by SMORE-LRLQ. Their combination yields the modified loss Ldyn . Coordinate-based decoding then evaluates the reconstructed field at arbitrary spatial query locations (right). 
+
+6components and other physical variables are often coupled through the governing equations), each component is decoded from its own latent code by a shared decoder, and the coupling is captured by the latent dynamics, which evolve the full latent state αt. Let u(q)(t, ·) denote the q-th component of the solution field, where q = 1 , . . . , c . We associate each component u(q)(t, ·) with a latent code 
+
+z(q) 
+
+> t
+
+∈ Rp. Collecting these component-wise latent codes yields the latent representation in Eq. (4), where the total latent dimension satisfies r = cp :
+
+αt =
+
+
+
+z(1) 
+
+> t
+
+...
+
+z(c)
+
+> t
+
+ ∈ Rr, r = cp. (4) Each component u(q)(t, ·) is approximated by a coordinate-based feedforward neural network 
+
+Dϕ : Ω → R (the INR decoder) shared across components. Here, ϕ denotes the parameters of the base INR decoder. The complete trainable parameter set θ includes ϕ and the FiLM modulation matrices. Given a component latent code z ∈ Rp, the map Φθ(z) produces the effective decoder parameters by replacing each modulated bias b(l) with b(l)+A(l)z, while leaving the other parameters unchanged. We denote the resulting decoder by DΦθ (z). The decoded field is obtained by applying the shared decoder to each component code, 
+
+ˆuθ(αt)( x) := DΦθ (z(1)  
+
+> t)
+
+(x), . . . , D Φθ (z(c) 
+
+> t)
+
+(x)⊤. (5) For brevity, we also write DΦθ (α) := ˆ uθ(α) for the component-wise decoding of the full latent state. The latent state of each snapshot is obtained by autodecoding, 
+
+αt ∈ argmin 
+
+> α∈Rr
+
+Lrec 
+
+ ˆuθ(α), u (t, ·). (6) Here, Lrec (f, g ) := Pcq=1 ∥f (q) − g(q)∥2 
+
+> L2(Ω)
+
+measures reconstruction error across field components. In practice, this minimization is solved approximately by gradient-based optimization. The FiLM construction is detailed in Appendix B. Although one could choose arbitrary INR frameworks, for simplicity, we consider the multiplicative filter network (MFN) [29] as Dϕ. Details of MFN are presented in Appendix A. In practice, Lrec is evaluated empirically on ΩNx during training, and on 
+
+Ωinit  
+
+> Nx
+
+when the initial latent state is inferred at test time. 
+
+4.2 Stability-Promoting Latent Dynamics 
+
+Given the latent states obtained by autodecoding, we model their temporal evolution through 
+
+˙α = fψ(α). We consider linear and linear-quadratic parameterizations of fψ, both of which are continuously differentiable, hence locally Lipschitz, so the latent ODE admits a unique local solution for every initial state. We approximate the latent trajectories using a fourth-order Runge–Kutta scheme and train the dynamics parameters using the continuous adjoint method [11]. To address rapidly growing rollouts and ill-conditioned gradients, we incorporate Lyapunov-guided stability regularization. 
+
+4.2.1 Linear Latent Dynamics 
+
+Koopman theory describes the evolution of observables of a nonlinear dynamical system through a linear operator on a generally infinite-dimensional function space [69]. When a finite set of observables spans an invariant subspace, their evolution admits a closed finite-dimensional linear 7representation. In continuous time, the corresponding matrix represents the Koopman generator restricted to that subspace. Motivated by this construction and prior work on learning linear latent dynamics [62, 70], we jointly learn latent coordinates and a matrix W to approximate their evolution by 
+
+˙αt = Wαt, (7) where W ∈ Rr×r is trainable. The learned coordinates provide an approximate linear representa-tion; exact Koopman invariance is not assumed. 
+
+4.2.2 Linear-Quadratic Latent Dynamics 
+
+For highly nonlinear PDE systems, the finite-dimensional linear dynamics above may be restrictive. We therefore use a linear-quadratic system [66, 67], 
+
+˙α = Wα + b + α⊤Q(1) α · · · α⊤Q(r)α⊤ , (8) with trainable parameters b ∈ Rr, W ∈ Rr×r, and ∀i ∈ { 1, . . . , r }, Q(i) ∈ Rr×r. Here, α ∈ Rr
+
+denotes the concatenated latent state defined in Eq. (4), where r = cp . The linear model Eq. (7) is the special case b = 0, Q(i) = 0.
+
+4.2.3 Lyapunov-Guided Stability Regularization 
+
+To prevent numerical overflow in both the rollout and back-propagation caused by an unbounded 
+
+forward pass through Eqs. (7) and (8), we introduce Lyapunov-guided stability regularization for the latent ODE. The design is guided by the following dissipativity criterion for linear-quadratic systems [64, 67, 71, 72]. The criterion separates a strictly dissipative case, which yields an explicit absorbing radius, from the marginal case γ = 0 used as the practical training target, which excludes finite-time blow-up. 
+
+Theorem 1. Consider Eq. (8) . Since only the symmetric part of each quadratic slice contributes to α⊤Q(i)α,assume without loss of generality that Q(i) = ( Q(i))⊤. For a shift m ∈ Rr, define y = α − m,
+
+d = b + Wm + m⊤Q(1) m · · · m⊤Q(r)m⊤ , (9) 
+
+and 
+
+A = W +
+
+
+
+2m⊤Q(1) 
+
+...
+
+2m⊤Q(r)
+
+ . (10) 
+
+These are the constant and linear coefficients of the shifted system (Eq. (49) ). If the following two conditions hold: 1. there exists γ ≥ 0 such that the symmetric part As = ( A + A⊤)/2 satisfies As ⪯ − γI,2. ∀i, j, k ∈ { 1, . . . , r }, Q(i) 
+
+> j,k
+
++ Q(k) 
+
+> i,j
+
++ Q(j) 
+
+> k,i
+
+= 0 ,then the shifted energy satisfies 
+
+˙V ≤ ∥ d∥∥ y∥ − γ∥y∥2, V (y) = 12 ∥y∥2.
+
+8Consequently, solutions exist for all t ≥ 0. If γ > 0, the shifted latent state is ultimately bounded and satisfies 
+
+lim sup 
+
+> t→∞
+
+∥αt − m∥ ≤ ∥d∥
+
+γ . (11) 
+
+Moreover, if d = 0 and γ ≥ 0, then 
+
+∥αt − m∥ ≤ e−γt ∥α(0) − m∥. (12) 
+
+In particular, the boundary case γ = 0 gives a non-expansive energy estimate ∥αt − m∥ ≤ ∥ α(0) − m∥
+
+when d = 0. If γ = 0 and d̸ = 0, the growth is at most linear, 
+
+∥αt − m∥ ≤ ∥ α(0) − m∥ + ∥d∥ t. (13) 
+
+The proof is provided in Section C. 
+
+Remark. The implementation uses m = 0, so As = Ws = ( W + W⊤)/2 and d = b. This is the most conservative choice. Because A depends affinely on m, a trained model that violates Ws ⪯ 0 may still admit some m̸ = 0 with As ⪯ − γI. Define the certificate margin as γcert = −λmax (Ws). For SMORE-Koopman, 
+
+b = 0 and Q(i) = 0, so the cyclic condition holds trivially and γcert ≥ 0 alone yields the non-expansive estimate in Eq. (12) . For SMORE-LRLQ, d = b is generally nonzero. A positive margin, together with the cyclic cancellation condition in Theorem 1, yields the absorbing radius ∥b∥/γ cert in Eq. (11) , whereas a zero margin yields the linear-growth bound in Eq. (13) . Training targets γcert ≥ 0, i.e., the zero-margin target γtgt = 0 , through finite-weight penalties on positive eigenvalues of Ws and violations of cyclic energy cancellation. These penalties encourage the structural conditions but do not guarantee that λmax (Ws) ≤ 0
+
+or that the cyclic identity holds exactly. The theoretical guarantees apply to a trained model only when the stated conditions hold, which can be checked a posteriori by evaluating λmax (Ws) and the cyclic defect in Eq. (18) .
+
+The preceding Lyapunov analysis motivates two soft penalties. One penalizes positive eigen-values of the symmetric linear part, and the other penalizes violations of cyclic energy cancellation in the quadratic term. To promote the marginal spectral condition in Theorem 1, we define 
+
+Lreg,eig =
+
+Pri=1 max( λi, 0) 1 + Pri=1 max( λi, 0) . (14) Here, λ1, . . . , λ r are the eigenvalues of Ws. The loss penalizes their positive part. Because λmax (Ws)
+
+bounds the instantaneous growth rate of V due to the linear part, and λmax (Ws) ≥ max i Re λi(W),this penalty also suppresses transient growth that a condition on the spectrum of W alone would permit. The normalization keeps Lreg,eig ∈ [0 , 1) .To encourage the cyclic energy cancellation in Theorem 1, we define 
+
+Lreg,cons =
+
+> r
+
+X
+
+> i=1
+> r
+
+X
+
+> j=1
+> r
+
+X
+
+> k=1
+
+
+
+Q(i) 
+
+> j,k
+
++ Q(k) 
+
+> i,j
+
++ Q(j)
+
+> k,i
+
+2
+
+. (15) The two regularizers are added to the latent-dynamics loss Lα with fixed coefficients βeig and βcons ,yielding 
+
+Ldyn = Lα + βeig Lreg,eig + βcons Lreg,cons , (16) where Lα is the latent-dynamics loss 
+
+Lα = 1
+
+|I| Ntrain r
+
+X
+
+> i∈I
+> Ntrain
+
+X
+
+> l=1
+
+ˆαi,l − α∗
+
+> i,l
+> 2
+
+. (17) 9Here, I is the minibatch of training trajectories, α∗ 
+
+> i,l
+
+is the latent state of snapshot l of trajectory 
+
+i obtained by autodecoding (Eq. (6)), and ˆαi,l is the prediction obtained by integrating fψ from 
+
+α∗ 
+
+> i, 1
+
+with scheduled sampling (Section 4.5). The targets α∗ 
+
+> i,l
+
+are held fixed when differentiating 
+
+Lα, so this loss updates only the dynamics parameters ψ and not the decoder or the latent states (Section 4.7). For SMORE-Koopman, the quadratic term vanishes, so βcons = 0 in Eq. (16). Because the regularizers depend only on the dynamics parameters, the implementation scales them by 1/N b
+
+per minibatch, where Nb is the number of minibatches per epoch, so that they enter once per epoch (Algorithm 1). 
+
+Remark. The conservation regularizer Lreg,cons has a direct certificate interpretation. Let 
+
+Tijk = Q(i) 
+
+> j,k
+
++ Q(k) 
+
+> i,j
+
++ Q(j) 
+
+> k,i
+
+, ηQ = 13 ∥T ∥F = 13 L1/2
+
+> reg,cons
+
+. (18) 
+
+Then the quadratic energy defect obeys 
+
+> r
+
+X
+
+> i=1
+
+yi y⊤Q(i)y ≤ ηQ∥y∥3. (19) 
+
+With a small defect in place of the exact cyclic identity, the Lyapunov estimate becomes 
+
+˙V ≤ ∥ d∥∥ y∥ − γ∥y∥2 + ηQ∥y∥3. (20) 
+
+When a positive certificate margin γ > 0 is available, ηQ > 0, and 4∥d∥ηQ < γ 2, the interval 
+
+ 2∥d∥
+
+γ , γ
+
+2ηQ
+
+
+
+(21) 
+
+is nonempty, and for every Rcert in it the ball {∥ α − m∥ ≤ Rcert } is forward invariant. Reducing Lreg,cons 
+
+enlarges the upper endpoint and hence the certified region. This soft certificate requires a strictly positive margin and is therefore not implied by the zero-margin training target alone. If ηQ = 0 , the upper endpoint is not needed and the exact cyclic case recovers Theorem 1. 
+
+4.2.4 Low-Rank Parameterization of the Quadratic Tensor 
+
+For SMORE-LRLQ, storing the full quadratic tensor {Q(i)}ri=1 becomes prohibitively expensive as the latent dimension r increases, requiring O(r3) parameters. To reduce this cost, SMORE-LRLQ adopts a low-rank parameterization of the quadratic term as a standard architectural component. Specifically, we use a rank-κ factorization for each output index i ∈ { 1, . . . , r }:
+
+Q(i)low = AiBi, Ai ∈ Rr×κ, Bi ∈ Rκ×r, (22) which reduces the quadratic parameter count from r3 to 2r2κ. Since a quadratic form depends only on the symmetric part of its matrix, the effective slice used in the theory is 
+
+Q(i)eff = AiBi + B⊤ 
+
+> i
+
+A⊤
+
+> i
+
+2 . (23) The latent dynamics in Eq. (8) is unchanged because α⊤AiBiα = α⊤Q(i)eff α. Because AiBi is generally non-symmetric, its symmetrized effective slice has rank at most 2κ rather than κ, so the factorization spans a broader class than symmetric rank-κ slices. It should therefore be viewed 10 as a scalable low-rank parameterization of the quadratic term, not as a structural constraint that enforces a symmetric, cyclic form. Accordingly, Lreg,cons in Eq. (15) and the defect ηQ in Eq. (18) are evaluated on the effective symmetric slices {Q(i)eff }ri=1 , since the low-rank factorization improves scalability but does not by itself enforce the cyclic identity. In summary, SMORE-LRLQ combines three mechanisms that can contribute to robust latent evolution. The Lyapunov-guided regularizers in Eqs. (14) and (15) promote the certificate conditions of Theorem 1. The low-rank quadratic parameterization in Eq. (22) carries no certificate by itself, but it restricts the capacity of the quadratic term and may act as an implicit regularizer. Gradient clipping is applied to the decoder and dynamics parameters (Algorithm 1) to bound individual updates when gradients become ill conditioned. Only the first mechanism is tied to the theory above; the contribution of each is assessed empirically in Section 5.3. 
+
+4.3 Boundedness and Error Bounds for Reconstructed Fields 
+
+The stability criterion above concerns the latent dynamics. To relate this analysis to the predicted solution, we show that bounded latent states produce bounded reconstructed fields and that perturbations in the latent state lead to bounded changes in the decoder output. The result relies on two properties of the SMORE decoder. Its Fourier filters are bounded, and the latent code enters only through the shift modulation in Eq. (46). Since the MFN applies no nonlinearity to its hidden state other than multiplication by the x-dependent filters, the decoder is therefore affine in the latent code. 
+
+Theorem 2 (Decoder growth and Lipschitz transfer) . Assume Ω is compact. Since the Fourier filters in Eq. (44) are bounded by one, the FiLM-modulated MFN decoder has bounded spatial filters. Then there exist constants CD, D D, L D ≥ 0, depending only on the trained decoder weights and on Ω, such that for all latent codes α, β ∈ Rr,
+
+sup 
+
+> x∈Ω
+
+DΦθ (α)(x) ≤ CD + DD∥α∥, (24) 
+
+and 
+
+DΦθ (α) − DΦθ (β) L2(Ω) ≤ LD∥α − β∥. (25) 
+
+If a latent trajectory satisfies ∥αt − m∥ ≤ R for all t ∈ [0 , T ], then for all such t the decoded field is bounded by 
+
+DΦθ (αt) L2(Ω) ≤ | Ω|1/2 [CD + DD(∥m∥ + R)] . (26) 
+
+In particular, under the conditions of Theorem 1, Eq. (56) supplies R over a rollout horizon [0 , T ]: R =
+
+∥α(0) − m∥ if d = 0; R = max {∥ α(0) − m∥, ∥d∥/γ } if γ > 0; and R = ∥α(0) − m∥ + ∥d∥T if 
+
+γ = 0 . With the implementation choice m = 0, the first case applies to SMORE-Koopman and the last to SMORE-LRLQ at the target γtgt = 0 , so marginal latent stability still yields a finite bound on the decoded field over any finite rollout horizon. 
+
+Remark (Explicit constants) . Since the decoder is affine in the latent code, for each component DΦθ (z)(x) = 
+
+c0(x) + J0(x)z with J0(x) ∈ R1×p independent of z, and hence DΦθ (α)(x) = c0(x)1c + ( Ic ⊗ J0(x)) α.The constants in Theorem 2 can therefore be taken as CD = √c sup x∈Ω |c0(x)|, DD = sup x∈Ω ∥J0(x)∥,and LD = λmax (G)1/2 with G = R 
+
+> Ω
+
+J0(x)⊤J0(x) dx. The Lipschitz bound Eq. (25) is then attained, and 
+
+LD ≤ | Ω|1/2DD.The proof is provided in Appendix D. 
+
+11 4.4 Sparse-to-Rollout Inference from Partial Initial Measurements 
+
+Sparse initialization estimates a low-dimensional latent state rather than an independent value at every grid point. A small fraction of the initial field can therefore provide enough information for recovery, provided that the observed locations distinguish the relevant latent states. Once the initial state is inferred, the learned dynamics predicts its evolution and the decoder reconstructs the future solution fields. We first characterize when the observations identify the initial latent state, then bound the resulting prediction error. Let S = {x1, . . . , xs} ⊂ Ω denote the observed spatial locations in the first snapshot, i.e., 
+
+S = Ω init  
+
+> Nx
+
+. Define the sparse measurement operator and the latent-to-sensor map as 
+
+PS u =
+
+
+
+u(x1)
+
+...
+
+u(xs)
+
+ , GS (α) = PS DΦθ (α). (27) At test time, given only yobs = PS u0 + ξ, the initial latent state is inferred by fitting the decoder to the sparse measurements, 
+
+bα0 ≈ argmin 
+
+> α∈B
+
+∥GS (α) − yobs ∥2 , (28) where B ⊂ Rr is the latent region explored during inference. The optimization slack δopt ≥ 0
+
+bounds how much the residual norm of the computed fit exceeds the smallest achievable residual norm on B,
+
+∥GS (bα0) − yobs ∥ ≤ inf  
+
+> α∈B
+
+∥GS (α) − yobs ∥ + δopt ,
+
+and accounts for incomplete optimization, separately from measurement noise and decoder repre-sentation error. With the decoder fixed, changing the observation mask changes the fitting objective but requires no retraining. The following lemma quantifies how sensitively the observed values respond to changes in the latent state. 
+
+Lemma 3 (Sensor Jacobian and restricted observability) . Let c denote the number of field components. Define the sensor Jacobian JS (α) = PS ∂αDΦθ (α) ∈ R(sc )×r. Here we use the lower singular value 
+
+σmin (J) := inf  
+
+> ∥v∥=1
+
+∥Jv ∥ = λmin (J⊤J)1/2.
+
+Then: 1. if sc < r , then σmin (JS (α)) = 0 and the latent code is not identifiable to first order from S;2. enlarging a nested observed set S appends rows to JS , so σmin (JS (α)) is nondecreasing in S;3. since the decoder is affine in the latent code (Section 4.3), JS does not depend on α and GS (α) −
+
+GS (β) = JS (α − β). Hence 
+
+∥GS (α) − GS (β)∥ ≥ σmin (JS )∥α − β∥ (29) 
+
+for all α, β ∈ Rr, so the restricted-observability constant in Appendix E can be taken as cS = σmin (JS )
+
+with B = Rr, and no larger constant is possible. 
+
+12 Proof. For (1), JS has sc < r rows and hence a nontrivial right null space, along which GS is first-order insensitive. For (2), appending a row v⊤ gives J′⊤ S J′S = J⊤S JS + vv ⊤ ⪰ J⊤S JS , so no eigenvalue of J⊤S JS , and in particular the lower singular value, can decrease. For (3), the identity follows from the affine form of the decoder, and the bound follows from the definition of σmin , with equality when α − β is a corresponding right singular vector. 
+
+Remark. At 10% visibility in the reported experiments, the number of observed scalar values sc exceeds the latent dimension r, so the fitting problem is overdetermined by equation count. Recovery still depends on the information carried by those observations, since redundant measurements or weak sensitivity to some latent directions can make the problem ill conditioned. The smallest singular value of the sensor Jacobian provides a diagnostic of this sensitivity. 
+
+The following certificate, adapted from the sparse-measurement and rollout estimates in Appendix E, states conditions under which sparse initialization leads to accurate future full-field prediction. 
+
+Theorem 4 (Sparse-to-rollout full-field certificate) . Let σ bound the measurement noise, ∥ξ∥ ≤ σ, let 
+
+εsens bound the decoder representation error of the initial state at the sensors, and let cS = σmin (JS ) be the observability constant from Theorem 3. Assume the sparse-recovery hypotheses stated in Appendix E hold on 
+
+B, and define 
+
+esparse = 2( εsens + σ) + δopt 
+
+cS
+
+. (30) 
+
+Let bαn be the latent rollout initialized from bα0, and let α⋆n be an ideal latent trajectory representing the target field un, with α⋆ 
+
+> 0
+
+= α0 from the sparse-recovery statement. Suppose that the latent rollout error 
+
+En = ∥bαn − α⋆n∥ satisfies, for n = 0 , . . . , N − 1 over a finite horizon under consideration 0 ≤ n ≤ N ,
+
+En+1 ≤ aE n + broll , a ≥ 0, broll ≥ 0. (31) 
+
+Let LD be the Lipschitz constant of the decoder from Theorem 2, and assume that the target fields have decoder representation error 
+
+DΦθ (α⋆n) − un L2(Ω) ≤ εdec . (32) 
+
+Then the decoded full-field rollout satisfies 
+
+DΦθ (bαn) − un L2(Ω) ≤ εdec + LD anesparse + broll 
+
+> n−1
+
+X
+
+> ℓ=0
+
+aℓ
+
+!
+
+, (33) 
+
+for every 0 ≤ n ≤ N . If the recurrence and decoder bounds hold uniformly for all n ≥ 0 and 0 ≤ a < 1,then 
+
+lim sup 
+
+> n→∞
+
+DΦθ (bαn) − un L2(Ω) ≤ εdec + LDbroll 
+
+1 − a . (34) The proof is provided in Appendix E.1. 
+
+Remark. Theorem 4 gives the theoretical counterpart of the sparse-mask experiment. The visible fraction of the first snapshot affects the restricted-observability constant cS , as fewer sensors can make the inverse problem less identifiable and increase esparse . The latent dynamics then determines how this initial error propagates through a and broll , while the decoder Lipschitz constant LD transfers latent error into full-field error. The recurrence in Eq. (31) is a local or finite-horizon rollout assumption rather than an automatic consequence of Theorem 1; it can be justified by a locally contractive learned flow or checked empirically on the trained model. Under these explicit assumptions, a model that sees only a sparse initial snapshot can still reconstruct the full future field accurately. 
+
+13 4.5 Scheduled Sampling 
+
+Following Yin et al. [32], we adopt scheduled sampling during latent dynamics training to stabilize the early stage of optimization. Before the dynamics pass, the latent states αt are updated by minimizing the reconstruction loss through the modulated INR decoder DΦθ (α). The post-update latent states α∗ 
+
+> t
+
+are then detached and used as the target latent trajectory for latent-dynamics training. Starting from the initial target latent state α∗ 
+
+> t1
+
+, the dynamics network rolls out the latent trajectory over time. Each intermediate time point ti is independently selected as a teacher-forcing anchor with probability εt. Whenever the rollout reaches such an anchor, the current predicted latent state is reset to the corresponding target latent state α∗ 
+
+> ti
+
+; otherwise, the dynamics network continues autoregressively from its own previous prediction. After the rollout is completed, the predicted latent trajectory is compared with the target latent trajectory for latent-dynamics training. The teacher-forcing probability εt decays exponentially during training. Early in training, frequent resets divide the trajectory into many short autoregressive segments and limit the accu-mulation of rollout errors. Later in training, anchors become increasingly sparse, and the dynamics network is forced to predict longer latent trajectories without intermediate target-latent resets. In the limit, the dynamics model produces a fully autoregressive latent rollout initialized only at 
+
+α∗ 
+
+> t1
+
+. This approaches the test-time latent rollout setting, where the initial latent state is inferred from the initial snapshot and no intermediate target latent states are available. This schedule also changes the interaction between the decoder pass and the dynamics model. In the early phase, the dynamics model frequently consumes target latent states obtained from the current reconstruction pass, whereas later training relies increasingly on latent states generated by the dynamics model itself. Additional implementation details are provided in Appendix F. 
+
+4.6 Pointwise Decoder Minibatching 
+
+We introduce a pointwise minibatching mechanism to address potential GPU memory shortages. The coordinate-based structure of the INR decoder allows spatial query locations to be processed independently for a fixed latent state. This property can be exploited to reduce the peak memory required by the decoder and autodecoding updates at high spatial resolutions. Consider a training minibatch indexed by I, and let M denote the observed spatial-sample mask used for autode-coding, i.e., ΩNx during training and Ωinit  
+
+> Nx
+
+during test-time initial latent fitting. The full decoder reconstruction loss is 
+
+Ldec = MSE 
+
+
+
+DΦθ (αi,l )(xi, M), ui,l [M]
+
+
+
+, i ∈ I , l = 1 , . . . , N train , (35) where the MSE is taken over all trajectories, training snapshots, observed spatial locations, and field components in the minibatch. Evaluating Eq. (35) over the entire spatial mask at once requires retaining decoder activations for all queried locations, which can become the dominant memory cost as the spatial resolution increases. To reduce this cost, we partition the observed spatial mask into disjoint pointwise minibatches, 
+
+M =
+
+> Nc
+
+[
+
+> k=1
+
+Ck, Ck ∩ C k′ = ∅ for k̸ = k′, |C k| ≤ BPM , (36) where BPM denotes the maximum number of spatial coordinates processed in one pointwise minibatch. For each spatial chunk, we define 
+
+L(k)dec = |C k||M| MSE 
+
+
+
+DΦθ (αi,l )(xi, Ck ), ui,l [Ck]
+
+
+
+, (37) 14 where the MSE is taken over the same trajectory, time, and field-component indices as in Eq. (35). Since the spatial chunks form a disjoint partition of M,
+
+Ldec =
+
+> Nc
+
+X
+
+> k=1
+
+L(k)dec . (38) Consequently, the corresponding gradients also satisfy 
+
+∇Ldec =
+
+> Nc
+
+X
+
+> k=1
+
+∇L(k)dec . (39) Therefore, the spatial chunks can be evaluated and backpropagated sequentially while accumu-lating their gradients. The computation graph associated with each chunk can be released before the next chunk is processed, so the peak decoder activation memory is governed primarily by the pointwise minibatch size BPM rather than by the total number of observed spatial locations 
+
+|M| . Pointwise minibatching does not subsample the observed field or modify the reconstruction objective; all spatial samples are still used in each decoder update. The resulting memory reduction comes at the cost of additional computation, and the result agrees with full-grid evaluation up to floating-point round-off. The same partition applies to test-time initial latent fitting, where only the initial latent state is updated, and to field reconstruction for evaluation, which requires no gradients. Its integration into the complete SMORE training procedure is summarized in Algorithm 2. 
+
+4.7 Overall Workflow 
+
+The SMORE learning procedure consists of two alternating stages, a training stage using the training set Dtr and an evaluation stage using the test set Dte . The training stage updates the latent representations, decoder, and latent dynamics, whereas the evaluation stage keeps the learned networks fixed and is used to assess the current model and select the checkpoint retained for final evaluation. Let Ntrain denote the number of snapshots from each trajectory used during the training stage, including the initial snapshot, and let Nroll denote the total number of snapshots in a complete trajectory. Thus, each training trajectory contains Nroll snapshots in total, but only its first Ntrain snapshots are used for model training. As summarized in Fig. 1, SMORE consists of an INR-based decoder and a structured latent-dynamics model. Fig. 1a illustrates the overall training and inference workflow, Fig. 1b summarizes the two latent-dynamics formulations, and Fig. 1c highlights the Lyapunov-guided stability regularization and coordinate-based decoding. The overall learning procedure is summarized as follows: 1. Before training begins, each trajectory in Dtr is assigned a sequence of trainable latent states corresponding to the Ntrain snapshots used in the training window. These latent states are stored in the latent-state table Z. Snapshots outside this training window are not assigned trainable latent states and do not participate in the training objective. Consequently, although each complete trajectory contains Nroll snapshots, only the first Ntrain snapshots contribute to the latent-state table and the subsequent parameter updates. 2. During training, the latent-state table ( Z), the decoder parameters ( θ), and the latent-dynamics parameters ( ψ) are all updated. For each minibatch of training trajectories, the corresponding latent states are retrieved from Z. The latent states and the decoder are jointly optimized through the reconstruction loss so that DΦθ (α) matches the observed physical fields at the sampled spatial locations. 15 After the latent-state update, the resulting latent states are retrieved again from Z and detached from the reconstruction computation graph. They are then treated as the target latent trajectory for learning the dynamics. For each training trajectory, the latent dynamics starts from the latent state associated with the initial snapshot and rolls forward through the remaining Ntrain − 1 training steps. Scheduled sampling is used during the early stage of training, allowing selected target latent states to serve as intermediate rollout anchors. As training progresses, the teacher-forcing probability decreases and the dynamics increasingly relies on its own predicted latent states. The predicted latent trajectory is compared with the detached target latent trajectory through the latent-dynamics loss, which provides the learning signal for updating fψ. The dynamics objective is additionally augmented by the stability regularization terms defined in Eqs. (14) and (15), with the applicable terms determined by the selected latent-dynamics model. The decoder and latent-dynamics gradients are accumulated over the training minibatches and their parameters are updated according to the optimization schedule summarized in Algorithm 1. 3. The evaluation stage does not update the latent-state table, decoder, or latent-dynamics parameters. Instead, the current decoder and dynamics networks are fixed and the initial latent state of each trajectory in Dte is inferred from its initial snapshot through autodecoding. Only this initial latent state is optimized during the inference procedure; the learned network parameters remain unchanged. Starting from the inferred initial latent state, the latent dynamics is rolled out for Nroll − 1
+
+prediction steps. The decoder then reconstructs the corresponding physical fields over the complete rollout horizon. The prediction error is computed over the predicted snapshots, excluding the initial snapshot. This evaluation provides the criterion used for checkpoint selection. Whenever the finite overall test MSE improves over the previously recorded value, the current decoder and latent-dynamics parameters are stored as the checkpoint with the lowest test error. 4. The training and evaluation stages are repeated throughout the prescribed learning process. After training is completed, the checkpoint with the lowest test error is loaded and both networks are frozen for the final evaluation. For each trajectory in Dte , the initial latent state is re-inferred from the initial-snapshot observations using the prescribed final fitting budget. The resulting latent state is then propagated for Nroll − 1 prediction steps, and the decoder reconstructs the corresponding physical fields. The final reported MSEs are computed over these predicted snapshots, with the initial snapshot excluded from the prediction metric. The complete training and evaluation procedure is summarized in Algorithm 1. 
+
+Algorithm 1. SMORE training workflow with final test evaluation 
+
+Inputs: - Dtr : training trajectories restricted to their first Ntrain snapshots - Dte : complete test trajectories used for checkpoint selection and final evaluation - Ntrain : number of snapshots from each training trajectory used in the training stage, including the initial snapshot - Nroll : total number of snapshots in each complete trajectory, including the initial snapshot - TNtrain = {t1, . . . , t Ntrain }: time stamps corresponding to the training window - M: observed spatial-sample mask used for autodecoding - DΦθ : INR decoder with FiLM modulation 16 - fψ: latent dynamics model - Ne: number of training epochs - Nb: number of minibatches per epoch - Ntraj : number of training trajectories - Z ∈ RNtraj ×Ntrain ×r: trainable latent-state table indexed by training trajectory and time - βeig , β cons : stability-regularization weights - ε0, ρ TF : initial teacher-forcing probability and decay factor - Keval : initial latent fitting budget for training-time evaluation, specified in Section 5.1.6 - Kfinal : initial latent fitting budget for final test evaluation 
+
+Initialize: - Initialize decoder parameters θ, dynamics parameters ψ, and latent-state table Z
+
+- Initialize three optimizers OZ , Oθ, and Oψ for Z, θ, and ψ, respectively - εt ← ε0; best test MSE ← +∞
+
+- OZ steps after each minibatch; Oθ and Oψ step once per epoch after gradient accumulation 
+
+for epoch ← 1 to Ne do 
+
+Oθ.zero grad () ; Oψ.zero grad () 
+
+for batch Dtr, I in Dtr do 
+
+{ui,l , xi, TNtrain }Ntrain  
+
+> i∈I , l =1
+
+← D tr, I
+
+{αi,l }Ntrain  
+
+> i∈I , l =1
+
+← gather (Z, I) ▷ retrieve latent states for this batch 
+
+Ldec ← MSE 
+
+
+
+DΦθ (αi,l )(xi, M), ui,l [M]
+
+
+
+over i ∈ I and l = 1 , . . . , N train 
+
+OZ .zero grad () ; backpropagate Ldec 
+
+OZ .step () ▷ update selected latent states; retain accumulated decoder gradients 
+
+{αi,l }Ntrain  
+
+> i∈I , l =1
+
+← gather (Z, I) ▷ re-read post-update latent states 
+
+α∗ 
+
+> i,l
+
+← detach (αi,l ) for i ∈ I and l = 1 , . . . , N train ▷ construct target latent trajectories 
+
+{ˆαi,l }Ntrain  
+
+> i∈I , l =1
+
+← scheduled sampling ode solve 
+
+
+
+fψ, {α∗
+
+> i,l
+
+}Ntrain  
+
+> l=1
+
+, TNtrain , ε t
+
+
+
+▷ roll out latent dynamics with scheduled sampling 
+
+Lα ← MSE 
+
+
+
+{ˆαi,l }Ntrain 
+
+> i∈I , l =1
+
+, {α∗
+
+> i,l
+
+}Ntrain 
+
+> i∈I , l =1
+
+
+
+if the latent dynamics is linear-quadratic then 
+
+Ldyn ← Lα +  βeig Lreg ,eig + βcons Lreg ,cons 
+
+/N b ▷ L reg ,eig and Lreg ,cons are defined in Eqs. (14) and (15) 
+
+else if the latent dynamics is linear then 
+
+Ldyn ← Lα + βeig Lreg ,eig /N b ▷ L reg ,eig is defined in Eq. (14) 
+
+else 
+
+Ldyn ← Lα
+
+Backpropagate Ldyn ▷ accumulate dynamics gradients; regularizers that depend only on the dynamics parameters are divided by Nb so that they enter once per epoch 
+
+Apply gradient clipping to decoder and dynamics parameters 
+
+Oθ.step () ; Oψ.step () 
+
+εt ← ρTF εt
+
+if test evaluation is scheduled then 
+
+Fit the initial latent state of each test trajectory using Keval steps with fixed networks Roll out for Nroll − 1 prediction steps and compute the overall test MSE over the predicted snapshots 
+
+if the test MSE is finite and lower than the best recorded value then 
+
+Save the decoder and dynamics parameters as the checkpoint with the lowest test error; update the best test MSE 17 Final test stage: load the checkpoint with the lowest test error and freeze both networks 
+
+for each test trajectory in Dte do 
+
+Initialize its latent state using the training-time evaluation initialization rule Optimize only the initial latent state for Kfinal steps using initial-snapshot observations Roll out the latent dynamics for Nroll − 1 prediction steps and decode the predicted fields Compute and report final test MSEs over the Nroll − 1 predicted snapshots, excluding the initial snapshot The pointwise decoder minibatching procedure introduced in Section 4.6 is summarized in Algo-rithm 2. 
+
+Algorithm 2. Memory-saving pointwise decoder minibatch update 
+
+Inputs: - Latent states {αi,l }, targets {ui,l }, and observed spatial-sample mask M
+
+- Optimizer O for the latent states being fitted - BPM : maximum number of spatial samples in each pointwise minibatch Partition M into disjoint spatial chunks {C k}Nc 
+
+> k=1
+
+such that SNc 
+
+> k=1
+
+Ck = M and |C k| ≤ BPM 
+
+O.zero grad () 
+
+for k = 1 to Nc do 
+
+L(k)dec ← |C k ||M| MSE 
+
+
+
+DΦθ (αi,l )(xi, Ck ), ui,l [Ck]
+
+
+
+Backpropagate L(k)dec ▷ accumulate gradients; release the graph of chunk k
+
+O.step () 
+
+Algorithm 2 is used in two places. During training, it replaces the decoder update in Algorithm 1 with O = OZ ; the accumulated decoder gradients are retained for the per-epoch update of θ.During test-time initial latent fitting, it is applied at each of the Keval or Kfinal fitting steps with the networks frozen, so that only the initial latent state is updated. Field reconstruction for evaluation uses the same spatial chunks in a forward pass without gradients. The experiments in Sections 5.2 to 5.4 use full-grid decoder updates, since their spatial resolutions fit within the available GPU memory and pointwise minibatching would only add computation time. Pointwise minibatching becomes useful when the spatial resolution is large enough that full-grid decoder evaluation becomes limited by GPU memory, as examined in Section 5.5. 
+
+# 5 Numerical Experiments 
+
+In this section, we conduct several numerical experiments to evaluate the performance of SMORE. We evaluate rollout accuracy, training robustness, and prediction from sparse initial observations on the Wave, Navier–Stokes, and Spherical Shallow Water benchmarks. We also compare the maximum spatial resolutions supported by different model architectures on a single GPU and assess how pointwise decoder minibatching affects memory use, training time, and prediction accuracy at a fixed resolution. 
+
+5.1 Experiment Setup 
+
+This section describes the benchmark datasets, compared models, rollout protocols, training and evaluation windows, training objectives, evaluation metrics, checkpoint-selection and final-evaluation procedures, and experimental environment. 18 5.1.1 Benchmark Datasets 
+
+Following the setup of [32], we consider three time-dependent PDE benchmarks, including 2D Wave, 2D Navier–Stokes, and 3D Spherical Shallow Water. The data are generated by numerically solving the corresponding governing equations under the dataset-specific sampling protocols described in Appendix G.1. Each training or test sequence contains Nroll = 20 temporal states, 
+
+{u0, u1, . . . , uNroll −1}. The spatial resolutions, temporal step sizes, prediction targets, and train-ing/test splits are summarized in Table 1.                              
+
+> Table 1: Summary of the PDE benchmark datasets. Grid denotes the spatial sampling resolution, and sequence length denotes the number of snapshots in each trajectory.
+> Dataset Prediction target Grid ∆tSeq. length Train seq. Test seq. 2D Wave two-component wave field 64 20.25 s20 512 32 2D Navier–Stokes vorticity 64 21s20 512 32 3D Spherical Shallow Water height, vorticity 64 ×128 1h20 64 16
+
+5.1.2 Compared Models 
+
+We compare the proposed SMORE family with FNO [19, 73], CNO [20], Transolver [25], and DINo [32]. DINo uses the same modulated-MFN INR decoder structure as SMORE, but adopts a multilayer perceptron (MLP) as its latent dynamics model. 
+
+5.1.3 Rollout Protocol 
+
+All model comparisons are formulated as initial-condition rollout prediction tasks. For FNO, CNO, and Transolver, we use a physical-space autoregressive rollout. Starting from u0, the model predicts 
+
+ˆu1, which is then fed back as input to predict ˆu2; the procedure is repeated until the desired rollout horizon is reached. For DINo and the two SMORE models, the initial physical state u0 is first represented by an inferred latent code α0 through INR-based autodecoding. The latent dynamics model then rolls out ˆα1, ˆα2, . . . from α0, and the INR decoder maps these predicted latent states to the corresponding physical fields ˆu1, ˆu2, . . . .
+
+5.1.4 Training and Evaluation Protocol 
+
+As described in Section 4, the learning procedure consists of two stages. The first is model training on trajectories restricted to their first Ntrain snapshots, followed by evaluation on complete test trajectories containing Nroll snapshots. In our experiments, Ntrain = 10 and Nroll = 20 ; the model is supervised over the first Ntrain −1 = 9 prediction steps and evaluated over the full Nroll −1 = 19 -step rollout. Throughout, prediction step n predicts un, i.e., the (n+1) -th snapshot of the trajectory. Accordingly, we define the in-horizon, extrapolation, and full prediction windows as 
+
+Tin = {1, . . . , N train − 1},
+
+Textra = {Ntrain , . . . , N roll − 1},
+
+and 
+
+Tfull = {1, . . . , N roll − 1}.
+
+19 The in-horizon MSE is computed over snapshots 2–10, corresponding to Ntrain − 1 = 9 predic-tions. The extrapolation MSE is computed over snapshots 11–20, corresponding to Nroll −Ntrain = 10 
+
+predictions. The overall MSE is computed over all Nroll − 1 = 19 predicted snapshots. The initial snapshot is excluded from all prediction MSEs. For a prediction window T and dataset D, we define the rollout MSE as 
+
+ET (D) = 1
+
+|T | |D| 
+
+> |D|
+
+X
+
+> i=1
+
+X
+
+> n∈T
+
+1
+
+Nxc ∥ˆui,n − ui,n ∥22 , (40) where Nx is the number of spatial sample points and c is the number of output channels. This quantity is the mean squared prediction error per field entry. We report it over Tin , Textra , and Tfull .Regarding training epochs, unless otherwise specified, the budget for all models is fixed at 5,000 epochs. All models are trained on the fully observed data in Eq. (3). 
+
+5.1.5 Training Objectives 
+
+FNO, CNO, and Transolver follow the physical-space autoregressive rollout described above. During training, a prediction loss is computed at each of the Ntrain − 1 rollout steps, and the losses over all prediction steps are summed and backpropagated to update the model parameters. DINo and SMORE instead separate representation learning from latent-dynamics learning. The latent states and INR decoder are jointly optimized through the reconstruction loss defined in Eq. (6), which measures the discrepancy between the decoded fields and the corresponding ground-truth fields. After this update, the resulting latent states are detached and used as the target latent trajectory. The latent-dynamics model is then trained separately by minimizing the discrepancy between its rolled-out latent trajectory and these target latent states. SMORE further augments the latent-dynamics objective with the Lyapunov-guided stabil-ity regularization introduced in Eqs. (14) and (15). For SMORE-LRLQ, both the spectral and conservation regularization terms are applied, whereas the conservation term is omitted for the SMORE-Koopman. Gradient clipping is applied to the decoder and dynamics parameters before each parameter update, with the global ℓ2 norm of the gradient clipped to 1.0.
+
+5.1.6 Checkpoint Selection and Final Evaluation 
+
+For DINo and both SMORE models, evaluation requires fitting the initial latent state of each test trajectory with the networks frozen. During training, we periodically fit this initial latent with a short budget of Keval = 300 on Navier–Stokes and 500 on Wave and Spherical Shallow Water, and select the checkpoint with the lowest finite overall test MSE, following the workflow in Section 4.7. At the end of training, we load the selected checkpoint, freeze the decoder and dynamics networks, and refit each test trajectory’s initial latent with Kfinal = 1000 steps to produce the final reported errors. Only the observed initial snapshot enters this fitting objective; the initialization rules and fitting learning rates are unchanged, and the checkpoint is not reselected using the Kfinal results. For further details of the experimental setup, see Appendix G.2 and G.3. 
+
+5.2 Long-Horizon Rollout Extrapolation 
+
+In this section, we evaluate SMORE’s ability to accurately predict the evolution of physical fields beyond the supervised training horizon. Data-driven models for time-dependent PDEs are typically trained over a finite temporal window. A key question is therefore whether the learned dynamics 20 can continue to predict the evolution of the physical field beyond this window while maintaining low prediction error. This question is particularly relevant to SMORE, where the generic black-box MLP latent dynamics used in DINo are replaced by explicit linear or linear–quadratic dynamics equipped with Lyapunov-guided stability regularization. To assess this capability, we evaluate SMORE over both the supervised in-horizon window and the subsequent extrapolation window and compare its performance against several representative baseline models. DINo provides the closest latent-model baseline to SMORE, since both use the same general INR-based autodecoding framework, differing only in the latent dynamics, where DINo uses an MLP while the two SMORE variants use structured linear (SMORE-Koopman) or linear–quadratic (SMORE-LRLQ) dynamics. Following the common experimental protocol described in Section 5.1, we evaluate FNO, CNO, Transolver, DINo, SMORE-Koopman, and SMORE-LRLQ on the 2D Wave, 2D Navier–Stokes, and 3D Spherical Shallow Water benchmarks. All models in this comparison are trained and evaluated using three random seeds, selected once and then held fixed. To ensure a fair comparison across models, the model sizes are selected such that the overall parameter budgets are approximately matched across methods for each dataset; the corresponding hyperparameter configurations and budgets are reported in Appendix Table 7 and Table 8 respectively. We report the rollout MSE separately over the supervised in-horizon window and the subsequent extrapolation window as shown in Table 2. 
+
+Table 2: In-horizon and extrapolation MSE for long-horizon rollout prediction under approximately matched parameter budgets. Values are averaged over three random seeds, with the corresponding standard devia-tions reported in Appendix Table 8. For each run, the checkpoint with the lowest finite overall test MSE over the 19 predicted snapshots is selected; the initial snapshot is excluded. Best values in each metric column are bolded, and second-best values are underlined.                                      
+
+> Model Wave In-horizon Wave Extrapolation Navier–Stokes In-horizon Navier–Stokes Extrapolation Shallow Water In-horizon Shallow Water Extrapolation FNO [19, 73] 2.89e-04 7.37e-02 1.61e-03 2.43e-03 1.79e-03 5.22e-03 CNO [20] 1.99e-02 1.53e-01 1.52e-03 3.87e-03 8.03e-04 2.86e-03 Transolver [25] 7.82e-04 1.67e-02 4.13e-01 6.22e-01 1.71e-03 6.05e-03 DINo [32] 1.13e-03 1.38e-02 1.34e-03 2.32e-03 4.90e-04 6.49e-04
+> SMORE-Koopman 6.74e-05 3.22e-04 5.37e-02 9.78e-02 2.22e-04 5.34e-04 SMORE-LRLQ 1.25e-03 8.65e-04 1.01e-03 2.00e-03 5.86e-04 7.67e-04
+
+Across all three benchmarks, one of the two SMORE variants attains the lowest MSE in every one of the six evaluation columns. SMORE-Koopman is best on Wave and Spherical Shallow Water in both windows, and SMORE-LRLQ is best on Navier–Stokes in both windows. The latent-model baseline DINo is at most second-best. Measured against DINo in the extrapolation window, the best SMORE variant reduces the error by 97 .7% on Wave (from 1.38 × 10 −2 to 3.22 × 10 −4), by 13 .8% on Navier–Stokes (from 2.32 × 10 −3 to 2.00 × 10 −3), and by 17 .7% on Spherical Shallow Water (from 
+
+6.49 × 10 −4 to 5.34 × 10 −4). The advantage of SMORE is most pronounced in the extrapolation window, where error accumulates without supervision. Several baselines that are competitive in-horizon degrade sharply once they leave the supervised window. On Wave, FNO attains the second-lowest in-horizon error ( 2.89 × 10 −4), yet its extrapolation error rises to 7.37 × 10 −2, a degradation of roughly 
+
+255 ×; over the same windows SMORE-Koopman rises only from 6.74 × 10 −5 to 3.22 × 10 −4, a factor of about 4.8, and its extrapolation error is about 229 × lower than that of FNO. On Spherical Shallow Water, CNO degrades from 8.03 × 10 −4 in-horizon to 2.86 × 10 −3 in extrapolation (about 3.6×), whereas SMORE-Koopman degrades only from 2.22 × 10 −4 to 5.34 × 10 −4 (about 2.4×) and remains about 5.4× more accurate in the extrapolation window. Strong in-horizon accuracy therefore does 21 not necessarily imply reliable extrapolation, whereas the structured, stability-regularized latent dynamics of SMORE show slower error accumulation over the unsupervised horizon than the baseline models. The two SMORE variants exhibit a clear trade-off between peak performance and cross-system robustness. SMORE-Koopman has the simplest structure, a single linear operator, which makes it easy to learn and yields the lowest errors when the dominant dynamics admit a linear latent evolution. This is the case for Wave, whose governing equation is itself linear. It also holds for Spherical Shallow Water. Although this system is physically nonlinear, with both advective and height–velocity coupling terms, it becomes a more regular regime once the transient spin-up phase is removed (Section G.1.3). The same simplicity, however, limits SMORE-Koopman when the dynamics are strongly nonlinear. On Navier–Stokes, its errors ( 5.37 × 10 −2 in-horizon and 
+
+9.78 × 10 −2 in extrapolation) are about 50 × those of SMORE-LRLQ. SMORE-LRLQ adds quadratic latent terms that are structurally compatible with the convective nonlinearity of Navier–Stokes, on which it is the best method in both windows ( 1.01 × 10 −3 and 2.00 × 10 −3). The additional quadratic coupling makes it harder to learn and yields no benefit on the nearly linear systems, where it is never the single best method, but it does not exhibit extreme error degradation in any of the six evaluation settings. The effective choice of latent dynamics is thus governed by the structure of the physics rather than by expressive capacity alone. Adding quadratic terms helps when the dynamics are convective and can hurt when an essentially linear evolution is already well represented. One result in Table 2 deserves some additional explanation. For Wave, the extrapolation error of SMORE-LRLQ ( 8.65 × 10 −4) is lower than its in-horizon error ( 1.25 × 10 −3), which may appear inconsistent with the usual tendency of prediction error to increase with horizon. This behavior results from window averaging in an oscillatory system rather than from an actual improvement at longer horizons. As shown by the per-snapshot error profile in Fig. 6, the Wave error is non-monotonic and varies with the oscillatory dynamics. It reaches a local maximum within the in-horizon window, around snapshots 7–9, and then decreases through much of the extrapolation window. Consequently, averaging over the two windows places the error peak in the in-horizon interval and much of the subsequent decline in the extrapolation interval, causing the extrapolation-window mean to fall below the in-horizon mean. This effect is specific to Wave; for Navier–Stokes and Shallow Water, the extrapolation error remains higher than the in-horizon error for all methods. Fig. 2 shows example predicted fields in the extrapolation window. The examples show that the low numerical errors are accompanied by accurate recovery of the underlying spatial structures. SMORE preserves these structures as they evolve throughout the rollout, suggesting that the model captures the field dynamics rather than producing overly smoothed spatial predictions. SMORE achieves the lowest error across all six evaluation columns, with the advantage be-ing most pronounced in the extrapolation window. This suggests that its structured, stability-regularized latent dynamics accumulate error more slowly over the rollout than the baselines. The two variants, however, show complementary strengths. SMORE-Koopman performs particularly well when a linear latent evolution is sufficient to capture the dominant dynamics, as in Wave and Shallow Water, but degrades substantially on Navier–Stokes. In contrast, SMORE-LRLQ provides more consistent performance across systems and achieves the lowest errors on the convection-dominated Navier–Stokes case. The two variants therefore show complementary strengths across the three systems. 22 Figure 2: Field-level extrapolation comparison at snapshot 15 (prediction step n = 14 ). Within each benchmark, all models are compared using the same random seed, the same test trajectory, and the same prediction step n. Rows show the ground truth followed by model predictions; columns show the normalized Wave field ux, Navier–Stokes vorticity, and Spherical Shallow Water vorticity. These snapshots confirm that the low MSE in Table 2 reflects actual structure recovery. The predicted fields track the real spatial patterns and their evolution rather than only a low average error. 
+
+23 5.3 Stability and Robustness Across Latent Dimensions 
+
+In this section, we investigate how the stability-related mechanisms in SMORE affect the robust-ness of its predictions. As discussed at the end of Section 4.2, SMORE-LRLQ incorporates three mechanisms that can contribute to robust latent evolution, which are Lyapunov-guided stability regularization, low-rank quadratic parameterization, and gradient clipping. In our experiments, we observe that enabling or disabling these mechanisms greatly affects both the prediction error and the training stability. We therefore ask what each of these three mechanisms contributes to the training stability and predictive accuracy of SMORE-LRLQ, how these contributions change with the per-component latent dimension p, and whether they are consistent across the three PDE systems. To answer these questions, we evaluate SMORE-LRLQ across different per-component latent dimensions p while selectively enabling or removing the three mechanisms. In the discussion that follows, the FULL configuration includes all three mechanisms. For compactness in the abla-tion labels, Lreg denotes the pair of Lyapunov-guided stability regularizers, Lreg ,cons and Lreg ,eig .The reported prediction error follows evaluation protocol described in Section 5.1, with final test errors computed using Kfinal = 1000 initial latent fitting steps. The number of epochs is set to 10,000 to facilitate the observation of long-term trends. For configurations that develop NaN, we report the first logged NaN epoch in Fig. 3(a). The first NaN epochs for all tested configurations on Shallow Water are listed in Appendix Table 9, and the complete Navier–Stokes mechanism sweep in Appendix Table 10. Fig. 3 reveals two different robustness issues. According to Fig. 3(a), when       
+
+> Figure 3: Training robustness of SMORE-LRLQ across per-component latent dimension p. (a) Spherical Shallow Water: rows denote stability configurations and columns denote per-component latent dimensions. Hatched cells report the first logged epoch with NaN; “Not observed” indicates that none was observed during the available training window. (b) Navier–Stokes: best finite overall test MSE over the 19 predicted snapshots for different stability configurations. Legend annotations give the relative MSE change from
+> p= 50 to p= 100 for each curve.
+
+all three stabilization mechanisms are disabled (OFF), Spherical Shallow Water develops non-finite training behavior at larger latent dimensions. In Fig. 3(b), under the same OFF configuration, Navier–Stokes remains numerically finite, but its prediction error becomes strongly dependent on the selected latent dimension and tends to increase rapidly as the latent dimension grows. On Spherical Shallow Water, SMORE-LRLQ exhibits a severe numerical failure mode. Of the six configurations shown in Fig. 3(a), four eventually produce NaN at one or more latent dimensions, 24 and these failures occur earlier as the latent dimension increases. For the OFF configuration the first observed NaN occurs at epoch 8111 for p = 50 , but already at epochs 200 and 100 for p = 70 and 
+
+p = 100 , respectively. Neither the stability regularizers alone nor gradient clipping alone prevents failure at the two larger latent dimensions, and removing only the low-rank parameterization from FULL still fails at p = 70 and p = 100 (epochs 160 and 137). In contrast, the low-rank quadratic parameterization alone is sufficient to prevent non-finite training across all three tested latent dimensions, indicating that it is the main mechanism mitigating the increased instability at larger 
+
+p. At p = 50 , however, the stability regularizers also have a clear effect on long-term training stability: the OFF configuration develops NaN at epoch 8111, whereas the configuration with stability regularization alone remains finite throughout the 10,000-epoch training window. At 
+
+p = 100 this benefit also appears in accuracy, where removing the low-rank parameterization increases the best finite rollout MSE from 0.6299 × 10 −3 to 5.585 × 10 −3 before the run diverges, a 
+
++786 .8% degradation (Table 3). However, a low error at the best checkpoint does not guarantee that training remains stable. At p = 50 , the OFF and clip only configurations reach best finite MSEs comparable to FULL, yet both subsequently become non-finite, as shown in Appendix Table 11. For Navier–Stokes, every configuration follows a U-shaped trend in p, dropping sharply to a minimum near p = 50 –70 and then rising on the high-capacity side. The configurations differ mainly in how steeply the error rises on this side, summarized by the relative change ∆MSE 50 →100 
+
+from p = 50 to p = 100 reported in the legend. FULL has the shallowest right arm ( +16 .6% ) and is therefore the least sensitive of all configurations to the exact choice of p once the latent space dimension is large. Removing a single mechanism from FULL increases this sensitivity only slightly for the stability regularizers ( +18 .9% ) and gradient clipping ( +20 .5% ), but sharply for the low-rank parameterization ( +95 .3% ), while the two configurations with neither the stability regularizers nor the low-rank parameterization are the most sensitive of all (gradient clipping only +133 .7% ,OFF +267 .1% ). For example, the clip only configuration is marginally better than FULL at p = 50 
+
+(1.939 × 10 −3 versus 2.003 × 10 −3) but rises to 4.532 × 10 −3 at p = 100 , whereas FULL changes only from 2.003 × 10 −3 to 2.337 × 10 −3 over the same range and in fact reaches its own minimum of 1.923 × 10 −3 at p = 70 . A low error at a single latent dimension therefore does not imply robustness across dimensions. The ordering of ∆MSE 50 →100 identifies the low-rank quadratic parameterization as the largest contributor to robustness at high latent dimensions. The stability regularizers and gradient clipping provide smaller additional protection. Together, they make FULL far less dependent on a well-chosen p. This matters in practice, since the intrinsic dimension of a physical system is rarely known in advance and the latent dimension is typically chosen with a margin. FULL remains accurate even when more resources are provided than necessary, which makes it applicable to a broader range of systems without careful tuning of p.Table 3 isolates the contribution of each mechanism at a fixed latent dimension p = 100 across the datasets, and shows that these contributions are strongly regime-dependent. On Navier– Stokes, removing any mechanism degrades accuracy, most strongly the low-rank parameterization (+122 .2% ) and the stability regularizers ( +48 .7% ), so all three contribute at this capacity. On Shallow Water the differences are negligible ( +1 .7% and +0 .7% for the stability regularizers and gradient clipping), except for the low-rank column. Its removal causes divergence and triggers a non-finite run ( †) after the large accuracy loss noted above, so here the low-rank parameterization is essential for stable training rather than for accuracy. The mechanism study shows that the three stability-related design choices play distinct and system-dependent roles. For Spherical Shallow Water, the low-rank quadratic parameterization is the primary mechanism for mitigating the deterioration in training stability as the latent dimension increases, while the Lyapunov-guided stability regularization prevents the long-term divergence observed at p = 50 when the regularization is disabled. For Navier–Stokes, all three mechanisms 25 Table 3: Leave-one-out ablation of the FULL SMORE-LRLQ configuration (all mechanisms enabled) at per-component latent dimension p = 100 . Each entry is the total MSE over the 19 predicted snapshots (snapshots 2–20) under the 1000-step initial latent fitting during evaluation; the value in parentheses is the relative change from FULL, where positive means higher error. The columns remove the Lyapunov-guided stability regularization, gradient clipping, and the low-rank quadratic parameterization respectively. A dagger ( †) marks a run that diverged to non-finite values during training; its best pre-divergence checkpoint is used for evaluation. Dataset FULL FULL without Lreg FULL without clip FULL without low -rank 
+
+Navier–Stokes 2.337e-3 3.475e-3 (+48.7%) 2.796e-3 (+19.7%) 5.191e-3 (+122.2%) Shallow Water 6.299e-4 6.403e-4 (+1.7%) 6.342e-4 (+0.7%) 5.585e-3 † (+786.8%) 
+
+help reduce the sensitivity of prediction accuracy to the per-component latent dimension. Together, these results show that the stability-related design in SMORE primarily provides flexibility in choosing the latent dimension and robustness to numerical training failure, rather than uniformly reducing prediction error in every setting. 
+
+5.4 Prediction from Sparse Initial Observations 
+
+In this section, we investigate whether SMORE can retain full-field predictive capability when only sparse spatial observations of the initial state are available. While the previous experiments assume access to the complete initial field, many practical settings provide only a limited number of measurements at the initial time. We therefore test whether SMORE trained entirely on fully observed fields can infer a useful initial latent state from sparse test-time measurements and subsequently recover the complete spatiotemporal trajectory without retraining. We use the three benchmark datasets introduced in Section 5.1 together with the corresponding SMORE models trained on fully observed spatial fields in Section 5.2. At test time, only a fraction vobs of the spatial locations in the initial snapshot is retained, with the observed locations sampled uniformly without replacement. Only these observed values are used to fit the initial latent state through the autodecoding procedure, after which prediction proceeds with the trained decoder and latent-dynamics model. Details of the spatial masks and the corresponding observation counts for each dataset are provided in Appendix G.6. 
+
+Table 4: Sparse-initialization performance under selected initial-snapshot observation ratios. Each entry reports overall MSE over the 19 predicted snapshots, averaged across three random seeds. The fitted initial snapshot is excluded from the metric. Only the retained samples of the first snapshot are used to infer the initial latent state; the subsequent rollout reconstructs complete spatial fields without retraining. The complete visibility sweep with standard deviations is reported in Appendix Table 12. Dataset (model) 100% 50% 10% 4% 2% 1% 
+
+Wave (SMORE-Koopman) 2.01e-04 2.05e-04 1.98e-04 2.11e-04 6.96e-04 4.06e-02 Navier–Stokes (SMORE-LRLQ) 1.53e-03 1.53e-03 1.60e-03 1.78e-03 3.77e-03 2.48e-02 Shallow Water (SMORE-Koopman) 3.86e-04 3.94e-04 4.55e-04 6.71e-04 1.32e-03 1.56e-03 
+
+Table 4 reports a representative subset of visibility levels; the full sweep with across-seed standard deviations is given in Appendix Table 12. Retaining 10% of the initial snapshot ( vobs =
+
+26 10% ) changes the overall MSE by only −1.5% for Wave, +4 .6% for Navier–Stokes, and +17 .9% 
+
+for Shallow Water relative to full observation, a modest change in all three cases. More generally, every system tolerates substantial sparsity, with the error staying within roughly a factor of two of its full-observation value down to about 4% visibility. The systems diverge only under extreme sparsity. For Wave and Navier–Stokes, the error increases moderately at 2% visibility, reaching about 3.5× and 2.5× their respective full-observation baselines, before rising sharply at 1% to 
+
+4.06 × 10 −2 and 2.48 × 10 −2. These values are approximately 200 × and 16 × the corresponding full-observation errors. In contrast, the error for Shallow Water increases much more gradually as visibility is reduced, from 3.86 to 3.94 , 4.55 , 6.71 , 13 .2, and 15 .6, in units of 10 −4, and reaches only about 4× its baseline at 1% .This difference at extreme sparsity is consistent with the loss of identifiability characterized by Theorem 3. Because the decoder is affine in the latent code, the observability constant cS = σmin (JS )
+
+can be computed exactly for each mask (Table 13). It decreases as visibility is reduced and becomes zero once the number of observed locations falls below p, which occurs at 2% and 1% for Wave and at 1% for Navier–Stokes and Shallow Water. The vanishing of cS marks the loss of observability. For Wave and Navier–Stokes, the strongest error degradation occurs at or beyond this point, whereas Shallow Water degrades more gradually. Fig. 4 shows example predictions at 10% visibility. From a single sparse initial snapshot, the frozen decoder and latent dynamics reconstruct the complete field sequence, and the predictions closely track the ground truth across the rollout. The sparse-initialization study demonstrates a practical capability of the coordinate-based latent representation. A model trained only on fully observed fields can be reused under substantially sparser initial measurements, without retraining, and still produce complete future fields. This is not spatial interpolation of the observed locations. The observed values are used to identify an initial state in the learned latent representation. The latent dynamics then evolves this state in time, and the frozen decoder maps it to full spatiotemporal fields. The capability has a clear limit. Under extremely sparse observations, the error increases sharply, since successful sparse-to-rollout inference requires the observed values to carry enough information to identify the initial latent state. This limit is set by the number of observed locations relative to the per-component latent dimension 
+
+p rather than by the visible ratio itself, since the same visible ratio yields different numbers of observed locations on different grids; at 1% , for example, it retains 40 locations on the 64 × 64 grids but 81 on the 64 × 128 grid. 
+
+5.5 Memory Efficiency and Spatial Capacity 
+
+In this section, we investigate the practical benefits of the pointwise minibatching strategy in SMORE. For neural models used to solve time-dependent PDEs, increasing spatial resolution can make training increasingly memory intensive. This issue remains relevant even for latent-space models such as SMORE. Although temporal evolution is performed in a compact latent space, the decoder must still evaluate and backpropagate through the physical field over the spatial grid during training. As the number of spatial points increases, this decoder evaluation can become a major memory bottleneck. The coordinate-based decoder in SMORE provides a natural way to alleviate it. Pointwise minibatching divides the spatial coordinates into pointwise minibatches without changing either the decoder architecture or the latent-dynamics model, which can greatly reduce GPU-memory usage and, under a fixed memory budget, make much larger spatial grids computationally feasible. We examine pointwise minibatching from two complementary perspectives. First, we test how much it increases the maximum spatial resolution that can be processed under a fixed GPU-memory budget, and compare this capacity with models that use their standard spatial execution 27 (a) Wave using SMORE-Koopman. 
+
+> (b) Navier–Stokes using SMORE-LRLQ.
+> (c) Spherical Shallow Water using SMORE-Koopman.
+
+Figure 4: Sparse initialization at 10% visibility for (a) Wave, (b) Navier–Stokes, and (c) Spherical Shallow Water. In each panel, the top row shows the ground-truth field at snapshot indices n = 0 , 4, 9, 14 , 19 (labeled 
+
+t in the panels). The bottom-left image shows the sparse initial observation, which is the only test-time input, while the remaining bottom images show full-field predictions at the corresponding later snapshots. Only the observed samples from the initial snapshot are used to infer bα0; the decoder and latent dynamics remain frozen. Wave and Spherical Shallow Water use SMORE-Koopman, whereas Navier–Stokes uses SMORE-LRLQ. 
+
+28 strategies. Second, at a fixed spatial resolution, we quantify the corresponding changes in memory usage, computation time, and prediction accuracy. Throughout these experiments, we cap the pointwise-minibatch chunk size at 64 spatial coordinates and refer to this setting as PM64. All spatial coordinates are still processed, so PM64 changes only the batching strategy rather than subsampling the observed field. If the total number of spatial points is not divisible by 64, the final chunk contains the remaining points; for example, 150 spatial points are processed as chunks of 64 + 64 + 22 . A smaller chunk size could further reduce the peak memory requirement and potentially extend the feasible spatial resolution, at the cost of additional computation and execution overhead, a trade-off we do not explore here. 
+
+5.5.1 Maximum Spatial Resolution on One GPU 
+
+We first examine whether the memory reduction provided by pointwise minibatching translates into greater spatial capacity. We evaluate all models introduced in Section 5.1. For each model, we determine the largest square grid on which it can complete a fixed training-and-evaluation protocol on a single A100 40 GB GPU. For this capacity experiment, all models use approximately matched parameter counts and the same hyperparameter configurations as in the Navier–Stokes comparison in Section 5.2, with a common batch size of 32. Instead of using a physical simulation dataset, we generate square-grid tensors at different spatial resolutions, and train each model for two epochs at each resolution. The grid side length is then progressively increased until training produces a CUDA out-of-memory (OOM) error, thereby determining the maximum spatial resolution supported by each model under the fixed GPU-memory budget. The two SMORE variants use PM64, while DINo, FNO, CNO, and Transolver are evaluated with their standard full-grid or native implementations. The two-epoch protocol is designed only to identify the memory limit and does not establish predictive performance or long-training feasibility at the limiting resolutions.                                           
+
+> Table 5: Maximum successful square grids on one A100 40 GB GPU under the two-epoch capacity protocol, together with model parameter counts on Navier–Stokes. Each maximum successful grid is one step below a CUDA OOM failure (i.e., the next larger square grid runs out of memory). PM64 denotes pointwise minibatches of 64 coordinates in all decoder evaluations, including training autodecoding, test-time initial latent fitting, and evaluation field reconstruction. Grid points is the number of spatial points at the maximum successful grid, and the last column reports this count relative to Transolver. Model Spatial execution Parameters Maximum successful grid Grid points Relative points Transolver [25] Full grid 358,007 64 ×64 4,096 1.00 ×
+> DINo [32] Full grid 356,444 163 ×163 26,569 6.49 ×
+> FNO [19, 73] Full grid 336,653 271 ×271 73,441 17 .93 ×
+> CNO [20] Full grid 326,184 307 ×307 94,249 23 .01 ×
+> SMORE-Koopman PM64 355,165 1714 ×1714 2,937,796 717 .24 ×
+> SMORE-LRLQ PM64 353,961 1714 ×1714 2,937,796 717 .24 ×
+
+The results in Table 5 show that pointwise minibatching increases the spatial capacity of SMORE under the tested memory budget. All models use approximately matched parameter counts, between 326 ,184 and 358 ,007 (within about 10% ), so the comparison reflects the spatial execution strategy rather than model size. Measured by side length, SMORE-LRLQ and SMORE-Koopman both reach a maximum successful grid of 1714 × 1714 , the largest of all models and well beyond the best physical-space baseline (CNO at 307 × 307 ). The gap is larger in terms of the actual number of spatial points processed, which is the quantity that drives decoder memory. Both 29 SMORE variants handle 2,937 ,796 points, corresponding to 717 .24 × the Transolver baseline and roughly 31 × the points of CNO. Pointwise minibatching therefore enables SMORE to operate at higher spatial resolutions than any baseline evaluated here. The two SMORE variants reach the same maximum grid size because their peak memory usage is dominated by data storage rather than by the model architecture at these resolutions. Pointwise minibatching limits the memory required by decoder activations, since it depends on the chunk size instead of the full grid size. As a result, most of the memory is used to store the input fields, predicted fields, and temporary tensors used to compute the error. These tensors have the same size for both variants because they use the same batch size, grid size, and number of snapshots. For example, at a resolution of 1715 × 1715 , storing 32 trajectories with 20 snapshots of a single-channel float32 field alone requires approximately 7 GiB. When the next pointwise chunk is processed during training, the additional memory required for its activations and temporary tensors exceeds the remaining available GPU memory, resulting in an out-of-memory error. 
+
+5.5.2 Resource and Accuracy Changes at a Fixed Resolution 
+
+Having established the spatial-resolution benefit of PM64, we next evaluate its effects on GPU memory usage, computation time, and prediction accuracy, using the SMORE-LRLQ model on the Navier–Stokes dataset at a fixed spatial resolution of 64 × 64 as a representative case. We use the same Navier–Stokes SMORE-LRLQ configuration as in Section 5.2, except that it additionally uses pointwise minibatching. These runs use four A100 80 GB GPUs and are separate from the single-GPU capacity experiment above; the reported memory is the peak allocated memory logged on rank 0. Table 6 reports training memory, elapsed time, and prediction error.                               
+
+> Table 6: Observed resource and accuracy changes for 64 ×64 Navier–Stokes SMORE-LRLQ. Memory is the logged training-epoch peak allocated memory on rank 0. Elapsed times are measured over complete 5,000-epoch runs and refer to one representative run per execution setting; these timings exclude the final 1,000-step test stage. MSEs are mean ±sample standard deviation over three random seeds. Metric Full-grid decoding PM64 Recorded peak allocated memory (MB) 18,613.9 314.6 Time for 5,000 epochs 1 h 8 min 21 s 4 h 4 min 32 s In-horizon MSE ( ×10 −3)1.008 ±0.025 1.048 ±0.014
+> Extrapolation MSE ( ×10 −3)2.000 ±0.199 2.111 ±0.262
+> Overall MSE ( ×10 −3)1.530 ±0.101 1.607 ±0.132
+
+At the fixed 64 × 64 resolution, PM64 reduces the recorded peak allocated training memory from 18 ,613 .9 to 314 .6 MB, a 59 .2× reduction (about 98 .31% ), while keeping the model architecture, spatial resolution, and per-rank batch size unchanged. The main effect of PM64 is therefore to trade reduced memory consumption for increased computation time. The representative full-grid run completes 5,000 epochs in 1 h 8 min 21 s, whereas PM64 requires 4 h 4 min 32 s, an increase of about 
+
+3.58 ×. The prediction error changes only slightly. The overall MSE increases by about 5.0% , from 
+
+1.530 × 10 −3 to 1.607 × 10 −3, which is within the across-seed standard deviation. The increase is similar in the two windows, 4.0% in-horizon (from 1.008 to 1.048 × 10 −3) and 5.6% in extrapolation (from 2.000 to 2.111 × 10 −3). 30 6 Conclusions 
+
+We introduced SMORE, a stability-promoting mesh-agnostic reduced-order modeling framework for time-dependent PDEs. SMORE separates spatial representation from temporal evolution. An INR autodecoder represents the physical field using a decoder modulated by a compact latent state that can be queried at arbitrary coordinates, while structured latent dynamics evolve the latent state in time. We considered two variants, SMORE-Koopman and SMORE-LRLQ, corresponding to linear and low-rank linear–quadratic latent dynamics, respectively. On the theoretical side, we derived Lyapunov-based sufficient conditions for the stability of latent dynamics based on spectral dissipativity and cyclic energy cancellation. These conditions motivate the stability regularizers used during training. We further showed that the decoder is affine in the latent code. This gives explicit constants that transfer latent-state bounds and errors to the reconstructed fields. We also bounded how errors in sparse initial-state recovery propagate into future full-field predictions. The recovery error is governed by the smallest singular value of the sensor Jacobian, and its propagation is controlled under an explicit rollout assumption. The numerical experiments examine four complementary aspects of the proposed framework. First, across the 2D Wave, 2D Navier–Stokes, and 3D Spherical Shallow Water benchmarks, SMORE achieves the lowest extrapolation error in each case at comparable parameter budgets. SMORE-Koopman performs best on Wave and Spherical Shallow Water, whereas SMORE-LRLQ provides the strongest performance on the more nonlinear Navier–Stokes system, demonstrating the com-plementary expressive capabilities of the linear and linear–quadratic latent dynamics. Second, the mechanism ablations show that the stability-related design choices play system-dependent roles. For Navier–Stokes, the low-rank quadratic parameterization is the dominant contributor to reducing sensitivity to the selected latent dimension, with the Lyapunov-guided regularization and gradient clipping providing additional robustness. For Spherical Shallow Water, the low-rank quadratic parameterization is particularly important for preventing non-finite training behavior. The Wave results further show that these mechanisms should not be interpreted as universal improvements in prediction accuracy; their main practical value is flexibility in choosing the latent dimension and robustness to numerical training failure. Third, SMORE retains full-field predictive capability when only sparse observations of the initial state are available. Models trained entirely on fully observed fields can infer an initial latent state from sparse test-time measurements and subsequently predict complete future fields without retraining. Prediction remains accurate under substantial spatial sparsity, and its sharp degradation under extreme sparsity coincides with the loss of identifiability, cS = 0 , predicted by the analysis. Finally, pointwise minibatching provides a practical trade-off of memory and computation. PM increases the maximum spatial resolution on a single GPU to 1714 × 1714 , compared with 
+
+307 × 307 for the best baseline CNO. At a fixed 64 × 64 resolution, we compare SMORE-LRLQ trained with PM64 against the same model trained with full-grid decoding. PM64 reduces the recorded peak allocated training memory by a factor of 59 .2, while increasing training time by approximately 3.58 ×. The overall MSE changes by about 5.0% , within the across-seed standard deviation. These gains are obtained without changing either the decoder architecture or the latent-dynamics formulation. Overall, the results show that SMORE combines structured latent evolution with coordinate-based decoding to support long-horizon extrapolation, improved empirical robustness, sparse-initialization inference, and memory-efficient spatial execution within a single reduced-order modeling framework. Future work will extend SMORE to parametric PDEs by conditioning the decoder and latent dynamics on physical parameters, so that a single trained model can represent families of PDE systems. We will also investigate adaptive weighting of the Lyapunov-guided 31 stability regularization to better balance prediction accuracy and progress toward the desired stability conditions during training. Additional directions include more complex geometries and unstructured meshes. 
+
+# Acknowledgement 
+
+This work is supported by the National Science Foundation (NSF) under Award No. 2616260. Shaowu Pan acknowledges support from the Google Research Scholar Program. This research used resources of the National Energy Research Scientific Computing Center (NERSC), a U.S. Department of Energy Office of Science User Facility supported by the Office of Science under Contract No. DE-AC02-05CH11231, through NERSC Award DDR-ERCAP0035696. Computational resources were also provided by the Alpha HPC cluster operated by the Empire AI Consortium, Inc., with support from Empire State Development (State of New York), the Simons Foundation, and the Secunda Family Foundation. This work further used Purdue Anvil, Texas A&M University FASTER, and Texas A&M University ACES through allocations PHY240112 and MCH260003 from the Advanced Cyberinfrastructure Coordination Ecosystem: Services & Support (ACCESS) program, which is supported by U.S. National Science Foundation Grants Nos. 2138259, 2138286, 2138307, 2137603, and 2138296. Additional computing hardware support was provided by the NVIDIA Academic Grant Program. This research used resources of the Oak Ridge Leadership Computing Facility at the Oak Ridge National Laboratory, which is supported by the Office of Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725. The authors also thank Mr. Jake Herman for his numerical experiments with the Koopman operator. 
+
+# References 
+
+[1] Moloud Abdar, Farhad Pourpanah, Sadiq Hussain, Dana Rezazadegan, Li Liu, Mohammad Ghavamzadeh, Paul Fieguth, Xiaochun Cao, Abbas Khosravi, U Rajendra Acharya, et al. A review of uncertainty quantification in deep learning: Techniques, applications and challenges. 
+
+Information fusion , 76:243–297, 2021. [2] Philip Beran, Bret Stanford, and Christopher Schrock. Uncertainty quantification in aeroelas-ticity. Annual review of fluid mechanics , 49:361–386, 2017. [3] Xiaosong Du, Ping He, and Joaquim RRA Martins. Rapid airfoil design optimization via neural networks-based parameterization and surrogate modeling. Aerospace Science and Technology ,113:106701, 2021. [4] Camille Zerfas, Leo G Rebholz, Michael Schneier, and Traian Iliescu. Continuous data as-similation reduced order models of fluid flow. Computer Methods in Applied Mechanics and Engineering , 357:112596, 2019. [5] Takashi Misaka. Image-based fluid data assimilation with deep neural network: T. misaka. 
+
+Structural and Multidisciplinary Optimization , 62(2):805–814, 2020. [6] C´ esar Quilodr´ an Casas, Rossella Arcucci, Pin Wu, Christopher Pain, and Yi-Ke Guo. A reduced order deep data assimilation model. Physica D: Nonlinear Phenomena , 412:132615, 2020. [7] Fredi Tr ¨ oltzsch. Optimal control of partial differential equations: theory, methods and applications ,volume 112. American Mathematical Society, 2024. 32 [8] Ahmad Asadi and Reza Safabakhsh. The encoder-decoder framework and its applications. In Witold Pedrycz and Shyi-Ming Chen, editors, Deep Learning: Concepts and Architectures ,volume 866 of Studies in Computational Intelligence , pages 133–167. Springer, 2020. [9] Zijie Li, Kazem Meidani, and Amir Barati Farimani. Transformer for partial differential equations’ operator learning. arXiv preprint arXiv:2205.13671 , 2022. [10] Jules Berman and Benjamin Peherstorfer. Colora: Continuous low-rank adaptation for re-duced implicit neural modeling of parameterized partial differential equations. arXiv preprint arXiv:2402.14646 , 2024. [11] Ricky TQ Chen, Yulia Rubanova, Jesse Bettencourt, and David K Duvenaud. Neural ordinary differential equations. Advances in neural information processing systems , 31, 2018. [12] Louis Serrano, Lise Le Boudec, Armand Kassa¨ ı Koupa¨ ı, Thomas X Wang, Yuan Yin, Jean-No¨ el Vittaut, and Patrick Gallinari. Operator learning with neural fields: Tackling pdes on general geometries. Advances in Neural Information Processing Systems , 36, 2024. [13] Woojin Cho, Kookjin Lee, Donsub Rim, and Noseong Park. Hypernetwork-based meta-learning for low-rank physics-informed neural networks. Advances in Neural Information Processing Systems , 36, 2024. [14] Yuehaw Khoo, Jianfeng Lu, and Lexing Ying. Solving parametric pde problems with artificial neural networks. European Journal of Applied Mathematics , 32(3):421–435, 2021. [15] Jiagang Qu, Weihua Cai, and Yijun Zhao. Learning time-dependent pdes with a linear and nonlinear separate convolutional neural network. Journal of Computational Physics , 453:110928, 2022. [16] Harwinder Singh Sidhu, Abhinav Narasingam, Prashanth Siddhamshetty, and Joseph Sang-Il Kwon. Model order reduction of nonlinear parabolic pde systems with moving boundaries using sparse proper orthogonal decomposition: Application to hydraulic fracturing. Computers & Chemical Engineering , 112:92–100, 2018. [17] Lu Lu, Pengzhan Jin, and George Em Karniadakis. Deeponet: Learning nonlinear operators for identifying differential equations based on the universal approximation theorem of operators. 
+
+arXiv preprint arXiv:1910.03193 , 2019. [18] Lu Lu, Xuhui Meng, Shengze Cai, Zhiping Mao, Somdatta Goswami, Zhongqiang Zhang, and George Em Karniadakis. A comprehensive and fair comparison of two neural operators (with practical extensions) based on fair data. Computer Methods in Applied Mechanics and Engineering ,393:114778, 2022. [19] Zongyi Li, Nikola Kovachki, Kamyar Azizzadenesheli, Burigede Liu, Kaushik Bhattacharya, Andrew Stuart, and Anima Anandkumar. Fourier neural operator for parametric partial differential equations. arXiv preprint arXiv:2010.08895 , 2020. [20] Bogdan Raonic, Roberto Molinaro, Tobias Rohner, Siddhartha Mishra, and Emmanuel de Bezenac. Convolutional neural operators. In ICLR 2023 workshop on physics for machine learning , 2023. [21] Tobias Pfaff, Meire Fortunato, Alvaro Sanchez-Gonzalez, and Peter W Battaglia. Learning mesh-based simulation with graph networks. arXiv preprint arXiv:2010.03409 , 2020. 33 [22] Filipe De Avila Belbute-Peres, Thomas Economon, and Zico Kolter. Combining differentiable pde solvers and graph neural networks for fluid flow prediction. In international conference on machine learning , pages 2402–2411. PMLR, 2020. [23] Zongyi Li, Daniel Zhengyu Huang, Burigede Liu, and Anima Anandkumar. Fourier neural operator with learned deformations for pdes on general geometries. Journal of Machine Learning Research , 24(388):1–26, 2023. [24] Songming Liu, Zhongkai Hao, Chengyang Ying, Hang Su, Ze Cheng, and Jun Zhu. Nuno: A general framework for learning parametric pdes with non-uniform data. In International Conference on Machine Learning , pages 21658–21671. PMLR, 2023. [25] Haixu Wu, Huakun Luo, Haowen Wang, Jianmin Wang, and Mingsheng Long. Transolver: A fast transformer solver for pdes on general geometries. In Proceedings of the 41st International Conference on Machine Learning , volume 235 of Proceedings of Machine Learning Research , pages 53681–53705. PMLR, 2024. [26] Peter Yichen Chen, Jinxu Xiang, Dong Heon Cho, Yue Chang, GA Pershing, Henrique Teles Maia, Maurizio M Chiaramonte, Kevin Carlberg, and Eitan Grinspun. Crom: Continu-ous reduced-order modeling of pdes using implicit neural representations. arXiv preprint arXiv:2206.02607 , 2022. [27] Shaowu Pan, Steven L Brunton, and J Nathan Kutz. Neural implicit flow: a mesh-agnostic dimensionality reduction paradigm of spatio-temporal data. Journal of Machine Learning Research , 24(41):1–60, 2023. [28] Vincent Sitzmann, Julien Martel, Alexander Bergman, David Lindell, and Gordon Wetzstein. Implicit neural representations with periodic activation functions. Advances in Neural Informa-tion Processing Systems , 33, 2020. [29] Rizal Fathony, Anit Kumar Sahu, Devin Willmott, and J Zico Kolter. Multiplicative filter networks. International Conference on Learning Representations, 2021. [30] Zhiqin Chen and Hao Zhang. Learning implicit fields for generative shape modeling. In 
+
+Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 5939–5948, 2019. [31] Lars Mescheder, Michael Oechsle, Michael Niemeyer, Sebastian Nowozin, and Andreas Geiger. Occupancy networks: Learning 3d reconstruction in function space. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4460–4470, 2019. [32] Yuan Yin, Matthieu Kirchmeyer, Jean-Yves Franceschi, Alain Rakotomamonjy, and Patrick Gallinari. Continuous pde dynamics forecasting with implicit neural representations. arXiv preprint arXiv:2209.14855 , 2022. [33] Pan Du, Meet Hemant Parikh, Xiantao Fan, Xin-Yang Liu, and Jian-Xun Wang. Confild: Conditional neural field latent diffusion model generating spatiotemporal turbulence. arXiv preprint arXiv:2403.05940 , 2024. [34] Yiyuan Yang, Ming Jin, Haomin Wen, Chaoli Zhang, Yuxuan Liang, Lintao Ma, Yi Wang, Chenghao Liu, Bin Yang, Zenglin Xu, et al. A survey on diffusion models for time series and spatio-temporal data. arXiv preprint arXiv:2404.18886 , 2024. 34 [35] Igor Mezi´ c. Spectral properties of dynamical systems, model reduction and decompositions. 
+
+Nonlinear Dynamics , 41(1-3):309–325, 2005. [36] Steven L Brunton, Marko Budiˇ si´ c, Eurika Kaiser, and J Nathan Kutz. Modern koopman theory for dynamical systems. arXiv preprint arXiv:2102.12086 , 2021. [37] Benjamin Peherstorfer and Karen Willcox. Data-driven operator inference for nonintrusive projection-based model reduction. Computer Methods in Applied Mechanics and Engineering ,306:196–215, 2016. [38] Elizabeth Qian, Boris Kramer, Benjamin Peherstorfer, and Karen Willcox. Lift & learn: Physics-informed machine learning for large-scale nonlinear dynamical systems. Physica D: Nonlinear Phenomena , 406:132401, 2020. [39] Rose Yu and Rui Wang. Learning dynamical systems from data: An introduction to physics-guided deep learning. Proceedings of the National Academy of Sciences , 121(27):e2311808121, 2024. [40] Kyle Genova, Forrester Cole, Daniel Vlasic, Aaron Sarna, William T Freeman, and Thomas Funkhouser. Learning shape templates with structured implicit functions. In Proceedings of the IEEE/CVF international conference on computer vision , pages 7154–7164, 2019. [41] Kyle Genova, Forrester Cole, Avneesh Sud, Aaron Sarna, and Thomas Funkhouser. Local deep implicit functions for 3d shape. In 2020 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 4856–4865. IEEE, 2020. [42] Takaaki Murata, Kai Fukami, and Koji Fukagata. Nonlinear mode decomposition with convolutional neural networks for fluid dynamics. Journal of Fluid Mechanics , 882:A13, 2020. [43] James Duvall and Karthik Duraisamy. Discretization-independent surrogate modeling of physical fields around variable geometries using coordinate-based networks. Data-Centric Engineering , 6:e5, 2025. [44] Peter Yichen Chen, Maurizio M Chiaramonte, Eitan Grinspun, and Kevin Carlberg. Model re-duction for the material point method via an implicit neural representation of the deformation map. Journal of Computational Physics , 478:111908, 2023. [45] Honglin Chen, Rundi Wu, Eitan Grinspun, Changxi Zheng, and Peter Yichen Chen. Implicit neural spatial representations for time-dependent pdes. In International Conference on Machine Learning , pages 5162–5177. PMLR, 2023. [46] David Ha, Andrew Dai, and Quoc V. Le. Hypernetworks, 2016. [47] Yifan Du and Tamer A Zaki. Evolutional deep neural network. Physical Review E , 104(4):045303, 2021. [48] Joan Bruna, Benjamin Peherstorfer, and Eric Vanden-Eijnden. Neural galerkin schemes with active learning for high-dimensional evolution equations. Journal of Computational Physics ,496:112588, 2024. [49] William Anderson and Mohammad Farazmand. Evolution of nonlinear reduced-order solu-tions for pdes with conserved quantities. SIAM Journal on Scientific Computing , 44(1):A176– A197, 2022. 35 [50] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. Lora: Low-rank adaptation of large language models. arXiv preprint arXiv:2106.09685 , 2021. [51] Kookjin Lee and Kevin T Carlberg. Deep conservation: A latent-dynamics model for exact satisfaction of physical conservation laws. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 35, pages 277–285, 2021. [52] Steffen Wiewel, Moritz Becher, and Nils Thuerey. Latent space physics: Towards learning the temporal evolution of fluid flow. In Computer graphics forum , volume 38, pages 71–82. Wiley Online Library, 2019. [53] James D Hamilton. Time series analysis . Princeton university press, 2020. [54] Sepp Hochreiter and J ¨ urgen Schmidhuber. Long short-term memory. Neural computation ,9(8):1735–1780, 1997. [55] Arvind Mohan, Don Daniel, Michael Chertkov, and Daniel Livescu. Compressed convolutional lstm: An efficient deep learning framework to model high fidelity 3d turbulence. arXiv preprint arXiv:1903.00033 , 2019. [56] Pradeep Hewage, Ardhendu Behera, Marcello Trovati, Ella Pereira, Morteza Ghahremani, Francesco Palmieri, and Yonghuai Liu. Temporal convolutional neural (tcn) network for an effective weather forecasting using time-series data from the local weather station: P. hewage et al. Soft Computing , 24(21):16453–16482, 2020. [57] Jiayang Xu and Karthik Duraisamy. Multi-level convolutional autoencoder networks for parametric prediction of spatio-temporal dynamics. Computer Methods in Applied Mechanics and Engineering , 372:113379, 2020. [58] Ashesh Chattopadhyay, Pedram Hassanzadeh, and Devika Subramanian. Data-driven pre-dictions of a multiscale lorenz 96 chaotic system using machine-learning methods: reservoir computing, artificial neural network, and long short-term memory network. Nonlinear Processes in Geophysics , 27(3):373–389, 2020. [59] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. Advances in neural information processing systems , 30, 2017. [60] Nicholas Geneva and Nicholas Zabaras. Transformers for modeling physical systems. Neural Networks , 146:272–289, 2022. [61] Samuel E Otto and Clarence W Rowley. Linearly recurrent autoencoder networks for learning dynamics. SIAM Journal on Applied Dynamical Systems , 18(1):558–593, 2019. [62] Shaowu Pan and Karthik Duraisamy. Physics-informed probabilistic learning of linear embed-dings of nonlinear dynamics with guaranteed stability. SIAM Journal on Applied Dynamical Systems , 19(1):480–509, 2020. [63] Steven L Brunton, Joshua L Proctor, and J Nathan Kutz. Discovering governing equations from data by sparse identification of nonlinear dynamical systems. Proceedings of the national academy of sciences , 113(15):3932–3937, 2016. 36 [64] Alan A Kaptanoglu, Jared L Callaham, Aleksandr Aravkin, Christopher J Hansen, and Steven L Brunton. Promoting global stability in data-driven models of quadratic nonlinear dynamics. 
+
+Physical Review Fluids , 6(9):094401, 2021. [65] Boris Kramer. Stability domains for quadratic-bilinear reduced-order models. SIAM Journal on Applied Dynamical Systems , 20(2):981–996, 2021. [66] Pawan Goyal, Igor Pontes Duff, and Peter Benner. Guaranteed stable quadratic models and their applications in sindy and operator inference. Physica D: Nonlinear Phenomena , page 134893, 2025. [67] Said Ouala, Steven L Brunton, Bertrand Chapron, Ananda Pascual, Fabrice Collard, Lucile Gaultier, and Ronan Fablet. Bounded nonlinear forecasts of partially observed geophysical systems with physics-constrained deep learning. Physica D: Nonlinear Phenomena , 446:133630, 2023. [68] Ethan Perez, Florian Strub, Harm De Vries, Vincent Dumoulin, and Aaron Courville. Film: Visual reasoning with a general conditioning layer. In Proceedings of the AAAI conference on artificial intelligence , volume 32, 2018. [69] Igor Mezi´ c. Operator is the model. arXiv preprint arXiv:2310.18516 , 2023. [70] C Ricardo Constante-Amores, Andrew J Fox, Carlos E P´ erez De Jes ´ us, and Michael D Graham. Data-driven koopman operator predictions of turbulent dynamics in models of shear flows. 
+
+arXiv preprint arXiv:2407.16542 , 2024. [71] Michael Schlegel and Bernd R Noack. On long-term boundedness of galerkin models. Journal of Fluid Mechanics , 765:325–352, 2015. [72] Pawan Goyal, Igor Pontes Duff, and Peter Benner. Guaranteed stable quadratic models and their applications in sindy and operator inference. arXiv preprint arXiv:2308.13819 , 2023. [73] Boris Bonev, Thorsten Kurth, Christian Hundt, Jaideep Pathak, Maximilian Baust, Karthik Kashinath, and Anima Anandkumar. Spherical fourier neural operators: Learning stable dynamics on the sphere. In International conference on machine learning , pages 2806–2823. PMLR, 2023. [74] Samy Bengio, Oriol Vinyals, Navdeep Jaitly, and Noam Shazeer. Scheduled sampling for sequence prediction with recurrent neural networks. Advances in neural information processing systems , 28, 2015. [75] Shaowu Pan and Karthik Duraisamy. Data-Driven Discovery of Closure Models. SIAM Journal on Applied Dynamical Systems , 17(4):2381–2413, 2018. [76] Joseph Galewsky, Richard K Scott, and Lorenzo M Polvani. An initial-value problem for testing numerical models of the global shallow-water equations. Tellus A , 56(5):429–440, 2004. [77] Keaton J Burns, Geoffrey M Vasil, Jeffrey S Oishi, Daniel Lecoanet, and Benjamin P Brown. Dedalus: A flexible framework for numerical simulations with spectral methods. Physical Review Research , 2(2):023068, 2020. 37 A Multiplicative Filter Network 
+
+A MFN replaces the compositional nonlinearities of a standard feedforward network with element-wise multiplication by sinusoidal filters of the input. An L-layer MFN Dϕ : Ω → R with Fourier filters is defined by: 
+
+h(0) (x) = x, (41) 
+
+h(l)(x) =  W (l−1) h(l−1) (x) + b(l−1)  ◦ g(x; w(l)), l = 1 , . . . , L − 1, (42) 
+
+Dϕ(x) = W (L−1) h(L−1) (x) + b(L−1) . (43) Here L counts the L − 1 filtered hidden layers and the output layer; in terms of the number of hidden linear layers ℓdec reported in Appendix Table 7, L = ℓdec + 2 . In Eqs. (41) to (43), x ∈ Ω and 
+
+g(x; w(l)) = 
+
+sin( w(l)x)cos( w(l)x)
+
+
+
+(44) is a Fourier embedding with frequency matrix w(l) = ws√L−1 ˜w(l), where ˜w(l) is trainable and the scaling factor ws is shared by all L − 1 filters, and ◦ is the element-wise multiplication. The dimensions are h(l)(x) ∈ Rhdec for l = 1 , . . . , L − 1, ˜w(l) ∈ R(hdec /2) ×d so that g(x; w(l)) ∈ Rhdec ,
+
+W (l) ∈ Rhdec ×hdec for l = 1 , . . . , L − 2, b(l) ∈ Rhdec for l = 0 , . . . , L − 2, and W (L−1) ∈ R1×hdec ,
+
+b(L−1) ∈ R for the scalar output layer. The set of trainable MFN parameters is 
+
+ϕ := {{ ˜w(l)}L−1 
+
+> l=1
+
+, {W (l)}L−1 
+
+> l=1
+
+, {b(l)}L−1 
+
+> l=0
+
+}. (45) For the first layer, we set W (0) = 0 , so that h(1) (x) = b(0) ◦ g(x; w(1) ) with a trainable bias b(0) . The scaling factor ws is a hyperparameter that controls the initial frequency range [28, 29]. In this study, we set ws = 64 for all datasets. 
+
+# B Feature-wise Linear Modulation 
+
+Here we describe how a component latent code z ∈ Rp modulates the decoder Dϕ by replacing ϕ
+
+with the modulated parameters Φθ(z), specifically through a shift modulation based on Feature-wise Linear Modulation (FiLM) [68]. The main idea is to incorporate the effect of z into Eq. (42) via the replacement in Eq. (46). 
+
+h(l)(x) =  W (l−1) h(l−1) (x) + b(l−1) + M (l−1) z ◦ g(x; w(l)), l = 1 , . . . , L − 1, (46) where M (l) ∈ Rhdec ×p, l = 0 , . . . , L − 2, are additional trainable matrices. This can be viewed as a restricted hypernetwork [27] modulation Φθ(z) where only the biases b(0) , . . . , b (L−2) are influenced by z. The trainable decoder parameters are defined as θ := ϕ ∪ { M (l)}L−2 
+
+> l=0
+
+. To summarize, the 
+
+z-modulated MFN parameterized by θ can be written as DΦθ (z) : Ω → R and the full field is assembled component-wise as in Eq. (5). 
+
+# C Dissipativity and Conservation Defect Certificates for the Linear-Quadratic System 
+
+We give the proof of Theorem 1 and the soft bound based on the conservation defect estimate used in Eqs. (19) and (20). Consider the linear-quadratic latent system 
+
+˙α = b + Wα + α⊤Q(1) α · · · α⊤Q(r)α⊤ . (47) 38 C.1 Symmetrization of Quadratic Slices 
+
+For each output component i, the scalar quadratic form satisfies 
+
+α⊤Q(i)α = α⊤ Q(i) + ( Q(i))⊤
+
+2
+
+!
+
+α. (48) Only the symmetric part of each slice is identifiable from the vector field. We may replace Q(i) by its symmetric part without changing the ODE. Under this convention, the shifted state y = α − m
+
+satisfies 
+
+˙y = d + Ay + y⊤Q(1) y · · · y⊤Q(r)y⊤ , (49) where d and A are defined in Eqs. (9) and (10). The formula for A follows by expanding 
+
+(m + y)⊤Q(i)(m + y) = m⊤Q(i)m + 2 m⊤Q(i)y + y⊤Q(i)y.
+
+Hence the i-th row of A is the i-th row of W plus 2m⊤Q(i), as in Eq. (10). 
+
+C.2 Cyclic Energy Cancellation 
+
+Let V (y) = 12 ∥y∥2. The contribution of the quadratic term to ˙V is 
+
+> r
+
+X
+
+> i=1
+
+yi y⊤Q(i)y =
+
+> r
+
+X
+
+> i,j,k =1
+
+Q(i)
+
+> j,k
+
+yiyj yk (50) 
+
+= 13
+
+> r
+
+X
+
+> i,j,k =1
+
+
+
+Q(i) 
+
+> j,k
+
++ Q(k) 
+
+> i,j
+
++ Q(j)
+
+> k,i
+
+
+
+yiyj yk. (51) The second equality holds because yiyj yk is invariant under cyclic permutations of (i, j, k ): rela-beling the summation indices as (i, j, k ) → (k, i, j ) and (i, j, k ) → (j, k, i ) turns the first sum into 
+
+P Q(k) 
+
+> i,j
+
+yiyj yk and P Q(j) 
+
+> k,i
+
+yiyj yk, respectively, and averaging the three equal expressions gives the result. This step does not require the slices to be symmetric. The cyclic identity in Theorem 1 makes the quadratic term energy-preserving: 
+
+> r
+
+X
+
+> i=1
+
+yi y⊤Q(i)y = 0 . (52) 
+
+C.3 Proof of the Hard Certificate 
+
+Using Eqs. (49) and (52), 
+
+˙V = d⊤y + y⊤Ay (53) 
+
+= d⊤y + y⊤Asy, As = A + A⊤
+
+2 . (54) Since the cubic term vanishes, the only term that can counteract the constant forcing d⊤y is the linear term y⊤Asy. Condition 1 of Theorem 1 requires this term to be dissipative: As ⪯ − γI with 
+
+γ ≥ 0 means y⊤Asy ≤ − γ∥y∥2 for all y, or equivalently that every eigenvalue of the symmetric 39 matrix As is at most −γ. Bounding the first term by the Cauchy–Schwarz inequality, d⊤y ≤ ∥ d∥∥ y∥,and the second by condition 1 gives 
+
+˙V ≤ ∥ d∥∥ y∥ − γ∥y∥2. (55) This is the basic energy estimate behind Theorem 1. For γ > 0, its right-hand side is negative whenever ∥y∥ > ∥d∥/γ , so the energy decreases outside the ball of radius ∥d∥/γ centered at m;this is the absorbing ball of the system. To turn Eq. (55) into an explicit bound on ∥y(t)∥, we avoid the non-differentiability of ∥y∥ at y = 0 as follows. For ϵ > 0, let wϵ = √2V + ϵ2 = p∥y∥2 + ϵ2.Since ∥y∥ ≤ wϵ and ∥y∥2 = w2 
+
+> ϵ
+
+− ϵ2, Eq. (55) gives 
+
+˙wϵ = ˙Vwϵ
+
+≤ ∥ d∥ − γw ϵ + γϵ 2
+
+wϵ
+
+≤ ∥ d∥ + γϵ − γw ϵ,
+
+where the last step uses wϵ ≥ ϵ. This is a linear differential inequality ˙wϵ ≤ a−γw ϵ with a = ∥d∥+γϵ .By the comparison lemma, wϵ does not exceed the solution of ˙v = a − γv with v(0) = wϵ(0) , that is, 
+
+wϵ(t) ≤ e−γt wϵ(0) + a 1 − e−γt 
+
+γ ,
+
+where the factor (1 − e−γt )/γ is interpreted as its limit t when γ = 0 . Since ∥y(t)∥ ≤ wϵ(t) and 
+
+wϵ(0) = p∥y(0) ∥2 + ϵ2, this gives 
+
+∥y(t)∥ ≤ e−γt p∥y(0) ∥2 + ϵ2 + ( ∥d∥ + γϵ ) 1 − e−γt 
+
+γ .
+
+The left-hand side is independent of ϵ, so letting ϵ → 0 yields, on the interval of existence, 
+
+∥y(t)∥ ≤ e−γt ∥y(0) ∥ + ∥d∥ 1 − e−γt 
+
+γ . (56) The right-hand side is finite for every t, so no finite-time blow-up occurs and the local solution extends to all t ≥ 0. The three statements of Theorem 1 follow directly from Eq. (56): letting t → ∞ 
+
+with γ > 0 gives Eq. (11); setting d = 0 gives Eq. (12), which reduces to the non-expansive bound when γ = 0 ; and setting γ = 0 with d̸ = 0 gives Eq. (13). 
+
+C.4 Soft Conservation Defect Certificate 
+
+Define the cyclic-condition residual tensor 
+
+Tijk = Q(i) 
+
+> j,k
+
++ Q(k) 
+
+> i,j
+
++ Q(j) 
+
+> k,i
+
+. (57) By the identity above and Cauchy–Schwarz, 
+
+> r
+
+X
+
+> i=1
+
+yi y⊤Q(i)y = 13
+
+> r
+
+X
+
+> i,j,k =1
+
+Tijk yiyj yk (58) 
+
+≤ 13 ∥T ∥F ∥y ⊗ y ⊗ y∥F (59) 
+
+= ηQ∥y∥3, ηQ = 13 ∥T ∥F . (60) 40 Since Lreg,cons = ∥T ∥2 
+
+> F
+
+, we have ηQ = 13 L1/2
+
+> reg,cons
+
+. Combining this bound with As ⪯ − γI yields 
+
+˙V ≤ ∥ d∥∥ y∥ − γ∥y∥2 + ηQ∥y∥3.
+
+The following finite-radius soft certificate requires a strictly positive margin and a nonzero defect, so assume γ > 0 and ηQ > 0. Writing R = ∥y∥, the estimate above reads ˙V ≤ R (∥d∥ − γR + ηQR2),in which, for ˙V < 0, the dissipation −γR must overcome both the constant forcing ∥d∥ and the defect term ηQR2. We allot half of the dissipation to each. First, the defect term uses at most half of the dissipation, ηQR2 ≤ γ 
+
+> 2
+
+R, provided 
+
+R ≤ γ
+
+2ηQ
+
+.
+
+Under this condition, ˙V ≤ R (∥d∥ − γ 
+
+> 2
+
+R), and the remaining half of the dissipation overcomes the constant forcing, giving ˙V < 0, provided 
+
+R > 2∥d∥
+
+γ .
+
+Both conditions hold for every R in the interval 
+
+ 2∥d∥
+
+γ , γ
+
+2ηQ
+
+
+
+,
+
+which is nonempty if and only if 4∥d∥ηQ < γ 2. Hence, for any Rcert in this interval, the boundary 
+
+∥y∥ = Rcert satisfies 
+
+˙V ≤ ∥ d∥Rcert − γ
+
+2 R2cert < 0.
+
+Hence the ball {∥ α − m∥ ≤ Rcert } is forward invariant. Moreover, inside this ball, Rcert ≤ γ/ (2 ηQ)
+
+gives ηQ∥y∥3 ≤ γ 
+
+> 2
+
+∥y∥2, so ˙V ≤ ∥ d∥∥ y∥ − γ 
+
+> 2
+
+∥y∥2. This is Eq. (55) with γ replaced by γ/ 2, and the argument of the hard case yields the practical estimate 
+
+lim sup 
+
+> t→∞
+
+∥α(t) − m∥ ≤ 2∥d∥
+
+γ
+
+for trajectories starting in the certified region. When ηQ = 0 , the upper endpoint involving γ/ (2 ηQ)
+
+is not used; the conservation defect vanishes and the hard certificate is recovered. 
+
+# D Decoder Boundedness and Lipschitz Transfer 
+
+We prove Theorem 2 and the constants in the subsequent remark. By Eq. (5), the decoder is applied separately to each component code z ∈ Rp.
+
+D.1 Affine Structure 
+
+Up to a relabeling of layer indices, the FiLM-modulated MFN of Appendices A and B has hidden states 
+
+h(0) (x) = x, h(ℓ+1) (x, z ) =  Wℓh(ℓ)(x, z ) + bℓ + A(ℓ)z ◦ gℓ(x),
+
+for ℓ = 0 , . . . , L − 1, and output DΦθ (z)(x) = WLh(L)(x, z ) + bL. Each layer applies only affine operations to (h(ℓ), z ), followed by multiplication with gℓ(x), which does not depend on z. Hence, if h(ℓ)(x, z ) = pℓ(x) + Pℓ(x)z, then 
+
+h(ℓ+1) (x, z ) = diag( gℓ(x))  Wℓpℓ(x) + bℓ
+
+ + diag( gℓ(x))  WℓPℓ(x) + A(ℓ)z, 
+
+41 which has the same form. Starting from p0(x) = x and P0 = 0 , induction gives DΦθ (z)(x) = 
+
+c0(x) + J0(x)z with c0 = WLpL + bL and J0 = WLPL ∈ R1×p. Both are continuous in x, since they are built from x and the sinusoidal filters by sums and products, and are therefore bounded on the compact set Ω. Assembling the c components gives 
+
+DΦθ (α)(x) = c0(x)1c + ( Ic ⊗ J0(x)) α. 
+
+D.2 Growth and Lipschitz Bounds 
+
+By the triangle inequality, ∥DΦθ (α)(x)∥ ≤ √c |c0(x)| + ∥J0(x)∥∥ α∥, which gives Eq. (24) with 
+
+CD = √c sup x∈Ω |c0(x)| and DD = sup x∈Ω ∥J0(x)∥. Write α − β as the stack of ∆z(1) , . . . , ∆z(c) and let G = R 
+
+> Ω
+
+J0(x)⊤J0(x) dx . Then 
+
+∥DΦθ (α) − DΦθ (β)∥2 
+
+> L2(Ω)
+
+=
+
+> c
+
+X
+
+> q=1
+
+∆z(q)⊤G ∆z(q) ≤ λmax (G)∥α − β∥2,
+
+with equality when every ∆z(q) is an eigenvector of G for λmax (G). This gives Eq. (25) with the attained constant LD = λmax (G)1/2. Since J⊤ 
+
+> 0
+
+J0 ⪯ ∥ J0∥2I pointwise, G ⪯ | Ω|D2
+
+> D
+
+I and LD ≤|Ω|1/2DD.
+
+D.3 Bound on the Decoded Field 
+
+If ∥αt − m∥ ≤ R for all t ∈ [0 , T ], then ∥αt∥ ≤ ∥ m∥ + R, and Eq. (24) together with ∥f ∥L2(Ω) ≤|Ω|1/2 sup x∈Ω ∥f (x)∥ gives Eq. (26). The three values of R stated after the theorem follow from Eq. (56): if d = 0, its right-hand side is at most ∥y(0) ∥; if γ > 0, it is a convex combination of ∥y(0) ∥
+
+and ∥d∥/γ , hence at most their maximum; and if γ = 0 , it is at most ∥y(0) ∥ + ∥d∥T .
+
+# E Sparse-Measurement Latent Recovery 
+
+This section formalizes the test-time inference step described in Section 4, in which the initial latent state is inferred from a possibly sparse first-snapshot measurement by autodecoding (Eq. (6)). We derive a stability estimate for that inverse problem as the theoretical counterpart of the sparse-observation ablation in Section 5.4. Let S = {x1, . . . , x s} ⊂ Ω be the observed sensor locations of the initial snapshot, and define the sparse measurement operator and the latent-to-sensor map 
+
+PS u =
+
+
+
+u(x1)
+
+...
+
+u(xs)
+
+ , GS (α) = PS DΦθ (α). (61) Restricting the autodecoding objective in Eq. (6) to S seeks a latent code whose decoded sensor values match the measurement. Although the implementation minimizes the squared residual, the slack variable δopt below is defined directly in terms of the residual norm for this estimate. 
+
+Theorem 5 (Sparse-measurement latent recovery) . Let the initial measurement be yobs = PS u0 + ξ
+
+with noise ∥ξ∥ ≤ σ. Assume: (i) (Restricted observability) there exist a latent set B ⊂ Rr and a constant cS > 0 such that cS ∥α − β∥ ≤ ∥GS (α) − GS (β)∥ for all α, β ∈ B ;
+
+42 (ii) (Representable initial state) there exists α0 ∈ B with ∥GS (α0) − PS u0∥ ≤ εsens ;(iii) (Near-optimal fit) the inferred code bα0 ∈ B satisfies ∥GS (bα0)−yobs ∥ ≤ inf α∈B ∥GS (α)−yobs ∥+δopt .Then 
+
+∥bα0 − α0∥ ≤ 2( εsens + σ) + δopt 
+
+cS
+
+. (62) 
+
+Proof. Since α0 ∈ B , the infimum in assumption (iii) is no larger than its value at α0. By the triangle inequality and assumption (ii), 
+
+∥GS (α0) − yobs ∥ ≤ ∥ GS (α0) − PS u0∥ + ∥ξ∥ ≤ εsens + σ. 
+
+Combining with assumption (iii) gives ∥GS (bα0) − yobs ∥ ≤ εsens + σ + δopt . A second triangle inequality yields 
+
+∥GS (bα0) − GS (α0)∥ ≤ ∥ GS (bα0) − yobs ∥ + ∥yobs − GS (α0)∥ ≤ 2( εsens + σ) + δopt .
+
+The restricted-observability assumption (i) gives cS ∥bα0 − α0∥ ≤ ∥ GS (bα0) − GS (α0)∥; dividing by 
+
+cS > 0 proves Eq. (62). 
+
+Remark. The constant cS quantifies how well the sparse sensors identify the latent code; it is an assumption on the decoder–sensor pair rather than a consequence of Theorem 1. Since GS (α) − GS (β) = JS (α − β),the map GS is bi-Lipschitz with constants σmin (JS ) and σmax (JS ), so the recovered latent, and hence the reconstructed field, degrades continuously as the noise σ, representation error εsens , and optimization slack 
+
+δopt grow. Reducing the visible fraction of the initial snapshot can shrink cS , although the exact change depends on the sensor locations, the mask construction, and the trained decoder. The empirical transition observed around 2% –4% visibility in Tables 4 and 12 is consistent with this interpretation, since observability remains adequate for moderately sparse masks but eventually becomes insufficient when too few spatial samples are available. Table 13 confirms that cS vanishes exactly at the visibility levels where s < p .
+
+E.1 Proof of the Sparse-to-Rollout Full-Field Certificate 
+
+We prove Theorem 4. By Theorem 5 and the definition of esparse in Eq. (30), the inferred initial latent state satisfies 
+
+E0 = ∥bα0 − α⋆
+
+> 0
+
+∥ ≤ esparse . (63) The rollout recurrence in Eq. (31) then implies, for every 0 ≤ n ≤ N over the finite horizon under consideration, 
+
+En ≤ anesparse + broll 
+
+> n−1
+
+X
+
+> ℓ=0
+
+aℓ. (64) Indeed, the claim is immediate for n = 0 . If it holds at n, then using En+1 ≤ aE n + broll and a ≥ 0
+
+gives 
+
+En+1 ≤ an+1 esparse + broll 
+
+> n
+
+X
+
+> ℓ=1
+
+aℓ + broll = an+1 esparse + broll 
+
+> n
+
+X
+
+> ℓ=0
+
+aℓ,
+
+which proves Eq. (64) by induction. For the decoded field, the triangle inequality gives 
+
+DΦθ (bαn) − un L2(Ω) ≤ DΦθ (bαn) − DΦθ (α⋆n) L2(Ω) + DΦθ (α⋆n) − un L2(Ω) (65) 
+
+≤ LDEn + εdec . (66) 43 Substituting Eq. (64) yields Eq. (33) on the finite horizon. If the recurrence and decoder bounds hold uniformly for all n ≥ 0 and 0 ≤ a < 1, then anesparse → 0 and Pn−1 
+
+> ℓ=0
+
+aℓ → (1 − a)−1, which gives the asymptotic bound Eq. (34). 
+
+# F Details of Scheduled Sampling 
+
+Scheduled sampling [74] was introduced to mitigate exposure bias in long-sequence modeling, which arises from the accumulation of prediction errors when only the initial condition is given in real-world scenarios (see Fig. 5). Interestingly, exposure bias closely resembles the accumulated error problem in learning closure models for dynamical systems [75], where models trained using only one-step minimization (i.e., teacher forcing) often fail to generalize effectively. The core idea of scheduled sampling is to gradually reduce reliance on teacher forcing during training. In Algorithm 3, Ntrain denotes the length of the supplied time array. During training, this routine is called with Ntrain = 10 , so it returns the initial state and nine subsequent states. Evaluation uses the initial state and 19 subsequent prediction times, without teacher-forcing resets. In our neural-ODE implementation, teacher forcing is applied by randomly selecting intermediate time points as restart anchors. The latent trajectory is split into integration segments, and each selected anchor starts the next segment from the corresponding target latent state rather than from the model prediction. We define the probability of selecting a time point as a teacher-forcing anchor as εt = ε0ρi
+
+> TF
+
+, where i represents the number of training epochs elapsed and ρTF is the per-epoch decay factor. In our experiments, we set ε0 = 0 .99 and ρTF = 0 .99 , following an approach similar to that used in autoregressive models. Finally, the forward propagation of the neural ODE with scheduled sampling is summarized in Algorithm 3.  
+
+> Figure 5: Scheduled sampling for latent-dynamics training. The upper-left panel shows target latent codes at supervised time stamps. The intermediate panels illustrate the progressive replacement of target codes by model-generated states during training. Intermediate target states are used as teacher-forcing anchors with probability εt; as this probability decays, training increasingly relies on free-running latent rollouts. The bottom panels schematically contrast a poorly matched rollout without intermediate anchors (left) with an improved rollout obtained using scheduled sampling (right).
+
+44 Algorithm 3 Forward propagation of the neural ODE with scheduled sampling 
+
+function SCHEDULED SAMPLING ODE SOLVE (fψ, {αtl }Ntrain  
+
+> l=1
+
+, TNtrain , εt)
+
+Ntrain ← |T Ntrain |
+
+if εt < 10 −3 then ▷ Classic full-length rollout is used for forward propagation 
+
+return {α(tl)}Ntrain  
+
+> l=1
+
+← ODEInt (fψ, α t1 , t 1, . . . , t Ntrain )
+
+else 
+
+Generate Boolean variables {mi}Ntrain −1 
+
+> i=2
+
+, where each mi is True with probability εt. εt of being selected as a teacher-forcing anchor Force the very last time point to False so the model must predict it Discard the first entry of the mask Set the start index is ← 1 to mark the start index of each integration trajectory 
+
+b ← [αt1 ] ▷ store the initial anchor so the returned sequence has length Ntrain 
+
+for i = 2 to Ntrain − 1 do if mi is True then ▷ Restart the rollout from a teacher-forcing anchor. 
+
+Determine a time sub-interval from tis up to ti.
+
+{α(tl)}il=is ← ODEInt (fψ, α tis , t is , . . . , t i)
+
+Append b with the integrated outputs of {α(tl)}il=is+1 
+
+is ← i
+
+{α(tl)}Ntrain  
+
+> l=is
+
+← ODEInt (fψ, α tis , t is , . . . , t Ntrain ) ▷ Numerical integration of last interval 
+
+Append b with the integrated outputs of {α(tl)}Ntrain 
+
+> l=is+1
+
+return b ▷ b = {α(tl)}Ntrain  
+
+> l=1
+
+includes the initial state 
+
+# G Experimental Details and Results 
+
+G.1 Dataset Details 
+
+G.1.1 2D Wave 
+
+The 2D Wave dataset follows the second-order wave equation used in [32]: 
+
+∂2u∂t 2 = v2
+
+ ∂2u∂x 2 + ∂2u∂y 2
+
+
+
+, (67) where v is the wave speed. We set v = 2 and define the spatial domain as Ω = [ −1, 1] 2. The initial displacement is sampled as a Gaussian pulse: 
+
+u0(x, y ; a, b, σ ) = a exp 
+
+
+
+− (x − bx)2 + ( y − by)2
+
+2σ2
+
+
+
+, (68) where a ∼ U (2 , 4) is the peak displacement amplitude, b = ( bx, b y) is the peak location sampled uniformly from Ω, and σ ∼ U (0 .25 , 0.30) is the standard deviation. The initial time derivative is set to zero: ∂u ∂t (0 , x, y ) = 0 . (69) The benchmark prediction target is a two-channel wave field, denoted by ux and uy following the dataset convention. These channels are treated as the two predicted components of the surrogate model; the notation does not introduce additional spatial derivatives in our method. We generate 256 trajectories for training and 16 trajectories for testing. Each trajectory is partitioned into two non-overlapping sequences, yielding 512 training sequences and 32 test 45 sequences in total. Each sequence contains 20 snapshots sampled every ∆t = 0 .25 s , and each snapshot is represented on a uniform 64 2 spatial grid. 
+
+G.1.2 2D Navier–Stokes 
+
+The 2D Navier–Stokes dataset is generated from the pressure-free vorticity formulation of the forced incompressible Navier–Stokes equations using the streamfunction-velocity approach [19]. The vorticity field evolves as 
+
+˙w(t, x, y ) + v(t, x, y ) · ∇ w(t, x, y ) = ν∇2w(t, x, y ) + f (x, y ), (70) where ν is the viscosity, v(t, x, y ) denotes the velocity field, and w(t, x, y ) = ∇ × v(t, x, y ) is the vorticity. The vorticity field is used as the prediction target. The forcing term is fixed as 
+
+f (x, y ) = 0 .1 [sin(2 π(x + y)) + cos(2 π(x + y))] . (71) The spatial domain is Ω = [ −1, 1] 2. We set ν = 10 −3, impose periodic boundary conditions, and use the same initial-condition sampling strategy as [19]. We generate 256 trajectories for training and 16 trajectories for testing. Each trajectory is partitioned into two non-overlapping sequences, yielding 512 training sequences and 32 test sequences in total. Each sequence contains 20 snapshots sampled every ∆t = 1 s , and each snapshot is represented on a uniform 64 2 spatial grid. 
+
+G.1.3 3D Spherical Shallow Water 
+
+The 3D Spherical Shallow Water dataset follows the setup of [32, 76]. The governing equations are 
+
+Du Dt = −f k × u − g∇h + ν∆u, Dh Dt = −h∇ · u + ν∆h, 
+
+(72) where u is the velocity field tangent to the spherical surface, h is the fluid layer thickness, k is the unit vector normal to the sphere, and f , g, and ν denote the Coriolis parameter, gravitational acceleration, and viscosity, respectively. The initial zonal velocity is prescribed as 
+
+u0(φ, θ ) = 
+
+ umax 
+
+en
+
+exp 
+
+ 1(ϕ − ϕ0)( ϕ − ϕ1)
+
+
+
+, 0
+
+
+
+, ϕ ∈ (ϕ0, ϕ 1),
+
+ umax 
+
+en
+
+exp 
+
+ 1(ϕ + ϕ0)( ϕ + ϕ1)
+
+
+
+, 0
+
+
+
+, ϕ ∈ (−ϕ1, −ϕ0),
+
+(0 , 0) , otherwise ,
+
+(73) where 
+
+en = exp 
+
+
+
+− 4(ϕ1 − ϕ0)2
+
+
+
+. (74) The initial water-height perturbation is defined as 
+
+h′
+
+> 0
+
+(ϕ, θ ) = ˆh cos( ϕ) exp −
+
+ θαh
+
+2! " 
+
+exp −
+
+ ϕ2 − ϕβ
+
+2!
+
++ exp −
+
+ ϕ2 + ϕβ
+
+2!# 
+
+. (75) 46 Simulations are performed using Dedalus [77] on a latitude-longitude grid of size 128 × 256 .The physical parameters follow [76]. The initial-condition parameters are set to 
+
+ϕ0 = π
+
+7 , ϕ1 = π
+
+2 − ϕ0, ϕ2 = π
+
+4 , ˆh = 120 m , αh = 13 , β = 115 .
+
+Trajectory-level variation is introduced by sampling umax ∼ U (60 , 80) . The model predicts two fields, the fluid layer thickness h and the vorticity field w = ∇ × u.The simulated 128 × 256 latitude–longitude grid is uniformly subsampled by a factor of two in both spatial directions, yielding a 64 × 128 grid. Each simulation records one snapshot per hour until the final time of 320 hours. The first 160 h correspond to the initial geostrophic adjustment and jet spin-up, after which the flow settles into a quasi-periodic regime. To remove the transient spin-up phase, we use the last 160 hours of each trajectory and divide them into eight consecutive non-overlapping sequences of length 20. The height field h is multiplied by 3×10 3, and the vorticity field w is scaled by 2. In total, eight long trajectories are used for training, yielding 64 training sequences, and two long trajectories are used for testing, yielding 16 test sequences. 47 G.2 Hyper-Parameter Selection and Computational Environment 
+
+The nominal training budget for the main model comparison is 5,000 epochs. The stability study uses a separate 10,000-epoch budget, and configurations that develop non-finite values are iden-tified in its results. During training, each run is evaluated every 100 epochs on test set. All experiments use three random seeds, selected once and then held fixed. The batch size is dataset-dependent, with 32 for 2D Wave, 32 for 2D Navier–Stokes, and 4 for 3D Spherical Shallow Water. The hyperparameters of baseline neural operators, listed in Table 7, are varied to match parameter budgets. The CNO implementation requires square input grids. For Spherical Shallow Water, we therefore downsample the 64 × 128 fields to 64 × 64 before applying CNO. 
+
+Table 7: Architecture hyper-parameters used in the final comparisons. The abbreviations wa , ns , and sw 
+
+denote 2D Wave, 2D Navier–Stokes, and Spherical Shallow Water, and “–” marks a parameter that does not apply. For the baseline operators, FNO is specified by (M, W, L ), where M is the number of retained Fourier modes per dimension, W the channel width, and L the number of Fourier layers; CNO by (L, R, RN, CM ),where L is the number of up/down-sampling layers, R the number of residual blocks per level, RN the number of residual blocks in the bottleneck, and CM the channel multiplier; and Transolver by (L, H, S ),where L is the number of layers, H the hidden dimension, and S the number of physics-attention slices. For the latent models, in which MLP denotes the DINo dynamics, p is the per-component latent dimension and 
+
+r = cp the total latent dimension, hdyn is the hidden width of the MLP latent-dynamics network, hdec is the hidden width of the INR (MFN) decoder, ℓdec is the number of hidden linear layers of the decoder, and qr is the quadratic rank κ of the low-rank factorization used by SMORE-LRLQ. 
+
+Baseline models 
+
+Dataset Model Architecture 
+
+wa FNO (M, W, L ) = (12 , 10 , 4) 
+
+CNO (L, R, RN, CM ) = (3 , 4, 6, 6) 
+
+Transolver (L, H, S ) = (5 , 33 , 64) 
+
+ns FNO (M, W, L ) = (12 , 17 , 4) 
+
+CNO (L, R, RN, CM ) = (3 , 1, 8, 10) 
+
+Transolver (L, H, S ) = (8 , 46 , 32) 
+
+sw FNO (M, W, L ) = (12 , 25 , 4) 
+
+CNO (L, R, RN, CM ) = (3 , 3, 8, 10) 
+
+Transolver (L, H, S ) = (8 , 46 , 64) 
+
+Latent models 
+
+Dataset Model p r hdyn hdec ℓdec qr 
+
+wa MLP 100 200 146 46 3 –SMORE-Koopman 100 200 – 116 3 –SMORE-LRLQ 40 80 – 112 3 5
+
+ns MLP 72 72 368 64 3 –SMORE-Koopman 128 128 – 260 3 –SMORE-LRLQ 72 72 – 160 4 18 
+
+sw MLP 100 200 290 100 3 –SMORE-Koopman 100 200 – 262 3 –SMORE-LRLQ 60 120 – 96 3 10 
+
+48 G.3 Experimental Environment 
+
+Experiments were conducted primarily on the Perlmutter supercomputer at the National Energy Research Scientific Computing Center (NERSC), a U.S. Department of Energy Office of Science user facility at Lawrence Berkeley National Laboratory. The NVIDIA GPU nodes used in these experiments were equipped with A100 GPUs with either 40 or 80 GB of device memory. The stability experiments in Section 5.3 were instead performed on the Frontier supercomputer at the Oak Ridge Leadership Computing Facility (OLCF), a U.S. Department of Energy Office of Science user facility at Oak Ridge National Laboratory (ORNL), using AMD Instinct MI250X GPUs. The implementation uses PyTorch with CUDA on the NVIDIA-based Perlmutter system and ROCm on the AMD-based Frontier system. 
+
+G.4 Detailed In-horizon and Extrapolation Statistics 
+
+The main comparison in Table 2 reports mean in-horizon and extrapolation errors for compactness. Table 8 lists the corresponding mean ± standard deviation values over three random seeds. Fig. 6 further shows the per-snapshot test MSE of SMORE-LRLQ on Wave. 
+
+Table 8: Detailed in-horizon and extrapolation MSE on unseen test trajectories. Values are mean ± sample standard deviation over three random seeds. DINo, SMORE-Koopman, and SMORE-LRLQ use results after 1,000 initial latent optimization steps. Dataset Model Parameters In-horizon loss Extrapolation loss Wave FNO 117,356 2.89 e − 04 ± 1.09 e − 04 7.37 e − 02 ± 1.41 e − 02 
+
+Wave CNO 111,996 1.99 e − 02 ± 4.34 e − 03 1.53 e − 01 ± 1.47 e − 02 
+
+Wave Transolver 128,328 7.82 e − 04 ± 3.90 e − 04 1.67 e − 02 ± 4.29 e − 03 
+
+Wave DINo 126,928 1.13 e − 03 ± 9.98 e − 05 1.38 e − 02 ± 1.01 e − 03 
+
+Wave SMORE-Koopman 128,045 6.74 e − 05 ± 3.63 e − 05 3.22 e − 04 ± 1.54 e − 04 
+
+Wave SMORE-LRLQ 127,265 1.25 e − 03 ± 8.22 e − 07 8.65 e − 04 ± 3.09 e − 06 
+
+Navier–Stokes FNO 336,653 1.61 e − 03 ± 2.12 e − 03 2.43 e − 03 ± 3.03 e − 03 
+
+Navier–Stokes CNO 326,184 1.52 e − 03 ± 3.71 e − 04 3.87 e − 03 ± 1.15 e − 03 
+
+Navier–Stokes Transolver 358,007 4.13 e − 01 ± 1.04 e − 01 6.22 e − 01 ± 2.12 e − 01 
+
+Navier–Stokes DINo 356,444 1.34 e − 03 ± 1.33 e − 04 2.32 e − 03 ± 7.72 e − 05 
+
+Navier–Stokes SMORE-Koopman 355,165 5.37 e − 02 ± 2.02 e − 03 9.78 e − 02 ± 2.22 e − 03 
+
+Navier–Stokes SMORE-LRLQ 353,961 1.01 e − 03 ± 2.54 e − 05 2.00 e − 03 ± 1.99 e − 04 
+
+Shallow Water FNO 366,336 1.79 e − 03 ± 1.48 e − 05 5.22 e − 03 ± 9.19 e − 05 
+
+Shallow Water CNO 346,727 8.03 e − 04 ± 2.69 e − 05 2.86 e − 03 ± 4.95 e − 06 
+
+Shallow Water Transolver 359,774 1.71 e − 03 ± 5.88 e − 04 6.05 e − 03 ± 1.47 e − 03 
+
+Shallow Water DINo 356,674 4.90 e − 04 ± 1.99 e − 05 6.49 e − 04 ± 1.74 e − 05 
+
+Shallow Water SMORE-Koopman 354,401 2.22 e − 04 ± 3.39 e − 06 5.34 e − 04 ± 1.91 e − 05 
+
+Shallow Water SMORE-LRLQ 354,553 5.86 e − 04 ± 2.89 e − 05 7.67 e − 04 ± 2.91 e − 05 
+
+G.5 Detailed Stability and Mechanism Ablations 
+
+This appendix provides detailed numerical results supporting Section 5.3. All experiments in this diagnostic study use SMORE-LRLQ. The reported latent size is the per-component latent dimension 
+
+p. The reported prediction metric is minimum overall test MSE and is shown in units of 10 −3.In the ablation labels, Lreg denotes the two regularizers enabled or removed jointly. For both Spherical Shallow Water and Navier–Stokes, we use (βcons , β eig ) = (10 −8, 10 −7).49 Figure 6: Per-snapshot test MSE of SMORE-LRLQ on the 2D Wave benchmark, averaged over three random seeds (individual seeds shown as thin lines). The dashed vertical line separates the in-horizon window (snapshots 2–10) from the extrapolation window (snapshots 11–20). The error rises to a peak inside the in-horizon window and decreases over much of the extrapolation window, so the extrapolation-window average lies below the in-horizon average even though no actual improvement occurs at longer horizons. Table 9: First observed NaN epoch in the Spherical Shallow Water mechanism study. “Not observed” indicates that no NaN was recorded during the full 10,000-epoch training budget. Remaining finite over this interval is an empirical observation and does not establish formal stability. Configuration p = 50 p = 70 p = 100 
+
+OFF 8111 200 100 
+
+Lreg,cons only Not observed 147 142 
+
+Lreg ,eig only 8100 227 135 
+
+Lreg only Not observed 150 146 clip only 7162 158 100 low-rank only Not observed Not observed Not observed FULL Not observed Not observed Not observed FULL without Lreg Not observed Not observed Not observed FULL without clip Not observed Not observed Not observed FULL without low -rank Not observed 160 137 Table 10: SMORE-LRLQ stability ablation on 2D Navier–Stokes. Values are the total rollout MSE over the 19 predicted snapshots (snapshots 2–20) under the 1000-step initial latent fitting during evaluation. The configured training budget is 10,000 epochs. The low-rank quadratic rank is ⌊p/ 6⌋.Configuration p = 10 p = 30 p = 50 p = 70 p = 100 
+
+OFF 3.139e-2 4.432e-3 1.966e-3 3.226e-3 7.215e-3 
+
+Lreg,cons only 3.137e-2 4.496e-3 2.921e-3 4.141e-3 6.708e-3 
+
+Lreg ,eig only 3.139e-2 4.506e-3 1.959e-3 3.351e-3 5.102e-3 
+
+Lreg only 3.137e-2 4.536e-3 2.845e-3 4.097e-3 7.018e-3 clip only 3.087e-2 4.441e-3 1.939e-3 2.295e-3 4.532e-3 low-rank only 3.960e-2 5.335e-3 2.635e-3 2.887e-3 4.161e-3 FULL 3.897e-2 4.970e-3 2.003e-3 1.923e-3 2.337e-3 FULL without Lreg 3.879e-2 5.104e-3 2.922e-3 2.509e-3 3.475e-3 FULL without clip 3.954e-2 5.049e-3 2.321e-3 1.902e-3 2.796e-3 FULL without low -rank 3.120e-2 4.438e-3 2.658e-3 3.271e-3 5.191e-3 
+
+50 Table 11: SMORE-LRLQ stability-mechanism ablation on 3D Spherical Shallow Water. Values are the best finite overall MSE over the 19 predicted snapshots, reported in units of 10 −3. A dagger ( †) indicates that the run subsequently produced NaN; the reported value is the best finite MSE obtained before divergence. The low-rank rank is 10. All training runs were continued for up to 10,000 epochs unless numerical divergence occurred. 
+
+Configuration p = 50 p = 70 p = 100 
+
+OFF 0.8614 † 2.360 † 4.069 †
+
+λ1 only 0.8574 2.757 † 3.397 †
+
+λ2 only 0.8603 † 2.699 † 3.427 †
+
+λ only 0.8464 2.953 † 3.240 †
+
+clip only 0.8843 † 2.669 † 5.313 †
+
+low-rank only 0.9120 0.7832 0.7305 FULL 0.9301 0.7845 0.7274 FULL −λ 0.9330 0.7833 0.7382 FULL −clip 0.9088 0.7793 0.7273 
+
+FULL −low -rank 0.8709 2.538 † 5.480 †
+
+G.6 Full Sparse-Initialization Results 
+
+Table 12 reports the complete sparse-initialization sweep corresponding to Section 5.4. Each row reports overall test MSE as mean ± standard deviation over three random seeds. The 100% row is the full-observation reference obtained under the same evaluation procedure, and the remaining rows evaluate sparse initial-snapshot observations without retraining. The same spatial mask-generation procedure is used for all three datasets. For an evaluation grid of size H × W and visible ratio vobs , ⌊vobs HW ⌋ spatial locations are sampled uniformly at random without replacement. The random realization is controlled by the mask seed. Wave and Navier–Stokes use 64 × 64 grids, whereas Spherical Shallow Water uses a 64 × 128 grid. Only the initial latent state is optimized from the retained observations; the trained decoder and latent dynamics remain unchanged. For Wave and Navier–Stokes, the 64 × 64 grid contains 4096 spatial locations, so 10% , 4% , 2% ,and 1% visibility retain 409, 163, 81, and 40 locations, respectively. For Spherical Shallow Water, the 
+
+64 × 128 grid contains 8192 locations, giving 819, 327, 163, and 81 retained locations at the same visible ratios. Since these absolute counts differ across datasets, the recovery transition is governed by the number of observed locations relative to the per-component latent dimension p rather than by the visible ratio itself, as quantified in Table 13. 51 Table 12: Complete sparse-initialization results using 1,000 initial latent optimization steps with frozen checkpoints. Overall test MSE excludes the fitted initial snapshot and is evaluated on the full spatial grid. Values are mean ± sample standard deviation across three random seeds. Wave and Navier–Stokes use 
+
+64 × 64 grids; Spherical Shallow Water uses 64 × 128 . A fixed random permutation of grid locations is generated for each dataset, and nested subsets are taken without replacement using the same procedure. Masks are shared across training seeds and test trajectories. The visible count is ⌊vobs HW ⌋ for visible fraction 
+
+vobs . Standard deviations reflect training-seed variation. Visible ratio Wave (SMORE-Koopman) Navier–Stokes (SMORE-LRLQ) Shallow Water (SMORE-Koopman) 
+
+100% 2.01e-04 ± 9.84e-05 1.53e-03 ± 1.01e-04 3.86e-04 ± 8.58e-06 
+
+50% 2.05e-04 ± 1.04e-04 1.53e-03 ± 1.09e-04 3.94e-04 ± 8.03e-06 
+
+25% 2.12e-04 ± 1.05e-04 1.56e-03 ± 1.06e-04 4.06e-04 ± 2.01e-06 
+
+20% 2.12e-04 ± 1.09e-04 1.57e-03 ± 9.51e-05 4.17e-04 ± 2.38e-06 
+
+15% 2.01e-04 ± 8.59e-05 1.59e-03 ± 1.03e-04 4.30e-04 ± 4.23e-06 
+
+10% 1.98e-04 ± 8.39e-05 1.60e-03 ± 1.03e-04 4.55e-04 ± 3.97e-06 
+
+8% 2.04e-04 ± 9.19e-05 1.64e-03 ± 1.26e-04 4.85e-04 ± 1.11e-05 
+
+6% 1.91e-04 ± 7.09e-05 1.65e-03 ± 1.31e-04 5.37e-04 ± 2.37e-05 
+
+4% 2.11e-04 ± 8.76e-05 1.78e-03 ± 2.38e-04 6.71e-04 ± 3.89e-05 
+
+2% 6.96e-04 ± 1.14e-04 3.77e-03 ± 1.32e-04 1.32e-03 ± 1.08e-04 
+
+1% 4.06e-02 ± 5.64e-03 2.48e-02 ± 3.71e-03 1.56e-03 ± 1.37e-04 Table 13: Observability constant cS = σmin (JS ) for the sparse-initialization masks of Table 12. Since the decoder is affine in the latent code, cS equals the smallest singular value of the s × p matrix whose rows are the single-component decoder Jacobians J0(x) at the s observed locations (Theorem 3). Values are mean ±
+
+sample standard deviation across the same three training seeds and use the same masks as Table 12. Entries equal to zero are exact and occur when s < p , in which case the initial latent state is not identifiable from the observations. Values are not comparable across datasets, since the scale of J0 depends on the trained decoder and the field normalization. Visible ratio Wave (SMORE-Koopman, p = 100 )Navier–Stokes (SMORE-LRLQ, p = 72 )Shallow Water (SMORE-Koopman, p = 100 )
+
+100% 0.170 ± 0.005 8.64 ± 0.48 8.20 ± 0.35 50% 0.114 ± 0.005 6.04 ± 0.21 5.58 ± 0.22 10% 0.0400 ± 0.0026 2.34 ± 0.16 1.92 ± 0.10 4% 0.0104 ± 0.0006 0.965 ± 0.088 0.696 ± 0.025 2% 0 0.102 ± 0.004 0.177 ± 0.016 1% 0 0 0
+
+52

@@ -1,0 +1,1243 @@
+Title: BiFE: Search-Efficient Discovery of CPU-Only Branching Policies via LLM-based Bi-Fidelity Evolution
+
+URL Source: https://arxiv.org/pdf/2609.36735v1
+
+Published Time: Wed, 30 Sep 2026 00:58:28 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# BiFE: Search-Efficient Discovery of CPU-Only Branching Policies via LLM-based Bi-Fidelity Evolution 
+
+Ce Zhang 1,2 , Bin Zhang 1, Zhiwei Xu 3, Hao Chen 1,2 , Xinyue Lu 1,2 ,Shanwei Fan 1,2 , Yingxuan Teng 1,2 , Guoliang Fan 1
+
+> 1
+
+Institute of Automation, Chinese Academy of Sciences 
+
+> 2
+
+School of Artificial Intelligence, University of Chinese Academy of Sciences 
+
+> 3
+
+Shandong University 
+
+{zhangce2023, zhangbin2020, chenhao2022, luxinyue2023, fanshanwei2024, tengyingxuan2024, guoliang.fan}@ia.ac.cn zhiwei_xu@sdu.edu.cn 
+
+Abstract 
+
+In branch-and-bound (B&B) for mixed-integer linear programming (MILP), branching vari-able selection critically impacts efficiency. Existing neural branching policies often re-quire GPU inference, while CPU-efficient sym-bolic expressions lack the representational ca-pacity for complex logic. Large Language Model (LLM)-generated code provides a flex-ible search space for designing lightweight branching rules with diverse algorithmic logic. To discover effective rules within LLM-based evolutionary frameworks, a core challenge arises: full B&B evaluation on real instances is prohibitively expensive, whereas offline im-itation learning suffers from distribution shift. To address this, we introduce a Bi-Fidelity Evolutionary framework (BiFE). It employs low-fidelity imitation scores as a rapid pre-screener and selectively applies high-fidelity on-instance evaluation only to elite candidates, effectively balancing search efficiency with per-formance reliability. Experiments validate both the search efficiency of BiFE and the competi-tiveness of its discovered rules, which outper-form the SCIP solver and other baselines on CPUs, and even surpass certain GPU-based neural policies. 
+
+1 Introduction 
+
+Combinatorial optimization problems represent a class of NP-hard problems with broad applications in transportation (Barnhart and Laporte, 2006), scheduling (Chen, 2010), and planning (Pochet and Wolsey, 2006). Many such problems can be ex-pressed as mixed-integer linear programs (MILPs) and solved exactly through the branch-and-bound (B&B) framework (Land and Doig, 2010). B&B proceeds by iteratively branching on variables that deviate from integrality constraints to yield sub-problem nodes, meanwhile updating the global up-per and lower bounds and pruning infeasible or suboptimal nodes, until it converges to the global optimal solution. This method underlies high-performance MILP solvers, including SCIP (Bo-lusani et al., 2024), Gurobi (Gurobi Optimization, LLC, 2024), and COPT (Ge et al., 2023). Within the B&B framework, branching variable selection is one of the key determinants for MILP solving efficiency. Recently, many studies have de-veloped learning-based branching policies to sup-plant handcrafted heuristics (Gasse et al., 2019; Zarpellon et al., 2021; Scavuzzo et al., 2022). Neu-ral policies learn from instance distributions and can significantly reduce tree size, but they typically rely on GPUs for fast inference. Since real-world MILP solving often runs on CPU-only environ-ments, Gupta et al. (Gupta et al., 2020) propose a CPU-efficient scheme using a complex network only at the root and lightweight networks elsewhere. Later, Kuang et al. (Kuang et al., 2024a,b) further improve CPU efficiency by representing branching rules as simple symbolic expressions discovered through neuro-symbolic search, which also brings interpretability. Symbolic operations, however, are inherently limited in representational capacity. Effective branching policies may demand more complex logic than a fixed expression grammar can capture. Large Language Model (LLM)-based algorithm-design frameworks (Romera-Paredes et al., 2024; Liu et al., 2024; Ye et al., 2024) offer a natural way to search for richer lightweight rules through evolutionary code generation. LLM4Branch (Hou et al., 2026) applies this paradigm to branching by combining LLM-generated program skeletons with zeroth-order parameter optimization based on direct solver feedback. Here, fitness evaluation poses a core challenge in the MILP setting. Directly testing each candi-date heuristic on real MILP instances demands full B&B solves, which becomes prohibitively expen-sive when searching a vast code space. A tempt-ing alternative is to inherit the imitation learning 1arXiv:2609.36735v1 [cs.AI] 29 Sep 2026 paradigm from neural branching policies, mimick-ing strong-branching decisions on offline-collected data (Gasse et al., 2019; Gupta et al., 2020). Yet this suffers from distribution shift: the heuristic’s own deployment trajectory can diverge significantly from the offline demonstrations, so high imitation accuracy offers no guarantee that the resulting rule is truly CPU-efficient and yields strong solving performance. To bridge this gap, we propose a Bi -Fidelity 
+
+Evolutionary framework inspired by multi-fidelity optimization (Li and Li, 2026), termed BiFE. The low-fidelity imitation score serves as a rapid pre-screening filter, while high-fidelity evaluation on real MILPs is selectively applied only to elite can-didates. This design preserves the efficiency of surrogate-based search while retaining the reliabil-ity of on-instance testing, enabling practical evo-lution of branching policies in the LLM-generated code space. Our contributions can be summarized as follows: • Branching rule discovery is formulated as a bi-fidelity evaluation problem: strong-branching imitation is efficient but subject to distribution shift, whereas solver feedback is reliable but costly. • We propose BiFE, which introduces elite-prioritized admission and selection to achieve an effective balance between search efficiency and the performance of discovered branching rules • Experiments show that BiFE improves rule-discovery efficiency while producing branch-ing rules that outperform comparable base-lines and the SCIP solver on CPUs, and even surpass certain neural branching policies eval-uated on GPUs. 
+
+2 Related Work 
+
+Deep Learning for MILP. The neural network ac-celeration of MILP solving can be roughly divided into two directions (Bengio et al., 2021; Scavuzzo et al., 2024): (1) Replacing traditional heuristic rules with neural networks within the B&B frame-work, such as variable selection (Khalil et al., 2016; Gasse et al., 2019; Gupta et al., 2020; Zarpellon et al., 2021; Gupta et al., 2022), node selection (He et al., 2014; Labassi et al., 2022; Zhang et al., 2025), cut selection (Tang et al., 2020; Huang et al., 2022; Wang et al., 2023; M. et al., 2026) and backdoor prediction (Ferber et al., 2022; Cai et al., 2024). (2) Using neural networks as a primal heuristic to obtain a high-quality feasible solution as the initial primal bound. This category includes two approaches: solution prediction (Ding et al., 2020; Han et al., 2023; Huang et al., 2024a; Liu et al., 2025; Pu et al., 2025) and neighborhood selec-tion (Wu et al., 2021; Sonnerat et al., 2022; Huang et al., 2023). We focus on CPU-efficient branching policies, a sub-direction of variable selection pro-gressing from lightweight networks (Gupta et al., 2020) to symbolic rules (Kuang et al., 2024a,b). Our method introduces a new paradigm beyond both trends, possessing competitive representa-tional power and near-symbolic computational effi-ciency. 
+
+LLM for MILP. Early research on LLM-based algorithm design (Romera-Paredes et al., 2024; Liu et al., 2024; Ye et al., 2024) primarily focuses on specific components of particular combinatorial optimization problems, such as constructive heuris-tics for the traveling salesman problem. More recently, some studies have extended LLMs to heuristic design for general MILPs, concentrat-ing on primal heuristics such as diving heuris-tics (Zhou et al., 2024; Zhang et al., 2026) and neighborhood selection (Ye et al., 2025), or cutting plane selection (Li et al., 2026) and design (Yaz-dani et al., 2025). For variable selection, Zheng et al. (2026) uses LLMs to schedule handcrafted heuristic rules online. Closely contemporaneous work, LLM4Branch (Hou et al., 2026), combines program-skeleton generation with zeroth-order pa-rameter tuning based on direct solver feedback. BiFE instead focuses on evaluation allocation dur-ing program evolution, using imitation as a cheap screening fidelity and selectively applying costly solver evaluations to correct the surrogate. 
+
+3 Preliminaries 
+
+B&B Algorithm. The standard form of MILPs is: arg min x
+
+c⊤x | Ax ≤ b, x ∈ Zp × Rn−p ,where the vector x represents n variables to be opti-mized, with p being the number of integer variables. 
+
+A, b, c represent constraint matrix, constraint right term, and objective coefficient. The B&B algo-rithm for solving MILPs consists of three steps: branching, bounding, and pruning. Starting from the relaxed root node solution, this method iter-atively branches on fractional variables xi = bi
+
+by adding xi ≤ [bi] and xi ≥ [bi] + 1 , main-2tains global primal and dual bounds (i.e., upper and lower bounds), and prunes nodes that are sub-optimal or infeasible. The procedure terminates when the upper and lower bounds align, yielding the optimal solution. 
+
+Handcrafted Branching Rules. In the B&B al-gorithm, variable selection involves choosing one variable from several fractional candidates. This decision significantly affects the total node count, which in turn influences overall solving time. Sev-eral handcrafted branching rules are discussed in (Achterberg et al., 2005). Pseudo-cost branch-ing uses historical data to guide current decisions, but suffers from poor accuracy early in the search tree. Strong branching evaluates the dual bound improvement from creating child nodes for all can-didates. Although effective in reducing the node count, its high computational cost of solving all child nodes undermines its purpose of acceleration. However, this property makes strong branching suitable as an expert for imitation learning in neu-ral branching policies (Gasse et al., 2019; Gupta et al., 2020). In MILP solvers, a hybrid approach is typical: strong branching initializes the process, while pseudo-cost branching takes over later. 
+
+4 Methodology 
+
+In this section, we formally introduce BiFE, a bi-fidelity evolutionary framework in which a low-fidelity surrogate based on strong-branching imita-tion serves as an efficient filter, while high-fidelity MILP solving evaluation is selectively applied to elite candidates. Candidate heuristics are generated by an LLM, and an elite-prioritized evolutionary mechanism allocates the two fidelities, enabling the discovery of CPU-efficient branching rules. The overall framework is illustrated in Figure 1. The pseudocode of BiFE is provided in Appendix A. 
+
+4.1 Bi-Fidelity Formulation 
+
+We formulate branching rule discovery as a black-box optimization problem over a heuristic space 
+
+H. Each candidate heuristic ˆf ∈ H assigns scores to candidate branching variables, and the variable with the highest score is selected during B&B search. The objective is to identify a branching heuristic that maximizes the solving performance over a distribution of MILP instances: 
+
+ˆf ⋆ = arg max  
+
+> ˆf∈H
+
+FHF ( ˆf ), (1) where the high-fidelity objective FHF is defined as 
+
+FHF ( ˆf ) = − 1
+
+|M| 
+
+X
+
+> m∈M
+
+J (m, ˆf ), (2) with M denoting a set of MILP instances and 
+
+J (m, ˆf ) representing the solving cost of heuris-tic ˆf on instance m, measured by metrics such as solving time or node count. However, directly optimizing FHF is compu-tationally prohibitive. Each evaluation requires deploying the heuristic inside a solver and execut-ing complete B&B procedures on multiple MILP instances, and the sheer number of candidates evaluated during evolutionary search renders rely-ing solely on high-fidelity evaluations impractical. To address this, we introduce a lightweight low-fidelity objective FLF : H → R. By design, FLF 
+
+is substantially cheaper to evaluate than FHF , yet it cannot perfectly reproduce the scoring of FHF 
+
+on candidate heuristics, as a perfect surrogate is typically unattainable in practice. This motivates a two-tier evaluation strategy: the low-fidelity ob-jective acts as an efficient filter, rapidly discarding unpromising candidates, while the expensive FHF 
+
+is reserved as a fine-grained verifier applied only to the surviving elite, correcting any inaccuracies introduced by the surrogate approximation. 
+
+4.2 Low-Fidelity Surrogate 
+
+To construct the low-fidelity objective, we define heuristic quality according to the consistency be-tween candidate branching decisions and strong-branching demonstrations. As mentioned in Pre-liminaries, strong branching yields accurate results but is time-consuming, making it unsuitable for direct online use. Nevertheless, it is well-suited for offline collection as expert experience (Gasse et al., 2019; Gupta et al., 2020). During data collection, strong branching is used as the branching rule to solve a class of instances, and data pairs (Xt, a ⋆t ) are collected throughout the process. Here Xt ∈ R|C|× 72 denotes the fea-tures of candidate variables at the current branch-ing step t, C denotes the set of candidate vari-ables, and |C| is the number of candidate vari-ables. Specifically, we adopt the 72-dimensional features designed by (Khalil et al., 2016), whose 18 static and 54 dynamic dimensions are clearly defined to encapsulate critical guidance for branch-ing variable selection. a⋆ = arg max c∈C scsb is the branching variable selected by strong branching, 31. Initialization             
+
+> 𝑭 𝑳𝑭 -Ranked Initial Population Selection Top-𝛼 as the Elite ℰ 𝑭 𝑯𝑭 Evaluation on ℰ
+> 2. Evolutionary Loop
+> ...
+> ...
+> ...
+> (2) Elite Admission
+> 𝜏 = 𝐹 $% arg min
+> &'∈ℰ 𝐹 *% 3𝑓 𝑭 𝑳𝑭 ≥ 𝜏 ? Calculate 𝑭 𝑳𝑭
+> Yes 𝑭 𝑯𝑭 Evaluation and Join Elite
+> ...
+> No
+> (3) Survival Selection
+> ...
+> ℰ ranked by 𝑭 𝑯𝑭
+> ...
+> General Population ranked by 𝑭 𝑳𝑭
+> +
+> Elite Priority Survival Population Size 𝑁
+> ...
+> LLM Generator Initialize Prompt
+> (1) Parent Selection
+> ...
+> ℰ ranked by 𝑭 𝑯𝑭
+> General Population ranked by 𝑭 𝑳𝑭
+> Elite Priority Sample
+> ...
+> +
+> LLM Generator
+> Crossover or Mutation
+> Low-Fidelity Surrogate
+> Collect (𝑋 +, 𝑎 +∗)
+> B&B tree
+> 𝒟 3𝑓
+> 𝐹 $% 3𝑓
+> High-Fidelity Evaluation
+> MILP Solver
+> 𝐹 *% 3𝑓 Instances
+> …
+> 3𝑓
+
+Figure 1: The overall framework of BiFE. To balance search efficiency and rule quality, FHF evaluates heuristics via expensive MILP solving while FLF offers a cheap surrogate by measuring consistency with strong-branching decisions. An LLM generator produces new heuristics through three operations: initialization, crossover, and mutation. The evolutionary process has two stages: (1) Initialization: the LLM generates an initial population, ranked by FLF with the top α forming the elite set E for FHF evaluation. (2) Evolutionary Loop: parent selection is elite-prioritized, where elites are ranked by FHF and others by FLF , and selected parents are passed to the LLM for crossover or mutation. New candidates with FLF exceeding threshold τ undergo FHF evaluation and are admitted into E. Survival selection retains all elites and fills the remaining slots from the general population. This selective allocation lets BiFE explore broadly with FLF while using FHF to correct the surrogate on promising candidates. 
+
+ssb ∈ R|C| denotes the strong-branching scores. Let 
+
+D = {(Xt, a ⋆t )}Tt=1 denote the set of T data pairs, the low-fidelity surrogate is defined as follows: 
+
+FLF ( ˆf ) = 1
+
+|D| 
+
+X
+
+> (X,a ⋆)∈D
+
+I(arg max 
+
+> c∈C
+
+ˆf (Xc) = a⋆),
+
+(3) where I(·) is the indicator function, returning 1 if its argument is true and 0 otherwise, and ˆf :
+
+R72 → R1. This formulation reflects the same principle behind the cross-entropy loss used in imi-tation learning for neural branching (Gasse et al., 2019): the goal is to match the expert’s decisions rather than regress its exact scores. Accordingly, we focus solely on the optimal action a⋆ and dis-regard all other scores. Computing FLF requires only evaluation on D, so its cost is negligible. The inability of FLF to perfectly reproduce the scoring of FHF stems from two inherent factors: (1) Strong branching itself is myopic, optimizing only the immediate dual bound improvement at each step, so even perfect imitation does not guar-antee globally optimal decisions. (2) D is col-lected from trajectories of strong branching, while a learned heuristic generates its own trajectory dur-ing deployment. This distribution shift induces a mismatch between FLF and FHF : high FLF on D
+
+does not guarantee strong solving performance. 
+
+4.3 LLM-Based Rule Generation 
+
+We leverage an LLM to generate branching heuris-tics throughout the evolutionary process. The LLM receives a structured prompt comprising: (1) a de-LLM-Based Rule Generator          
+
+> LLM Problem Description
+> üTask Overview
+> üConstraints
+> üInput Feature List Rule Template
+> def f(x) -> float: """ Args: Return: """
+> return 0.0
+> new $ 𝑓
+> Crossover Description
+> +
+> Parents
+> Crossover Prompt
+> Mutation Description
+> +
+> Parent
+> Mutation Prompt
+> Initialize Prompt or or
+> ... ...
+> Initialization Evolutionary Loop Bi-Fidelity Evolution
+> Best $ 𝑓 ∗
+
+Figure 2: LLM-based rule generator. Given an opera-tion instruction (initialization, crossover, or mutation), a problem description, and a rule template, the LLM generates a new rule. The LLM-generated rules undergo evolution and selection within the BiFE framework to yield an optimal rule. 
+
+scription of the input features and output semantics of a branching rule, (2) a code template, (3) an in-struction indicating whether to initialize a diverse rule, perform crossover, or apply mutation, and (4) the selected parent rule(s), if applicable. During ini-tialization, no parents are available, so component (4) is omitted and the LLM generates the initial pop-ulation from scratch. In later generations, parents are provided and the instruction directs crossover or mutation accordingly. The LLM directly out-puts each new heuristic as code. Heuristics that fail to execute (due to syntax errors, runtime errors, or timeout) are assigned a minimal fitness score and naturally eliminated during selection. Details are provided in Appendix D. The structure of the LLM-based rule generator is illustrated in Figure 2. 44.4 Elite-Prioritized Population Evolution 
+
+The imperfect nature of FLF motivates retaining 
+
+FHF as a fine-grained verifier to discover heuristics that surpass the imitation ceiling. We define an elite population E as the subset of individuals that un-dergo high-fidelity evaluation. In the initial genera-tion, the LLM generates a population of heuristics from scratch, which are then ranked by FLF , and the top α fraction form E. Each ˆf ∈ E is then eval-uated on real MILP instances to obtain FHF . In the main evolutionary loop, the elite admission thresh-old τ is set as the FLF of the individual with the worst FHF in E, τ = FLF 
+
+ arg min ˆf ∈E FHF ( ˆf ),
+
+which means that in subsequent generations, a can-didate is admitted into E for high-fidelity evaluation provided that FLF ( ˆf ) ≥ τ .This hierarchical structure reshapes both parental and survival selection in the evolutionary loop, prioritizing the elite population in both forms of selection. For parent selection, individuals in E
+
+are ranked first by FHF , followed by the general population ranked by FLF . The combined pool is then sampled with probability proportional to rank, where the selection probability for the r-th individ-ual is p(r) ∝ 1 
+
+> r+N
+
+, with N denoting the overall population size. Selected parents are then passed to the LLM for crossover or mutation and producing new candidate. Survival selection simply retains all members of E, filling the remaining slots with the top-ranked general population individuals ac-cording to FLF .
+
+5 Experiments 
+
+5.1 Settings Benchmarks. Consistent with prior studies (Gasse et al., 2019; Gupta et al., 2020; Scavuzzo et al., 2022; Kuang et al., 2024a,b), we evaluate BiFE on four standard benchmark problems: Combinato-rial Auctions (CA), Set Covering (SC), Maximum Independent Set (MIS), and Capacitated Facility Location (CFL). For each problem, we assess the generated branching rules on two categories of in-stances: those of the same scale as the instances used during the algorithm design phase (referred to as “test instances”) and those of a larger scale (referred to as “transfer instances”). To validate the performance of BiFE on real-world problems, we further evaluate on three benchmark problems drawn from the NeurIPS 2021 ML4CO compe-tition (Gasse et al., 2022) and the Distributional MIPLIB library (Huang et al., 2024b): Balanced Item Placement (BIP), Neural Network Verifica-tion (NNV), and Optimal Transmission Switching (OTS). The specific sizes of the test and transfer instances for the standard benchmarks, along with further details regarding the three real-world bench-marks, are documented in Appendix B. Evaluation Metrics. We report the number of B&B nodes and solving time for standard benchmarks and real-world benchmarks NNV and OTS. Since our ul-timate goal is to minimize solving time, a metric determined by both node count and per-node in-ference cost, fewer nodes do not guarantee faster solving if inference is expensive. Thus, solving time serves as the primary metric, with node count provided for reference. For BIP, instances are ex-tremely computationally challenging and measur-ing solving time or node counts is not practical. Following common practice for such cases (Gasse et al., 2022), we evaluate BIP using the primal-dual integral (PDI) and the optimality gap. The PDI quantifies the area enclosed by the solver’s primal and dual bound curves over time, thus rewarding both progress in finding good feasible solutions and in improving the dual bound. Given a time limit T ,it is defined as PDI = R Tt=0 
+
+ c⊤x⋆t − y⋆t
+
+ dt, where 
+
+x⋆t is the best feasible solution up to time t, and 
+
+y⋆t is the best dual bound at time t. The optimality gap is defined as the relative gap between the best primal and dual bounds at the end of the time limit 
+
+T : gap = |c⊤x⋆T − y⋆T |/(|c⊤x⋆T | + ϵ), where ϵ is a small constant for numerical stability. 
+
+Baselines. We evaluate against four categories of baselines: (1) Handcrafted heuristic: SCIP’s de-fault branching rule, reliable pseudo-cost branch-ing (RPB) (Bolusani et al., 2024), represents a highly engineered heuristic adopted in solvers. (2) CPU-efficient policies: FiLM (Gupta et al., 2020) uses a lightweight neural architecture, while Symb4CO (Kuang et al., 2024a) and GS4CO (Kuang et al., 2024b) employ neuro-symbolic search to obtain symbolic policies. (3) General neural policies: GNN (Gasse et al., 2019) (imitation learning) and tMDP (Scavuzzo et al., 2022) (reinforcement learning). The “-GPU” suf-fix denotes GPU evaluation and default denotes CPU. (4) LLM-based algorithm design: EoH (Liu et al., 2024) and ReEvo (Ye et al., 2024) are general-purpose LLM-based frameworks that di-rectly use low-fidelity LLF to evolve heuristics. LLM4Branch (Hou et al., 2026) generates program skeletons and tunes their numerical parameters with direct solver feedback. Together, they con-5Table 1: The experimental results on standard benchmarks. Values are reported as geometric mean (geometric standard deviation) over 100 solving attempts per method. Bold font marks the best time among CPU-evaluated methods (our core focus), underline marks cases where the best CPU method additionally outperforms all GPU-evaluated methods. Nodes are reported for completeness but not the primary evaluation metric, and ⋆ in the Nodes column marks cases that hit the 1000s time limit. 
+
+Test Instances 
+
+Method CA SC MIS CFL Nodes Time Nodes Time Nodes Time Nodes Time RPB 8.79(3 .97) 2.31(1 .60) 24 .93(8 .88) 6.13(1 .75) 30 .71(9 .47) 8.74(1 .72) 65 .51(5 .64) 33 .70(2 .07) 
+
+FiLM 57 .68(2 .93) 2.01(1 .47) 87 .23(4 .00) 5.20(1 .68) 108 .52(10 .57) 13 .78(2 .48) 228 .93(3 .17) 30 .82(2 .29) 
+
+Symb4CO 63 .10(3 .06) 1.59(1 .48) 114 .74(4 .37) 4.93(1 .76) 70 .00(7 .07) 6.35(1 .66) 264 .45(3 .12) 33 .19(2 .44) 
+
+GS4CO 59 .66(3 .03) 1.93(1 .43) 112 .26(4 .34) 5.21(1 .70) 146 .25(10 .29) 8.66(2 .03) 273 .15(3 .01) 40 .22(2 .36) 
+
+GNN 59 .41(3 .09) 3.65(1 .99) 92 .33(3 .66) 32 .36(3 .24) 51 .74(6 .16) 9.67(2 .27) 217 .83(3 .03) 70 .79(2 .64) 
+
+EoH 85 .27(3 .15) 1.62(1 .45) 113 .36(4 .17) 4.73(1 .71) 674 .73(30 .81) 22 .61(5 .83) 265 .82(3 .04) 28 .37(2 .25) 
+
+ReEvo 817 .17(6 .21) 4.58(3 .22) 109 .00(4 .18) 4.71(1 .70) 89 .70(7 .14) 6.44(1 .59) 272 .33(3 .03) 29 .60(2 .25) 
+
+LLM4Branch 80 .14(2 .88) 1.64(1 .26) 148 .95(4 .15) 4.77(1 .52) 93 .93(6 .71) 6.57(1 .43) 281 .54(3 .01) 31 .11(2 .18) 
+
+BiFE 70 .50(3 .11) 1.51 (1 .41) 109 .17(4 .10) 4.58 (1 .67) 81 .75(7 .75) 6.26 (1 .62) 266 .52(2 .99) 28.29 (2 .22) 
+
+GNN-GPU 59 .41(3 .09) 1.93(1 .48) 92 .33(3 .66) 5.07(1 .71) 51 .74(6 .16) 6.96(1 .53) 217 .83(3 .03) 29 .23(2 .18) 
+
+tMDP-GPU 94 .90(2 .81) 2.09(1 .50) 406 .79(5 .82) 10 .13(2 .94) 119 .46(8 .87) 7.96(2 .17) 381 .80(3 .74) 43 .60(2 .76) 
+
+Transfer Instances 
+
+Method CA SC MIS CFL Nodes Time Nodes Time Nodes Time Nodes Time RPB 766 .90(4 .16) 16 .80(1 .59) 3624 .9(3 .83) 68.25 (2 .16) 2701 .3(7 .55) 115 .67(2 .49) 144 .29(9 .26) 99 .42(2 .94) 
+
+FiLM 848 .24(2 .74) 16 .23(2 .00) 3090 .0(3 .36) 70 .56(2 .61) 1552 .4(12 .35) 112 .89(5 .16) 488 .62(5 .11) 100 .99(3 .38) 
+
+Symb4CO 933 .03(2 .77) 15 .37(2 .19) 4883 .4(3 .53) 85 .12(2 .88) 3880 .1(9 .99) 176 .70(4 .42) 504 .12(5 .16) 105 .92(3 .61) 
+
+GS4CO 1042 .5(3 .04) 14 .40(2 .03) 4429 .2(3 .50) 76 .38(2 .72) 16044 ⋆(14 .84) 452 .49(6 .99) 464 .10(4 .65) 110 .36(3 .07) 
+
+GNN 884 .32(2 .78) 54 .95(2 .57) 2217 .6⋆(2 .42) 771 .15(1 .72) 1411 .6⋆(7 .83) 200 .77(4 .77) 420 .31 ⋆(4 .82) 248 .22(4 .01) 
+
+EoH 1261 .1(2 .87) 13 .57(2 .05) 4067 .4(3 .37) 77 .69(2 .82) 22914 ⋆(5 .26) 587 .86(3 .18) 479 .60(4 .88) 84 .30(3 .11) 
+
+ReEvo 87523 ⋆(3 .35) 446 .89(3 .14) 3976 .0(3 .37) 76 .79(2 .77) 2354 .0(6 .77) 89 .99(3 .16) 495 .37(4 .89) 89 .55(3 .16) 
+
+LLM4Branch 1243 .1(2 .68) 13 .95(1 .74) 5618 .5(3 .53) 69 .78(2 .72) 2963 .5(7 .30) 90 .97(3 .05) 507 .17(4 .93) 96 .19(3 .09) 
+
+BiFE 1092 .7(2 .68) 11.95 (1 .92) 3820 .8(3 .33) 71 .80(2 .73) 2547 .4(5 .98) 89.07 (2 .98) 474 .91(4 .69) 83.89 (2 .99) 
+
+GNN-GPU 884 .32(2 .78) 16 .02(2 .03) 2815 .9(3 .27) 69 .29(2 .63) 1430 .2(8 .03) 82 .95(3 .23) 435 .50(5 .16) 96 .88(3 .22) 
+
+tMDP-GPU 1768 .5(3 .08) 22 .70(2 .26) 43880 ⋆(3 .87) 735 .99(3 .70) 4085 .3⋆(9 .05) 113 .87(4 .21) 788 .73 ⋆(5 .44) 139 .43(3 .77) 
+
+trast low-fidelity-only evolution and repeated high-fidelity solver tuning with BiFE’s bi-fidelity eval-uation allocation. We note that other LLM-based methods targeting different MILP components are not directly comparable within the branching pol-icy evaluation framework. A detailed discussion of these methods is provided in Appendix C. 
+
+Implementation. We implement BiFE and all baselines within SCIP 7.0.3 (Bolusani et al., 2024). Following prior work (Gasse et al., 2019; Gupta et al., 2020; Kuang et al., 2024a,b), we modify only the branching rule, allow cutting plane generation at the root node only, and deactivate solver restarts, with all other SCIP parameters kept at their default values. For evaluation, all methods are tested on 20 instances across 5 random seeds, totaling 100 solving attempts, with a time limit of 1,000 sec-onds per attempt. All evaluations are conducted on identical hardware. For LLM-based methods, we use DeepSeek-V4-Flash (DeepSeek-AI, 2026) as the backbone model with consistent evolution-ary parameters (such as number of LLM calls and population size). Prompt design (crossover and mu-tation, problem descriptions, etc.) and other details are provided in Appendix D. 
+
+BiFE Setup. To construct FLF , we collect 1,000 strong-branching samples per benchmark, and 
+
+FHF is evaluated on 20 disjoint instances. For 
+
+FHF , the performance metric varies by benchmark: for CA, SC, MIS, and CFL, it is solving time with a 60-second per-instance time limit. For NNV, OTS, and BIP, the time limit is 300 seconds, with metrics being solving time, optimality gap, and PDI, respec-tively. For a fair comparison, LLM4Branch uses comparable time limits across its three evaluation stages. Full per-benchmark settings are provided in Appendix D. 
+
+5.2 Results Standard Benchmarks. The experimental re-sults in Table 1 demonstrate the effectiveness of BiFE across all standard benchmarks. On test instances, BiFE achieves the best solving time among all CPU-evaluated methods across all four 6Table 2: Experimental results on real-world benchmarks. Similarly, values are reported as geometric mean (geometric standard deviation) over 100 solving attempts per method. Bold marks the best gap/PDI/time among CPU methods, underline indicates the best CPU method outperforms all GPU methods. ⋆ indicates hitting the 1000s time limit.                                                   
+
+> Method BIP OTS NNV PDI Gap Nodes Time Nodes Time RPB 81057 .56(1 .24) 93 .47(13 .99) 939 .91(9 .01) 320 .62(2 .60) 372 .96(31 .85) 22 .96(7 .85)
+> Symb4CO 89220 .25(1 .07) 132 .48(11 .95) 1474 .2⋆(3 .17) 544 .89(1 .94) 365 .89(60 .40) 25 .43(15 .50)
+> GS4CO 87270 .12(1 .12) 118 .91(12 .09) 2107 .4⋆(2 .11) 961 .48(1 .16) 502 .99(80 .20) 25 .55(18 .31)
+> GNN 87835 .06(1 .08) 88 .39(6 .29) 269 .80 ⋆(2 .96) 479 .07(2 .42) 254 .01 ⋆(18 .54) 58 .55(11 .49)
+> LLM4Branch 76010.83 (1 .30) 72 .25(14 .12) 4709 .2⋆(2 .29) 785 .75(1 .51) 362 .27(23 .67) 18 .32(4 .49)
+> BiFE 76152 .79(1 .21) 65.85 (16 .13) 4327 .6(3 .76) 306.28 (2 .40) 242 .54(18 .69) 12.58 (5 .22)
+> GNN-GPU 82599 .38(1 .11) 52 .67(3 .89) 561 .03(6 .61) 211 .45(2 .67) 270 .85(20 .06) 20 .55(6 .60)
+
+benchmarks, and these results also surpass GPU-evaluated baselines. LLM4Branch provides a closely competitive LLM-generated-code baseline on these distributions. On transfer instances in-volving larger problem scales, BiFE maintains its leading position among CPU-evaluated methods on CA, MIS, and CFL, with CA and CFL again outper-forming GPU-evaluated baselines. LLM4Branch edges ahead only on SC transfer, where both still trail RPB. Notably, BiFE achieves shorter solving time while exploring more nodes than certain base-lines. Since solving time is the primary metric, node count alone does not fully reflect branching policy performance. The reasons behind this phe-nomenon are further examined in Discussion. More statistical tests are reported in Appendix E. 
+
+Real-World Benchmarks. The results on real-world benchmarks are presented in Table 2, where we evaluate a subset of baselines that are com-petitive on the standard benchmarks. On BIP, LLM4Branch obtains a 0.19% lower PDI, while BiFE yields the lowest gap among CPU-evaluated methods, indicating comparable solving efficiency between the two approaches. On NNV and OTS, BiFE achieves the best solving time among CPU-evaluated methods on both benchmarks, outper-forming LLM4Branch and even surpassing GNN-GPU on NNV. Notably, BiFE also attains the fewest nodes on NNV among all methods. 
+
+5.3 Discussion More Nodes, Yet Less Time. Tables 1 and 2 show that RPB and neural policies (GNN, FiLM) ex-plore fewer nodes than neuro-symbolic (Symb4CO, GS4CO) and LLM-based methods (BiFE, EoH, ReEvo, LLM4Branch), yet often incur longer solv-ing times. As Figure 4(a) reveals, this stems from their high inference cost: RPB relies on expensive strong branching for initialization, while neural methods are inefficient on CPU, unlike on GPU. Neuro-symbolic and LLM-based methods, by con-trast, use lightweight symbolic or LLM-generated rules with minimal CPU overhead, exploring more nodes but solving faster. Among them, Symb4CO and GS4CO sometimes underperform BiFE despite similar or fewer nodes, as their official implemen-tations combine RPB with symbolic rules, raising inference cost. BiFE avoids this by relying solely on lightweight rules, achieving the best time effi-ciency. 
+
+Limitations of Relying Solely on FLF . We ob-serve that EoH and ReEvo perform comparably to BiFE on most benchmarks, yet fail drastically on specific ones—EoH on MIS and ReEvo on CA (see Table 1). To investigate this, we visualize the relationship between FLF and FHF using all indi-viduals from BiFE’s populations on standard bench-marks. Figure 3 presents the scatter plots highlight-ing the performance drop from the best FLF to the true best FHF on each benchmark. The degrada-tion is most severe on MIS and CA, precisely mir-roring the failure cases of EoH and ReEvo. This directly validates our core argument: due to distri-bution shift, FLF based on offline datasets cannot fully substitute for FHF . The imperfect FLF thus necessitates retaining FHF as a fine-grained veri-fier within our bi-fidelity framework. 
+
+Search Efficiency Relative to LLM4Branch. The performance results in Tables 1 and 2 indicate largely comparable solution quality: BiFE matches or slightly exceeds LLM4Branch on the standard benchmarks and BIP, and is stronger on OTS and NNV. Despite this comparable solution quality, Fig-ure 4(b) reports a pronounced difference in rule-design time. To ensure a fair comparison, BiFE’s total budget includes evolutionary search and the one-off cost of collecting strong-branching samples to construct FLF , while LLM4Branch is evaluated 70.09 0.12 0.15 0.18 0.21                  
+
+> Low-Fidelity Score
+> 4.0
+> 3.2
+> 2.4
+> 1.6
+> High-Fidelity Score
+> [a] CA
+> Best FHF
+> Best FLF
+> -62%
+> 0.32 0.40 0.48 0.56
+> Low-Fidelity Score
+> 31.5
+> 30.0
+> 28.5
+> 27.0
+> [b] CFLP
+> Best FHF
+> Best FLF
+> -2%
+> 0.04 0.08 0.12 0.16
+> Low-Fidelity Score
+> 9.0
+> 8.4
+> 7.8
+> 7.2
+> 6.6
+> [c] SC
+> Best FHF
+> Best FLF
+> -12%
+> 0.00 0.05 0.10 0.15
+> Low-Fidelity Score
+> 20
+> 16
+> 12
+> 8
+> [d] MIS
+> Best FHF
+> Best FLF
+> -136%
+
+Figure 3: Scatter plot of FLF vs. FHF highlighting the performance drop based solely on FLF .CA SC MIS CFL 10 0
+
+10 1
+
+> Time (s)
+> BiFE GS4CO RPB GNN Inference
+
+10 3 10 4
+
+Rule-Design Time (s, log scale) 
+
+SC CA MIS CFL BIP OTS NNV       
+
+> 1.1k 7.9k 16.0k 1.3k 2.5k 26.4k 4.6k 7.9k 25.3k 2.4k 11.0k 22.7k 4.5k 31.1k 18.2k 4.8k 30.4k 18.5k 3.4k 31.2k 16.9k
+
+BiFE BiFE w/o FLF LLM4Branch 
+
+Figure 4: (a) Left: Inference time in total time of BiFE, RPB, GS4CO, and GNN on test instances of standard benchmarks. (b) Right: Rule-design time across benchmarks. BiFE includes evolutionary search and the one-off cost of collecting strong-branching demonstrations. LLM4Branch’s time includes solver-based Bayesian parameter optimization and validation. 
+
+Method SC CA CFL MIS BiFE w/o FLF 4.66 1.52 29.38 6.54 BiFE 4.58 1.51 28.29 6.26 
+
+Table 3: Times of rules designed by BiFE and BiFE w/o 
+
+FLF on the test instances of standard benchmarks. 
+
+under time limits aligned with BiFE. Under these settings, BiFE requires 3.9 × to 20.6 × less time than LLM4Branch across all benchmarks. This marked reduction reflects their different evalua-tion workflows: LLM4Branch runs fitness eval-uation both before and after Bayesian search, each driven by costly solver feedback. By screening the population with FLF and reserving FHF for elite candidates, BiFE avoids repeated solver-feedback workload. The resulting order-of-magnitude re-duction shows that BiFE can attain comparable downstream performance while spending far less time on rule discovery, demonstrating a substantial improvement in search efficiency. 
+
+5.4 Ablation Study 
+
+We construct an ablation study to investigate whether BiFE’s bi-fidelity framework indeed of-fers superior search efficiency compared to relying solely on FHF . To isolate this effect, we compare BiFE against a variant that removes the low-fidelity filter, denoted BiFE w/o FLF , which directly eval-uates all candidates via FHF . Both configurations are run with identical generations and population sizes across all benchmarks, and BiFE’s reported time retains the one-off FLF data-collection cost. The rule-design time of both methods is shown in Figure 4(b). Furthermore, we compare the solving times of rules designed by both methods on the test instances of standard benchmarks, presented in Table 3. As shown, BiFE achieves substantially shorter rule-design time than BiFE w/o FLF across all benchmarks, with speedups ranging from 1.7 × on MIS to over 9.2 × on NNV, even with the offline data collection overhead included. Meanwhile, the rules designed by both methods show no signifi-cant difference in performance. This confirms that the low-fidelity pre-screener effectively prunes the search space, enabling the bi-fidelity framework to discover branching rules with far higher search ef-ficiency than pure high-fidelity evaluation, without compromising the quality of the resulting rules. 
+
+6 Conclusion 
+
+In this paper, we introduce BiFE, a bi-fidelity evo-lutionary framework that discovers LLM-generated branching policies for MILP. By using low-fidelity 8imitation scores as a fast pre-screener and reserv-ing expensive on-instance evaluation for elite can-didates, BiFE effectively balances search efficiency with performance reliability. Experiments on stan-dard and real-world benchmarks show that the dis-covered rules outperform SCIP’s default heuris-tic, existing CPU-efficient baselines, and even cer-tain GPU-based neural policies, demonstrating the promise of LLM-generated code as a lightweight, interpretable, and expressive representation for branching. However, the policies discovered by BiFE remain benchmark-specific. In future work, we will focus on LLM-designed branching rules that generalize across instances, rather than policies tailored to a single benchmark. 
+
+Limitations 
+
+While BiFE effectively discovers CPU-efficient and complex branching policies within the LLM-generated code space, the discovered policies re-main benchmark-specific. Currently, the evolution-ary search is conducted and tailored independently for each problem distribution (e.g., CA, SC, MIS). Consequently, a policy evolved for one benchmark may not generalize well to structurally different MILP instances, necessitating the search process to be rerun for new problem domains. In future work, we aim to focus on LLM-designed branch-ing rules that generalize across instances, exploring universal algorithmic logic that can adapt to or be shared among diverse MILP benchmarks, rather than relying on benchmark-specific policies. 
+
+References 
+
+Tobias Achterberg, Thorsten Koch, and Alexander Mar-tin. 2005. Branching rules revisited. Operations Research Letters , 33(1):42–54. Cynthia Barnhart and Gilbert Laporte. 2006. Hand-books in operations research and management sci-ence: Transportation . Elsevier. Yoshua Bengio, Andrea Lodi, and Antoine Prouvost. 2021. Machine learning for combinatorial optimiza-tion: A methodological tour d’horizon. European Journal of Operational Research , 290(2):405–421. Suresh Bolusani, Mathieu Besançon, Ksenia Bestuzheva, Antonia Chmiela, João Dionísio, Tim Donkiewicz, Jasper van Doornmalen, Leon Eifler, Mohammed Ghannam, Ambros Gleixner, Christoph Graczyk, Katrin Halbig, Ivo Hedtke, Alexander Hoen, Christopher Hojny, Rolf van der Hulst, Dominik Kamp, Thorsten Koch, Kevin Kofler, and 12 others. 2024. The SCIP Optimization Suite 9.0. Technical report, Optimization Online. Junyang Cai, Taoan Huang, and Bistra Dilkina. 2024. Learning backdoors for mixed integer lin-ear programs with contrastive learning. Preprint ,arXiv:2401.10467. Zhi-Long Chen. 2010. Integrated production and out-bound distribution scheduling: review and extensions. 
+
+Operations research , 58(1):130–148. DeepSeek-AI. 2026. Deepseek: Large language model. Jian-Ya Ding, Chao Zhang, Lei Shen, Shengyin Li, Bing Wang, Yinghui Xu, and Le Song. 2020. Accelerat-ing primal solution findings for mixed integer pro-grams based on solution prediction. Proceedings of the AAAI Conference on Artificial Intelligence ,34(02):1452–1459. Aaron Ferber, Jialin Song, Bistra Dilkina, and Yisong Yue. 2022. Learning pseudo-backdoors for mixed integer programs. In Integration of Constraint Pro-gramming, Artificial Intelligence, and Operations Re-search , pages 91–102, Cham. Springer International Publishing. Maxime Gasse, Simon Bowly, Quentin Cappart, Jonas Charfreitag, Laurent Charlin, Didier Chételat, Anto-nia Chmiela, Justin Dumouchelle, Ambros Gleixner, Aleksandr M. Kazachkov, Elias Khalil, Pawel Li-chocki, Andrea Lodi, Miles Lubin, Chris J. Mad-dison, Morris Christopher, Dimitri J. Papageorgiou, Augustin Parjadis, Sebastian Pokutta, and 23 others. 2022. The machine learning for combinatorial opti-mization competition (ml4co): Results and insights. In Proceedings of the NeurIPS 2021 Competitions and Demonstrations Track , volume 176 of Proceed-ings of Machine Learning Research , pages 220–231. PMLR. Maxime Gasse, Didier Chételat, Nicola Ferroni, Laurent Charlin, and Andrea Lodi. 2019. Exact combinato-rial optimization with graph convolutional neural net-works. Advances in neural information processing systems , 32. Dongdong Ge, Qi Huangfu, Zizhuo Wang, Jian Wu, and Yinyu Ye. 2023. Cardinal Optimizer (COPT) user guide. https://guide.coap.online/copt/en-doc. Prateek Gupta, Maxime Gasse, Elias Khalil, Pawan Mudigonda, Andrea Lodi, and Yoshua Bengio. 2020. Hybrid models for learning to branch. Advances in neural information processing systems , 33:18087– 18097. Prateek Gupta, Elias Boutros Khalil, Didier Chételat, Maxime Gasse, Andrea Lodi, Yoshua Bengio, and M. Pawan Kumar. 2022. Lookback for learning to branch. Transactions on Machine Learning Research .Expert Certification. Gurobi Optimization, LLC. 2024. Gurobi Optimizer Reference Manual. 
+
+9Qingyu Han, Linxin Yang, Qian Chen, Xiang Zhou, Dong Zhang, Akang Wang, Ruoyu Sun, and Xi-aodong Luo. 2023. A GNN-guided predict-and-search framework for mixed-integer linear program-ming. In The Eleventh International Conference on Learning Representations .He He, Hal Daume III, and Jason M Eisner. 2014. Learn-ing to search in branch and bound algorithms. In 
+
+Advances in Neural Information Processing Systems ,volume 27. Curran Associates, Inc. Zhinan Hou, Xingchen Li, Yankai Zhang, Tianxun Li, and Keyou You. 2026. LLM4branch: Large language model for discovering efficient branching policies of integer programs. In Forty-third International Conference on Machine Learning .Taoan Huang, Aaron Ferber, Yuandong Tian, Bistra Dilkina, and Benoit Steiner. 2023. Searching large neighborhoods for integer linear programs with con-trastive learning. In Proceedings of the 40th Interna-tional Conference on Machine Learning , ICML’23. JMLR.org. Taoan Huang, Aaron M Ferber, Arman Zharmagambe-tov, Yuandong Tian, and Bistra Dilkina. 2024a. Con-trastive predict-and-search for mixed integer linear programs. In Proceedings of the 41st International Conference on Machine Learning , volume 235 of 
+
+Proceedings of Machine Learning Research , pages 19757–19771. PMLR. Weimin Huang, Taoan Huang, Aaron M Ferber, and Bistra Dilkina. 2024b. Distributional miplib: a multi-domain library for advancing ml-guided milp meth-ods. Preprint , arXiv:2406.06954. Zeren Huang, Kerong Wang, Furui Liu, Hui-Ling Zhen, Weinan Zhang, Mingxuan Yuan, Jianye Hao, Yong Yu, and Jun Wang. 2022. Learning to select cuts for efficient mixed-integer programming. Pattern Recognition , 123:108353. Elias Khalil, Pierre Le Bodic, Le Song, George Nemhauser, and Bistra Dilkina. 2016. Learning to branch in mixed integer programming. Proceedings of the AAAI Conference on Artificial Intelligence ,30(1). Yufei Kuang, Jie Wang, Haoyang Liu, Fangzhou Zhu, Xijun Li, Jia Zeng, Jianye HAO, Bin Li, and Feng Wu. 2024a. Rethinking branching on exact combi-natorial optimization solver: The first deep symbolic discovery framework. In The Twelfth International Conference on Learning Representations .Yufei Kuang, Jie Wang, Yuyan Zhou, Xijun Li, Fangzhou Zhu, Jianye HAO, and Feng Wu. 2024b. Towards general algorithm discovery for combinato-rial optimization: Learning symbolic branching pol-icy from bipartite graph. In Forty-first International Conference on Machine Learning .Abdel Ghani Labassi, Didier Chételat, and Andrea Lodi. 2022. Learning to compare nodes in branch and bound with graph neural networks. In Advances in Neural Information Processing Systems .Ailsa H Land and Alison G Doig. 2010. An automatic method for solving discrete programming problems .Springer. Ke Li and Fan Li. 2026. Multi-fidelity methods for optimization: A survey. ACM Comput. Surv. Just Accepted. Xijun Li, Jiexiang Yang, Jinghao Wang, Bo Peng, Jian-guo Yao, and Haibing Guan. 2026. STRCMP : Inte-grating graph structural priors with language models for combinatorial optimization. In The Thirty-ninth Annual Conference on Neural Information Process-ing Systems .Fei Liu, Xialiang Tong, Mingxuan Yuan, Xi Lin, Fu Luo, Zhenkun Wang, Zhichao Lu, and Qingfu Zhang. 2024. Evolution of heuristics: towards efficient auto-matic algorithm design using large language model. In Proceedings of the 41st International Conference on Machine Learning , ICML’24. JMLR.org. Haoyang Liu, Jie Wang, Zijie Geng, Xijun Li, Yux-uan Zong, Fangzhou Zhu, Jianye HAO, and Feng Wu. 2025. Apollo-MILP: An alternating prediction-correction neural solving framework for mixed-integer linear programming. In The Thirteenth Inter-national Conference on Learning Representations .Arjun M., Rijul Tandon, Agam Gupta, HARIPRASAD KODAMANA, and Manojkumar Ramteke. 2026. MIRACLE: Model-free imitation and reinforcement learning for adaptive cut-selection. In The Fourteenth International Conference on Learning Representa-tions .Yves Pochet and Laurence A Wolsey. 2006. Production planning by mixed integer programming , volume 149. Springer. Tianle Pu, Zijie Geng, Haoyang Liu, Shixuan Liu, Jie Wang, Li Zeng, Chao Chen, and Changjun Fan. 2025. RoME: Domain-robust mixture-of-experts for MILP solution prediction across domains. In The Thirty-ninth Annual Conference on Neural Information Pro-cessing Systems .Bernardino Romera-Paredes, Mohammadamin Barekatain, Alexander Novikov, Matej Balog, M. Pawan Kumar, Emilien Dupont, Francisco J. R. Ruiz, Jordan S. Ellenberg, Pengming Wang, Omar Fawzi, Pushmeet Kohli, and Alhussein Fawzi. 2024. Mathematical discoveries from program search with large language models. Nature , 625(7995):468–475. Lara Scavuzzo, Karen Aardal, Andrea Lodi, and Neil Yorke-Smith. 2024. Machine learning augmented branch and bound for mixed integer linear program-ming. Mathematical Programming , pages 1–44. Lara Scavuzzo, Feng Chen, Didier Chetelat, Maxime Gasse, Andrea Lodi, Neil Yorke-Smith, and Karen Aardal. 2022. Learning to branch with tree mdps. In 
+
+10 Advances in Neural Information Processing Systems ,volume 35, pages 18514–18526. Curran Associates, Inc. Nicolas Sonnerat, Pengming Wang, Ira Ktena, Sergey Bartunov, and Vinod Nair. 2022. Learning a large neighborhood search algorithm for mixed integer pro-grams. Preprint , arXiv:2107.10201. Yunhao Tang, Shipra Agrawal, and Yuri Faenza. 2020. Reinforcement learning for integer programming: learning to cut. In Proceedings of the 37th Interna-tional Conference on Machine Learning , ICML’20. JMLR.org. Zhihai Wang, Xijun Li, Jie Wang, Yufei Kuang, Mingx-uan Yuan, Jia Zeng, Yongdong Zhang, and Feng Wu. 2023. Learning cut selection for mixed-integer linear programming via hierarchical sequence model. In 
+
+The Eleventh International Conference on Learning Representations .Yaoxin Wu, Wen Song, Zhiguang Cao, and Jie Zhang. 2021. Learning large neighborhood search policy for integer programming. In Advances in Neural Information Processing Systems .Milad Yazdani, Mahdi Mostajabdaveh, Samin Aref, and Zirui Zhou. 2025. Evocut: Strengthening integer pro-grams via evolution-guided language models. arXiv preprint arXiv:2508.11850 .Haoran Ye, Jiarui Wang, Zhiguang Cao, Federico Berto, Chuanbo Hua, Haeyeon Kim, Jinkyoo Park, and Guo-jie Song. 2024. Reevo: Large language models as hyper-heuristics with reflective evolution. In The Thirty-eighth Annual Conference on Neural Informa-tion Processing Systems .Huigen Ye, Hua Xu, An Yan, and Yaoyang Cheng. 2025. Large language model-driven large neighborhood search for large-scale milp problems. In Proceedings of the 42nd International Conference on Machine Learning , ICML’25. JMLR.org. Giulia Zarpellon, Jason Jo, Andrea Lodi, and Yoshua Bengio. 2021. Parameterizing branch-and-bound search trees to learn branching policies. Proceedings of the AAAI Conference on Artificial Intelligence ,35(5):3931–3939. Sijia Zhang, Shuli Zeng, Shaoang Li, Feng Wu, and Xiangyang Li. 2025. Learning to select nodes in branch and bound with sufficient tree representation. In The Thirteenth International Conference on Learn-ing Representations .Zhihao Zhang, Siyuan Li, Chenxi Li, Feifan Liu, chen-mengjing, Kai Li, Tao Zhong, Bo An, and Peng Liu. 2026. DHEvo: Data-algorithm based heuristic evolu-tion for generalizable MILP solving. Zetao Zheng, HANJIE GU, and Jie Shao. 2026. Large language model guided dynamic branching rule scheduling in branch-and-bound. Yuyan Zhou, Jie Wang, Yufei Kuang, Xijun Li, Weilin Luo, Jianye HAO, and Feng Wu. 2024. LLM4solver: Large language model for efficient algorithm design of combinatorial optimization solver. 
+
+11 A Algorithm Pseudocode of BiFE 
+
+A more detailed algorithmic description of the BiFE framework introduced in the main paper is provided in Algorithm 1, covering initialization, elite-prioritized evolution, and survival selection. 
+
+Algorithm 1: BiFE: Bi-Fidelity Evolution-ary Framework 
+
+Input :LLM generator G, offline D, MILP instance set M, population size N ,elite fraction α, generations K
+
+Output : Best heuristic ˆf ⋆ 
+
+> 1
+
+P0 ← G .initialize (N ); 
+
+> 2
+
+for ˆf ∈ P 0 do  
+
+> 3
+
+Evaluate FLF ( ˆf ) on D; 
+
+> 4
+
+Sort P0 by FLF descending;  
+
+> 5
+
+E ← top ⌈αN ⌉ of P0; 
+
+> 6
+
+for ˆf ∈ E do  
+
+> 7
+
+Evaluate FHF ( ˆf ) on M; 
+
+> 8
+
+τ ← FLF (arg min ˆf ∈E FHF ( ˆf )) ; 
+
+> 9
+
+for k ← 1 to K do  
+
+> 10
+
+Pnew ← ∅ ; 
+
+> 11
+
+for each crossover and mutation operator do  
+
+> 12
+
+Select parent pair ( ˆfa, ˆfb) via elite-prioritized ranking;  
+
+> 13
+
+ˆfchild ← G .crossover ( ˆfa, ˆfb) or 
+
+G.mutation ( ˆfa); 
+
+> 14
+
+Evaluate FLF ( ˆfchild ) on D; 
+
+> 15
+
+if FLF ( ˆfchild ) ≥ τ then  
+
+> 16
+
+Evaluate FHF ( ˆfchild ) on M; 
+
+> 17
+
+E ← E ∪ { ˆfchild }; 
+
+> 18
+
+Pnew ← P new ∪ { ˆfchild }; 
+
+> 19
+
+Update τ w.r.t. current E; 
+
+> 20
+
+Pk ←E ∪ top (N −|E| ) of (Pnew \E ) by FLF ; 
+
+> 21
+
+return arg max ˆf ∈E FHF ( ˆf );
+
+B More Details on Benchmarks 
+
+For each standard benchmark, the parameter set-tings in the test and transfer instances are presented in Table 4. Notably, the algorithm design and test-ing phases employ instances of the same size. Ad-ditionally, to further evaluate the generalization capability of the generated branching policy, trans-fer instances of a larger scale have been specifically designed. The Balanced Item Placement (BIP) problem involves spreading items, e.g., files or processes, across containers, e.g., disks or machines, utiliz-ing them evenly. Items can have multiple copies, but at most one copy can be placed in a single bin. The number of items that can be moved is con-strained, modeling the real-life situation of a live system for which some placement already exists. In the ML4CO competition (Gasse et al., 2022), this dataset contains 10,000 training instances (pre-split into 9,900 train and 100 validation instances) and 100 test instances. The Neural Network Verification (NNV) prob-lem addresses the verification of adversarial robust-ness for a pre-trained neural network on a given input example. The goal is to determine the mini-mum perturbation to the input required to change the network’s output from the correct class to an in-correct one; if this minimum perturbation exceeds a specified robustness threshold, the network is con-sidered robust on that input. The NNV instances we use belong to the “easy” hardness level in the Distributional MIPLIB (Huang et al., 2024b). The Optimal Transmission Switching (OTS) problem arises in energy planning under high wild-fire ignition risk. The transmission grid is modeled as a graph of power buses (vertices) connected by transmission lines (edges). During high-risk con-ditions, lines may ignite wildfires; the problem seeks the optimal strategy to de-energize or un-derground transmission lines to mitigate wildfire risk while minimizing power outages under a re-source budget. The OTS instances we use belong to the “easy” hardness level in the Distributional MIPLIB (Huang et al., 2024b). 
+
+C Discussion of Related LLM-based Methods for MILP 
+
+Several recent works apply LLM-based algorithm design to other components of the MILP solve pro-cess. Here we clarify their relationship to our work and explain why they are not included in the main comparison. 
+
+C.1 Primal heuristics 
+
+Methods such as Zhou et al. (2024); Zhang et al. (2026); Ye et al. (2025) use LLMs to generate primal heuristics, which aim to find feasible so-12 Table 4: Size of the test and transfer instances in stan-dard benchmarks 
+
+Benchmarks Parameters Test Transfer Set Covering Items Sets 500 1000 1000 1000 Combinatorial Auctions Items Bids 100 500 200 1000 Maximum Independent Set Nodes Affinity 500 41000 4Capacitated Facility Location Customers Facilities 100 100 200 100 lutions quickly during the solving process. Un-like branching policies and cutting plane selection, primal heuristics do not operate within the exact optimization framework: they only produce feasi-ble solutions without optimality guarantees. We therefore exclude primal heuristic methods from our evaluation. 
+
+C.2 Cutting plane selection 
+
+Several works apply LLM-based design to cut-ting plane selection and generation, including STR-CMP (Li et al., 2026) and EvoCut (Yazdani et al., 2025). We note that cutting plane selection and branching policies are entirely orthogonal stages of the branch-and-cut framework and can in principle be jointly applied. Since both operate within the exact optimization paradigm, unlike primal heuris-tics, a comparison is at least not categorically ruled out. We select STRCMP as a reference point as it is evaluated on benchmarks comparable to ours (e.g., CA, SC, MIS, CFL), whereas EvoCut tar-gets a different set of problems (e.g., TSP, JSSP). We provide a brief comparison with STRCMP on standard benchmarks in Table 5, noting that the comparison cannot be strictly controlled: STR-CMP uses RPB for branching and its designed method for cutting plane selection, whereas we use our designed branching policy and default cut-ting planes. Across both test and transfer instances, BiFE achieves lower solving times on the major-ity of benchmarks (five out of eight). While the comparison is not fully controlled, BiFE compares favorably to STRCMP overall. 
+
+C.3 Variable selection rules scheduling 
+
+Zheng et al. (2026) propose using LLMs to dynam-ically schedule handcrafted branching rules online, rather than discovering new rules. As the method is not open-sourced and targets a different problem formulation, we do not include it in our compari-son. 
+
+D Implementation Details 
+
+D.1 LLM Generation Details 
+
+Heuristics that raise syntax errors, runtime excep-tions, or exceed the 30-second execution timeout are assigned a minimal fitness score and naturally eliminated during selection without explicit repair. To encourage computational efficiency, the prompt instructs the LLM to design lightweight rules; ex-ternal dependencies are restricted to numpy and 
+
+math , which is pre-imported in the rule template. Heuristics with excessive overhead are further pe-nalized by poor solving time under FHF , leading to automatic elimination. 
+
+D.2 Hardware and environment 
+
+All experiments are conducted on a server equipped with Intel(R) Xeon(R) Platinum 8280 CPUs, Nvidia GeForce RTX 3090 graphics cards, and 256 GB (8 × 32 GB) DDR4 2666 MHz ECC mem-ory. All methods are evaluated on identical hard-ware. 
+
+D.3 Prompt design 
+
+For LLM-based methods, the prompt templates for initialization, crossover, and mutation are identical to those used in EoH (Liu et al., 2024), with one template for initialization, and two templates each for crossover and mutation. The problem descrip-tion prompts are illustrated in Figures 6 and 7, and the rule template is shown in Listing 1. At each evo-lutionary operation, we concatenate the problem description, the corresponding operation prompt, and the parent selection results into a single input fed to the LLM, which then outputs a new heuristic for the subsequent generation. 
+
+D.4 Evolutionary parameters 
+
+The number of LLM calls, population size, and other evolutionary parameters are kept consistent across all LLM-based methods. The key hyperpa-rameters are summarized in Table 6. 
+
+D.5 FHF evaluation metrics 
+
+For standard benchmarks (CA, SC, CFL, and MIS), we set a time limit of 60 seconds and use solv-ing time as the primary performance metric, as 13 Table 5: Comparison between BiFE and STRCMP on standard benchmarks.                                                                                                      
+
+> Test Instances
+> Method CA SC MIS CFL Nodes Time Nodes Time Nodes Time Nodes Time BiFE 70 .50 ±3.11 1.51 ±1.41 109 .17 ±4.10 4.58 ±1.67 81 .75 ±7.75 6.26 ±1.62 266 .52 ±2.99 28 .29 ±2.22
+> STRCMP 8.88 ±3.77 2.69 ±1.52 23 .06 ±8.46 7.20 ±1.73 25 .93 ±9.76 4.81 ±2.03 70 .86 ±5.77 32 .61 ±2.03
+> Transfer Instances
+> Method CA SC MIS CFL Nodes Time Nodes Time Nodes Time Nodes Time BiFE 1092 .66 ±2.68 11 .95 ±1.92 3820 .80 ±3.33 71 .80 ±2.73 2547 .39 ±5.98 89 .07 ±2.98 474 .91 ±4.69 83 .89 ±2.99
+> STRCMP 752 .74 ±4.26 18 .34 ±1.47 3767 .86 ±3.76 64 .53 ±2.13 2329 .81 ±7.68 83 .74 ±2.83 149 .88 ±9.88 86 .78 ±3.15
+> 1import numpy as np
+> 2import math
+> 3def candidate_variable_score(variable_features) -> float :
+> 4"""
+> 5Assign ascore to this candidate variable reflecting the potential dual bound improvement resulting from branching on it.
+> 678Args:
+> 9variable_features: Feature vector of the candidate variable, 72 dimensions.
+> 10 11 Return:
+> 12 Ascore indicating how much the dual bound would improve if this variable were chosen as the branching variable.
+> 13 """
+> 14 return 0.0
+
+Listing 1: Branching Rule Template. Table 6: Hyperparameter settings of the evolutionary algorithm. 
+
+Parameter Value 
+
+Population size 8Initial population size 16 Number of instances in FHF 20 Random seed per FHF instance 0Maximum sampled heuristics (LLM calls) 100 LLM output time limit (s) 60 Number of parents in crossover 2these instances can typically be solved to optimal-ity within this budget. For real-world benchmarks (NNV, OTS, and BIP), we impose a time limit of 300 seconds. Under this setting, all NNV instances can be solved to optimality, OTS instances can be partially solved, and BIP instances remain en-tirely unsolved. Consequently, we employ solving time, optimality gap, and PDI as the respective performance metrics for NNV, OTS, and BIP. The rationale is that for BIP instances, the optimality gap at 300 seconds may remain close to the initial large value, making gap comparisons less informa-tive, whereas for OTS instances the gap has already been reduced to a relatively small value, allowing meaningful discrimination among methods. We therefore use gap for OTS and PDI for BIP to bet-ter capture algorithmic progress. 
+
+D.6 LLM4Branch evaluation settings 
+
+For a fair comparison, we set LLM4Branch’s stage-1 screening, stage-2 validation, and Bayesian parameter-optimization limits to 60/60/10 seconds, respectively, for CA, SC, MIS, and CFL. For NNV, OTS, and BIP, the corresponding limits are 100/200/10 seconds. The Bayesian optimization uses two training instances per trial. We run 100 evolutionary iterations targeting solving time, with four training instances, 20 validation instances. Other search settings follow the released configura-tion: numerical parameter optimization is enabled; the population size, archive size, and number of islands are 120, 20, and 8; the elite-selection and exploitation ratios are 0.2 and 0.7. The dataset-14 Table 7: Exact two-sided Wilcoxon signed-rank tests comparing instance-level solving time of BiFE and LLM4Branch. Each test uses 20 instance-level geo-metric means, obtained by aggregating five seeds per instance. Values are Holm-adjusted p-values across all eight comparisons; bold values are below 0.05.                    
+
+> Setting Holm-adjusted pBiFE win/tie/loss CA Test 0.4128 12/0/8 SC Test 0.6146 15/0/5 MIS Test 0.9354 12/0/8 CFL Test 0.0018 18/0/2 CA Transfer 0.0499 17/0/3 SC Transfer 1.0000 10/0/10 MIS Transfer 1.0000 10/0/10 CFL Transfer <0.001 18/0/2
+
+specific Bayesian-optimization budgets are 80/10 calls/initial points for SC, 100/10 for CA, 50/10 for MIS, 16/2 for CFL, and 10/4 for each real-world benchmark. 
+
+E Statistical Significance Tests 
+
+We compare BiFE with LLM4Branch using solv-ing time, the primary metric for the standard bench-marks. For each benchmark setting, we aggregate the five seed-level solving times of each instance by their geometric mean, yielding 20 paired instance-level observations. This avoids treating repeated seeds of the same instance as independent samples. We then conduct exact two-sided Wilcoxon signed-rank tests. The displayed Holm-adjusted p-value controls the family-wise error rate over all eight comparisons. A value below 0.05 indicates statis-tically significant evidence that the paired solving times differ; the direction is reported through the win/tie/loss counts, where a win denotes a lower BiFE solving time. Table 7 shows that BiFE is significantly faster than LLM4Branch on CFL test instances, CA trans-fer instances, and CFL transfer instances in the statistical sense. In these settings, BiFE is faster on 17 or 18 of the 20 paired instances. The re-maining five settings do not show a statistically significant difference after Holm correction. Nev-ertheless, BiFE records more instance-level wins than LLM4Branch in three of these settings (CA, SC, and MIS test instances), and ties LLM4Branch in the other two transfer settings; it is never out-performed in the win/tie/loss comparison. Impor-tantly, our comparison is not intended to claim that BiFE uniformly and significantly improves the downstream solving performance of the dis-AST Nodes (Code Size) Operators (+, , ×, ÷, >, ...) 
+
+> Branches (If-Else/Clamp) Intermediate Variables Nonlinear Calls (exp, log, sqrt ...) 134 344 2504025 05
+> BiFE Symb4CO
+> Figure 5: Complexity comparison between the branch-ing rules discovered by Symb4CO and BiFE on SC.
+
+covered rules over LLM4Branch. Instead, the central comparison concerns the rule-design time required to obtain these rules: as shown in the main paper, BiFE requires substantially less search time than LLM4Branch while achieving compara-ble solving performance overall, with statistically significant improvements on several benchmarks. Thus, BiFE’s primary advantage is its markedly higher search efficiency, which enables it to dis-cover competitive branching rules—and, on some benchmarks, significantly superior ones—without incurring LLM4Branch’s substantially higher rule-design cost. 
+
+F Rule Complexity Analysis and Examples 
+
+F.1 Motivation and overview 
+
+Across transfer and real-world benchmarks, sym-bolic rules exhibit a larger performance drop than BiFE in the main paper. To investigate a possible structural explanation, we compare the branching rules discovered by Symb4CO and BiFE on SC along five complementary complexity metrics. As Figure 5 shows, BiFE’s rule is consistently more complex across these metrics, indicating a greater capacity to express multi-step algorithmic logic. The following definitions and rule examples make this comparison explicit. 
+
+F.2 Metric definitions 
+
+To quantitatively compare the complexity of branching rules discovered by different methods, we define five metrics: • AST Node Count: The total number of nodes in the Abstract Syntax Tree of the generated 15 code, capturing overall code size and struc-tural complexity. • Operator Count: The number of distinct arithmetic and comparison operators (e.g., +,
+
+-, *, /, <= , >) appearing in the rule, reflect-ing the diversity of mathematical operations employed. • Non-linear Calls: The number of invocations of non-linear functions such as exp , log ,
+
+log1p , sqrt , and abs , indicating the rule’s ability to capture non-linear relationships. • Branches: The total count of if-else state-ments and clamp operations (e.g., max , min ), quantifying the rule’s conditional logic and decision-making capacity. • Intermediate Variables: The number of named variables that store intermediate com-putation results, reflecting the stepwise rea-soning structure embedded in the rule. 
+
+F.3 Illustrative examples 
+
+On standard benchmarks, the rules discovered by BiFE and Symb4CO exhibit clear differences in complexity. The rules found by BiFE are shown in Listing 2 (CA), Listing 3 (SC), Listing 4 (MIS) and Listing 5 (CFL). For comparison, the rules discovered by Symb4CO on the same benchmarks are provided in Listing 6, Listing 7, Listing 8, List-ing 9. Even from a purely visual inspection, BiFE’s rules exhibit markedly more sophisticated structure than those of Symb4CO. Taking the rules discov-ered on CA as an example, BiFE’s rule (Listing 2) first extracts and caps several features, computes a harmonic mean of pseudocosts, combines them with a weighted sum via a geometric mean, and fi-nally applies a logistic transformation to spread the scores—demonstrating a clear, multi-step algorith-mic logic. In contrast, Symb4CO’s rule (Listing 6) simply multiplies a sequence of input features to-gether in a single expression, with no intermediate reasoning or non-linear processing. This qualitative contrast aligns with the quantitative comparison in Figure 5, suggesting that LLM-based methods in-herently generate more complex algorithmic logic suited for challenging MILPs. 16 Now, I will provide you with the features of a candidate variable, which has 72 dimensions. 
+
+Design a novel algorithm to assign a score to this candidate variable reflecting the potential dual 
+
+bound improvement resulting from branching on it. 
+
+Note: You need to select features that you consider truly useful based on their meanings, the 
+
+scoring function does not necessarily need to be complex, and ensure that the algorithm code is 
+
+runnable.The features are as follows: 
+
+----- Static Features (18)  -----
+
+1. Objective coefficient (original value). 
+
+2. Positive part of objective coefficient (0 if negative). 
+
+3. Negative part of objective coefficient (0 if positive). 
+
+4. Number of constraints containing the variable. 
+
+5. Mean degree of those constraints. 
+
+6. Std. dev. of those constraint degrees. 
+
+7. Min degree of those constraints. 
+
+8. Max degree of those constraints. 
+
+9. Count of positive coefficients in constraints. 
+
+10. Mean of positive coefficients. 
+
+11. Std. dev. of positive coefficients. 
+
+12. Min positive coefficient. 
+
+13. Max positive coefficient. 
+
+14. Count of negative coefficients in constraints. 
+
+15. Mean of negative coefficients. 
+
+16. Std. dev. of negative coefficients. 
+
+17. Min negative coefficient. 
+
+18. Max negative coefficient. 
+
+BiFE Prompt (1/2) —— Task Description & Static Features Figure 6: Problem Description Prompt for BiFE, Part I. 
+
+17 ----- Dynamic Features (54) -----
+
+19. Fractionality (distance to nearest integer). 
+
+20. Distance to ceiling (upper integer). 
+
+21. Up pseudocost (avg. obj. deterioration per unit fractionality, ceil). 
+
+22. Down pseudocost (avg. obj. deterioration per unit fractionality, floor). 
+
+23. Ratio: up pseudocost / down pseudocost. 
+
+24. Sum: up pseudocost + down pseudocost. 
+
+25. Product: up pseudocost * down pseudocost. 
+
+26. Count: times branching up led to infeasible/pruned node. 
+
+27. Count: times branching down led to infeasible/pruned node. 
+
+28. Ratio: up cutoffs / total branches on this variable. 
+
+29. Ratio: down cutoffs / total branches on this variable. 
+
+30. Mean constraint degree (current LP). 
+
+31. Std. dev. of constraint degrees (current LP). 
+
+32. Min constraint degree (current LP). 
+
+33. Max constraint degree (current LP). 
+
+34. Ratio: static mean degree / dynamic mean degree. 
+
+35. Ratio: static min degree / dynamic min degree. 
+
+36. Ratio: static max degree / dynamic max degree. 
+
+37. Min (coeff / RHS) for RHS > 0. 
+
+38. Max (coeff / RHS) for RHS > 0. 
+
+39. Min (coeff / RHS) for RHS < 0. 
+
+40. Max (coeff / RHS) for RHS < 0. 
+
+41. Min (positive coeff / sum of positive coeffs in constraint). 
+
+42. Max (positive coeff / sum of positive coeffs in constraint). 
+
+43. Min (positive coeff / sum of negative coeffs in constraint). 
+
+44. Max (positive coeff / sum of negative coeffs in constraint). 
+
+45. Min (negative coeff / sum of positive coeffs in constraint). 
+
+46. Max (negative coeff / sum of positive coeffs in constraint). 
+
+47. Min (negative coeff / sum of negative coeffs in constraint). 
+
+48. Max (negative coeff / sum of negative coeffs in constraint). 
+
+49. Count of active constraints containing the variable. 
+
+50. Sum of absolute coefficients in active constraints. 
+
+51. Mean of absolute coefficients in active constraints. 
+
+52. Std. dev. of absolute coefficients in active constraints. 
+
+53. Min absolute coefficient in active constraints. 
+
+54. Max absolute coefficient in active constraints. 
+
+55. Active constraint count, weighted by 1/(sum of all coeffs in constraint). 
+
+56. Sum of absolute coeffs, weighted by 1/(sum of all coeffs in constraint). 
+
+57. Mean of weighted absolute coeffs. 
+
+58. Std. dev. of weighted absolute coeffs. 
+
+59. Min of weighted absolute coeffs. 
+
+60. Max of weighted absolute coeffs. 
+
+61. Active constraint count, weighted by 1/(sum of candidate coeffs in constraint). 
+
+62. Sum of absolute coeffs, weighted by 1/(sum of candidate coeffs in constraint). 
+
+63. Mean of weighted absolute coeffs. 
+
+64. Std. dev. of weighted absolute coeffs. 
+
+65. Min of weighted absolute coeffs. 
+
+66. Max of weighted absolute coeffs. 
+
+67. Active constraint count, weighted by dual cost. 
+
+68. Sum of absolute coeffs, weighted by dual cost. 
+
+69. Mean of weighted absolute coeffs. 
+
+70. Std. dev. of weighted absolute coeffs. 
+
+71. Min of weighted absolute coeffs. 
+
+72. Max of weighted absolute coeffs. 
+
+BiFE Prompt (2/2) —— Dynamic Features Figure 7: Problem Description Prompt for BiFE, Part II. 
+
+18 1 import numpy as np  
+
+> 2
+
+import math  
+
+> 3
+
+def candidate_variable_score(variable_features) -> float : 
+
+> 4
+
+"""  
+
+> 5
+
+Assign a score to this candidate variable reflecting the potential dual bound improvement resulting from branching on it.  
+
+> 678
+
+Args:  
+
+> 9
+
+variable_features: Feature vector of the candidate variable, 72 dimensions.  
+
+> 10 11
+
+Return:  
+
+> 12
+
+A score indicating how much the dual bound would improve if this variable were chosen as the branching variable.  
+
+> 13
+
+"""  
+
+> 14
+
+f = variable_features  
+
+> 15
+
+frac = max (f[18], 1e-10)  
+
+> 16
+
+up_pc = max (f[20], 1e-10)  
+
+> 17
+
+down_pc = max (f[21], 1e-10)  
+
+> 18
+
+harmonic_pc = 2.0 / (1.0/up_pc + 1.0/down_pc)  
+
+> 19
+
+weighted_active_sum = max (f[67], 1e-10)  
+
+> 20 21
+
+geom_part = (frac * harmonic_pc) ** 0.5  
+
+> 22
+
+logit_input = geom_part * weighted_active_sum  
+
+> 23
+
+# Inverse logistic to center and spread scores  
+
+> 24
+
+raw = logit_input / (logit_input + 1.0)  
+
+> 25
+
+return 1.0 / (1.0 + np.exp(-5.0 * (raw - 0.5))) 
+
+Listing 2: Branching Rule Designed by BiFE on CA. 
+
+19 1 import numpy as np  
+
+> 2
+
+import math  
+
+> 3
+
+def candidate_variable_score(variable_features) -> float : 
+
+> 4
+
+"""  
+
+> 5
+
+Assign a score to this candidate variable reflecting the potential dual bound improvement resulting from branching on it.  
+
+> 678
+
+Args:  
+
+> 9
+
+variable_features: Feature vector of the candidate variable, 72 dimensions.  
+
+> 10 11
+
+Return:  
+
+> 12
+
+A score indicating how much the dual bound would improve if this variable were chosen as the branching variable.  
+
+> 13
+
+"""  
+
+> 14
+
+import math  
+
+> 15 16
+
+fractionality = variable_features[18] # feature 19  
+
+> 17
+
+up_pseudocost = variable_features[20] # feature 21  
+
+> 18
+
+down_pseudocost = variable_features[21] # feature 22  
+
+> 19
+
+weighted_active_count = variable_features[66] # feature 67  
+
+> 20
+
+unweighted_active_count = variable_features[48] # feature 49  
+
+> 21 22
+
+# Geometric mean of pseudocosts  
+
+> 23
+
+if up_pseudocost <= 0 or down_pseudocost <= 0:  
+
+> 24
+
+pseudocost_geom = 0.0  
+
+> 25
+
+else : 
+
+> 26
+
+pseudocost_geom = math.sqrt(up_pseudocost * down_pseudocost)  
+
+> 27 28
+
+# Weighted harmonic mean of active constraint counts (avoid division by zero)  
+
+> 29
+
+if weighted_active_count > 0 and unweighted_active_count > 0:  
+
+> 30
+
+harmonic_mean = 2.0 / (1.0 / weighted_active_count + 1.0 /unweighted_active_count)  
+
+> 31
+
+else : 
+
+> 32
+
+harmonic_mean = max (weighted_active_count, unweighted_active_count)  
+
+> 33 34
+
+# Product with fractionality, then log-scale clamp  
+
+> 35
+
+raw_score = fractionality * pseudocost_geom * (1.0 + harmonic_mean)  
+
+> 36 37
+
+# Normalize via log transformation and clamp to [0, 1]  
+
+> 38
+
+if raw_score <= 0:  
+
+> 39
+
+return 0.0  
+
+> 40
+
+normalized = math.log(1.0 + raw_score) / math.log(1.0 + 100.0)  
+
+> 41
+
+return min (1.0, normalized) 
+
+Listing 3: Branching Rule Designed by BiFE on SC. 
+
+20 1 import numpy as np  
+
+> 2
+
+import math  
+
+> 3
+
+def candidate_variable_score(variable_features) -> float : 
+
+> 4
+
+"""  
+
+> 5
+
+Assign a score to this candidate variable reflecting the potential dual bound improvement resulting from branching on it.  
+
+> 678
+
+Args:  
+
+> 9
+
+variable_features: Feature vector of the candidate variable, 72 dimensions.  
+
+> 10 11
+
+Return:  
+
+> 12
+
+A score indicating how much the dual bound would improve if this variable were chosen as the branching variable.  
+
+> 13
+
+"""  
+
+> 14
+
+frac = variable_features[18]  
+
+> 15
+
+up_pseudo = variable_features[20]  
+
+> 16
+
+down_pseudo = variable_features[21]  
+
+> 17
+
+pseudo_sum = variable_features[23]  
+
+> 18
+
+active_count = variable_features[48]  
+
+> 19
+
+sum_abs_dual = variable_features[67]  
+
+> 20 21
+
+# Fractionality component: tanh scaling  
+
+> 22
+
+frac_score = math.tanh(frac * 3.0)  
+
+> 23 24
+
+# Pseudocost component: geometric mean normalized by (1 + sum)^0.5  
+
+> 25
+
+if up_pseudo > 1e-9 and down_pseudo > 1e-9:  
+
+> 26
+
+geo_mean = math.sqrt(up_pseudo * down_pseudo)  
+
+> 27
+
+else : 
+
+> 28
+
+geo_mean = max (up_pseudo, down_pseudo)  
+
+> 29
+
+pseudo_score = geo_mean / (1.0 + math.sqrt(pseudo_sum))  
+
+> 30 31
+
+# Activity component: product of active count and dual-weighted sum, log-scaled  
+
+> 32
+
+if active_count > 0 and sum_abs_dual > 0:  
+
+> 33
+
+activity_score = math.log1p(active_count * sum_abs_dual)  
+
+> 34
+
+else : 
+
+> 35
+
+activity_score = 0.0  
+
+> 36 37
+
+# Weighted sum and compress with square root  
+
+> 38
+
+score = (2.5 * frac_score + 3.5 * pseudo_score + 2.0 * activity_score)  
+
+> 39
+
+return math.sqrt( max (score, 0.0)) 
+
+Listing 4: Branching Rule Designed by BiFE on MIS. 
+
+21 1 import numpy as np  
+
+> 2
+
+import math  
+
+> 3
+
+def candidate_variable_score(variable_features) -> float : 
+
+> 4
+
+"""  
+
+> 5
+
+Assign a score to this candidate variable reflecting the potential dual bound improvement resulting from branching on it.  
+
+> 678
+
+Args:  
+
+> 9
+
+variable_features: Feature vector of the candidate variable, 72 dimensions.  
+
+> 10 11
+
+Return:  
+
+> 12
+
+A score indicating how much the dual bound would improve if this variable were chosen as the branching variable.  
+
+> 13
+
+"""  
+
+> 14
+
+fractionality = variable_features[18] # Feature 19  
+
+> 15
+
+up_pc = variable_features[20] # Feature 21  
+
+> 16
+
+down_pc = variable_features[21] # Feature 22  
+
+> 17
+
+count_pos = variable_features[8] # Feature 9: count of positive coefficients in constraints  
+
+> 18
+
+count_neg = variable_features[13] # Feature 14: count of negative coefficients in constraints  
+
+> 19 20
+
+# Avoid division by zero and extreme values  
+
+> 21
+
+pos = max (count_pos, 1e-8)  
+
+> 22
+
+neg = max (count_neg, 1e-8)  
+
+> 23 24
+
+# Balance ratio: closer to 1 means balanced positive/negative presence  
+
+> 25
+
+ratio = min (pos, neg) / max (pos, neg)  
+
+> 26 27
+
+# Pseudocost product (feature 25)  
+
+> 28
+
+pc_product = max (up_pc * down_pc, 1e-8)  
+
+> 29 30
+
+# Score: fractionality * sqrt(pseudocost product) * balance ratio  
+
+> 31
+
+score = fractionality * (pc_product ** 0.5) * ratio  
+
+> 32 33
+
+return max (score, 0.0) 
+
+Listing 5: Branching Rule Designed by BiFE on CFL.  
+
+> 1
+
+def candidate_variable_score( input ) 
+
+> 2
+
+return ((((((((((((inputs[:,89] * inputs[:,89]) * inputs[:,84]) * inputs[:,35]) * inputs[:,89]) * inputs[:,89]) * inputs[:,67]) * inputs[:,21]) * inputs[:,16]) * inputs[:,57]) * inputs[:,89]) * inputs[:,89]) * inputs[:,84]) 
+
+Listing 6: Branching Rule Designed by Symb4CO on CA.  
+
+> 1
+
+def candidate_variable_score( input ) 
+
+> 2
+
+return (((((((((((inputs[:,79] * inputs[:,26]) + inputs[:,84]) + inputs[:,57]) + inputs[:,70]) + inputs[:,70]) + inputs[:,70]) * inputs[:,79]) + inputs[:,37]) *inputs[:,37]) * inputs[:,89]) * inputs[:,89]) 
+
+Listing 7: Branching Rule Designed by Symb4CO on SC.  
+
+> 1
+
+import torch  
+
+> 2
+
+def candidate_variable_score( input ) 
+
+> 3
+
+return ((((((((((((inputs[:,89] + inputs[:,32]) + inputs[:,71]) * inputs[:,90]) * inputs[:,32]) + inputs[:,90]) + inputs[:,89]) + inputs[:,90]) + inputs[:,32]) + inputs[:,89]) - inputs[:,22]) + torch.tensor(0.2, dtype=torch. float , device= consts.DEVICE)) + inputs[:,75]) 
+
+Listing 8: Branching Rule Designed by Symb4CO on MIS. 
+
+22 1 def candidate_variable_score( input ) 
+
+> 2
+
+return ((((((((((inputs[:,71] * inputs[:,71]) + inputs[:,24]) * inputs[:,34]) +inputs[:,19]) + inputs[:,71]) + inputs[:,71]) + inputs[:,71]) + inputs[:,24]) +inputs[:,89]) * inputs[:,89]) 
+
+Listing 9: Branching Rule Designed by Symb4CO on CFL. 
+
+23

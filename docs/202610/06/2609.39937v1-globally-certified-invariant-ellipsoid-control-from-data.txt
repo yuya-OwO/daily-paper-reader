@@ -1,0 +1,490 @@
+Title: Globally Certified Invariant-Ellipsoid Control from Data
+
+URL Source: https://arxiv.org/pdf/2609.39937v1
+
+Published Time: Thu, 01 Oct 2026 01:59:23 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Globally Certified Invariant-Ellipsoid Control from Data 
+
+Ngoc Tuan Dinh, Egor Dogadin, and Alexey Peregudin 
+
+Abstract — This letter develops a data-based method for designing state feedback for a discrete-time linear sys-tem under bounded disturbances. For each admissible feedback gain and scalar design parameter, a Lyapunov equation determines an invariant ellipsoid: a region that the state cannot leave under the permitted disturbances. We optimise the gain and parameter to minimise a trace-based measure of the resulting output enclosure. At each parameter value, value iteration gives a lower cost bound, while separate controller evaluation gives an achievable upper bound. These bounds also let us assess whole pa-rameter intervals without evaluating every point. We prove that the search stops after finitely many evaluations with a stabilising state-feedback gain whose objective is within any prescribed absolute tolerance of the infimum over the chosen ellipsoid family. Neither an initially stabilising gain nor attainment of the infimum is assumed. The guarantee assumes exact arithmetic and a sufficiently informative batch of exact measurements, including disturbances dur-ing data collection; the resulting feedback uses only the state. A position–velocity example illustrates the bounds, controller checks, and computational cost. 
+
+Index Terms — Data driven control, optimal control, com-putational methods, stability of linear systems. 
+
+I. I NTRODUCTION 
+
+Persistent disturbances can have a known amplitude bound without a useful stochastic model or finite energy. A con-troller can then be assessed by a set enclosing its possible responses. Invariant ellipsoids provide tractable geometric bounds through Lyapunov equations or inequalities, as in classical LMI-based design [1]–[3]. Recent duality results yield Riccati equations for the corresponding trace criterion in continuous time [4] and discrete time [5]. Each Riccati solution is conditional on a scalar ellipsoid parameter, leaving a further optimisation problem. Direct data-based formulas provide stabilising and optimal feedback from informative trajectories [6]; informativity char-acterises when a batch determines a control property [7]. Sets of compatible models can represent bounded unmeasured errors [8]. Data-based invariant-set synthesis also includes polytopic constructions that maximise an admissible region under state and input constraints [9]. Here, we minimise the 
+
+> Ngoc Tuan Dinh is with ITMO University, St. Petersburg, Russia (email: dinhngoctuan6789@gmail.com). Egor Dogadin is with ITMO University, St. Petersburg, Russia (email: egor.dogadin@icloud.com). Alexey Peregudin is with the School of Electrical and Electronic Engineering, University of Sheffield, Sheffield, United Kingdom (e-mail: a.peregudin@sheffield.ac.uk).
+
+output trace of a specified invariant-ellipsoid family using exact measurements of the disturbances present during col-lection. Bellman and Q-learning methods provide another route. Efficient offline Q-learning for discrete-time LQR includes data-based initial stabilising policies and comparisons with identify-then-design [10]. Value iteration can avoid an ini-tially admissible policy in continuous-time adaptive optimal control [11]; Q-learning also addresses completely unknown discrete-time LQR systems [12]. For invariant ellipsoids, Dinh et al. [13] combine continuous-time policy iteration with pa-rameter adaptation. We retain the discrete-time trace criterion of [5] and ask when computation can stop with a certified error relative to its full-domain infimum. Asymptotic convergence alone does not answer this ques-tion. A finite-horizon critic is a lower value bound; its greedy policy can perform worse or be unstable. General value-iteration stopping theory already connects finite computation, stability, and near-optimality [14], [15]. The additional issue here is to certify the returned invariant ellipsoid while ac-counting for every unexplored parameter interval, including a possible unattained boundary optimum. Our main result is a finite global certificate. Exact data collected under measured disturbances are used to reconstruct the Bellman operator through deterministic virtual probes, and policy evaluation supplies admissibility and objective bounds. Monotonicity of the normalised value matrix yields interval lower bounds and a computable upper-tail exclusion. An explicit interval-width estimate then proves that best-first bisection terminates for any absolute tolerance, without an interior-minimiser assumption. The result is a stabilising gain, its data-derived invariant ellipsoid, and a gap to the global infimum. The same outer certificate can be combined with a Riccati solver; matched numerical comparisons quantify the computational cost. 
+
+II. P ROBLEM AND EXACT DATA 
+
+Consider the discrete-time linear system 
+
+xk+1 = Ax k + Bu k + Ew k, zk = Cx k + Du k, (1) where xk ∈ Rn, uk ∈ Rm, wk ∈ Rr , and zk ∈ Rp.Disturbances satisfy ∥wk∥2 ≤ 1 at every step. We seek a static feedback uk = Kx k. Write FK = A + BK and 
+
+CK = C + DK ; ρ(·) denotes spectral radius, tr( ·) trace, and ⪰ the ordering of symmetric matrices. Vector norms are Euclidean. A. Which ellipsoid is optimised? 
+
+An invariant set contains the next state whenever it contains the current state, for every permitted disturbance. For P ⪰ 0,define 
+
+E(P ) = {P 1/2v : ∥v∥2 ≤ 1}. (2) When P ≻ 0, this is the familiar ellipsoid x⊤P −1x ≤ 1.A singular P describes an ellipsoid in a lower-dimensional subspace. For a gain and parameter satisfying ρ(FK )2 < α < 1, the unique solution of 
+
+P = α−1FK P F ⊤ 
+
+> K
+
++ (1 − α)−1EE ⊤ (3) is positive semidefinite and defines an invariant ellipsoid. We call such a pair (α, K ) admissible. Thus P is determined by the pair, rather than chosen independently; different admissible values of α can give different ellipsoids for the same gain. The output image is CK E(P ). Its squared semiaxis lengths sum to 
+
+J(α, K ) = tr( CK P C ⊤ 
+
+> K
+
+). (4) Thus J measures the size of a guaranteed output enclosure under persistent bounded disturbances. It also bounds ∥zk∥22
+
+for states in the ellipsoid. We optimise this trace within family (3); it is neither ellipsoid volume nor the exact induced peak gain. Define 
+
+f (α) = min   
+
+> K:ρ(FK)2<α
+
+J(α, K ), J⋆ = inf  
+
+> 0<α< 1
+
+f (α). (5) The infimum is essential: for A = 0 , B = E = 1 , and z =[x u ]⊤, f (α) = 1 /(1 − α) approaches 1 only as α ↓ 0. Given 
+
+δ > 0, our goal is to return an admissible gain and its ellipsoid with J(̂ α, ̂ K) − J⋆ ≤ δ, together with computable lower and upper bounds proving this gap. 
+
+B. Information available to the computation 
+
+A finite batch of one-step measurements is arranged as D =(X, U, W, X +, Z ), with the samples as columns, so 
+
+X+ = AX + BU + EW, Z = CX + DU. (6) Samples may come from a trajectory or several episodes. The disturbance is measured during collection, along with the state, input, and regulated output; it is not measured by the deployed feedback. No numerical plant matrices need be supplied. 
+
+Assumption 1: The pair (A, B ) is controllable, (C, A ) is observable, C⊤D = 0, D⊤D ≻ 0, and E̸ = 0. The measurements satisfy (6) exactly, and 
+
+M =
+
+
+
+XUW
+
+ , rank M = n + m + r. (7) Controllability and observability ensure that the scaled LQR problem below is well posed for every positive α. The computation is offline; it requires neither an initial stabilising policy nor application of intermediate gains. Safe exploration and unmeasured learning errors are outside this information pattern. Let M † be the Moore–Penrose inverse. For v ∈ Rn+m,form 
+
+g(v) = M †
+
+[v
+
+0
+
+]
+
+, t(v) = X+g(v), o(v) = Zg (v). (8) Because M g (v) = [ v⊤ 0] ⊤, the data equations imply t(v) = [A B ]v and o(v) = [ C D ]v. These are nominal virtual tran-sitions: linear combinations remove the measured disturbance before the output is squared. Likewise, 
+
+E = X+M †
+
+[ 0
+
+Ir
+
+]
+
+, F K = X+M †
+
+
+
+In
+
+K
+
+0
+
+, C K = ZM †
+
+
+
+In
+
+K
+
+0
+
+. (9) Thus the disturbance channel and each candidate closed-loop map are recovered explicitly. Assumption 1 also permits exact identification of A, B, E, C, D .To reconstruct a quadratic form, evaluate it on coordinate probes. If h(v) = v⊤Hv , the probes ei and ei + ej give 
+
+Hii = h(ei), Hij = 12
+
+(h(ei + ej ) − h(ei) − h(ej )). (10) These deterministic probes reconstruct every symmetric H and impose no additional quadratic-feature rank condition. They are synthetic combinations of the same batch, not extra mea-surements. The right inverse and virtual probes are computed once and reused for every parameter and iteration. 
+
+III. A F INITE POLICY CERTIFICATE 
+
+For a fixed ellipsoid parameter α, value iteration provides lower bounds on the optimal cost, while separate evaluation of admissible controllers provides upper bounds. 
+
+A. Building a lower cost bound 
+
+Value iteration builds the cost one time step at a time. Each update adds the current output penalty to the scaled estimate of future cost, then minimises over the input. Starting from zero gives lower values because a finite horizon omits nonnegative future penalties. For 0 < α ≤ 1 and S ⪰ 0, define the Bellman matrix by 
+
+v⊤Hα(S)v = ∥o(v)∥2 + α−1t(v)⊤St (v). (11) This quadratic state–action value is the Q-function for a scaled LQR problem. Partition H = Hα(Sj ) by state and input coordinates. Starting from S0 = 0 , perform 
+
+Kj = −H−1 
+
+> uu
+
+Hux , Sj+1 = Hxx − Hxu H−1 
+
+> uu
+
+Hux . (12) The input block is positive definite because D⊤D ≻ 0. The gain Kj minimises the expression based on Sj ; the updated value Sj+1 includes one more time step. 
+
+Lemma 1 (Value bounds): For each 0 < α < 1, itera-tion (12) satisfies 0 ⪯ Sj ↑ S⋆, Kj → K⋆, and 
+
+f (α) = tr( E⊤S⋆(α)E)1 − α , ρ(FK⋆ )2 < α. (13) Moreover, Sj (a) ⪰ Sj (b) for 0 < a ≤ b ≤ 1.
+
+Proof: The data identities give 
+
+Hα(S) = [ C D ]⊤[C D ] + α−1[A B ]⊤S[A B ]. (14) Completing the square in the input shows that x⊤Sj x is the 
+
+j-stage optimal cost for dynamics (A, B )/√α and stage cost 
+
+∥Cx + Du ∥2. Controllability and observability are preserved by this scaling. Standard finite-horizon LQR convergence [16] therefore gives the stabilising infinite-horizon value and gain. Its policy equation is 
+
+SK = C⊤ 
+
+> K
+
+CK + α−1F ⊤ 
+
+> K
+
+SK FK . (15) For any admissible K, substitution into (4) and cyclicity of the trace give 
+
+J(α, K ) = tr [SK (P − α−1FK P F ⊤
+
+> K
+
+)] 
+
+= tr( E⊤SK E)1 − α ,
+
+where the second equality uses (3). Applying this identity to 
+
+K⋆ proves (13). The identity connects geometry and cost: 
+
+P describes the state enclosure, whereas SK evaluates the controller. The disturbance channel E enters through the trace after this nominal cost is computed. Finally, Bellman minimisation preserves matrix order in both S ⪰ 0 and 1/α .Induction from zero proves the parameter ordering. □
+
+B. Evaluating and accepting a controller 
+
+The iterate Sj gives an optimal finite-horizon value, not the cost of repeatedly applying its greedy gain Kj . We therefore evaluate that gain separately. The finite-horizon value supplies a lower bound on the optimum; an admissible policy supplies an upper bound. Their difference tells us when this fixed-parameter computation can stop. 
+
+Proposition 1 (Accepted policies and their ellipsoids): 
+
+Fix 0 < α < 1. For a candidate Kj , solve (15) using the data-derived FKj , C Kj . Accept the candidate only when the equation has a unique symmetric solution SKj ≻ 0. Every accepted candidate satisfies ρ(FKj )2 < α , and 
+
+Lj = tr( E⊤Sj E)1 − α ≤ f (α) ≤ Uj = tr( E⊤SKj E)1 − α . (16) The solution P ⪰ 0 of (3) defines an invariant ellipsoid and satisfies J(α, K j ) = Uj . For every η > 0, an accepted candidate with Uj − Lj ≤ η is obtained after finitely many iterations. 
+
+Proof: Suppose FK v = λv for a nonzero possibly complex 
+
+v. Equation (15) implies 
+
+(1 − | λ|2/α )v∗SK v = ∥Cv ∥2 + ∥DKv ∥2. (17) For SK ≻ 0, |λ|2 > α is impossible. Equality forces Cv =
+
+Kv = 0 , hence Av = λv , contradicting observability. Thus the policy is admissible. The lower bound follows from Lemma 1. The upper bound follows from the definition of f (α), and 
+
+J(α, K j ) = Uj follows from the trace identity in that lemma’s proof. For invariance, write the next state as the image of a single unit-ball vector. The matrix 
+
+T =
+
+[
+
+FK P 1/2/√α E/ √1 − α
+
+]
+
+satisfies T T ⊤ = P , so it maps the unit ball onto E(P ).If x = P 1/2v with ∥v∥ ≤ 1, then FK x + Ew =
+
+T [√α v ⊤ √1 − α w ⊤]⊤ belongs to E(P ) because the stacked vector has norm at most one. This also covers singular P .By Lemma 1, Kj approaches a strictly admissible gain. In its neighbourhood the Lyapunov solution exists, is positive definite, and depends continuously on Kj . Consequently the acceptance test eventually succeeds, SKj → S⋆, and Uj −
+
+Lj → 0. □
+
+A small increment Sj+1 − Sj alone cannot replace the acceptance test. Once Kj is accepted, subtraction of the two Bellman identities gives 
+
+SKj − Sj =
+
+> ∞
+
+∑
+
+> t=0
+
+α−t(F tKj )⊤(Sj+1 − Sj )F tKj . (18) Thus the closed-loop dynamics determine how an increment propagates into the remaining cost. An endpoint evaluation at (α, η ) runs (12) and the policy test until it returns a gain K and bounds L, U satisfying 
+
+ρ(FK )2 < α, L ≤ f (α) ≤ J(α, K ) = U, U − L ≤ η. 
+
+In the outer search, L(b) and U (b) denote the bounds returned at b. Different endpoints may stop at different iteration indices. 
+
+IV. C ERTIFICATION OVER THE FULL PARAMETER 
+
+DOMAIN 
+
+Bounds at a few parameter values do not exclude a better controller elsewhere. To obtain a global certificate, we bound the objective over whole intervals, including parameter values that have not been evaluated. 
+
+A. Bounds for intervals and the upper tail 
+
+To bound an interval without sampling its interior, sep-arate the objective into two factors that change in known directions with the parameter. By Lemma 1, (1 − α)f (α) = tr( E⊤S⋆(α)E) is non-increasing in α. On [a, b ], the right endpoint therefore bounds the numerator in (13) from below, while the left endpoint bounds the increasing factor (1 − α)−1
+
+from below. Their product bounds the objective throughout the interval. No convexity or unimodality of f is needed. 
+
+Lemma 2 (Interval and endpoint bounds): For I = [a, b ]
+
+with 0 ≤ a < b < 1, any iterate at b yields 
+
+ℓ(I) = tr( E⊤Sj (b)E)1 − a = 1 − b
+
+1 − a Lj (b) ≤ inf  
+
+> α∈I∩(0 ,1)
+
+f (α).
+
+(19) In addition, n steps of (12) at α = 1 give 
+
+c = tr( E⊤Sn(1) E) > 0, f (α) ≥ c
+
+1 − α . (20) 
+
+Proof: For α ∈ I ∩ (0 , 1) , Lemma 1 gives S⋆(α) ⪰ S⋆(b) ⪰
+
+Sj (b) and (1 −α)−1 ≥ (1 −a)−1, proving (19). At α = 1 , zero cost over n stages forces all inputs and outputs to vanish, since 
+
+C⊤D = 0 and D⊤D ≻ 0. Observability then forces the initial state to vanish, so Sn(1) ≻ 0. Since E̸ = 0 , c > 0. Apply parameter monotonicity and the finite-horizon lower bound to obtain (20). □
+
+The calculation at α = 1 uses only a finite horizon to bound the tail; it requires no admissible infinite-horizon design at that endpoint. 0.0 0.2 0.4 0.6 0.8 1.0  
+
+> Ellipsoid parameter α
+> 0.3 0.4 0.5 0.6 0.7 0.8
+> Trace objective
+
+(a) Full-domain parameter bounds     
+
+> f(α) (DARE reference) Interval lower bounds Best accepted policy 020 40 60 80
+> Distinct parameter evaluations
+> 10 −3
+> 10 −2
+> 10 −1
+> Absolute objective gap
+
+(b) Global certi fi cate convergence        
+
+> Global upper-minus-lower gap Requested δ= 10 −3 Fig. 1. Full-domain search for (26) . Left: each red segment bounds the whole corresponding interval from below; the narrow shaded tail is excluded by (20) . The model-based curve is a validation reference. Right: the global gap reaches the prescribed tolerance after 92 parameter evaluations.
+
+An initial evaluation at α = 1 /2 gives a usable policy with cost Us. Since c/ (1 − α) grows without bound near one, parameters sufficiently close to one cannot improve this cost. Set 
+
+b0 = 1 − c/U s ∈ [1 /2, 1) . (21) Equation (20) excludes [b0, 1) from improving this policy. The remaining interval starts at zero, but only its positive right endpoints are evaluated. 
+
+B. Refining the remaining intervals 
+
+The search keeps a partition of [0 , b 0] and the best controller found so far, called the incumbent. Its cost gives a global upper bound. The smallest interval bound, together with the excluded-tail bound, gives a global lower bound. Their differ-ence measures the improvement that is still possible. We split an interval attaining the smallest lower bound and evaluate its new midpoint. Once the global bounds differ by at most δ, the incumbent is sufficiently close to optimal. 
+
+Theorem 1 (Finite global certificate): Under Assump-tion 1, Algorithm 1 terminates for every δ > 0 and returns 
+
+(̂ α, ̂ K, ̂ P , J, J ) satisfying 
+
+ρ(F̂ K )2 <̂ α < 1, E(̂ P ) is invariant , (22) 
+
+J ≤ J⋆ ≤ J(̂ α, ̂ K) = J, J − J ≤ δ. (23) No initial stabilising gain or interior minimiser is required. 
+
+Proof: Proposition 1 makes every endpoint evaluation finite and every incumbent admissible. Lemma 2, the excluded-tail bound Us, and the covering partition imply J ≤ J⋆ ≤ J
+
+throughout. It remains to prove termination, including near zero. Write 
+
+η = δ/ 4 and consider any current interval I = [ a, b ]. Its endpoint bounds obey U (b) − L(b) ≤ η and U (b) ≥ J,since the incumbent is the smallest visited policy cost. With 
+
+q = (1 − b)/(1 − a) and ℓ(I) = qL (b),
+
+J − ℓ(I) ≤ qη 
+
+︸︷︷︸ 
+
+> endpoint error
+
++ (1 − q)J
+
+︸ ︷︷ ︸
+
+> interval contribution
+
+≤ η + b − a
+
+1 − b0
+
+Us. (24) 
+
+Algorithm 1 Globally certified ellipsoid design 
+
+Require: Exact batch satisfying Assumption 1; δ > 0. 
+
+> 1:
+
+Construct (8)–(9); set η = δ/ 4. 
+
+> 2:
+
+Evaluate (1 /2, η ); store the returned policy and cost Us as incumbent.  
+
+> 3:
+
+Compute c and b0 from (20), (21).  
+
+> 4:
+
+Evaluate (b0, η ); initialise the partition I = {[0 , b 0]} and its bound (19).  
+
+> 5:
+
+loop  
+
+> 6:
+
+Update J and its policy from all visited upper values; set 
+
+J = min {Us, min I∈I ℓ(I)}. 
+
+> 7:
+
+if J − J ≤ δ then  
+
+> 8:
+
+Solve (3) for the incumbent and return the quantities in Theorem 1.  
+
+> 9:
+
+end if  
+
+> 10:
+
+Bisect an interval of smallest ℓ(I); evaluate its midpoint with tolerance η. 
+
+> 11:
+
+Replace the parent by its two children and compute (19), reusing the old right endpoint.  
+
+> 12:
+
+end loop 
+
+The endpoint evaluation controls the first term; bisection controls the second. A sufficiently narrow interval cannot lie more than δ below the incumbent. Hence, if the stopping test fails, the selected interval must have width greater than 
+
+h⋆ = ( δ − η)(1 − b0)/U s > 0. (25) Each split halves the interval width. Bisection therefore cannot select any interval at depth d⋆ = max {0, ⌈log 2(b0/h ⋆)⌉} .There are at most 2d⋆ −1 shallower nodes. The estimate applies unchanged to [0 , b ]: zero is never evaluated, and no uniform inner-iteration bound near zero is needed. Only finitely many endpoints are visited, and each evaluation terminates. At ter-mination the stopping test gives (23); Proposition 1 gives (22) and the returned ellipsoid. □
+
+The guarantee concerns exact data and exact arithmetic. Floating-point rank decisions and Lyapunov solves require conditioning and residual checks; they do not constitute outward-rounded numerical certification or robustness to un-measured errors. The interval construction can also be com-bined with a model-based Riccati solver that supplies valid endpoint bounds. 0 2 4 6 8 10 12 14  
+
+> Value-iteration index j
+> 0.0 0.1 0.2 0.3 0.4 0.5
+> Trace objective
+> Rejected
+
+(a) Finite-policy bounds          
+
+> Finite-horizon lower value Lj
+> Accepted policy cost Uj
+> −0.3 −0.2 −0.1 0.0 0.1 0.2 0.3
+> Position x1
+> −0.4 −0.2 0.0 0.2 0.4
+> Velocity  x2
+
+(b) Certi fi ed state enclosure            
+
+> 120-step reachable set Invariant ellipsoid Sample trajectory Fig. 2. Policy and geometric checks at the returned parameter. Left: early greedy gains are rejected; accepted policy costs need not decrease at every value update. Right: the grey polygon is an inner approximation of the 120 -step reachable set from x0= 0 , formed by joining support points in 900 directions. The trajectory also starts at x0= 0 and uses wk= ( −1) ⌊k/ 13 ⌋. Containment in the ellipsoid for every admissible disturbance follows from Proposition 1, not from this trajectory.
+
+V. N UMERICAL STUDY 
+
+A. A disturbed position–velocity system 
+
+Consider a sampled position–velocity system: 
+
+A =
+
+[1 0.20 1
+
+]
+
+, B = E =
+
+[0.02 0.2
+
+]
+
+, zk =
+
+[ x1,k 
+
+0.3uk
+
+]
+
+. (26) This models position and velocity with a sampling period of 0.2 and an unknown bounded acceleration acting through the input channel. Position is penalised; velocity is observed through the dynamics, so the state penalty is semidefinite. The batch contains 20 open-loop episodes of 8 steps each. The initial state of each episode is drawn uniformly from 
+
+[−1, 1] 2, and inputs and measured disturbances are indepen-dent uniform samples in [−1, 1] . Resetting after eight steps limits open-loop growth; it is an experimental capability, not a learned safety guarantee. The data matrix has rank 4 and condition number 1.70 . Only the five measured arrays are passed to the learner; the matrices in (26) are used separately for validation. Reported numerical values are rounded; all checks use the unrounded quantities. With δ = 10 −3 and η = δ/ 4, the computation returns ̂ α = 0 .5572 and ̂
+
+K = [−6.3577 −4.2834 ] ,̂
+
+P =
+
+[ 0.0388 −0.0587 
+
+−0.0587 0.2504 
+
+]
+
+. (27) The unrounded controller gives the bounds and gap 
+
+J = 0 .30464773 , J = 0 .30564354 ,J − J = 9 .9581 × 10 −4. (28) The weighted stability margin 1 − ρ(F̂ K )2/̂ α is 0.5146 . The search uses 92 distinct parameters, 90 bisections, and 1569 
+
+value updates. The normalised primal Lyapunov residual and primal–dual trace discrepancy are below 3 × 10 −16 . These are floating-point diagnostics; the bound proved in Theorem 1 is an exact-arithmetic statement. Figure 1 shows the interval lower bounds and the closing global gap. Figure 2 distinguishes finite-horizon critic values                  
+
+> TABLE I SAME -DATA COMPARISON FOR δ= 10 −3
+> Method Evals. Time (ms) Global gap VI / local 12 12.3 unavailable DARE / local 13 9.1 unavailable VI / certified 92 306.8 9.96 ×10 −4
+> DARE / certified 88 58.9 9.88 ×10 −4
+> Gaps are computed in floating-point arithmetic; Theorem 1 assumes exact arithmetic.
+
+from accepted policy performance and displays the returned geometric enclosure. An independent DARE calculation gives the reference value 0.30564346 near α = 0 .5574 . Agreement alone would not supply the lower bound in (28). 
+
+B. Matched computations and diagnostic cases 
+
+Table I compares value iteration (VI) and Riccati (DARE) computations using the same batch and criterion. The local methods use bounded scalar minimisation on [0 .02 , 0.98] , with parameter tolerance 10 −9. The local VI baseline stops when 
+
+∥Sj+1 − Sj ∥F
+
+1 − α + ∥Sj ∥F
+
+≤ 10 −10 ,
+
+where ∥ · ∥ F is the Frobenius norm. Its scalar search uses 
+
+tr( E⊤Sj+1 E)/(1 − α); the reported objective is obtained by evaluating the returned gain separately. The DARE global method uses the same interval bounds with exact Riccati endpoint values in theory. Numerical policy evaluation rejects Lyapunov operators with condition number above 10 10 .Computations use Python 3.12.14, NumPy 2.5.3, and SciPy 1.18.1 on Windows 11 with an Intel Core i7-1185G7 processor at 3.00 GHz. Riccati and policy evaluations use SciPy’s discrete Riccati and Lyapunov solvers. Timings are medians of three runs with one BLAS thread; preprocessing takes less than 0.3 ms in each case. All four objectives lie within 9 × 10 −8 of the DARE refer-ence. The local computations are faster but do not bound un-explored parameters. The matched global DARE computation is also faster than value iteration: the proposed contribution is the finite global certificate and its data-based realisation, not computational superiority. Two scalar cases test failures that a nominal convergence plot misses. First, take A = 1.1, B = E = 1, z =[10 −7x u]⊤, and α = 1/2. The first matrix increment is S1 − S0 = 10 −14 , and the corresponding lower-bound increment is L1 − L0 = 2 × 10 −14 . Either increment is below 10 −12 , although K0 = 0 leaves the pole at 1.1. In contrast, (15) gives SK0 = 10 −14 /(1 − 1.12/α ) < 0, so Proposition 1 rejects the gain. Second, for the boundary exam-ple after (5), tolerances 10 −2, 10 −3, 10 −4 require respectively 
+
+7, 10 , 14 parameter evaluations. The returned parameters are 
+
+2−7, 2−10 , 2−14 and the corresponding gaps to J⋆ = 1 are 
+
+7.874 × 10 −3, 9.775 × 10 −4, and 6.104 × 10 −5. No positive lower cutoff is imposed. 
+
+VI. C ONCLUSION 
+
+The proposed procedure uses a finite batch of exact data collected under measured disturbances to compute a feedback gain, a scalar parameter, and their associated invariant ellip-soid, together with a finite global objective gap. Its key step is the combination of policy upper bounds with normalised-value interval lower bounds. The resulting width estimate proves termination over the entire open parameter domain and accommodates an unattained boundary infimum. The certificate also applies to model-based Riccati evaluations; its benefit is an explicit performance guarantee rather than a speed or information advantage. Extending the bounds to measurement uncertainty and verified numerical arithmetic remains a separate problem. 
+
+ACKNOWLEDGMENT 
+
+AI use statement: This letter was written with the assistance of ChatGPT 5.6 Sol. Working with AI was an iterative process, making it difficult to isolate its specific contribution. 
+
+REFERENCES 
+
+[1] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan, Linear Matrix Inequalities in System and Control Theory , ser. Studies in Applied Mathematics. SIAM, 1994, vol. 15. [2] S. A. Nazin, B. T. Polyak, and M. V. Topunov, “Rejection of bounded exogenous disturbances by the method of invariant ellipsoids,” Autom. Remote Control , vol. 68, no. 3, pp. 467–486, 2007. [3] M. V. Khlebnikov, B. T. Polyak, and V. M. Kuntsevich, “Optimization of linear systems subject to bounded exogenous disturbances: The invariant ellipsoid technique,” Autom. Remote Control , vol. 72, no. 11, pp. 2227– 2275, 2011. [4] A. Peregudin and I. Furtat, “New duality relations in linear systems and optimal control under bounded disturbances,” IEEE Trans. Autom. Control , vol. 69, no. 8, pp. 5569–5576, 2024. [5] E. Dogadin, A. Peregudin, and D. Shirokih, “Optimal control for discrete-time systems under bounded disturbances,” in Proc. American Control Conf. , 2024, pp. 1940–1945. [6] C. De Persis and P. Tesi, “Formulas for data-driven control: Stabilization, optimality, and robustness,” IEEE Trans. Autom. Control , vol. 65, no. 3, pp. 909–924, 2020. [7] H. J. van Waarde, J. Eising, H. L. Trentelman, and M. K. Camlibel, “Data informativity: A new perspective on data-driven analysis and control,” 
+
+IEEE Trans. Autom. Control , vol. 65, no. 11, pp. 4753–4768, 2020. [8] A. Bisoffi, C. De Persis, and P. Tesi, “Data-driven control via Petersen’s lemma,” Automatica , vol. 145, p. 110537, 2022. [9] M. Mejari and A. Gupta, “Direct data-driven computation of polytopic robust control invariant sets and state-feedback controllers,” in Proc. IEEE Conf. Decision Control , 2023, pp. 590–595. [10] V. G. Lopez, M. Alsalti, and M. A. Müller, “Efficient off-policy Q-learning for data-based discrete-time LQR problems,” IEEE Trans. Autom. Control , vol. 68, no. 5, pp. 2922–2933, 2023. [11] T. Bian and Z.-P. Jiang, “Value iteration and adaptive dynamic pro-gramming for data-driven adaptive optimal control design,” Automatica ,vol. 71, pp. 348–360, 2016. [12] W. Fan and J. Xiong, “Q-learning methods for LQR control of com-pletely unknown discrete-time linear systems,” IEEE Trans. Autom. Sci. Eng. , vol. 22, pp. 5933–5943, 2025. [13] N. T. Dinh, E. Dogadin, T. Torbati, A. Peregudin, and O. Borisov, “Reinforcement learning approach in adaptive ε-optimal control,” IFAC-PapersOnLine , vol. 59, no. 14, pp. 31–36, 2025. [14] M. Granzotto, R. Postoyan, D. Neši´ c, L. Bu¸ soniu, and J. Daafouz, “When to stop value iteration: Stability and near-optimality versus computation,” in Proc. 3rd Conf. Learning for Dynamics and Control ,ser. Proc. Mach. Learn. Res., vol. 144, 2021, pp. 412–424. [Online]. Available: https://proceedings.mlr.press/v144/granzotto21a.html [15] ——, “Value iteration with stopping criterion: Finite iterations, stability, and near-optimality guarantees,” arXiv:2606.23229, 2026, preprint. [Online]. Available: https://arxiv.org/abs/2606.23229 [16] F. L. Lewis, D. L. Vrabie, and V. L. Syrmos, Optimal Control , 3rd ed. Wiley, 2012.

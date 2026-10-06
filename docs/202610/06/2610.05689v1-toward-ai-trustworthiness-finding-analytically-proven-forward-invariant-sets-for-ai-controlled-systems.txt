@@ -1,0 +1,624 @@
+Title: Toward AI Trustworthiness: Finding Analytically Proven Forward-Invariant Sets for AI-Controlled Systems
+
+URL Source: https://arxiv.org/pdf/2610.05689v1
+
+Published Time: Tue, 06 Oct 2026 02:40:53 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Toward AI Trustworthiness: Finding Analytically Proven Forward-Invariant Sets for AI-Controlled Systems 
+
+Haoyang Song 1, Qixin Wang 2, XikunYang 2,Department of Computing, The Hong Kong Polytechnic University, Hong Kong SAR, China. Email: haoyang.song@connect.polyu.hk csqwang@polyu.edu.hk frank-xikun.yang@connect.polyu.hk 
+
+Abstract —The rise of Neural Network (NN) based AI fos-ters increasing demands to apply AI in control applications, particularly, to generate AI-controllers for nonlinear control applications, where traditional control theories often fail to work well. However, such AI-controlled systems are well-known to be highly nonlinear, and hard to explain/verify, leading to trustworthiness concerns. On the other hand, many AI-controlled systems are safety/mission critical, it often needs to be certifiably trustworthy. But due to the the aforementioned trustworthiness concerns, certification legal/regulatory authorities are deterred from approving the AI-controlled systems. A key solution to address the trustworthiness concerns is to find a Forward-Invariant Set (FIS) for the AI-controlled systems. A FIS is a subset of the state space of the controlled target, so that starting from any state inside of the FIS, the future state trajectory remains inside the FIS. If the FIS does not intersect with any concerned unsafe state set, the legal/regulatory authorities can be assured of the trustworthiness of the AI-controlled system. However, finding the FIS for a given (e.g. by the control system vendor to the authority for certification) AI-controlled system is a well-known hard problem. In this paper, we propose a solution to find analytically proven FISs for given AI-controlled systems. We propose to use an Invertible NN (INN) to transform the original state space into a latent state space, to reduce the high nonlinearity of the original AI-controlled system, so as to increase the likelihood of a regular-shaped FIS. We further propose a procedure to stimulate the INN to converge to a preferred hyper-rectangular FIS candidate and conduct verification. We proved that, when this procedure returns success, the hyper-rectangular FIS candidate (and its INN inversely transformed counterpart in the original state space) is an analytically proven FIS. We conducted extensive trials on representative AI-controlled system testbeds. Our solution succeeded in finding FISs for all the testbeds. Meanwhile, to our best knowledge, there is no other work in the literature that addresses exactly the same problem as ours. The best we can compare with is a baseline solution adapted from a state-of-the-art solution for a related (but not the same) problem. The baseline solution failed to find any FIS for our testbeds. Furthermore, for 40 of the 45 testbeds, our solution’s time costs are significantly smaller than those of the baseline solution’s. The centers of our found FISs also roughly meet the preferences set by domain experts. 
+
+I. I NTRODUCTION 
+
+The rise of Neural Network (NN) based AI (simplified as “AI ” in the following) [1] [2] [3] fosters increasing demands to apply AI in control applications. Such demands are particularly valid for nonlinear control applications, where traditional control theories often fail to work well [4] [5] [6] [7]. (par1) For such control applications, AI does make significant progresses: various novel AI generated controllers (simplified as “ AI-controllers ” in the following) are reported [7] [8] [9] [10]. However, adoption of AI-controllers is still hampered by their trustworthiness. On one hand, AI generated models, including AI-controllers, are well-known to be highly nonlinear, and hard to explain/verify. Particularly, the difficulty often worsens for those nonlinear control applications, where traditional control theories cannot work well (hence need AI-controllers). On the other hand, many nonlinear control applications are safety or mission critical, such as aviation, smart driving, surgical robots etc. Such applications often demand certifiably trustworthy controllers due to legal or regulatory requirements [11] [12] [13]. If an AI-controller cannot be explained/verified, author-ities would not dare to issue the necessary legal/regulatory certificates to approve the adoption of the AI-controller. In other words, the authorities cannot trust such AI-controllers. (par2) To address the above trustworthiness problem, an AI-controlled system should better guarantee proven safety. To guarantee proven safety, one approach is to find aso-called Forward-Invariant Set (FIS) for the AI-controlled system, where the FIS does not intersect with the set of concerned unsafe states . These concepts are explained as follows. First, any control application has its control target, aka 
+
+plant . For example, a robotic control system’s plant is the physical robot. The state of the plant (simplified as “ state ” in the following) at time instance t can be denoted as a vector ⃗x(t) ∈ R n, where Rn is called the n-dimensional state space ,and each dimension of ⃗x(t) is also called a component of the state. (par3) Second, a FIS I is a subset of Rn, where given any initial time instance t0, then for any initial state ⃗x(t 0) ∈ I , the future 
+
+state trajectory {⃗x(t)} t∈[t0,+∞) always remains in I. (par4) Third, the set F of concerned unsafe states is another subset of Rn, whose elements (aka unsafe states ) are states arXiv:2610.05689v1 [cs.AI] 5 Oct 2026 considered unsafe by the legal/regulatory authority. Often, we also call F the forbidden set ; and call ¯F def 
+
+= ( Rn − F ) the safe set . (par5) If a FIS I is found, and I ∩ F = ∅ is proven, then the AI-controlled system guarantees proven safety. Specif-ically, any state trajectory {⃗x(t)} t∈[t0,+∞) starting from an initial state ⃗ x(t 0) ∈ I is guaranteed to be safe: as 
+
+{⃗x(t)} t∈[t0,+∞) ⊆ I (due to the definition of FIS, see (par4)) implies {⃗x(t)} t∈[t0,+∞) ∩ F = ∅ (due to I ∩ F = ∅). The legal/regulatory authority can thus trust the AI-controlled system, given the initial state ⃗x(t 0) ∈ I . (par6) However, how to find the FIS I is a well-known difficult problem [14] [15], especially when the dynamics of the system involve high nonlinearity, which is a feature of AI-controlled systems (see (par2)). To our best knowledge, the state-of-the-art solution is by Yang et al. [14]. Specifically, Yang et al. [14] propose to jointly train the AI-controller and a Lyapunov func-tion 1, so that if the training succeeds, the outputted Lyapunov function also implies a FIS. However, in this method, the AI-controller is supposed to be jointly adjusted with the Lyapunov function (and the implied FIS) throughout the training. The method is not intended for problems where the AI-controller is given a priori (e.g., provided by a control system vendor to the legal/regulatory authority for certification). Such problems, however, are the focus of this paper. In summary, the focus of this paper is to find a FIS for an AI-controlled system S, where the AI-controller is given a priori. We propose the following solution heuristics. (par7) First, we notice a state-of-the-art verification tool, α, β -CROWN [16] [17] [18] [19], which can analytically prove if a given polytope (see (3)) B actually bounds an NN’s outputs on a given hyper-rectangular (see (2)) input domain of concern. Consider S holistically as an NN, whose input is the original state ⃗x(t), and the output is the next state ⃗x(t + δ) (where 
+
+δ is the sensing/actuation period, see Section IV for more discussions on discretization), i.e. both the input domain and output range are subsets of the n-dimensional state space. Then S can be analyzed by α, β -CROWN. Specifically, given a hyper-rectangular input domain of concern X ⊆ Rn, denote the corresponding output range of S as S(X ) ⊆ Rn. Let 
+
+B = X (note hyper-rectangle is polytope). Then if α, β -CROWN can analytically prove that S(X ) ⊆ B = X , then 
+
+X is intuitively a FIS. That is, α, β -CROWN can help us analytically prove whether a hyper-rectangular FIS candidate 
+
+X is actually a FIS for S.However, α, β -CROWN requires X to be hyper-rectangular. The chance that a highly nonlinear system S’s FIS has a hyper-rectangular shape is low. To cope with this, we propose to 
+
+> 1Lyapunov function intuitively is a pseudo potential energy defined upon the states, with certain properties, such as always decreasing along any state trajectories. Traditional control theories often turn a controller design problem into a Lyapunov function construction problem [4]. If the controller can be adjusted, so that a Lyapunov function can be constructed for the controlled system for a given initial state set, then the given initial state set is a FIS; in other words, the controller has a FIS, hence is stable. However, when the system is highly nonlinear, there is no generic solution to adjust the controller and construct the Lyapunov function.
+
+Fig. 1: Solution heuristics: a hyper-rectangular FIS constructed and proven in the latent state space maps to a nonlinear FIS in the original state space. construct a transformation function T and its inverse T −1,to transform the original n-dimensional state space X0 to another (aka the latent ) n-dimensional state space X1, so that 
+
+S’s nonlinear behaviors in X0 become more regular (to be formally defined in (par20)) in X1. We propose to use the tool of Invertible NN (INN) [20] to find such T and T −1. (par8) Specifically, in X1, we shall specify an intended hyper-rectangle I1 to be the FIS candidate . We train the INN of T
+
+and T −1, so that I1 looks like a FIS for the transformed S in 
+
+X1. Once the training succeeds, we shall exploit α, β -CROWN to analytically prove if I1 is actually a FIS for the transformed 
+
+S in X1. If so, I0 = T −1(I1) (i.e. inverse transform I1 from 
+
+X1 to X0, see (10)) shall be the FIS for S in X0. Note we do not adjust I1, instead, we adjust the INN, as the latter can automatically adjust itself using backpropagation from a well designed loss function. (par9) The above heuristics are illustrated by Fig. 1. In summary, this paper makes the following contributions. 1) We propose a solution to find a FIS for an AI-controlled sys-tem S, where the AI-controller is given a priori. Specifically, our solution exploits INN to transform the complex and highly nonlinear S from the original state space X0 to a latent state space X1, so that the transformed S becomes more regular. We propose a specially designed loss function and training set, to train the INN, so that a hyper-rectangular FIS candidate I1
+
+becomes more likely a real FIS for the transformed S in X1.2) We theoretically prove that if I1 in X1 can pass a certain test by α, β -CROWN, then it is an analytically proven hyper-rectangular FIS for S in X1, and its INN inverse transformed counterpart I0 in X0 is an analytically proven FIS for S in 
+
+X0.3) We carried out extensive evaluations on various AI-controlled systems. Our proposed solution finds analytically proven FISs for all of them, while the state-of-the-art baseline solution finds none. Our solution also achieves significantly smaller time costs on 40 of the 45 evaluated AI-controlled systems; and the centers of the found FISs also roughly meet the preferences set by domain experts. The rest of the paper is organized as follows. Section II discusses related work. Section III introduces background technologies. Section IV formulates the problem. Section V proposes and analyzes our solution. Section VI evaluates our solution. Section VII concludes the paper. II. R ELATED WORK 
+
+How to find FIS (often in the form of Lyapunov stability study) is a long time topic in traditional control theory [4] [21]. For linear control systems, the most classic method is the Linear Matrix Inequalities (LMI) method [22] [23] [24]. However, this method requires purely linear dynamics, which is not the case for nonlinear AI-controlled systems. For non-linear control systems, there is not a generic panacea solution for finding FIS [25] [26]. The state-of-the-art methods include Lyapunov’s indirect methods [4] [5], Zubov’s methods [27] [28], sum of squares programming [29] [30], LaSalle’s invari-ance principle [4] [31], Krasovskii methods [32], and variable gradient methods [33] [34]. However, these methods assume linear, polynomial, or other analytically tractable closed-form algebraic representations of the dynamics. Unfortunately, such assumptions do not suit AI-controlled systems involving NN components, as NN is well-known to be nonlinear, non-polynomial, and analytically intractable [35]. To avoid the analytically intractable problem, there are efforts to exploit formal method tools, such as the Satisfiability Modulo Theories (SMT) [36], Mixed Integer Programming (MIP) [37], Hamilton-Jacobi (HJ) reachability analysis [38], and Semi-Definite Programming (SDP) [39] to find FISs for NNs. However, SMT, MIP, and HJ methods have the well-known scalability problem; while SDP requires that the NN can be well approximated with smooth quadratic envelopes. To address the above limitations, the state-of-the-art FIS finding method for AI-controlled system is the method pro-posed by Yang et al. [14]. But as discussed in Section I, Yang et al.’s method is not for the cases where the controller is given a priori. It modifies the controller together with the FIS candidate until a FIS is found. In this paper, however, we focus on a different application context: a legal/regulatory authority needs to certify a vendor provided AI-controlled system. Therefore, the controller is given a priori. (par10) In case the AI-controlled system is given a priori, Hara-panahalli et al. [40] proposed a method to analytically prove if a given parallelotope FIS candidate is actually a FIS. But if the FIS candidate cannot be proven to be actually a FIS, the method does not specify how to search for another FIS candidate. That is, the method provides a sufficient condition to prove if a FIS candidate is actually a FIS; but it is not a method to find (proactively search for) FISs. III. B ACKGROUND 
+
+A. Invertible NN (INN) and Normalized INN (NINN) 
+
+An INN [20] is an NN that learns a bijective mapping be-tween the original n-dimensional state space X0 and the latent 
+
+n-dimensional state space X1 (see (par8)). Once successfully trained, an INN can be denoted as a tuple of (T , T −1), where 
+
+T is a function of X0 → X1, while T −1 : X1 → X0 is the inverse function of T . Note, as “bijective mappings,” the range of T is the full set of X1, and vice versa for T −1.To speed up training, we can also insert a normalization layer Nnorm (⃗μ,⃗ σ) between X 0 and an INN Ninn = ( T , T −1),where ⃗μ ∈ X 0,⃗σ ∈ R n>0 are the configuration parameters given a priori. Nnorm (⃗μ,⃗ σ) also consists of a transformation 
+
+ˆT⃗μ,⃗ σ and its inverse ˆT −1⃗μ,⃗ σ , which together set up a bijec-tive mapping between X0 and another (aka normalized ) n-dimensional state space ˆX0. Specifically, 
+
+∀⃗x 0 ∈ X0, ˆT⃗μ,⃗ σ (⃗x 0) def 
+
+= ( ⃗x 0 −⃗μ) ⊘⃗σ, 
+
+∀ˆ⃗x 0 ∈ ˆX0, ˆT −1⃗μ,⃗ σ (ˆ⃗x 0) def 
+
+= ˆ⃗x 0 ⊙⃗σ +⃗μ. (1) where ⊘ and ⊙ are respectively the component-wise division operator and the component-wise multiplication operator be-tween two vectors. Correspondingly, Ninn = ( T , T −1) is now in charge of the bijective mapping between ˆX0 and X1.We call the concatenated NN of Nnorm (⃗μ,⃗ σ) and N inn =(T , T −1) the Normalized INN (NINN), and denote it as 
+
+˜N (⃗μ,⃗ σ, T , T −1). As Nnorm (⃗μ,⃗ σ) is bijective between X 0
+
+and ˆX0, and Ninn = ( T , T −1) is bijective between ˆX0 and 
+
+X1, ˜N (⃗μ,⃗ σ, T , T −1) hence is bijective between X0 and X1.Denote the corresponding transformation from X0 to X1 and the inverse respectively as ˜T and ˜T −1, we have 
+
+∀⃗x 0 ∈ X0, ˜T (⃗x 0) = T ( ˆT⃗μ,⃗ σ (⃗x 0)) ,
+
+∀⃗x 1 ∈ X1, ˜T −1(⃗x 1) = ˆT −1⃗μ,⃗ σ (T −1(⃗x 1)) .
+
+Correspondingly, heuristics (par8)(par9) and Fig. 1 are adjusted: instead of training an INN, we shall train a NINN. Furthermore, when the context is unambiguous, we also denote NINN ˜N (⃗μ,⃗ σ, T , T −1) with the tuple ( ˜T , ˜T −1). (par11) 
+
+B. Analytical Bound of NN Outputs: α, β -CROWN 
+
+α, β -CROWN [16] [17] [18] [19] is a state-of-the-art ver-ification tool to analytically prove if a given polytope set 
+
+B bounds the outputs of a complex function (typically an NN, or consisting of NN component(s)) over a given hyper-rectangular (see (2)) input domain . 
+
+α, β -CROWN allows the complex function to conduct var-ious computations, including various NN layering operations (fully connected, convolutional, pooling, etc.), various activa-tion/nonlinear functions (ReLU, sigmoid, tanh, arctan, sin, cos, tan, gelu, pow, multiplication etc.), any linear specifications on the NN output etc. [16] [17] [18] [19]. Specifically, α, β -CROWN takes four inputs, respectively denoted as f , X , B, and Tmax in the rest of this subsection. The first input to α, β -CROWN is the complex function 
+
+f : Rn0 → Rn1 to be analyzed, where n0, n1 are respectively the dimensions of the input and output vector spaces for f .Note n0 = n1 is allowed. The second input to α, β -CROWN is the given input domain of concern X ⊆ Rn0 for f . Note X must be hyper-rectangular ,i.e., X = {⃗x |⃗x ∈ R n0 and ⃗x ≼⃗x ≼⃗ x}, (2) where ⃗x ∈ Rn0 and ⃗x ∈ R n0 respectively denote the lower and upper bounds of the input ⃗x to f ; “ ≼” is the component-wise vector not-greater-than operator, meaning ⃗x [i] ⩽⃗x[i] ⩽⃗ x[i]
+
+(∀i ∈ { 1, 2, . . . , n0}), where ⃗ •[i] means the ith component of vector ⃗ •.The third input to α, β -CROWN is a given candidate output bound set B ⊆ Rn1 in f ’s output vector space. Note B must be polytope , i.e. 
+
+B = {⃗y |⃗y ∈ R n1 and CB⃗y ≼⃗ dB}, (3) where CB ∈ Rr×n1 and ⃗ dB ∈ Rr . We can interpret B as r
+
+polytope output constraints , where the jth ( j = 1 , 2, . . . , r)constraint is 
+
+CB[j, :] ⃗y ⩽⃗ dB[j], (4) where •[j, :] means the jth row of matrix •. Note in case 
+
+n0 = n1, B can be X , as hyper-rectangle is also polytope. The fourth input to α, β -CROWN is the maximum comput-ing time limit Tmax . Verification will be terminated with the result “ unknown ” if this computing time limit is reached. Given the above inputs, if α, β -CROWN terminates within 
+
+Tmax with the result “ true ,” then it is analytically proven [16] [17] [18] [19] that 
+
+∀⃗x ∈ X , f (⃗x) ∈ B ; i.e., ∀⃗x ∈ X , C Bf (⃗x) ≼⃗ dB. (5) If α, β -CROWN terminates within Tmax with the result “ false ,” then it is analytically proven [16] [17] [18] [19] that 
+
+∃⃗x ∈ X , f (⃗x) /∈ B ; i.e., ∃⃗x ∈ X , C Bf (⃗x)̸ ≼⃗ dB.
+
+If α, β -CROWN terminates within Tmax with the result “ un-known ,” then α, β -CROWN realizes that it is unable to deter-mine whether the result should be “true” or “false.” In summary, we can denote α, β -CROWN as a function 
+
+α_β_CROWN (f , X , B, Tmax ), which returns “true,” “false,” or “unknown” within Tmax . (par12) As α, β -CROWN evolves, the chance that it can give deter-ministic answers (true or false) within Tmax is improving [16] [17] [18] [19]. IV. P ROBLEM FORMULATION 
+
+Our problem formulation shall start from clarifying the details on an AI-controlled system S.First, a controlled system must have a controller , and the controlled target. The latter is called the “ plant .” The afore-mentioned “ state ” (see (par3)), rigorously speaking, should mean the state of the plant . The controller takes as input the state of the plant ⃗x(t) ∈ R n (where t is the time of concern), and outputs an actuation , denoted as ⃗u(t) ∈ R m, where m is the dimension of the actuation space . Thus, the controller is actually a function π(⃗x(t)) : R n → Rm, where ⃗u(t) = π(⃗x(t)) .
+
+When the controller outputs the actuation ⃗u(t), it is applied back to the plant, and the plant’s state evolves accordingly. Formally, this means 
+
+˙⃗x = f plt (⃗x(t),⃗ u(t)) = f plt (⃗x(t), π (⃗x(t))) def 
+
+= fcl (⃗x(t)) , (6) where ˙⃗x is the time derivative of ⃗ x(t), and f plt and fcl 
+
+are respectively called the plant model and the closed-loop dynamics .When the controller is an AI-controller, and AI refers to an NN (see (par1)), then the controller is typically run on discrete computers. Correspondingly, there are mature routines to convert the continuous time model of (6) to the below 
+
+discretized model [41]: ⃗x d(k + 1) = fpltd (⃗x d(k),⃗ u d(k)) = fpltd (⃗x d(k), π (⃗x d(k))) = fcld (⃗x d(k)) . (7) where k = 0 , 1, . . . ;⃗x d(k) def 
+
+=⃗x(t 0 + kδ ) is the discretized state ; t0 is the initial time instance; δ is the sensing/actuation period; ⃗u d(k) def 
+
+= π(⃗x d(k)) (8) is the discretized actuation ; note ∀t ∈ [t0 + kδ, t 0 + ( k + 1) δ)
+
+(k = 0 , 1, . . . ), ⃗ u(t) = ⃗ u d(k), i.e. the actuation is zero-order hold ; and fpltd and fcld are respectively called the dis-cretized plant model and the discretized closed-loop dynamics .(par13) Typically, an AI-controller π is directly trained upon a discretized plant model fpltd using reinforcement learning [3], instead of trained on a physical plant (which follows the continuous time plant model fplt , see (6)). In this way, the training can be conducted entirely on computer. This train-ing preference is due to several reasons. First, AI-controller training typically carries out millions of operations on the plant. If conducted on the physical plant, so many operations can damage the plant, or cost too much time (computer simulated world’s time can be orders of magnitude faster than the physical world time). Second, during the training, the immature AI-controller may issue dangerous operations, which may cause serious accidents if the training is conducted on the physical plant. (par14) Back to the discretized model of (7), a discretized FIS 
+
+Id is defined as a subset of the n-dimensional state space 
+
+Rn, where given any ⃗x d(0) ∈ I d, the future discretized state trajectory {⃗x d(k)}k=0 ,1,... derived from (7) always remains in 
+
+Id. (par15) If we can find a hyper-rectangular discretized FIS Id, and given ⃗ x d(k) ∈ Id (∀k ∈ Z⩾0, note Id is independent from ⃗x d(k)), then we have mature tools [16] [17] [18] [19] to analyze (8) to find a hyper-rectangular bound Bad (in-dependent from ⃗x d(k)) for ⃗u d(k). With Bad and zero-order hold actuation (see (par13)), there are often (depending on (6)) mature routines [41] to find the hyper-rectangular bound 
+
+Bed (independent from ⃗ x d(k)) on the discretization error :
+
+(⃗x(t) −⃗x d(k)) (∀t ∈ [t0 + kδ, t 0 + ( k + 1) δ)). In this paper, we shall focus on the cases where such mature routines to derive 
+
+Bed from Bad exist. Such cases are common when the plant is a macroscopic physical world object [41]. (par16) For the aforementioned cases, once a hyper-rectangular dis-cretized FIS Id independent from ⃗x d(k) (∀k ∈ Z⩾0) is found for the discretized model of (7), then ∀⃗x(t 0) = ⃗x d(0) ∈ I d,the future discretized trajectory {⃗x d(k)}k=0 ,1,... is bounded by Id, and the future continuous trajectory {⃗x(t)} t∈[t0,+∞) is bounded by (Id +Bed ) (here “ +” means the vector sum of sets, aka Minkowski sum). Therefore, as long as (Id + Bed ) ∩ F =
+
+∅, the continuous system is safe. (par17) (par17) and (par16) show that the key/only missing piece in guaranteeing proven safety of an AI-controlled system S
+
+lies in finding Id, i.e. a hyper-rectangular discretized FIS for the discretized model (7) of S. Therefore, in the following, 
+
+we shall focus on finding this Id. (par18) Once this Id is found, the proven safety guarantee shall mean (Id + Bed ) ∩ F = ∅ (see (par17)) instead of I ∩ F = ∅
+
+(see (par6)). An exception is when S is discrete (i.e. of model (7)) to begin with, then the proven safety guarantee means Id ∩ F = ∅. Also note that when the plant is a macroscopic physical world object, often lim δ→0Bed = ∅ [41], hence lim δ→0(Id + Bed ) = Id. Therefore, with a sufficiently small sensing/actuation period δ, the intended proven safety guarantee of (Id + Bed ) ∩ F = ∅ can be empirically relaxed to Id ∩ F = ∅. (par19) Due to (par14)(par18)(par19), we shall focus on the dis-cretized state, discretized actuation, discretized plant model, discretized closed-loop dynamics, discretized model, dis-cretized FIS, and discretized state trajectory, instead of their continuous time counterparts. Hence, to simplify narration, unless otherwise denoted, we no longer explicitly add the prefix “discretized” when referring to these concepts .V. S OLUTION 
+
+As per Section I and IV, this paper shall focus on finding a hyper-rectangular FIS Id for the model (7) of S (see (par18)), where the AI-controller π is given a priori (see (par7)). However, as per heuristics (par8)(par9)(par11), the chance that the highly nonlinear system S has a hyper-rectangular FIS is low. To remedy, we propose to construct a transformation function ˜T and its inverse ˜T −1, to transform the original 
+
+n-dimensional state space X0 to another (aka latent ) n-dimensional state space X1, so that S’s nonlinear behaviors in X0 become more regular in X1: specifically, a hyper-rectangular FIS Id,1 can be found in X1 for S. (par20) Formally, ˜T : X0 → X1 and ˜T −1 : X1 → X0 is a pair of transformation functions between n-dimensional state spaces 
+
+X0 and X1, such that 
+
+∀⃗x 0 ∈ X0,⃗ x 1 = ˜T (⃗x 0) ∈ X1 and ⃗x 0 = ˜T −1(⃗x 1); 
+
+∀⃗x 1 ∈ X1,⃗ x 0 = ˜T −1(⃗x 1) ∈ X0 and ⃗x 1 = ˜T (⃗x 0). (9) Given X0 ⊆ X0 or X1 ⊆ X1, we further define 
+
+˜T (X0) def 
+
+= {⃗x 1 | ∃ ⃗x 0 ∈ X 0 s.t. ⃗x 1 = ˜T (⃗x 0)},
+
+˜T −1(X1) def 
+
+= {⃗x 0 | ∃ ⃗x 1 ∈ X 1 s.t. ⃗x 0 = ˜T −1(⃗x 1)}. (10) We have a trivial proposition for (10): 
+
+Proposition 1. Claim 1 ) ∀⃗x 0 ∈ ˜T −1(X1), ˜T (⃗x 0) ∈ X 1;
+
+Claim 2 ) ∀⃗x 1 ∈ ˜T (X0), ˜T −1(⃗x 1) ∈ X 0. □
+
+Proof : As ⃗x 0 ∈ ˜T −1(X1), due to the definition of ˜T −1(X1)
+
+(see (10)), we have 
+
+∃⃗x 1 ∈ X 1 s.t. ⃗x 0 = ˜T −1(⃗x 1). (11) Apply ˜T to both sides of (11), we get ⃗x 1 = ˜T (⃗x 0). (12) Hence ⃗x 1 ∈ X 1 (see (11)) ⇒ ˜T (⃗x 0) ∈ X 1. Claim 1 holds. Claim 2 can be proved the same way. ■
+
+Denote the states ⃗x d in the original state space X0 as ⃗x d,0,
+
+fpltd as fpltd ,0, fcld as fcld ,0,⃗u d as ⃗u d,0, and π as π0, we can rewrite S’s model (7) in X0 as ⃗x d,0(k + 1) = fpltd ,0(⃗x d,0(k),⃗ u d,0(k)) = fpltd ,0(⃗x d,0(k), π 0(⃗x d,0(k))) = fcld ,0(⃗x d,0(k)) . (13) For k = 0 , 1, . . . , define ⃗x d,1(k) def 
+
+= ˜T (⃗x d,0(k)) and ⃗ u d,1(k) def 
+
+= ˜T (⃗u d,0(k)) .
+
+Apply ˜T to both sides of (13), and combine with (9), we get S’s model in the latent state space X1 as ⃗x d,1(k + 1) = ˜T (⃗x d,0(k + 1)) = ˜T (fcld ,0( ˜T −1(⃗x d,1(k)))) def 
+
+= fcld ,1(⃗x d,1(k)) . (14) Similarly, we can derive the discretized actuation in X1 to be ⃗u d,1(k) = ˜T (π0( ˜T −1(⃗x d,1(k)))) def 
+
+= π1(⃗x d,1(k)) .
+
+We have the following proposition, lemma, and theorem. 
+
+Proposition 2. For an AI-controlled system S of model (7), a set Id ⊆ Rn is a FIS of S if ∀⃗x d(0) ∈ I d,⃗x d(1) ∈ I d. □
+
+Proof : Regard ⃗x d(1) as the new ⃗x d(0) , and the induction can go on forever. ■
+
+Lemma 1. If Id,1 ⊆ X1 is a FIS for the model (14) of S in state space X1, then Id,0 = ˜T −1(Id,1) is a FIS for the model (13) of S in state space X0. □
+
+Proof : ∀⃗x d,0(0) ∈ I d,0 = ˜T −1(Id,1), as per S’s model (13) in the original state space X0, the next state in X0 should be ⃗x d,0(1) = fcld ,0(⃗x d,0(0)) . (15) We need to prove ⃗x d,0(1) ∈ I d,0. To prove this, first denote ⃗x d,1(0) def 
+
+= ˜T (⃗x d,0(0)) . (16) Due to Proposition 1, ⃗x d,1(0) ∈ I d,1.As Id,1 is a FIS for the model (14) of S in state space X1,as per the definition of FIS (see (par15)), we have ⃗x d,1(1) = fcld ,1(⃗x d,1(0)) ∈ I d,1. (17) Meanwhile, due to (14), ⃗x d,1(1) = fcld ,1(⃗x d,1(0)) = ˜T (fcld ,0( ˜T −1(⃗x d,1(0)))) ,
+
+due to (16) ,⃗ x d,1(1) = ˜T (fcld ,0(⃗x d,0(0))) ,
+
+due to (15) ,⃗ x d,1(1) = ˜T (⃗x d,0(1)) ,
+
+therefore ⃗ x d,0(1) = ˜T −1(⃗x d,1(1)) . (18) (17) , (18) , (10) ⇒⃗x d,0(1) ∈ ˜T −1(Id,1) = Id,0. (19) Therefore, in the state space X0, (19) proves that ∀⃗x d,0(0) ∈Id,0, we have ⃗x d,0(1) ∈ I d,0. Due to Proposition 2, Id,0 hence is a FIS for the model (13) of S in X0. ■
+
+Theorem 1. Given an AI-controlled system S of model (14) in X1, whose closed-loop dynamics is fcld ,1. Given a hyper-rectangular set Id,1 ⊆ X1, such that α_β_CROWN (f = fcld ,1,
+
+X = Id,1, B = Id,1, Tmax ) (see (par12)) returns true. Then 
+
+Claim 1 ) Id,1 is an analytically proven hyper-rectangular FIS for the model (14) of S in X1; Claim 2 ) Id,0 = ˜T −1(Id,1) is an analytically proven FIS for the model (13) of S in X0. □
+
+Proof : As per (5) and Proposition 2, Claim 1 sustains. Based on Claim 1 and Lemma 1, Id,0 = ˜T −1(Id,1) is hence a FIS for the model (13) of S in X0. ■
+
+With Theorem 1, we propose the following Overall Proce-dure to realize the heuristics of (par20), given the model (13) of S in the original n-dimensional state space X0. (par21) 
+
+Step 1. In another (aka latent) n-dimensional state space X1,we forcefully choose a hyper-rectangular FIS candidate Id,1.
+
+Step 2. Train a NINN ˜N = ( ˜T , ˜T −1), to transform between 
+
+X0 and X1 (see (9) for what this means). Note ˜T and ˜T −1
+
+define the details of (14), i.e. the model of S in X1. In each 
+
+training epoch (simplified as “ epoch ” in the following), the loss function and the sampled training set from Id,1 shall be designed to adjust ˜T and ˜T −1 (hence (14)), so that Id,1 looks more like a FIS for (14). Also note as per Section III-A, to train a NINN, we need to set the normalization configuration parameters ⃗μ and ⃗σ a priori. The settings of ⃗μ and ⃗σ are application dependent. Intuitively, they should respectively reflect the center and the dimension-wise radii of a preferred FIS in X0. For example, if the safe set ¯F (see (par5)) in X0 is a hyper-rectangle, then we can set ⃗μ to the center of this hyper-rectangle, and set every component of ⃗σ to the corresponding half-edge-length of this hyper-rectangle. 
+
+Step 3. With the ˜T and ˜T −1 trained from Step 2 defining (14), use α, β -CROWN to analytically verify if Id,1 is actually a hyper-rectangular FIS for (14) in X1. Specifically, verify the result of α_β_CROWN (f = fcld ,1, X = Id,1, B = Id,1, Tmax )(see (par12)). If the result is true, then as per Theorem 1 Claim 1, Id,1 is an analytically proven hyper-rectangular FIS for the model (14) of S in X1, and Id,0 = ˜T −1(Id,1) is an analytically proven FIS for the model (13) of S in X0. Return “success.” Otherwise (i.e. if the verification result is false or unknown), return “failure.” Several details of the Overall Procedure are further clarified by the following subsections. 
+
+A. About Overall Procedure Step 1: How to Choose Id,1
+
+In the latent state space X1, define the centered hypercube with radius R (where R ∈ R>0), denoted as C(R), as 
+
+C(R) def 
+
+= {⃗x 1 |⃗x 1 ∈ X1, and ∥⃗x 1∥∞ ⩽ R}, (20) where ∥⃗•∥ ∞ is the ∞-norm (i.e. maximum absolute value of vector ⃗ •’s components), and R is the so-called hypercube radius . Note C(R) is centered upon the origin of X1; and as a hypercube, it is also a hyper-rectangle. We set Id,1, the hyper-rectangular FIS candidate in X1, as 
+
+Id,1
+
+> def
+
+= C(Rfis ), (21) where Rfis ∈ R>0 is the pre-configured hypercube radius constant. 
+
+B. About Overall Procedure Step 2: How to Train the NINN 
+
+As per heuristics (par9)(par11), we shall fix the hyper-rectangular FIS candidate Id,1 in X1, whereas properly train the NINN ˜N = ( ˜T , ˜T −1) (hence adjust (14)), so that Id,1
+
+looks more like an actual FIS for (14). 
+
+Fig. 2: Training subsets: Zinr , Zb, Zadv , and Zrep .To properly train ˜N , we need to punish deviations from 
+
+Id,1. Hence we need to first formally define “deviation.” Specifically, given a pre-configured trajectory horizon constant 
+
+K ∈ Z>0, ∀⃗x d,1(0) ∈ X1, define ⃗x d,1(0) ’s K-step maximum deviation from C(R) (simplified as the “ deviation ” when the context is unambiguous) as 
+
+d∗(⃗x d,1(0) , K, C(R)) def 
+
+= d∗(⃗x d,1(0) , K, R )
+
+> def
+
+= max 
+
+> k=1 ,...,K
+
+{(∥⃗x d,1(k)∥∞ − R)+}, (22) where C(R) is a centered hypercube defined by (20), ⃗x d,1(k) (where k = 1, . . . , K) are defined by (14), and 
+
+(•)+
+
+> def
+
+= max {0, •} .Given Id,1 = C(Rfis ) (see (21)), and given 
+
+Rshr def 
+
+= ρshr Rfis , (23) where ρshr ∈ (0 , 1] is the pre-configured shrinking ratio 
+
+constant, if 
+
+∀⃗x d,1(0) ∈ I d,1 = C(Rfis ), d ∗(⃗x d,1(0) , K, R shr ) = 0 , (24) then Id,1 = C(Rfis ) looks like a FIS. In contrast, if 
+
+∃⃗x d,1(0) ∈ I d,1 = C(Rfis ), d ∗(⃗x d,1(0) , K, R shr ) > 0, (25) then Id,1 = C(Rfis ) looks unlike a FIS. Our loss function shall be designed to encourage (24) and discourage (25). (par22) To gather more info for the loss function, we prefer K =+∞, but thus the computing time cost will surge to infinity. We have to compromise based on the available computing resources. Empirically, we can set K to 3 ∼ 5.Similarly, to check every vector ⃗x d,1(0) ∈ I d,1 = C(Rfis ) on (24) and (25) is neither feasible due to the infinite computing time cost incurred. Therefore, in each epoch, we have to wisely sample a few subsets, aka training subsets , of vectors from 
+
+Id,1 = C(Rfis ), to form our training set. Fig. 2 illustrates these training subsets. The first training subset of vectors are sampled inside of 
+
+Id,1 = C(Rfis ), i.e. from {⃗z ∈ I d,1 = C(Rfis ) | ∥ ⃗z∥ ∞ < R fis }.We randomly (as per uniform distribution) sample Iinr ∈ Z>0
+
+(Iinr is a pre-configured constant) such vectors. We call them 
+
+interior training cases , and respectively denote them as ⃗z inr ,i 
+
+(i = 1 , . . . , Iinr ). We denote 
+
+Zinr def 
+
+= {⃗z inr ,i }i=1 ,...,I inr . (26) The second training subset of vectors are sampled from the boundaries of Id,1 = C(Rfis ), i.e. from {⃗z ∈ I d,1 =
+
+C(Rfis ) | ∃ j ∈ { 1, . . . , n },⃗ z[j] = R fis }. We randomly (as per uniform distribution) sample Ib ∈ Z>0 (Ib is a pre-configured constant) such vectors. We call them boundary training cases ,and respectively denote them as ⃗z b,i (i = 1 , . . . , Ib). We denote 
+
+Zbdef 
+
+= {⃗z b,i }i=1 ,...,I b . (27) The third training subset of vectors are those found from 
+
+Id,1 = C(Rfis ) by the well-known Projected Gradient Descent 
+
+(PGD) adversarial training/testing method [42]. The PGD adversarial training objective is set to find Iadv ∈ Z>0
+
+(Iadv is a pre-configured constant) vectors with maximized deviations. We call these vectors the adverse training cases ,and respectively denote them as ⃗z adv ,i (i = 1 , . . . , Iadv ). The specific process to find ⃗z adv ,i is as follows. For each i, we randomly (as per uniform distribution) sample an initial value for ⃗z adv ,i from Id,1 = C(Rfis ), and then adjust ⃗z adv ,i as per PGD to maximize d∗(⃗z adv ,i , K, R fis ). We denote 
+
+Zadv def 
+
+= {⃗z adv ,i }i=1 ,...,I adv . (28) The fourth training subset of vectors are sampled from known hard boundary training cases of previous epochs. The details are elaborated in Appendix A. Intuitively, we maintain a set Qrep , aka replay buffer , whose elements are boundary training cases with big deviations in previous epochs. At the beginning of the current epoch, we randomly sample 
+
+I′ 
+
+> rep
+
+= min {|Q rep |, I rep } vectors from Qrep (where Irep ∈ Z>0
+
+is a pre-configured constant), respectively denoted as ⃗z rep ,i 
+
+(i = 1 , . . . , I′
+
+> rep
+
+). We denote 
+
+Zrep def 
+
+= {⃗z rep ,i }i=1 ,...,I ′ 
+
+> rep
+
+. (29) At the end of the current epoch, we update Qrep with newly found hard boundary training cases (see Appendix A for details). (par23) 
+
+Zinr , Zb, Zadv , and Zrep form the training set , denoted as 
+
+Z def 
+
+= {Z inr , Zb, Zadv , Zrep }. (30) For each Z = {⃗z 1, . . . ,⃗ z I } ∈ Z, where I = |Z| , sort 
+
+Z’s elements into ⃗z (1) , . . . ,⃗ z (I), so that d∗(⃗z (1) , K, R shr ) ⩾
+
+· · · ⩾ d∗(⃗z (I), K, R shr ) (Rshr is defined by (23)). Given a pre-configured hard-case ratio constant ρhrd ∈ (0 , 1] , we define 
+
+H(Z, ρ hrd ) def 
+
+= {⃗z (j) | 1 ⩽ j ⩽ ⌈ρhrd I⌉} . (31) We then define the deviation loss to be 
+
+Ldev def 
+
+= X
+
+> Z∈ Z
+
+wZ
+
+P⃗z∈H (Z,ρ hrd )
+
+ν2(⃗z)
+
+|H (Z, ρ hrd )| + λ
+
+|Z| 
+
+X⃗z∈Z 
+
+ν2(⃗z)
+
+ , (32) where ν(⃗z) def 
+
+= d∗(⃗z, K, R shr ), (33) 
+
+wZ is the pre-configured loss weight constant assigned to the training subset Z (Z = Zinr , Zb, Zadv , or Zrep ), and λ is another pre-configured loss weight constant. Empirically, we set wZinr = 30 , wZb = 120 , wZadv = 80 , wZrep = 220 , and 
+
+λ = 0 .15 , The use of ν(⃗z) (see (33)) in (32) embodies the heuristics of (par22). Besides the deviation loss, Overall Procedure Step 2 also suggests setting the normalization configuration parameters ⃗μ to reflect the center of a preferred FIS in X 0. When the FIS candidate in X1 is Id,1 = C(Rfis ), the corresponding FIS candidate in X0 is Id,0 = ˜T −1(Id,1), where ˜T −1 is decided by the current NINN under training. Therefore, we can define a centering loss Lcen to encourage the NINN to move the center of Id,0 in X0 toward ⃗μ. Specifically, 
+
+Lcen def 
+
+= ˜T −1(⃗0) −⃗μ 22
+
+. (34) 
+
+Algorithm 1 NINN Training for Overall Procedure Step 2 1. Input : controller π0, fcld ,0, /* see (13) */ ⃗μ,⃗σ, /* see (1) and Overall Procedure Step 2 */ 
+
+Rfis , K, ρshr , ρhrd , /* see (21), (22), (23), (31) */ 
+
+Iinr , Ib, Iadv , Irep , /* see (26), (27), (28), (29) */ total number of training epochs E,early-stop test triggering threshold θstp ,early-stop test set size Istp ;2. Output : the trained NINN ( ˜T , ˜T −1);3. Initialize NINN ( ˜T , ˜T −1) with ⃗μ and ⃗σ;4. Id,1 := C(Rfis ); // hyper-rectangular FIS candidate in X1.5. Initialize replay buffer Qrep := ∅;6. Initialize continuous good epoch count ccge := 0;7. for epoch := 1 to E { // epoch begins 8. Sample Zinr , Zb, Zadv from Id,1 as per (26), (27), and (28) respectively; // note (26), (27), (28) use Iinr , Ib, Iadv .9. Sample Zrep from Qrep as per (29); // (29) uses Irep .10. // now training set Z of (30) is ready. 11. Compute Ldev as per (32); // (32) uses π0, fcld ,0, Rfis , K, ρshr , ρhrd , ˜T , ˜T −1
+
+// via (13), (14), (21), (22), (23), (31), (33). 12. Compute Lcen as per (34); // (34) uses ˜T −1,⃗μ.13. Compute loss function L as per (35); // (35) uses Ldev , Lcen .14. Backpropagate from L to update NINN ( ˜T , ˜T −1);15. Update Qrep as per (par23); 16. // early-stop attempt begins 17. if ∀Z ∈ Z, ∀⃗z ∈ Z , d ∗(⃗z, K, R fis ) = 0 { // see (22) 18. ccge := ccge + 1 ;19. } else { ccge := 0; } 20. if ccge ⩾ θstp {21. Sample Zstp from Id,1 as per (36); //(36) uses Istp .22. if ∀⃗z ∈ Z stp , d∗(⃗z, K, R fis ) = 0 { // see (22) 23. return ( ˜T , ˜T −1); // early-stop 24. }25. ccge := 0;26. } // early-stop attempt ends. 27. } // epoch ends. 28. return ( ˜T , ˜T −1);where ⃗ 0 ∈ Rn is the zero vector, and ∥⃗ •∥ 2 is the Euclidean norm of ⃗ •.Finally, we define the overall NINN training loss function 
+
+L def 
+
+= Ldev + wcen Lcen , (35) where wcen is a pre-configured loss weight constant. Empiri-cally, we set wcen = 5 .Based on the above, we propose the NINN Training algo-rithm for Overall Procedure Step 2 as Algorithm 1. Note to further reduce training cost, Algorithm 1 line 6, 16 
+
+∼ 26 attempt to stop the training early when the current NINN is already good enough. Specifically, Algorithm 1 maintains a continuous good epoch count ccge throughout the training epochs (see Algo-TABLE I: Summary of AI-controllers                  
+
+> Application nmηactivation function Number of AI-Controllers Trained Pendulum 21128 SB3 default 20 Cart pole 41128 20 PVTOL 6224 5
+> n: state space dimension, i.e. an AI-controller’s NN input size;
+> m: actuation space dimension, i.e. an AI-controller’s NN output size;
+> η: number of neurons inside of an AI-controller’s NN.
+
+rithm 1 line 6, 16 ∼ 26). An epoch is considered “good” iff the condition of Algorithm 1 line 17 holds, i.e. iff after the backpropagation adjustment of the NINN (by Algorithm 1 line 14), all the training cases’ deviations from Id,1 = C(Rfis )
+
+become 0.If ccge reaches a pre-configured constant threshold θstp (see Algorithm 1 line 20), then a more aggressive test for early-stop is triggered. Specifically, similar to the creation of Zadv 
+
+(see (28)), we use the PGD training/testing method [42] again, but this time for testing. We set the PGD adversarial testing objective to find Istp ∈ Z>0 (Istp is a pre-configured constant) vectors from Id,1 = C(Rfis ) with maximized deviations. We denote these vectors as ⃗z stp ,i (i = 1 , . . . , Istp ). The specific process to find ⃗z stp ,i is as follows. For each i, we randomly (as per uniform distribution) sample an initial value for ⃗z stp ,i from 
+
+Id,1 = C(Rfis ), and then adjust ⃗z stp ,i as per PGD to maximize 
+
+d∗(⃗z stp ,i , K, R fis ). We denote 
+
+Zstp def 
+
+= {⃗z stp ,i }i=1 ,...,I stp . (36) The early stop is triggered iff ∀⃗z stp ,i (i = 1 , . . . , Istp ), the deviation from Id,1 = C(Rfis ) is 0 (see Algorithm 1 line 22 and 23). Otherwise, the attempt to early-stop fails, and ccge is reset to 0 (see Algorithm 1 line 25). VI. E VALUATION 
+
+A. Evaluation Testbed Set Up 
+
+We carry out evaluations on three classic nonlinear control applications: pendulum, cart pole, and Planar Vertical Take-Off and Landing (PVTOL) of aerial vehicles. The plant model implementations (see fpltd of (7)) of the pendulum and cart pole are transplanted from Gym-nasium [43], a well established repository of plant models (control testbeds) for training/testing AI-controllers. The plant model implementation of the PVTOL is transplanted from Yang et al. [14]. As per (par14), to train AI-controllers, we connect the plant model implementations with classic reinforcement learning algorithm implementations from the well-known Stable Base-lines3 (SB3) [44] repository. In this way, we trained 20, 20, and 5 AI-controllers respectively for the pendulum, cart pole, and PVTOL control applications. Each AI-controller is an NN, whose scale is summarized by n, m, and η, respectively the dimension of the state space (i.e. NN’s input size), the dimension of the actuation space (i.e. the NN’s output size), and the number of neurons inside the NN. Table I summarizes these NNs. (par24) We then connect the trained AI-controllers with the plant model implementations to generate 20 pendulum, 20 cart pole, TABLE II: Configuration parameter settings                                                                  
+
+> Application ⃗μ⃗ σ
+> Pendulum (0, 0) T(0.3, 1.5) T
+> Cart pole (0, 0, 0, 0) T(0.35, 1.0, 0.1, 1.6) T
+> PVTOL (0, 0, 0, 0, 0, 0) T(1.0, 1.0, 0.8, 1.0, 1.0, 1.0) T
+> •T: transpose of the vector/matrix represented by •.Application Rfis Kρshr ρhrd Iinr IbIadv Irep
+> Pendulum 1.0 30.995 0.25 4096 4096 2048 2048 Cart pole 1.0 30.995 0.25 4096 4096 2048 2048 PVTOL 1.0 30.995 0.25 65536 65536 32768 32768 Application Eθstp Istp Imax rep Jadd Erep
+> Pendulum 3000 34096 16384 512 25 Cart pole 50000 54096 16384 512 25 PVTOL 100000 516384 262144 8192 25
+
+and 5 PVTOL AI-controlled systems. For each AI-controlled system, we carry out our proposed Overall Procedure (see (par21)) to find the analytically proven FIS. The configuration parameters (see (1), Algorithm 1, and Algorithm 2) are set as per Table II. Besides, we set Tmax (see (par12)) big enough, so that the calls to α_β_CROWN are never terminated due to reaching Tmax . (par25) Particularly, ⃗ μ and ⃗ σ values are set by domain experts. Settings on other configuration parameters are best effort. How to optimize these settings is beyond the scope of this paper. Nonetheless, even without optimization, our proposed solution already outperforms the comparison baseline in the evaluations (see Section VI-B). As discussed in Section I and II (particularly, (par10)), to our best knowledge, there is no existing work in the literature that exactly solves our focus problem. The closest state-of-the-art solution is that proposed by Yang et al. [14]. But this solution is for jointly designing the AI-controller and the FIS. That is, as the search for FIS goes on, the AI-controller is mod-ified. This is not our focus problem, where the AI-controller is given a priori (e.g. when the legal/regulatory authority needs to certify a vendor provided AI-controlled system). To provide a comparison baseline, we have to alter Yang et al.’s solution: ban the modifications to the AI-controller (i.e. it has to use the AI-controllers generated in (par24)) during the search for FIS. We call the altered Yang et al.’s solution as the baseline solution . (par26) 
+
+B. Evaluation Results 
+
+We use both our proposed solution (i.e. the Overall Proce-dure, see (par21)) and the baseline solution (i.e. the altered Yang et al. [14]’s solution, see (par26)) to find FISs for the 20 pendulum, 20 cart pole, and 5 PVTOL AI-controlled systems described in (par24), (par25). All experiments were performed on a hardware platform equipped with a 32-core AMD Ryzen-series CPU, 64 GB of RAM, and an NVIDIA GeForce RTX 4090 GPU with 24 GB of VRAM. The success rates of our proposed solution and the baseline solution are compared by Table III. Based on Table III, our proposed solution found FISs for all the 20 pendulum, 20 cart pole, and 5 PVTOL AI-controlled systems. In contrast, the baseline solution cannot find any FIS for any of these AI-controlled systems. TABLE III: Success rates of finding FIS         
+
+> Application Proposed Solution Baseline Solution Pendulum 100% (20/20) 0% (0/20) Cart pole 100% (20/20) 0% (0/20) PVTOL 100% (5/5) 0% (0/5)
+
+Fig. 3: Comparisons: time cost to run the FIS finding solution. The time costs of our proposed solution and the baseline solution are compared by Fig. 3. Here, each instance of time cost refers to the time cost to run the FIS finding solution for a given AI-controlled system. As per the figure, for pendulum and cart pole, our proposed solution’s time costs are significantly smaller than the baseline solution’s. While for PVTOL, the baseline solution’s time costs are significantly smaller, partly due to its fast acknowledgments on failing to find the FISs (it founds 0 FIS, but our solution finds a FIS for each of the 5 PVTOL AI-controlled systems). People are also interested in the sizes of the found FISs. As discussed in (par6), the legal/regulatory authority can only trust the AI-controlled system when its initial state is within the found FIS. Therefore, the bigger the found FIS, the more freedom to choose the initial state. (par27) In the n-dimensional latent state space X1, the size of our found hyper-rectangular FIS Id,1 (referred to as “ X1 FIS” in the following) is fixed to (2 Rfis )n. Hence the focus is the size of the FIS Id,0 in the n-dimensional original state space X0
+
+(referred to as “ X0 FIS” in the following). Table IV lists the statistics on the sizes 2 of the X0 FISs found by our solution. Note, the baseline solution finds no FIS at all, hence has no FIS size statistics. Also, as mentioned in Step 2 of the Overall Procedure, ⃗μ and ⃗σ (see Table II for their exact values set by domain experts) reflect the center and the dimension-wise radii of the preferred X0 FIS. Assume the preferred X0 FIS is hyper-rectangular, then its size is Πni=1 (2 ⃗σ[i]) .Table IV shows that for pendulum and cart pole, the X0 FIS sizes fluctuate from 3.7% to 150 .4% of the preferred sizes. For PVTOL, the X0 FIS sizes are significantly smaller, only fluctuate from 0.016 % to 0.025 % of the preferred size. This could be due to the highly nonlinear nature of the PVTOL X0
+
+FIS, as we assume the preferred X0 FIS is hyper-rectangular. The domain expert given preferred X0 FIS center ⃗μ and preferred X0 FIS dimension-wise radii ⃗ σ also motivate us                                       
+
+> 2Due to the nonlinearity of the AI-controlled system (see Fig. 1), a FIS
+> Id,0found by our solution in the original state space X0is of highly irregular shape. To analytically calculate its size is hard. Instead, we use Monte Carlo [45] to estimate the size. We randomly (as per uniform distribution) sample vector ⃗xfrom a big enough hyper-rectangle C0(where
+> Id,0⊆ C 0), and measure the probability pthat ⃗x∈ I d,0(in other words,
+> ˜T(⃗x)∈ I d,1=C(Rfis )in the latent state space X1). Then size (Id,0)can be approximated by psize (C0), where size (•)represents the size of •.
+
+TABLE IV: X0 FIS size statistics on our proposed solution                     
+
+> Application min median mean max preferred Pendulum 0.929 1.307 1.288 1.308 1.800 Cart Pole 0.033 0.346 0.473 1.348 0.896 PVTOL 0.008 0.012 0.011 0.013 51.200 Note the baseline solution finds no FIS, hence has no FIS size statistics.
+
+TABLE V: Dimension-wise range size statistics on X0 FISs found by our proposed solution                                                                    
+
+> Application Dimension Index i
+> min median mean max preferred range size Pendulum 10.822 0.822 0.823 0.840 0.600 22.110 3.108 3.058 3.108 3.000 Cart Pole 11.000 1.913 2.018 3.014 0.700 21.729 3.360 3.304 4.234 2.000 30.381 0.632 0.626 0.847 0.200 41.056 2.674 2.656 3.416 3.200 PVTOL 11.670 2.066 2.048 2.414 2.000 22.239 2.384 2.382 2.609 2.000 30.253 0.288 0.286 0.321 1.600 41.886 2.284 2.269 2.693 2.000 51.100 1.266 1.266 1.406 2.000 60.948 1.022 1.013 1.061 2.000 Note the baseline solution finds no FIS, hence has no corresponding statistics.
+
+to evaluate dimension-wise statistics of our found X0 FISs 3.Specifically, given an X0 FIS Id,0, define its ith ( i = 1 , . . . ,
+
+n) dimension upper and lower bounds respectively as 
+
+Id,0[i] def 
+
+= max ⃗x∈I d,0 {⃗x[i]} and I d,0[i] def 
+
+= min ⃗x∈I d,0 {⃗x[i]}.
+
+Then we define the ith dimension range size of Id,0 as 
+
+(Id,0[i] − I d,0[i]) . In contrast, we define the ith dimension 
+
+preferred range size as 2⃗σ[i]. Meanwhile, we define the ith dimension center drift of Id,0 as   12 (Id,0[i] + Id,0[i]) −⃗μ[i] .For an X0 FIS Id,0, its Id,0[i] and Id,0[i] can be approxi-mated by randomly (as per uniform distribution) sampling the counterpart hyper-rectangular X1 FIS Id,1.Table V compares the dimension-wise range sizes of our found X0 FISs with their corresponding preferred range sizes. It shows that the range sizes on all dimensions fluctuate from 
+
+15 .8% to 430 .6% of the corresponding preferred range sizes. Note the baseline solution finds no FIS at all, hence has no dimension-wise range size statistics. Table VI lists the statistics on the dimension-wise center drifts of our found X0 FISs. To understand the relative extent of the center drifts, we can again compare them with the preferred range sizes listed in Table V. Table VI shows that the center drifts on all dimensions fluctuate from −5.6% to 
+
+6.5% of the corresponding preferred range sizes (as noted in the title, all numbers listed in Table VI should ×10 −3 before being used). The small center drifts may due to the use of the centering loss (see (34)). They also mean that the X0 FISs’ centers roughly meet the preferred centers. Note the baseline solution finds no FIS at all, hence has no dimension-wise center drift statistics. 
+
+C. Discussions on Threats to Validity 1. Construct Validity Threats 
+
+There can be other metrics to evaluate.        
+
+> 3Note the X1FIS Id,1is always a hypercube centered on the origin point of X1with edge length 2Rfis .
+
+TABLE VI: Dimension-wise center drift (unit: 10 −3) statistics on X0 FISs found by our proposed solution                                                       
+
+> Application Dimension Index i
+> min median mean max Pendulum 1-6.557 -0.370 -0.679 -0.370 2-38.995 -2.024 -3.872 -2.024 Cart Pole 1-29.255 1.053 -0.240 45.220 2-51.584 -4.826 -3.262 24.570 3-11.171 -0.255 -1.298 4.192 4-12.437 1.516 1.062 11.026 PVTOL 1-45.552 -12.109 2.390 43.405 2-19.766 9.474 7.279 26.993 3-6.361 0.217 -2.090 0.999 4-46.040 14.341 7.399 70.504 5-65.811 -17.873 -30.718 -12.352 6-40.333 -15.338 -19.986 -2.152 Note the baseline solution finds no FIS, hence has no corresponding statistics.
+
+However, as per Section I, IV, particularly (par7) and (par18), finding FIS is the focus of this paper. Hence the success rate of finding FISs (see Table III) is undoubtedly the most relevant metric. Related to success rate, the computing time cost (see Fig. 3) is also relevant: if the time cost is too big, the solution is impractical. The size of the FIS (see Table IV) and the dimension-wise range size (see Table V) are relevant because they reflect the freedom on the choice of the initial state (see (par27)). The dimension-wise center drift (see Table VI) is relevant as it reflects how well the centers of the found FISs match the preferences set by domain experts. The above said, these metrics will be more relevant if the maximum feasible FIS size is known; or even more, if the maximum feasible FIS size for the given forbidden set F (see (par5)) is known. However, how to calculate these values is a nontrivial problem way beyond the focus of this paper. It deserves many future papers. In this paper, we are laying the indispensable foundation for these future papers: to have a working solution that can find FIS in the first place. 
+
+2. Internal Validity Threats 
+
+We carefully checked our code. For the transplantation of plant implementations from Gym-nasium [43] and Yang et al. [14], we implemented simulation-based consistency checks to verify that, given the same input, the transplanted implementations output the same results as the original implementations. For altering Yang et al. [14]’s solution to realize the baseline solution, we did not modify Yang et al.’s source code; instead, we only altered the config-uration parameter to fix the controller. Two domain experts independently reviewed the baseline solution to check the correctness of the alteration. Moreover, to reduce the risk of implementation bugs, we reused well-tested public code repositories as much as pos-sible, such as SB3 [44] and α, β -CROWN [16] [17] [18] [19]. These repositories have been widely used and actively maintained by the community. Also, due to limited computing budget, we only evaluated 5 (instead of 20) PVTOL testbeds. However, the per application comparisons are already revealing important facts. 
+
+3. External Validity Threats: 3.1 Control Application Testbed Representativeness 
+
+We can always expand our testbeds to cover more control applications. However, we claim the pendulum, cart pole, and PVTOL testbeds used in this paper are reasonably rep-resentative. They have long been used as classic testbeds in control-theory research/textbooks [46] [3] [47] [14]. In particular, pendulum and cart pole are among the most popular classic control testbeds in Gymnasium [43], while PVTOL is a classic high dimensional control testbed [14]. Moreover, these three testbeds cover different state space dimensionalities, ranging from 2 to 6. In comparison, in Gymnasium, a well recognized control testbed repository, under the category of “classic control,” the testbeds’ state space dimensionalities also range from 2 to 6, which matches our range of 2 to 6. 
+
+3.2 SB3 Representativeness 
+
+SB3 is a well established open source repository for re-inforcement learning algorithm implementations. It has over 13,500 stars and over 2,200 forks on GitHub [48], and over 1 million per month downloads as per the ecosyste.ms 
+
+ecosystem list report [49]. VII. C ONCLUSION 
+
+Our proposed solution can find analytically proven FISs for given AI-controlled systems. Our evaluations show that our proposed solution can find FISs for all 45 AI-controlled system testbeds, while the baseline solution can find none. Further-more, our solutions’s time costs are significantly smaller than those of the baseline solutions for 40 of the 45 testbeds. The centers of our found FISs also roughly meet the preferences set by domain experts. APPENDIX AREPLAY BUFFER 
+
+The replay buffer Qrep mentioned in Section V-B stores at most Imax rep elements. At any time instance, denote the jth element in Qrep (j = 1 , . . . , |Q rep |) as tuple (⃗z j , ˜νj ), where ⃗z j ∈ C (Rfis ) and ˜νj is a past deviation recorded in one of the past epochs, detailed later. Suppose the current epoch is the eth ( e ∈ Z>0) epoch of training. At the beginning of the current epoch, we sample Zrep 
+
+(see (29)) from Qrep . Specifically, we sample I′ 
+
+> rep
+
+=
+
+min {Irep , |Q rep |} tuples from Qrep as per the following prob-abilistic distribution: for each (⃗z j , ˜νj ) ∈ Q rep , its probability to be sampled is 
+
+Pr (( ⃗z j , ˜νj )) = ˜νj
+
+P 
+
+> ℓ=1 ,..., |Q rep |
+
+˜νℓ
+
+.
+
+Denote the sampled I′ 
+
+> rep
+
+tuples as {(⃗z rep ,i , ˜νrep ,i )}i=1 ,...,I ′ 
+
+> rep
+
+,thus Zrep def 
+
+= {⃗z rep ,i }i=1 ,...,I ′ 
+
+> rep
+
+, i.e. (29). Note if Qrep = ∅, then 
+
+I′ 
+
+> rep
+
+= 0 , hence Zrep = ∅.At the end of the current epoch, we update Qrep as per Al-gorithm 2. Besides the aforementioned parameters, additional input parameters to this algorithm include the following. Zb
+
+(see (27)) is the set of boundary training cases sampled in the current epoch. Jadd ∈ Z>0 is a pre-configured constant denoting the preferred number of boundary training cases from 
+
+Zb to be added to Qrep . Erep ∈ Z>0 is a pre-configured constant denoting the period to overhaul Qrep (see Algorithm 2 line 9 ∼ 14). 
+
+Algorithm 2 Replay Buffer Update 1. Input : Qrep , Imax rep , e, Zb, Jadd , Erep ;2. Output : the updated Qrep ;3. Sort all elements of Zb into ⃗z b,(1) , . . . ,⃗ z b,(Ib) so that 
+
+ν(⃗z b,(1) ) ⩾ · · · ⩾ ν(⃗z b,(Ib)); // ν(⃗•) is defined by (33) 4. J′ 
+
+> add
+
+:= min {Jadd , I b};5. Arep := {⃗z b,(j) | 1 ⩽ j ⩽ J′
+
+> add
+
+};6. Q′ 
+
+> rep
+
+:= Qrep ∪ { (⃗z, ν (⃗z)) |⃗z ∈ A rep };7. Sort all elements of Q′ 
+
+> rep
+
+into (⃗z ′
+
+> 1
+
+, ˜ν′
+
+> 1
+
+), . . . ,
+
+(⃗z ′|Q ′
+
+> rep |
+
+, ˜ν′|Q ′
+
+> rep |
+
+) so that ˜ν′ 
+
+> 1
+
+⩾ · · · ⩾ ˜ν′|Q ′
+
+> rep |
+
+;8. Qrep := {(⃗z ′ 
+
+> j
+
+, ˜ν′ 
+
+> j
+
+)) | 1 ⩽ j ⩽ min {Imax rep , |Q ′
+
+> rep
+
+|}} ;9. // overhaul begins 10. if (|Q rep | > 0) and ( e mod Erep = 0 ) { 11. for j := 1 to |Q rep | {12. Update the jth element (⃗z j , ˜νj ) of Qrep using the current NINN, i.e. set ˜νj := ν(⃗z j );13. }14. } // overhaul ends. REFERENCES [1] Y. LeCun, Y. Bengio, and G. Hinton, “Deep learning,” nature , vol. 521, no. 7553, pp. 436–444, 2015. [2] V. Mnih, K. Kavukcuoglu, D. Silver, A. A. Rusu, J. Veness, M. G. Bellemare, A. Graves, M. Riedmiller, A. K. Fidjeland, G. Ostrovski 
+
+et al. , “Human-level control through deep reinforcement learning,” 
+
+nature , vol. 518, no. 7540, pp. 529–533, 2015. [3] R. S. Sutton, A. G. Barto et al. , Reinforcement learning: An introduction .MIT press Cambridge, 1998, vol. 1, no. 1. [4] H. K. Khalil, Nonlinear systems . Upper Saddle River, N.J.: Prentice Hall, 2002. [5] J.-J. E. Slotine, W. Li et al. , Applied nonlinear control . Prentice Hall, 1991. [6] B. Recht, “A tour of reinforcement learning: The view from continuous control,” Annual Review of Control, Robotics, and Autonomous Systems ,vol. 2, no. 1, pp. 253–279, 2019. [7] J. Kober, J. A. Bagnell, and J. Peters, “Reinforcement learning in robotics: A survey,” The International Journal of Robotics Research ,vol. 32, no. 11, pp. 1238–1274, 2013. [8] J. Hwangbo, J. Lee, A. Dosovitskiy, D. Bellicoso, V. Tsounis, V. Koltun, and M. Hutter, “Learning agile and dynamic motor skills for legged robots,” Science robotics , vol. 4, no. 26, p. eaau5872, 2019. [9] T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, and D. Wierstra, “Continuous control with deep reinforcement learning,” 2019. [Online]. Available: https://arxiv.org/abs/1509.02971 [10] I. Radosavovic, T. Xiao, B. Zhang, T. Darrell, J. Malik, and K. Sreenath, “Real-world humanoid locomotion with reinforcement learning,” Sci-ence Robotics , vol. 9, no. 89, p. eadi9579, 2024. [11] J. C. Knight, “Safety critical systems: challenges and directions,” in Pro-ceedings of the 24th international conference on software engineering ,2002, pp. 547–550. [12] A. D. Ames, X. Xu, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs for safety critical systems,” IEEE Transactions on Automatic Control , vol. 62, no. 8, pp. 3861–3876, 2017. [13] B. Paden, M. ˇ Cáp, S. Z. Yong, D. Yershov, and E. Frazzoli, “A survey of motion planning and control techniques for self-driving urban vehicles,” 
+
+IEEE Transactions on intelligent vehicles , vol. 1, no. 1, pp. 33–55, 2016. [14] L. Yang, H. Dai, Z. Shi, C.-J. Hsieh, R. Tedrake, and H. Zhang, “Lyapunov-stable neural control for state and output feedback: A novel formulation,” in Proceedings of the 41st International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 235. PMLR, 21–27 Jul 2024, pp. 56 033–56 046. [15] C. Sidrane, A. Maleki, A. Irfan, and M. J. Kochenderfer, “Overt: an algorithm for safety verification of neural network control policies for nonlinear systems,” J. Mach. Learn. Res. , vol. 23, no. 1, Jan. 2022. [16] H. Zhang, T.-W. Weng, P.-Y. Chen, C.-J. Hsieh, and L. Daniel, “Efficient neural network robustness certification with general activation functions,” Advances in Neural Information Processing Systems , vol. 31, pp. 4939–4948, 2018. [Online]. Available: https://arxiv.org/pdf/1811. 00866.pdf [17] S. Wang, H. Zhang, K. Xu, X. Lin, S. Jana, C.-J. Hsieh, and J. Z. Kolter, “Beta-crown: Efficient bound propagation with per-neuron split constraints for neural network robustness verification,” Advances in neural information processing systems , vol. 34, pp. 29 909–29 921, 2021. [18] K. Xu, H. Zhang, S. Wang, Y. Wang, S. Jana, X. Lin, and C.-J. Hsieh, “Fast and complete: Enabling complete neural network verification with rapid and massively parallel incomplete verifiers,” arXiv preprint arXiv:2011.13824 , 2020. [19] K. Xu, Z. Shi, H. Zhang, Y. Wang, K.-W. Chang, M. Huang, B. Kailkhura, X. Lin, and C.-J. Hsieh, “Automatic perturbation analysis for scalable certified robustness and beyond,” Advances in Neural Information Processing Systems , vol. 33, 2020. [20] L. Dinh, J. Sohl-Dickstein, and S. Bengio, “Density estimation using real NVP,” in 5th International Conference on Learning Representations, ICLR 2017, Toulon, France, April 24-26, 2017, Conference Track Proceedings . OpenReview.net, 2017. [Online]. Available: https://openreview.net/forum?id=HkpbnH9lx [21] F. Blanchini, “Set invariance in control,” Automatica , vol. 35, no. 11, pp. 1747–1767, 1999. [22] G.-R. Duan and H.-H. Yu, LMIs in control systems: analysis, design and applications . CRC press, 2013. [23] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan, Linear matrix inequalities in system and control theory . SIAM, 1994. [24] P. Gahinet and P. Apkarian, “A linear matrix inequality approach to H∞
+
+control,” International journal of robust and nonlinear control , vol. 4, no. 4, pp. 421–448, 1994. [25] H. K. Khalil and M. Minor, Nonlinear control . Pearson, 2014. [26] P. Giesl and S. Hafstein, “Review on computational methods for lyapunov functions,” Discrete and Continuous Dynamical Systems-B ,vol. 20, no. 8, pp. 2291–2331, 2015. [27] V. I. Zubov et al. , “Methods of A.M. Lyapunov and their application,” 
+
+(No Title) , 1964. [28] F. Camilli, L. Grüne, and F. Wirth, “A generalization of Zubov’s method to perturbed systems,” SIAM Journal on Control and Optimization ,vol. 40, no. 2, pp. 496–515, 2001. [29] A. Papachristodoulou and S. Prajna, “On the construction of lyapunov functions using the sum of squares decomposition,” in Proceedings of the 41st IEEE Conference on Decision and Control, 2002. , vol. 3. IEEE, 2002, pp. 3482–3487. [30] U. Topcu, A. Packard, P. Seiler, and T. Wheeler, “Stability region analysis using simulations and sum-of-squares programming,” in 2007 American Control Conference , 2007, pp. 6009–6014. [31] J. LaSalle, “Some extensions of Liapunov’s second method,” IRE Transactions on circuit theory , vol. 7, no. 4, pp. 520–527, 1960. [32] N. N. Krasovskii, Stability of motion: applications of Lyapunov’s second method to differential systems and equations with delay . Stanford University Press, 1963. [33] D. G. Schultz and J. E. Gibson, “The variable gradient method for generating liapunov functions,” Transactions of the American Institute of Electrical Engineers, Part II: Applications and Industry , vol. 81, no. 4, pp. 203–210, 1962. [34] C. Hang and J. Chang, “An algorithm for constructing lyapunov func-tions based on the variable gradient method,” IEEE Transactions on Automatic Control , vol. 15, no. 4, pp. 510–512, 1970. [35] S. J. D. Prince, Understanding deep learning . MIT press, 2023. [36] R. Zhou, T. Quartz, H. De Sterck, and J. Liu, “Neural Lyapunov control of unknown nonlinear systems with stability guarantees,” Advances in Neural Information Processing Systems , vol. 35, pp. 29 113–29 125, 2022. [37] R. Schwan, C. N. Jones, and D. Kuhn, “Stability verification of neural network controllers using mixed-integer programming,” IEEE Transac-tions on Automatic Control , vol. 68, no. 12, pp. 7514–7529, 2023. [38] M. Ganai, S. Gao, and S. L. Herbert, “Hamilton-Jacobi reachability in reinforcement learning: A survey,” IEEE Open Journal of Control Systems , vol. 3, pp. 310–324, 2024. [39] H. Yin, P. Seiler, and M. Arcak, “Stability analysis using quadratic con-straints for systems with neural network controllers,” IEEE Transactions on Automatic Control , vol. 67, no. 4, pp. 1980–1987, 2022. [40] A. Harapanahalli, S. Jafarpour, and S. Coogan, “Forward invariance in neural network controlled systems,” IEEE Control Systems Letters ,vol. 7, pp. 3962–3967, 2023. [41] K. J. Åström and B. Wittenmark, Computer-Controlled Systems: Theory and Design , 3rd ed. Prentice Hall, 1997. [42] A. Madry, A. Makelov, L. Schmidt, D. Tsipras, and A. Vladu, “Towards deep learning models resistant to adversarial attacks,” arXiv preprint arXiv:1706.06083 , 2017. [43] M. Towers, A. Kwiatkowski, J. Balis, G. De Cola, T. Deleu, M. Goulão, K. Andreas, M. Krimmel, A. Kg, R. Perez-Vicente et al. , “Gymnasium: A standard interface for reinforcement learning environments,” in Ad-vances in Neural Information Processing Systems , vol. 38, 2025. [44] A. Raffin, A. Hill, A. Gleave, A. Kanervisto, M. Ernestus, and N. Dormann, “Stable-baselines3: Reliable reinforcement learning implementations,” Journal of Machine Learning Research , vol. 22, no. 268, pp. 1–8, 2021. [Online]. Available: https://jmlr.org/papers/v22/ 20-1364.html [45] M. H. Kalos and P. A. Whitlock, Monte Carlo methods . John Wiley & Sons, 2008. [46] I. Fantoni and R. Lozano, Non-linear control for underactuated mechan-ical systems . Springer London, 2012. [47] J. Wu, A. Clark, Y. Kantaros, and Y. Vorobeychik, “Neural Lyapunov control for discrete-time systems,” in Proceedings of the 37th Interna-tional Conference on Neural Information Processing Systems , ser. NIPS ’23. Red Hook, NY, USA: Curran Associates Inc., 2023. [48] “Stable baselines3,” 2026. [Online]. Available: https://github.com/ DLR-RM/stable-baselines3 [49] “stable-baselines3,” 2026. [Online]. Available: https://packages.ecosyste. ms/registries/pypi.org/packages/stable-baselines3

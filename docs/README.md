@@ -7,29 +7,40 @@
 
 ## 每次日报
 - 最新运行日期：2026-10-06
-- 运行时间：2026-10-06 00:47:31 UTC
+- 运行时间：2026-10-06 23:23:39 UTC
 - 运行状态：成功
-- 本次总论文数：3
-- 精读区：0
+- 本次总论文数：6
+- 精读区：3
 - 速读区：3
 
 ### 今日简报（AI）
-今日速读3篇控制与动力系统论文，均分6.0，无精读。可关注三维非完整车辆的球坐标逆最优反馈镇定，以及高阶Kolmogorov-Arnold网络用于动力学建模这两条方向。普通读者若感兴趣，建议先从这两篇的摘要和仿真结果入手，判断是否值得深读。
+- 今日共生成 6 篇推荐（精读 3 篇，速读 3 篇）
+- 精读：《Port-Hamiltonian Neural Networks for Systems with Multiple Asymptotically Stable Equilibria》（9.0/10）, 《Nesterov-Accelerated Concurrent Learning for Lyapunov-Based Deep Neural Networks》（8.0/10）
+- 速读：《Globally Certified Invariant-Ellipsoid Control from Data》（7.0/10）, 《AlphaPADI: Formulaic Alpha Discovery via Pool-Aware Hierarchical Discrete Diffusion》（7.0/10）, 《Toward AI Trustworthiness: Finding Analytically Proven Forward-Invariant Sets for AI-Controlled Systems》（6.0/10）
+- 这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。
 - 详情：[/202610/06/README](/202610/06/README)
 
 ### 精读区论文标签
-- 本次无精读推荐。
+1. [Port-Hamiltonian Neural Networks for Systems with Multiple Asymptotically Stable Equilibria](/202610/06/2610.01356v2-port-hamiltonian-neural-networks-for-systems-with-multiple-asymptotically-stable-equilibria)  
+   标签：评分：9.0/10、query:lyapunov-ai
+   evidence：端口哈密顿神经网络作为李雅普诺夫函数并支持多平衡点
+2. [Nesterov-Accelerated Concurrent Learning for Lyapunov-Based Deep Neural Networks](/202610/06/2610.04200v1-nesterov-accelerated-concurrent-learning-for-lyapunov-based-deep-neural-networks)  
+   标签：评分：8.0/10、query:lyapunov-ai
+   evidence：基于Lyapunov的深度神经网络与加速并行学习
+3. [First-order plants are globally asymptotically stable under antithetic feedback](/202610/06/2610.06608v1-first-order-plants-are-globally-asymptotically-stable-under-antithetic-feedback)  
+   标签：评分：8.0/10、query:lyapunov-ai
+   evidence：为动力系统稳定性显式构造李雅普诺夫函数
 
 ### 速读区论文标签
-1. [Inverse Optimal Feedback Stabilization of 3D Nonholonomic Vehicles in Spherical Coordinates](/202610/06/2609.36212v1-inverse-optimal-feedback-stabilization-of-3d-nonholonomic-vehicles-in-spherical-coordinates)  
+1. [Globally Certified Invariant-Ellipsoid Control from Data](/202610/06/2609.39937v1-globally-certified-invariant-ellipsoid-control-from-data)  
+   标签：评分：7.0/10、query:lyapunov-ai
+   evidence：用李雅普诺夫方程从数据认证不变椭球
+2. [AlphaPADI: Formulaic Alpha Discovery via Pool-Aware Hierarchical Discrete Diffusion](/202610/06/2610.04959v1-alphapadi-formulaic-alpha-discovery-via-pool-aware-hierarchical-discrete-diffusion)  
+   标签：评分：7.0/10、query:sr
+   evidence：用强化学习与生成模型发现符号表达式
+3. [Toward AI Trustworthiness: Finding Analytically Proven Forward-Invariant Sets for AI-Controlled Systems](/202610/06/2610.05689v1-toward-ai-trustworthiness-finding-analytically-proven-forward-invariant-sets-for-ai-controlled-systems)  
    标签：评分：6.0/10、query:lyapunov-ai
-   evidence：构造严格控制李雅普诺夫函数用于镇定
-2. [Higher-Order Kolmogorov-Arnold Networks for Dynamics](/202610/06/2610.02637v1-higher-order-kolmogorov-arnold-networks-for-dynamics)  
-   标签：评分：6.0/10、query:sr
-   evidence：无需候选库从数据学习控制方程，与符号方程发现相近
-3. [Wasserstein Contraction of Stochastic Systems on Manifolds: A Differential Approach](/202610/06/2610.03264v1-wasserstein-contraction-of-stochastic-systems-on-manifolds-a-differential-approach)  
-   标签：评分：6.0/10、query:lyapunov-ai
-   evidence：随机系统收缩的微分Lyapunov函数
+   evidence：可逆神经网络为AI控制系统寻找前向不变集
 
 
 <div class="dpr-home-promo-card">

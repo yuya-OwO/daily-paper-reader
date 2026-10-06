@@ -1,0 +1,737 @@
+Title: Nesterov-Accelerated Concurrent Learning for Lyapunov-Based Deep Neural Networks
+
+URL Source: https://arxiv.org/pdf/2610.04200v1
+
+Published Time: Tue, 06 Oct 2026 00:30:19 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Nesterov-Accelerated Concurrent Learning for Lyapunov-Based Deep Neural Networks 
+
+Hossein Papi 1, Omkar Sudhir Patil 1
+
+Abstract —Concurrent learning (CL) has recently been ex-tended to Lyapunov-based deep neural networks (DNNs) to obtain parameter convergence under finite rather than persistent excitation. However, the existing first-order law converges slowly, especially for high-dimensional systems and overparameterized networks. To address this problem, this paper develops aNesterov-accelerated concurrent learning (NACL) adaptation law for uncertain second-order control-affine systems. The developed law drives momentum dynamics with recorded state-input data, so that all hidden layers of the DNN are updated online under a verifiable finite excitation condition. A dynamic state-derivative observer is designed to reconstruct the recorded input without acceleration measurements. The momentum variable introduces a cross term coupling the momentum lag error to the state-dependent DNN Jacobian and the tracking error, and a state-dependent normalization is introduced into the momentum filter to dominate it. A Lyapunov-based analysis establishes exponential convergence of the tracking, momentum, observer, and weight estimation errors to a bounded residual ball. Simulations on a six-degree-of-freedom unmanned underwater vehicle demonstrate a 
+
+24 .5% and 62 .9% reduction in the root-mean-square function approximation error relative to first-order CL and to a higher-order tuner without CL, respectively. 
+
+Index Terms —Adaptive control, deep neural networks, higher order tuner, concurrent learning, Lyapunov methods, nonlinear control systems. 
+
+I. I NTRODUCTION 
+
+# DEEP neural networks (DNNs) are universal function approximators [1], [2] and have long been used to compensate for unstructured uncertainty in nonlinear systems [3]–[7]. Conventional DNN-based controllers are trained of-fline on a fixed dataset and held constant during operation, so no guarantee relates the learned model to the dynamics encountered at run time. Lyapunov-based DNNs (Lb-DNNs) remove the offline stage by deriving the adaptation law for every layer from a stability analysis [8]–[13], which yields real-time weight adaptation with a guarantee on the tracking error. However, a guarantee on the tracking error is not a guarantee on learning the model. Since the update laws of [8], [10] are driven by the instantaneous tracking error alone, the weight estimates need not converge, and the identified DNN cannot be relied upon for prediction, fault detection, or operation without continuous feedback [14]. Parameter convergence classically requires persistence of excitation (PE) [15]–[18]. For a DNN the condition falls on the network Jacobian, which depends on the weight estimates themselves, so the requirement is  
+
+> 1
+
+Hossein Papi and Omkar Sudhir Patil are with the Division of Electrical and Computer Engineering, Louisiana State University, Baton Rouge, LA 70803 USA (e-mail: hpapi1@lsu.edu, opatil1@lsu.edu). 
+
+trajectory dependent, cannot be verified online, and forces a continual tradeoff between exploration and tracking. Data-driven adaptation replaces PE with initial, interval, or finite excitation (FE) conditions imposed on recorded signals, through dynamic regressor extension and mixing [19]– [21], matrix regressors [22], and filter-based and integral constructions [23]–[26]. Concurrent learning (CL) [27]–[29], integral CL [30], and composite learning [31], [32] obtain parameter convergence by driving the update with a prediction error formed from a history stack, so that the excitation condition becomes verifiable online. Extending CL to a DNN is challenging because of the nonlinear-in-parameter (NIP) dependence on the inner-layer weights: the prediction error is not affine in the estimates, and the Jacobian that takes its place evolves with them. Lb-DNN controllers have been augmented with CL for control-affine and Euler-Lagrange plants [33]– [35], and the all-layer case was addressed in [36] by recon-structing the history stack from the current Jacobian. However, the Jacobian history stack of a deep network is severely ill-conditioned, since inner-layer directions are excited only through products of outer-layer weights, so the first-order law of [36] learns at the rate of its weakest recorded direction. The first-order structure of the update law itself has been revisited. Higher-order tuners (HOTs), motivated by the continuous-time limit of Nesterov’s accelerated gradient method [37]–[39], add an auxiliary momentum state and a state-dependent normalization, and improve the convergence rate for constant and time-varying regressors [40]–[45]. Mo-mentum and concurrent learning were combined for linear-in-the-parameters Euler-Lagrange systems in [46], where an integral CL term drives an accelerated gradient update under finite excitation. The accelerated structure reaches the DNN setting in [47], where all weights adapt in real time and asymptotic tracking is established, but without recorded data. Combining momentum with concurrent learning for a DNN is not a matter of replacing the update law of [36]. A higher-order law splits the weight estimation error into two coupled states, the momentum variable and the lag of the estimates behind it, and a single CL gain multiplies both. Consequently, the recorded-data term damps one state while exciting the other and is no longer purely stabilizing: a richer history stack drives the estimates toward their ideal values and drives the lag harder at the same time. Moreover, the momentum variable introduces a cross term among the lag, the state-dependent DNN Jacobian, and the tracking error that has no first-order counterpart. Higher-order tuners for linear-in-the-parameters uncertainty dominate the analogous term with a normalization built from a known regressor, whereas the DNN Jacobian arXiv:2610.04200v1 [eess.SY] 3 Oct 2026 is evaluated at the current estimates, so the normalization is estimate dependent and its boundedness must be established rather than assumed. This paper develops a Nesterov-accelerated concurrent learning (NACL) adaptation law for Lyapunov-based DNNs, together with the stability analysis that resolves the aforemen-tioned obstructions. Relative to [46], which combined momen-tum and CL for known regressors, the history stack here acts through the current-weight Jacobian, and the Taylor remainder and the normalization must be designed rather than assumed. The central element is a dual state-dependent normalization matched to the two obstructions above. Projection of the weight estimates and the momentum variable ensures that the normalizers, the Jacobian, and the Taylor remainder remain uniformly bounded, and a dynamic state-derivative observer reconstructs the recorded control input without acceleration measurements. A Lyapunov-based analysis shows that the tracking, momentum, weight estimation, and observer errors converge exponentially to an ultimate bound under a finite excitation condition on the recorded Jacobian data, rather than under persistent excitation of the trajectory. Simulations on a six-degree-of-freedom unmanned underwater vehicle show that momentum without recorded data performs worse than first-order CL, whereas the developed law reduces the root-mean-square function approximation error by 62 .9% relative to the momentum tuner and by 24 .5% relative to first-order CL. 
+
+A. Notation 
+
+The sets of real, positive, and nonnegative real numbers are denoted by R, R>0, and R≥0, respectively. The identity matrix is denoted by In, and A⊤ denotes the transpose of A. The symbols ∥·∥ , tr( ·), and λmin (·) denote the Euclidean/Frobenius norm, trace, and minimum eigenvalue, respectively. The space of essentially bounded signals is denoted by L∞.II. P ROBLEM FORMULATION AND CONTROL DESIGN 
+
+A. System Model 
+
+Consider a class of second-order control-affine nonlinear dynamical systems governed by 
+
+¨x = f (X) + u, (1) where x ∈ Rn denotes the system state vector, X =[x⊤, ˙x⊤]⊤ ∈ R2n is the composite state vector, u ∈ Rn is the control input, and f (X) ∈ Rn is an unknown, smooth nonlinear drift vector field. Let xd(t) ∈ Rn be a reference trajectory that is twice con-tinuously differentiable and satisfies ∥xd∥ ≤ ¯xd, ∥ ˙xd∥ ≤ ¯˙xd,and ∥¨xd∥ ≤ ¯¨xd, where ¯xd, ¯˙xd, ¯¨xd ∈ R>0 are known constants. Define the tracking error e ≜ x − xd and the filtered tracking error r ∈ Rn [3], [15] as 
+
+r = ˙ e + α1e, (2) where α1 > 0 is a gain constant. The unknown drift function 
+
+f (X) is modeled using a DNN over a compact domain ΩX ⊂
+
+R2n [1], [3] as 
+
+f (X) = Ψ( X, θ ∗) + ε(X), (3) where Ψ( X, θ ∗) ∈ Rn represents the ideal DNN output, θ∗ ∈
+
+Rnθ is the ideal weight vector containing all stacked inner and outer layer weights and biases, and ε(X) ∈ Rn is the function approximation error bounded by ∥ε(X)∥ ≤ ¯ε. Taking the time derivative of (2) and applying (1) and (3) yields the open-loop error system 
+
+˙r = Ψ( X, θ ∗) + ε(X) + u − ¨xd + α1 ˙e. (4) Since a DNN is NIP with respect to its hidden-layer weights, the function approximation error cannot be expressed as a lin-ear function of the weight estimation error. Let ˆθ ∈ Rnθ denote the weight estimate, and define the parameter estimation error as ˜θ ≜ θ∗ − ˆθ. The ideal and estimated weights are constrained to the known compact convex set Θ ≜ {θ ∈ Rnθ : ∥θ∥ ≤ ¯θ},where ¯θ ∈ R>0 is a user-selected bound satisfying θ∗ ∈ Θ.
+
+B. Closed-Loop Error System and Control Law Development 
+
+The controller is the standard Lb-DNN controller of [8], held fixed so that the contribution lies entirely in the adaptation law of Section III and so that every CL method compared in Section V drives the same closed loop. Since f (X) is unknown, the control input is designed to cancel the known terms in (4) and to leave the parametric error J (X, ˆθ)˜θ,which is the signal the adaptation law acts on. Based on the subsequent stability analysis, the control input is designed as 
+
+u = ¨ xd − Ψ( X, ˆθ) − k1r − e − α1 ˙e, (5) where k1 ∈ R>0 is a user-defined control gain. Taking a first-order Taylor series expansion of Ψ( X, θ ∗)
+
+around ˆθ yields 
+
+Ψ( X, θ ∗) − Ψ( X, ˆθ) = J (X, ˆθ)˜θ + R(X, ˜θ), (6) where J (X, ˆθ) ≜ ∂Ψ( X,θ ) 
+
+> ∂θ θ=ˆθ
+
+∈ Rn×nθ is the state-dependent DNN Jacobian matrix, and R(X, ˜θ) ∈ Rn repre-sents the higher-order Taylor remainder term, which satisfies 
+
+∥R(X, ˜θ)∥ ≤ ρ0(∥X∥) ∥˜θ∥2 on a compact domain for a known polynomial ρ0 [48]; the explicit form of ρ0 is given in (29). Substituting (3) and (5) into the open-loop error system, applying (6), and canceling cross terms yields 
+
+˙r = J (X, ˆθ)˜θ + R(X, ˜θ) + ε(X) − k1r − e. (7) 
+
+C. Dynamic State-Derivative Observer 
+
+To incorporate previously recorded data into the update law in the concurrent learning style, the update law is augmented with a history stack containing the error between the applied control input and a reconstructed version of it. Reconstructing the input from (1) requires ¨x, which is not measured, so a dynamic state-derivative observer is developed. The observer is designed as 
+
+˙ˆr = ˆ∆ − ¨xd + α1 ˙e + α2 ˜r, (8) 
+
+˙ˆ∆ = ˜ r + k∆ ˜∆ + ˙ u, (9) where ˆr, ˆ∆ ∈ Rn denote the observer estimates of r and ¨x, the observer errors are ˜r ≜ r−ˆr and ˜∆ ≜ ¨x− ˆ∆, α2, k ∆ ∈ R>0 are constant observer gains, and ˙u is the derivative of the control input. Taking the time derivative of ˜r and ˜∆ and applying (1), (8), and (9) yields 
+
+˙˜r = ˜∆ − α2 ˜r, (10) 
+
+˙˜∆ = ˙f (X) − ˜r − k∆ ˜∆, (11) where ˙f (X) ≜ ∂f ∂x ˙x + ∂f ∂ ˙x ¨x.The observer error ˜r is known, since r and ˆr are both known. Because (10) gives ˜∆ = ˙ ˜r + α2 ˜r, an implementable form of (9) is obtained by integrating both sides and using R tt0
+
+˙˜r dτ =˜r(t) − ˜r(t0), which yields 
+
+ˆ∆( t) = ˆ∆( t0) + k∆
+
+ ˜r(t) − ˜r(t0) +  u(t) − u(t0)
+
++
+
+Z tt0
+
+ k∆α2 + 1 ˜r(τ ) dτ, (12) so that ˙u is never required online. Let the concatenated observer error vector z ∈ R2n be defined as z ≜ [˜ r⊤, ˜∆⊤]⊤, and let the composite error vector be ζ ≜ [r⊤, e ⊤, ϑ ⊤, η ⊤]⊤ ∈ Rψ with ψ ≜ 2n + 2 nθ , where the parameter coordinates ϑ, η ∈ Rnθ are defined in (24) below. Let the open and connected set D ⊂ Rψ be defined as 
+
+D ≜ {ζ ∈ Rψ : ∥ζ∥ < χ }, where χ ∈ R>0 is a subsequently defined known upper bound. The following lemma bounds ˙f
+
+on D.
+
+Lemma 1. For all ζ ∈ D , there exists a constant δf ∈ R>0
+
+such that ∥ ˙f (X)∥ ≤ δf .Proof. See [36]. Let Λ0 ≜ min {k∆, 2α2}, and let the initial acceleration error be bounded by a known constant ∥ ˜∆( t0)∥ ≤ ¯∆0. The following lemma summarizes the property of the observer used in the subsequent development. 
+
+Lemma 2. Consider the observer given by (8) and (9) with 
+
+ˆr(t0) = r(t0), and let δ∆ ∈ R>0 be a prescribed accuracy satisfying the feasibility gain condition 
+
+k∆Λ0 > δ2
+
+> f
+
+δ2∆
+
+. (13) 
+
+Provided ζ(τ ) ∈ D for all τ ∈ [t0, t ], the observer error satisfies ∥z(t)∥ ≤ δ∆ for all t ≥ t∆, where the settling time 
+
+t∆ ≥ t0 is a known function of Λ0, k∆, δf , δ∆, and ¯∆0.Proof. See [36]. III. NACL A DAPTATION LAW 
+
+The adaptation law is developed by extending CL to the NIP structure of the DNN and augmenting the resulting update with higher-order momentum dynamics. The shorthand 
+
+J (X, ˆθ) denotes the DNN Jacobian at the current state and weight estimates, and Ji ≜ J (Xi, ˆθ) denotes the Jaco-bian evaluated using the current weight estimates and the previously recorded state Xi ≜ X(ti). Compared to CL approaches that begin gathering data immediately, the history stack H = {(Xi, u i, ˆ∆i)}Ni=1 , with ˆ∆i the observer estimate at the recording time, is constructed only for ti ≥ t∆, where the observer settling time t∆ is characterized in Lemma 2. Using the observer estimate ˆ∆i ≜ ˆ∆( ti), the control input at each recorded point is reconstructed as 
+
+ˆui = ˆ∆i − Ψ( Xi, ˆθ). (14) The implementable form of the NACL update law is de-signed as 
+
+˙Λ = proj 
+
+(
+
+Γ
+
+"
+
+J ⊤(X, ˆθ)r − γ1
+
+N
+
+> N
+
+X
+
+> i=1
+
+J ⊤
+
+> i
+
+ ui − ˆui
+
+ − γ2 ˆθ
+
+#) 
+
+,
+
+(15) 
+
+˙ˆθ = proj 
+
+n
+
+− β Γ ˆθ − ΛN (t)
+
+o
+
+, (16) where Λ ∈ Rnθ is an auxiliary momentum variable, β, γ 1, γ 2 ∈
+
+R>0 are user-selected adaptation gains, and Γ( t) ∈ Rnθ ×nθ is a positive-definite time-varying least-squares adaptation gain. The update in (15) performs the gradient-like adjustment using the instantaneous tracking error and the recorded data, whereas (16) drives the weights toward Λ through a normalized first-order filter; this is the Nesterov-inspired momentum structure. The projection operator confines both Λ and ˆθ to Θ, which renders the DNN bounds used in Lemma 1 and in Section IV uniform and yields ˆθ ∈ L ∞.The projection operator satisfies the property [49, App. E] that, for the projected estimate ψ ∈ { Λ, ˆθ}, any ξ ∈ Θ, and any y ∈ Rnθ ,
+
+(ψ − ξ)⊤Γ−1  proj {Γy} − Γy ≤ 0. (17) The state-dependent normalization signal in (16) is defined as 
+
+N (t) ≜ 1 + μ1 J (X, ˆθ) 22
+
++ μ2 tr  ΦJ
+
+, (18) where ∥·∥ 2 is the induced 2-norm, μ1, μ 2 ∈ R>0, and ΦJ is the averaged Jacobian history stack 
+
+ΦJ (t) ≜ 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+J ⊤(Xi, ˆθ)J (Xi, ˆθ). (19) The two state-dependent terms in (18) are what allow the higher-order cross term to be dominated, as made precise by the gain conditions in Section IV. The adaptation gain evolves according to the guarded least-squares law with forgetting [36] 
+
+ddt Γ−1(t) = 
+
+
+
+−κ Γ−1(t) + νγ 1ΦJ (t), if λΓ,min < λ min (Γ) 
+
+and λmax (Γ) < λ Γ,max ,
+
+0, otherwise ,
+
+(20) where κ ∈ R>0 is a forgetting factor, 0 < ν < 2,and λΓ,min , λ Γ,max ∈ R>0 are user-selected bounds on the spectrum of Γ with Γ( t0) initialized so that λΓ,min I ⪯ Γ( t0) ⪯
+
+λΓ,max I. Freezing the update outside the band prevents covari-ance windup during intervals of low excitation, where ΦJ is rank deficient and the forgetting term alone would drive Γ−1
+
+toward zero, and it ensures 
+
+0 < λ Γ,min I ⪯ Γ( t) ⪯ λΓ,max I, ∀ t ≥ t0, (21) by construction. In implementation, the two terms are faded continuously rather than switched: the forgetting term is scaled by max {0, 1 − λmax (Γ) /λ Γ,max } and the history-stack term by min {1, max {0, λ min (Γ) /λ Γ,min − 1}} ; the subsequent analysis covers this variant, since it only requires the branch weights to lie in [0 , 1] . Since ν and γ1 enter (20) only through the product νγ 1, the bound on ν places no restriction on the CL gain; the choice ν = 1 recovers the covariance law used in [36]. For notational convenience let s(t) ∈ { 0, 1}
+
+denote the indicator of the active branch of (20), so that  
+
+> ddt
+
+Γ−1 = s(t) − κΓ−1 + νγ 1ΦJ
+
+. All subsequent identities hold almost everywhere, with Γ continuous and without gain resets. An analytical form of (15) is obtained from the observer construction. Using (14) with the DNN model in (3) and the Taylor expansion in (6), the reconstruction error at each recorded point satisfies ui − ˆui = ˜∆i − J i ˜θ − Ri − εi.Multiplying by −γ1J ⊤ 
+
+> i
+
+/N and summing, and noting that ˜θ
+
+carries no index and therefore factors out of the sum, yields 
+
+− γ1
+
+N
+
+> N
+
+X
+
+> i=1
+
+J ⊤
+
+> i
+
+ ui − ˆui
+
+ = γ1ΦJ ˜θ + γ1dR + γ1dε, (22) where dR ≜ 1
+
+> N
+
+PNi=1 J ⊤ 
+
+> i
+
+R(Xi, ˜θ) and dε ≜
+
+> 1
+> N
+
+PNi=1 J ⊤ 
+
+> i
+
+(εi − ˜∆i). Consequently ˙Λ = proj {ΓG}
+
+with 
+
+G ≜ J ⊤(X, ˆθ)r + γ1ΦJ ˜θ + γ1dR + γ1dε − γ2 ˆθ. (23) Equation (22) is the step that makes CL applicable to a DNN: the recorded-data term resolves into a positive semidefinite history stack acting on ˜θ, plus two disturbances arising from the Taylor remainder and from the approximation and observer errors, respectively. Because the update evolves in two coupled parameter states, the analysis is performed in the coordinates 
+
+η ≜ ˆθ − Λ, ϑ ≜ θ∗ − Λ, (24) so that ˜θ = ϑ − η. Here η quantifies the lag of the weight estimates behind the momentum variable and ϑ the distance of the momentum variable from the ideal weights. Since θ∗ is constant, (15) and (16) give 
+
+˙ϑ = − proj {ΓG}, ˙η = proj  − βΓηN − proj {ΓG}.
+
+(25) 
+
+Assumption 1 (Finite Excitation) . There exist λe ∈ R>0 and 
+
+T > t ∆ such that the current-weight CL history stack satisfies 
+
+λmin (Φ J (t)) ≥ λe, ∀ t ≥ T . (26) Assumption 1 is imposed on the retained samples {Xi},which are recorded over a finite interval and re-evaluated through J (Xi, ˆθ) at the current weights, in contrast to a PE condition, which would require excitation of the closed-loop trajectory for all time. 
+
+Lemma 3. Let t′ ≥ t∆ and suppose that ζ(t) ∈ D for all 
+
+t ∈ [t0, t ′]. Then every sample retained at a time ti ∈ [t∆, t ′]
+
+satisfies 
+
+˜∆( ti) ≤ δ∆. (27) 
+
+Proof. Since ζ(t) ∈ D on [t0, t ′], Lemma 1 bounds ˙f by δf
+
+on that interval, so Lemma 2 applies and yields ∥z(t)∥ ≤ δ∆
+
+for all t ∈ [t∆, t ′]. The claim follows from ˜∆( ti) ≤ ∥ z(ti)∥
+
+and the retention rule ti ≥ t∆.Theorem 1 establishes the invariance of D from t0 by a first-exit argument, so no separate assumption on the recorded data is required; the retention rule ti ≥ t∆ is the only condition enforced in implementation. IV. S TABILITY ANALYSIS 
+
+Using the structure of the DNN, the following bounds are established. By [48, Lemma 2], the Jacobian is bounded on Θ
+
+and the corresponding compact input domain by a constant 
+
+¯J ∈ R>0, so that J (X, ˆθ) ≤ ¯J and ∥J i∥ ≤ ¯J . By [48, Theorem 1], which follows from the DNN Hessian bound therein, the Lagrange remainder in (6) satisfies 
+
+R(X, ˜θ) ≤ ρ0(∥X∥) ˜θ 2
+
+, (28) 
+
+ρ0(∥X∥) = a2 ∥X∥2 + a1 ∥X∥ + a0, (29) with a2, a 1, a 0 ∈ R>0 computable from the layer widths, the activation constants, and ¯θ. Because θ∗, ˆθ ∈ Θ and Θ
+
+is convex, the Taylor segment from ˆθ to θ∗ lies in Θ. On D,the state bounds established in the proof of Lemma 1 give 
+
+∥X∥ ≤ c0 + c1 ∥ζ∥ with c0 = ¯ xd + ¯ ˙xd and c1 = 2 + α1, so that (28) and (29) yield 
+
+∥R∥ ≤ ¯ρ0(χ) ˜θ 2
+
+, ¯ρ0(χ) ≜ a2(c0+c1χ)2+a1(c0+c1χ)+ a0.
+
+(30) Whenever every retained sample was recorded while ζ ∈ D ,so that ∥Xi∥ ≤ c0 + c1χ and, by Lemma 3, (27) holds, the averaged stack disturbances satisfy 
+
+∥dR∥ ≤ CR ˜θ 2
+
+, CR ≜ ¯J ¯ρ0(χ), (31) 
+
+∥dε∥ ≤ ¯dΦ, ¯dΦ ≜ ¯J  ¯ε + δ∆
+
+. (32) Consider the candidate Lyapunov function V : Rψ ×R≥0 →
+
+R≥0 defined as 
+
+V (ζ, t ) ≜ 12 r⊤r + 12 e⊤e + 12 ϑ⊤Γ−1ϑ + 12 η⊤Γ−1η. (33) Because Γ is time-varying, converting a bound on V into a bound on ζ requires uniform spectral bounds on the gain. These are supplied directly by the guard in (20), which enforces (21), whence 
+
+β1 ∥ζ∥2 ≤ V (ζ, t ) ≤ β2 ∥ζ∥2 , (34) with β1 ≜ 12 min {1, λ −1Γ,max } and β2 ≜ 12 max {1, λ −1Γ,min }.Let cν ≜ 1 − ν/ 2 > 0 and dν ≜ 1 + ν/ 2, and select the gains to satisfy 
+
+μ1 ≥ 2
+
+βk 1
+
+, μ2 ≥ dν γ1
+
+β , β > γ 2. (35) Define A0 ≜ γ2, A ≜ cν γ1λe + γ2, B ≜ β − γ2, D0 ≜
+
+γ1 ¯dΦ + γ2 ¯θ, and, for a ∈ { A0, A },
+
+ρq (a) ≜ 2¯ ρ0(χ)2
+
+k1
+
++ γ21 C2
+
+> R
+
+ 1
+
+a + 1
+
+B
+
+
+
+, (36) 
+
+ι(a) ≜ 2¯ ε2
+
+k1
+
++ D20
+
+ 1
+
+a + 1
+
+B
+
+
+
+, (37) together with λ(a) ≜ min {k1/4, α 1, a/ 2, B/ 2}. The con-stants indexed by A0 govern the interval before the excitation condition is met, when the ϑ channel is damped by the leakage gain alone, and those indexed by A govern the interval after it. Since A ≥ A0, it follows that ρq (A) ≤ ρq (A0), ι(A) ≤ ι(A0),and λ(A) ≥ λ(A0). For a selected convergence rate 0 < λ d <λ(A0), let the domain radius satisfy 4ρq (A0)χ2 ≤ λ(A0)−λd,define λT ≜ λ(A) − 4ρq (A)χ2 ≥ λd, and let the set of stabilizing initial conditions be 
+
+S ≜
+
+n
+
+ζ ∈ Rψ : ∥ζ∥ < pβ1/β 2 χ
+
+o
+
+. (38) 
+
+Theorem 1. Consider the system in (1) with the control input 
+
+(5) , the observer in (8) and (9) , and the adaptation laws (15) 
+
+and (16) with the gain law (20) . Let the feasibility condition 
+
+(13) and the gain conditions (35) be satisfied, let Assumption 1 hold, let ∥ ˜∆( t0)∥ ≤ ¯∆0, and let ζ(t0) ∈ S with β2ι(A0)/λ d <β1χ2. Then ζ(t) ∈ D for all t ≥ t0, every retained sample satisfies (27) , the observer error satisfies ∥z(t)∥ ≤ δ∆ for all 
+
+t ≥ t∆, and the composite error vector is bounded in the sense that 
+
+∥ζ(t)∥ ≤ 
+
+s
+
+β2
+
+β1
+
+∥ζ(t0)∥2 e− λdβ2 (t−t0) + β2 ι(A0)
+
+β1λd
+
+, t ≥ t0,
+
+(39) 
+
+∥ζ(t)∥ ≤ 
+
+s
+
+β2
+
+β1
+
+∥ζ(T )∥2 e− λT   
+
+> β2(t−T )
+
++ β2 ι(A)
+
+β1λT
+
+, t ≥ T .
+
+(40) 
+
+Proof. Let te ≜ sup {t ≥ t0 : ζ(τ ) ∈ D ∀ τ ∈ [t0, t ]}. Since 
+
+ζ(t0) ∈ S ⊂ D and ζ is continuous, te > t 0. Throughout 
+
+[t0, t e), ζ ∈ D , so by Lemma 3 every sample retained before 
+
+te satisfies (27), and the bounds (30)–(32) hold. The derivative of V is now bounded on [t0, t e). Let P ≜ Γ−1 and Vθ ≜ 
+
+> 12
+
+ϑ⊤P ϑ + 12 η⊤P η , so that V = 12 ∥r∥2 + 12 ∥e∥2 + Vθ . Since 
+
+P is symmetric and time-varying, the product rule applied to (33) yields 
+
+˙V = r⊤ ˙r + e⊤ ˙e + ϑ⊤P ˙ϑ + η⊤P ˙η
+
+| {z }
+
+> adaptation
+
++ 12 ϑ⊤ ˙P ϑ + 12 η⊤ ˙P η 
+
+| {z }
+
+> gain variation
+
+.
+
+(41) The four groups in (41) are evaluated in turn. Substituting (7), ˙e = r − α1e, the scalars −r⊤e and e⊤r
+
+cancel, leaving 
+
+r⊤ ˙r + e⊤ ˙e = r⊤J ˜θ + r⊤R + r⊤ε − k1 ∥r∥2 − α1 ∥e∥2 . (42) Applying the projection property (17) to each contribution in (25), with ξ = θ∗ for the ϑ channel and with ξ = Λ and 
+
+ξ = ˆθ for the two contributions to the η channel, all of which lie in Θ
+
+ϑ⊤P ˙ϑ + η⊤P ˙η ≤ − βN ∥ η∥2 − (ϑ + η)⊤G. (43) Substituting (20)  
+
+> 12
+
+ϑ⊤ ˙P ϑ + 12 η⊤ ˙P η = s(t)
+
+h
+
+− κV θ + νγ 1
+
+> 2
+
+ ϑ⊤ΦJ ϑ + η⊤ΦJ ηi
+
+.
+
+(44) Substituting (42)–(44) into (41) gives the first bound 
+
+˙V ≤ − k1 ∥r∥2 − α1 ∥e∥2 − βN ∥ η∥2 + r⊤J ˜θ + r⊤R + r⊤ε
+
+− (ϑ + η)⊤G + s(t)
+
+h
+
+− κV θ + νγ 1
+
+> 2
+
+ ϑ⊤ΦJ ϑ + η⊤ΦJ ηi
+
+.
+
+(45) Using ϑ + η = ˜θ + 2 η and expanding G from (23), the term 
+
+−˜θ⊤J ⊤r cancels r⊤J ˜θ in (45), since both are equal scalars, and the residue is the higher-order cross term −2η⊤J ⊤r.Using the identity ˜θ⊤ΦJ ˜θ + 2 η⊤ΦJ ˜θ = ϑ⊤ΦJ ϑ − η⊤ΦJ η,the concurrent-learning quadratics in −(ϑ + η)⊤G and the gain-variation terms in (45) collect into the single quantity 
+
+Ξs ≜ −γ1
+
+ 1− sν 
+
+> 2
+
+ϑ⊤ΦJ ϑ+γ1
+
+ 1+ sν 
+
+> 2
+
+η⊤ΦJ η−sκV θ , (46) which is bounded on both branches of (20) by a single s-free expression: since 0 < ν < 2 gives cν < 1 < d ν , since 
+
+ΦJ ⪰ 0, and since −sκV θ ≤ 0,
+
+Ξs ≤ − cν γ1ϑ⊤ΦJ ϑ + dν γ1η⊤ΦJ η, s ∈ { 0, 1}. (47) The κ term is dropped because it vanishes when s = 0 and cannot contribute a uniform decay rate. Defining the aggregate disturbance d ≜ γ1dε − γ2θ∗ and substituting (47) into (45) yields the second bound, 
+
+˙V ≤ − k1 ∥r∥2 − α1 ∥e∥2 − βN ∥ η∥2 − 2η⊤J ⊤r + r⊤R
+
++ r⊤ε − cν γ1ϑ⊤ΦJ ϑ + dν γ1η⊤ΦJ η − γ2 ∥ϑ∥2
+
++ γ2 ∥η∥2 − γ1(ϑ + η)⊤dR − (ϑ + η)⊤d. (48) The cross term is separated by Young’s inequality, using the in-duced norm, as −2η⊤J ⊤r ≤ βμ 1 ∥J ∥ 22 ∥η∥2 + ∥r∥2 /(βμ 1).Substituting (18) and using η⊤ΦJ η ≤ tr(Φ J ) ∥η∥2, the η
+
+channel becomes 
+
+− βN ∥ η∥2 + βμ 1 ∥J ∥ 22 ∥η∥2 + dν γ1η⊤ΦJ η + γ2 ∥η∥2
+
+≤ − B ∥η∥2 −  βμ 2 − dν γ1
+
+ tr(Φ J ) ∥η∥2 ≤ − B ∥η∥2 ,
+
+(49) where the second and third conditions in (35) were used. The 
+
+ϑ channel satisfies −cν γ1ϑ⊤ΦJ ϑ − γ2 ∥ϑ∥2 ≤ − a ∥ϑ∥2, with 
+
+a = A0 for all t ≥ t0 because ΦJ ⪰ 0, and with a = A for 
+
+t ≥ T under Assumption 1. The first condition in (35) gives 
+
+∥r∥2 /(βμ 1) ≤ (k1/2) ∥r∥2. The third bound is therefore 
+
+˙V ≤ − k1 
+
+> 2
+
+∥r∥2 − α1 ∥e∥2 − a ∥ϑ∥2 − B ∥η∥2 + r⊤R + r⊤ε
+
+− γ1(ϑ + η)⊤dR − (ϑ + η)⊤d. (50) The remaining sign-indefinite terms are bounded by Young’s inequality in the form ab ≤ ϵa 2 + b2/(4 ϵ), using (31), (32), (30), and ∥d∥ ≤ D0, as 
+
+r⊤ε ≤ k1 
+
+> 8
+
+∥r∥2 + 2¯ ε2 
+
+> k1
+
+, r ⊤R ≤ k1 
+
+> 8
+
+∥r∥2 + 2 ¯ ρ0(χ)2
+
+> k1
+
+˜θ 4
+
+,
+
+−γ1ϑ⊤dR ≤ a 
+
+> 4
+
+∥ϑ∥2 + γ21 C2 
+
+> R
+> a
+
+˜θ 4
+
+, −ϑ⊤d ≤ a 
+
+> 4
+
+∥ϑ∥2 + D20 
+
+> a
+
+,
+
+−γ1η⊤dR ≤ B 
+
+> 4
+
+∥η∥2 + γ21 C2 
+
+> R
+> B
+
+˜θ 4
+
+, −η⊤d ≤ B 
+
+> 4
+
+∥η∥2 + D20 
+
+> B
+
+.
+
+(51) Substituting (51) into (50) and collecting the coefficients of 
+
+∥r∥2, ∥ϑ∥2 and ∥η∥2 with (36) and (37) gives the fourth bound, 
+
+˙V ≤ − k1 
+
+> 4
+
+∥r∥2 − α1 ∥e∥2 − a 
+
+> 2
+
+∥ϑ∥2 − B 
+
+> 2
+
+∥η∥2
+
++ ρq (a) ˜θ 4
+
++ ι(a). (52) Applying ˜θ 4
+
+= ∥ϑ − η∥4 ≤ 4 ∥ζ∥4 reduces (52) to 
+
+˙V ≤ −  λ(a) − 4ρq (a) ∥ζ∥2  ∥ζ∥2 + ι(a). (53) On [t0, t e), where ∥ζ∥ < χ , taking a = A0 and using the domain condition 4ρq (A0)χ2 ≤ λ(A0) − λd reduces (53) to ˙V ≤ − λd ∥ζ∥2 + ι(A0) ≤ − (λd/β 2)V + ι(A0), and the comparison lemma yields 
+
+V (t) ≤ V (t0)e− λdβ2 (t−t0) + β2ι(A0)
+
+λd
+
+
+
+1 − e− λdβ2 (t−t0)
+
+(54) for t ∈ [t0, t e). Since ζ(t0) ∈ S implies V (t0) < β 1χ2
+
+by (34), and β2ι(A0)/λ d < β 1χ2 by hypothesis, the right side of (54) is a convex combination of two numbers below 
+
+β1χ2 and therefore remains strictly below β1χ2 on [t0, t e),and by continuity also at te if te < ∞. If te < ∞, then 
+
+∥ζ(te)∥ = χ by continuity of ζ, so (34) gives V (te) ≥ β1χ2,a contradiction. Hence te = ∞ and ζ(t) ∈ D for all 
+
+t ≥ t0. Consequently Lemma 3 covers every retained sample, Lemma 2 gives ∥z(t)∥ ≤ δ∆ for all t ≥ t∆, and applying (34) to (54) yields (39). For t ≥ T , taking a = A in (53) and using 
+
+∥ζ∥ < χ gives ˙V ≤ − λT ∥ζ∥2 + ι(A) ≤ − (λT /β 2)V + ι(A),and the comparison lemma with (34) yields (40). 
+
+Remark 1. The leakage term −γ2 ˆθ is placed in the Λ dynamics rather than in the ˆθ dynamics. Since the cross terms cancel exactly, this placement produces no mixed ϑ⊤η term in the Lyapunov derivative. Its cost is a positive γ2 ∥η∥2 contribution, which is dominated by the gain condition β > γ2, and its benefit is a negative γ2 ∥ϑ∥2 contribution that provides damping in the ϑ channel even in the absence of excitation; this damping is the constant A0 on which the pre-excitation invariance argument in Theorem 1 is based. V. S IMULATION 
+
+A. Setup 
+
+The developed method is evaluated on the six-degree-of-freedom unmanned underwater vehicle of [14], with the mass, inertia and hydrodynamic damping of [50]. The body-fixed inertia is 
+
+Mb = diag(215 , 265 , 265 , 40 , 80 , 80) , the linear and quadratic damping coefficients are diag(70 , 100 , 200 , 30 , 50 , 50) 
+
+and diag(100 , 200 , 50 , 50 , 100 , 100) , and the vehicle is neutrally buoyant. The state x ∈ R6 collects the earth-frame position and orientation, so X ∈ R12 and n = 6 ,and the input u in (1) is the commanded earth-frame acceleration, from which the applied wrench follows through the known inertia matrix. The desired trajectory is the helix 
+
+xd(t) = [2 cos(0 .5t), 2 sin(0 .5t), 0.1t, 0, 0, −0.125 t]⊤,initialized at x(t0) = [−0.5, −0.5, −0.5, 0, 0, 0] ⊤ and 
+
+˙x(t0) = 0 , and each run is integrated for 30 s at a fixed step of 10 ms; the linearly growing depth and yaw are understood to be continued by a bounded profile after the simulated interval, so that the bounds on xd hold. The DNN has k = 4 hidden layers of 12 neurons with 
+
+tanh activations and a bias appended to every layer, so nθ =702 . All methods use identical initial weights, the same plant, and the same observer. The control and observer gains are 
+
+α1 = 5 , k1 = 20 , α2 = 50 and k∆ = 20 . The gating time 
+
+t∆ = 5 s was selected conservatively; the observer error ˜∆
+
+falls below 0.03 within 2 s in every run. The history stack holds N = 150 samples. Every second sample after t∆ is retained until the stack is full; afterwards a candidate sample is examined every 50 ms and replaces the oldest retained sample only if the rank and minimum eigenvalue of ΦJ , evaluated at the current weights, do not decrease. The retained states 
+
+Xi are never otherwise altered, and their Jacobians are re-evaluated at ˆθ(t) at every step. The CL gains are γ1 = 20 and 
+
+γ2 = 10 −3, the gain law (20) uses κ = 0 .1 and ν = 0 .05 with 
+
+Γ( t0) = 0 .5I confined to the band [10 −4, 10] , the higher-order gain is β = 0 .5, and μ1 and μ2 are set to 1.05 times the lower bounds in (35). The projection bound is ¯θ = 100 .Three methods are compared. The Lb-CL-DNN of [36] is a first-order CL law using the same history stack, replacement rule, and observer, with its gain law run at ν = 1 and a forgetting factor of 0.1. The A-DNN of [47] is a higher-order tuner without CL, run with its own control law and the gains γν = 0.5, γθ = 4 and βs = 0.05 reported therein. The Lb-DNN baseline is the first-order gradient law of [8] with constant gain 0.5I. Performance is quantified over 
+
+t ∈ [10 , 30] s by the RMS of the tracking error ∥e∥ and of the function approximation error ˜f ≜ f (X) − Ψ( X, ˆθ), each split into linear and angular components, together with ˜f evaluated at 100 test inputs obtained by perturbing reference states at random instants by up to 0.25 in every coordinate, which measures whether the function was learned rather than the path memorized. 
+
+B. Discussion 
+
+Table I and Fig. 1 summarize the results. Compared to the first-order CL law of [36], which is driven by the same recorded data, the developed method reduces the composite RMS approximation error from 0.458 to 0.346 , i.e., by 24 .5% ,with 22 .9% and 26 .1% reductions in the linear and angular channels and a 24 .5% reduction in the tracking error. The off-trajectory errors of the two CL methods are within 2% of each other. Hence, the improvement of the developed law over [36] lies in the accuracy of learning along the recorded data rather than in generalization beyond it; since the two laws also differ in the covariance weighting ν, the comparison does not attribute the improvement to the momentum channel alone. The comparison with the higher-order tuner of [47] indicates the role of the recorded data. Since that tuner has no history stack, it attains 0.933 , which is worse than the 0.777 of the first-order gradient baseline, whereas the developed method attains 0.346 , an improvement of 62 .9% over [47] and of 
+
+44 .4% in the off-trajectory metric. Therefore, momentum alone does not improve learning on this plant; the higher-order TABLE I RMS ERRORS OVER t ∈ [10 , 30] S WITH THE RETAINED HISTORY STACK ,
+
+N = 150 , AND IMPROVEMENT OF THE DEVELOPED METHOD IN PERCENT .                                     
+
+> Method ∥elin ∥ ∥ eang ∥ ∥ ˜flin ∥ ∥ ˜fang ∥ ∥ ˜fot ∥∥˜f∥
+> Proposed NACL-DNN 0.0024 0 .0023 0 .2499 0 .2391 0 .5776 0 .3459
+> Hart et al. Lb-CL-DNN 0.0032 0 .0031 0 .3239 0 .3236 0 .5896 0 .4579
+> Lb-DNN baseline (first-order) 0.0069 0 .0033 0 .7011 0 .3349 1 .0531 0 .7770
+> Le et al. A-DNN (no CL) 0.0063 0 .0034 0 .8107 0 .4615 1 .0386 0 .9328
+> Impr. vs. Hart et al. [%] 23 .425 .722 .926 .12.024 .5
+> Impr. vs. baseline [%] 64 .930 .164 .428 .645 .255 .5
+> Impr. vs. Le et al. [%] 61 .632 .269 .248 .244 .462 .90510 15 20 25 30
+
+time [s] 
+
+> 10 −1
+> 10 0
+> 10 1
+>  ˜f(t) ˜[m/s 2, rad/s 2]
+
+on-trajectory approximation error, retained stack, N = 150 
+
+> Proposed NACL-DNN Hart et al. Lb-CL-DNN Le et al. A-DNN (HOT, no CL) Lb-DNN baseline
+
+Fig. 1. Function approximation error ∥ ˜f (t)∥ of the developed method against the first-order CL law of [36], the higher-order tuner of [47] without a history stack, and the first-order Lb-DNN baseline. 
+
+channel must be driven by the recorded data. Across all runs, 
+
+ˆθ remained below 8.1, well inside the projection bound. At the final time, the history stack ΦJ evaluated at the current weights has λmax = 26 .9 and a minimum eigenvalue at machine precision, with a numerical rank of 182 out of 702 
+
+at a relative tolerance of 10 −9. The helix therefore excites only part of the parameter space, Assumption 1 is not met on this trajectory, and the learning observed in Table I takes place along the excited directions of ΦJ . The domain and residual conditions of Theorem 1 are likewise sufficient conditions that were not verified at the simulated gains. 1
+
+VI. C ONCLUSION 
+
+A Nesterov-accelerated concurrent learning (NACL) adapta-tion law was developed for a Lyapunov-based DNN controller that updates all layers online, in which the momentum variable is driven by a finitely exciting history stack and the higher-order cross term is dominated by a state-dependent normal-ization. The Lyapunov-based analysis established exponential convergence of the tracking, momentum, weight estimation, and observer errors to a ball whose radius is set by the ap-proximation error, the observer accuracy, and the leakage gain, from initialization and under a finite excitation condition on the retained Jacobian data rather than persistent excitation of 
+
+> 1
+
+As is typical of Lyapunov-based robust and adaptive designs, the gain conditions are sufficient rather than necessary and are conservative; the gains that satisfy them are not necessarily the gains that perform best, and the simulated gains were selected for performance. 
+
+the trajectory. On a six-degree-of-freedom UUV, the developed method reduced the RMS function approximation error by 
+
+24 .5% relative to the first-order CL law of [36] driven by the same data and by 62 .9% relative to the higher-order tuner without CL of [47]. ACKNOWLEDGMENT 
+
+AI-based tools were used for the purposes of simulation code development, proofreading, and language review. The core mathematical development, the stability analysis, and the conceptual framework were entirely performed by the authors. All AI-generated outputs and suggestions were thoroughly reviewed, verified, and approved by the authors, who take full responsibility for the content of the final manuscript. REFERENCES [1] K. Hornik, M. Stinchcombe, and H. White, “Multilayer feedforward networks are universal approximators,” Neural Netw. , vol. 2, no. 5, pp. 359–366, 1989. [2] K. S. Narendra and K. Parthasarathy, “Identification and control of dynamical systems using neural networks,” IEEE Trans. Neural Netw. ,vol. 1, no. 1, pp. 4–27, Mar. 1990. [3] F. L. Lewis, A. Yesildirek, and K. Liu, “Multilayer neural-net robot controller with guaranteed tracking performance,” IEEE Trans. Neural Netw. , vol. 7, no. 2, pp. 388–399, Mar. 1996. [4] R. M. Sanner and J.-J. E. Slotine, “Gaussian networks for direct adaptive control,” IEEE Trans. Neural Netw. , vol. 3, no. 6, pp. 837–863, Nov. 1992. [5] S. S. Ge, C. C. Hang, T. H. Lee, and T. Zhang, Stable Adaptive Neural Network Control . Boston, MA, USA: Kluwer, 2002. [6] J. A. Farrell and M. M. Polycarpou, Adaptive Approximation Based Control: Unifying Neural, Fuzzy and Traditional Adaptive Approxima-tion Approaches . Hoboken, NJ, USA: Wiley, 2006. [7] E. Lavretsky and K. A. Wise, Robust and Adaptive Control: With Aerospace Applications . London, U.K.: Springer, 2012. [8] O. S. Patil, D. M. Le, M. L. Greene, and W. E. Dixon, “Lyapunov-derived control and adaptive update laws for inner and outer layer weights of a deep neural network,” IEEE Control Syst. Lett. , vol. 6, pp. 1855–1860, 2022. [9] G. Joshi, J. Virdi, and G. Chowdhary, “Design and flight evaluation of deep model reference adaptive controller,” in Proc. AIAA SciTech Forum ,2020, AIAA Paper 2020-1336. [10] R. Sun, M. L. Greene, D. M. Le, Z. I. Bell, G. Chowdhary, and W. E. Dixon, “Lyapunov-based real-time and iterative adjustment of deep neural networks,” IEEE Control Syst. Lett. , vol. 6, pp. 193–198, 2022. [11] E. J. Griffis, O. S. Patil, Z. I. Bell, and W. E. Dixon, “Lyapunov-based long short-term memory (Lb-LSTM) neural network-based control,” 
+
+IEEE Control Syst. Lett. , vol. 7, pp. 2976–2981, 2023. [12] R. G. Hart, E. J. Griffis, O. S. Patil, and W. E. Dixon, “Lyapunov-based physics-informed long short-term memory (LSTM) neural network-based adaptive control,” IEEE Control Syst. Lett. , vol. 8, pp. 13–18, 2024. [13] W. A. Makumi, O. S. Patil, and W. E. Dixon, “Lyapunov-based adaptive deep system identification for approximate dynamic programming,” 
+
+Automatica , vol. 180, p. 112462, Oct. 2025. [14] O. S. Patil, E. J. Griffis, W. A. Makumi, and W. E. Dixon, “Simulta-neous online system identification and control using composite adaptive Lyapunov-based deep neural networks,” 2026, arXiv:2311.13056. [15] P. A. Ioannou and J. Sun, Robust Adaptive Control . Upper Saddle River, NJ, USA: Prentice-Hall, 1996. [16] K. S. Narendra and A. M. Annaswamy, Stable Adaptive Systems .Englewood Cliffs, NJ, USA: Prentice-Hall, 1989. [17] K. J. ˚ Astr¨ om and B. Wittenmark, Adaptive Control , 2nd ed. Mineola, NY, USA: Dover, 2008. [18] S. Sastry and M. Bodson, Adaptive Control: Stability, Convergence, and Robustness . Englewood Cliffs, NJ, USA: Prentice-Hall, 1989. [19] S. Aranovskiy, A. Bobtsov, R. Ortega, and A. Pyrkin, “Performance enhancement of parameter estimators via dynamic regressor extension and mixing,” IEEE Trans. Autom. Control , vol. 62, no. 7, pp. 3546–3550, 2017. [20] R. Ortega, S. Aranovskiy, A. A. Pyrkin, A. Astolfi, and A. A. Bobtsov, “New results on parameter estimation via dynamic regressor extension and mixing: Continuous and discrete-time cases,” IEEE Trans. Autom. Control , vol. 66, no. 5, pp. 2265–2272, May 2021. [21] A. Bobtsov, B. Yi, R. Ortega, and A. Astolfi, “Generation of new exciting regressors for consistent online estimation of unknown constant parameters,” IEEE Trans. Autom. Control , vol. 67, no. 9, pp. 4746–4753, 2022. [22] B. Jenkins, A. Krupadanam, and A. M. Annaswamy, “Fast adaptive observers for battery management systems,” IEEE Trans. Control Syst. Technol. , vol. 28, no. 3, pp. 776–789, 2020. [23] G. Kreisselmeier, “Adaptive observers with exponential rate of conver-gence,” IEEE Trans. Autom. Control , vol. 22, no. 1, pp. 2–8, 1977. [24] S. B. Roy, S. Bhasin, and I. N. Kar, “Combined MRAC for unknown MIMO LTI systems with parameter convergence,” IEEE Trans. Autom. Control , vol. 63, no. 1, pp. 283–290, 2018. [25] A. Katiyar, S. B. Roy, and S. Bhasin, “Initial-excitation-based robust adaptive observer for MIMO LTI systems,” IEEE Trans. Autom. Control ,vol. 68, no. 4, pp. 2536–2543, 2023. [26] N. Cho, H.-S. Shin, Y. Kim, and A. Tsourdos, “Composite model reference adaptive control with parameter convergence under finite excitation,” IEEE Trans. Autom. Control , vol. 63, no. 3, pp. 811–818, 2018. [27] G. Chowdhary, T. Yucelen, M. M¨ uhlegg, and E. N. Johnson, “Concurrent learning adaptive control of linear systems with exponentially convergent bounds,” Int. J. Adapt. Control Signal Process. , vol. 27, no. 4, pp. 280– 301, 2013. [28] R. Kamalapurkar, B. Reish, G. Chowdhary, and W. E. Dixon, “Con-current learning for parameter estimation using dynamic state-derivative estimators,” IEEE Trans. Autom. Control , vol. 62, no. 7, pp. 3594–3601, Jul. 2017. [29] G. Chowdhary, M. M¨ uhlegg, J. P. How, and F. Holzapfel, “Concurrent learning adaptive model predictive control,” in Advances in Aerospace Guidance, Navigation and Control . Berlin, Germany: Springer, 2013, pp. 29–47. [30] A. Parikh, R. Kamalapurkar, and W. E. Dixon, “Integral concurrent learning: Adaptive control with parameter convergence using finite excitation,” Int. J. Adapt. Control Signal Process. , vol. 33, no. 12, pp. 1775–1787, Dec. 2019. [31] J.-J. E. Slotine and W. Li, “Composite adaptive control of robot manipulators,” Automatica , vol. 25, no. 4, pp. 509–519, Jul. 1989. [32] Y. Pan and H. Yu, “Composite learning robot control with guaranteed parameter convergence,” Automatica , vol. 89, pp. 398–406, Mar. 2018. [33] S. Basyal, J. Ting, K. Mishra, and B. C. Allen, “Augmentation of a Lyapunov-based deep neural network controller with concurrent learning for control-affine nonlinear systems,” in Proc. Amer. Control Conf. , 2024, pp. 2885–2890. [34] ——, “Concurrent learning and Lyapunov-based updates of deep neural networks for Euler-Lagrange dynamic systems,” in Proc. Amer. Control Conf. , 2024, pp. 15–20. [35] S. Basyal, J. Ting, K. Mishra, and B. Allen, “A lyapunov-and concurrent learning-based approach to train the weights of a dnn-based controller in real-time,” in 2026 American Control Conference (ACC) , 2026, pp. 444–449. [36] R. G. Hart, O. S. Patil, Z. I. Bell, and W. E. Dixon, “Concurrent learning for system identification and control using Lyapunov-based deep neural networks,” IEEE Control Syst. Lett. , vol. 9, pp. 2957–2962, 2025. [37] Y. E. Nesterov, “A method of solving a convex programming problem with convergence rate O(1 /k 2),” Sov. Math. Dokl. , vol. 27, no. 2, pp. 372–376, 1983. [38] W. Su, S. Boyd, and E. J. Cand` es, “A differential equation for modeling Nesterov’s accelerated gradient method: Theory and insights,” in Adv. Neural Inf. Process. Syst. , vol. 27, 2014, pp. 2510–2518. [39] J. E. Gaudio, T. E. Gibson, A. M. Annaswamy, M. A. Bolender, and E. Lavretsky, “Connections between adaptive control and optimization in machine learning,” in Proc. IEEE Conf. Decis. Control , 2019, pp. 4563–4568. [40] J. E. Gaudio, A. M. Annaswamy, M. A. Bolender, E. Lavretsky, and T. E. Gibson, “A class of high order tuners for adaptive systems,” IEEE Control Syst. Lett. , vol. 5, no. 2, pp. 391–396, 2021. [41] Y. Cui and A. M. Annaswamy, “Accelerated performance and acceler-ated learning with discrete-time high-order tuners,” in Proc. IEEE Conf. Decis. Control , 2022, pp. 1350–1355. [42] J. E. Gaudio, A. M. Annaswamy, E. Lavretsky, and M. A. Bolender, “Parameter estimation in adaptive control of time-varying systems under a range of excitation conditions,” IEEE Trans. Autom. Control , vol. 67, no. 10, pp. 5440–5447, 2022. [43] S. B. Roy and A. Annaswamy, “Exponential stability in the large and accelerated convergence for higher order adaptive tuners with persistence of excitation,” IEEE Trans. Autom. Control , 2026, early access. [44] Y. Pan, T. Shi, and C. Wen, “Least-squares composite learning back-stepping control with high-order tuners,” in Proc. IEEE Conf. Decis. Control , 2023, pp. 515–520. [45] T. Shi, C. Wen, and Y. Pan, “Composite learning backstepping control with guaranteed exponential stability and robustness,” 2024, arXiv:2401.10785. [46] D. M. Le, O. S. Patil, P. M. Amy, and W. E. Dixon, “Integral concurrent learning-based accelerated gradient adaptive control of uncertain Euler-Lagrange systems,” in Proc. Amer. Control Conf. , 2022, pp. 806–811. [47] D. M. Le, O. S. Patil, C. F. Nino, and W. E. Dixon, “Accelerated gradient approach for deep neural network-based adaptive control of unknown nonlinear systems,” IEEE Trans. Neural Netw. Learn. Syst. , vol. 36, no. 4, pp. 6299–6313, 2025. [48] O. S. Patil, B. C. Fallin, C. F. Nino, R. G. Hart, and W. E. Dixon, “Bounds on deep neural network partial derivatives with respect to parameters,” 2026, arXiv:2503.21007. [49] M. Krsti´ c, I. Kanellakopoulos, and P. V. Kokotovi´ c, Nonlinear and Adaptive Control Design . New York, NY, USA: Wiley, 1995. [50] N. Fischer, D. Hughes, P. Walters, E. M. Schwartz, and W. E. Dixon, “Nonlinear RISE-based control of an autonomous underwater vehicle,” 
+
+IEEE Trans. Robot. , vol. 30, no. 4, pp. 845–852, 2014.

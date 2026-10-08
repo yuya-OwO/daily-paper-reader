@@ -1,0 +1,502 @@
+Title: Continuous-Time Critic as a Lyapunov Function: Projected Adaptation and Cart-Pole Stabilization
+
+URL Source: https://arxiv.org/pdf/2610.09988v1
+
+Published Time: Thu, 08 Oct 2026 01:18:54 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Continuous-Time Critic as a Lyapunov Function: Projected Adaptation and Cart-Pole Stabilization 
+
+## Pavel Osinenko ∗
+
+Central University, 7 Gasheka St., bld. 1, Moscow, 123056, Russia Center for Engineering Systems and Sciences, 30 Bolshoy Boulevard, bld. 1, Moscow, 121205, Russia Sirius University of Science and Technology, 1 Olimpiyskiy Avenue, Sirius, 354340, Russia 
+
+## October 6, 2026 
+
+Abstract 
+
+We study adaptive stabilization of known control-affine systems by treating the current parameterized critic itself as a Lyapunov candidate. Its total derivative contains a parameter-velocity term that can compensate unfavorable state evolution. A projection onto the intersection of a bounded admissible velocity set and one decay halfspace enforces parameter invariance and Lyapunov decrease simultaneously. We give an exact pointwise feasibility test, a conditional state-stability theorem, and a counterexample showing why a positive critic family containing a stabilizing member does not imply persistent feasibility. A convex endpoint constraint provides a distinct sampled implementation. A generic periodic polynomial-factor critic with a local Riccati anchor is evaluated on a force-limited cart-pole without mechanical-energy features, replay training, waypoints, or controller switching. The frozen controller passes stabilization and numerical decay checks on 600 sampled initial states across two draw sets; 400 matched continuous trajectories also pass. Independent reintegration audits and a conservative local feasibility certificate are distinguished from a global or machine-arithmetic guarantee. Compared with nonlinear model-predictive control, the measured implementation uses less CPU but has higher cost, settling time, and cart travel. The results support a conditional adaptive stabilization mechanism. 
+
+# 1 Introduction 
+
+Control-Lyapunov functions (CLFs) convert the stabilization problem into feedback selection once an appropriate state function is available. The classical universal construction of Sontag [1] makes this dependence explicit. The difficult part is often finding a suitable CLF, particularly when a locally stabilizing quadratic function does not describe the desired large excursion. Adaptive CLFs [2] address nonlinear stabilization with unknown plant parameters through a different structured design problem. The critic-as-Lyapunov-function (CALF) viewpoint uses a learned or adjusted critic as the stability object. Earlier work develops reinforcement-learning schemes with Lyapunov constraints [3], an actor-critic framework with environment stability guarantees [4], and a model-free CALF agent incorporating a nominal stabilizer [5]. The present construction is explicitly model-based : the known vector fields enter the critic derivative, and the sample-and-hold implementation predicts the next state. The online parameters describe a critic and not an estimate of unknown masses or other plant coefficients. No optimal value representation, Bellman equality, or ideal parameter vector is assumed here. No nominal stabilizers are assumed known either. The key observation is simple but operationally important. For a smooth critic V (x, θ ), the term ∇θ V ⊤ ˙θ
+
+appears in its total derivative. One can therefore adapt the critic to meet a decay inequality while the state evolves. A projection that only preserves parameter bounds is insufficient: the same projection must also respect this particular derivative direction. This yields a general-purpose formula with a state-dependent feasibility condition, rather than an unconditional stabilizer for every stabilizable system. The contributions are as follows: (i) a bounded destination-projection formulation with an explicit feasibility budget and conditional state-stability proof; (ii) an exact-flow sampled counterpart whose endpoint 
+
+> ∗Correspondence: p.osinenko@gmail.com.
+
+1arXiv:2610.09988v1 [eess.SY] 7 Oct 2026 optimization is convex for a positive factorized critic; and (iii) a reproducible cart-pole study separating numerical success, local analytic guarantees, and failure modes. The chain rule, convex projection, and Lyapunov argument are established tools; the contribution claimed here is their particular continuous-time CALF construction and its implementation and assessment rather than a new general Lyapunov theorem. It should be stressed that persistent feasibility remains a substantive condition for theoretical guarantees. 
+
+## 1.1 Related work and positioning 
+
+Continuous-time online critic adaptation has a substantial history in adaptive dynamic programming. Vamvoudakis and Lewis [6] develop simultaneous actor and critic updates to approximate the infinite-horizon Hamilton–Jacobi–Bellman equation, with excitation conditions for critic convergence. Dierks and Jagannathan [7] use a single online approximator for the value function and associated control, establishing uniform ultimate boundedness in the presence of approximation errors. These results establish precedents for continuous learning during control and for obtaining feedback from a critic. Our stabilization condition is imposed directly on the current critic’s total derivative, without requiring convergence to an optimal value representation. Parameter-dependent Lyapunov functions and adaptation laws are also established in adaptive control [2]. Lopez and Slotine [8] explicitly account for the parameter-derivative term and dynamically scale adaptation to handle estimation transients, starting from a family of CLFs for uncertain plant models. More directly, Sinaei and Ebeigbe [9] modify a parameter adaptation law through a minimally invasive real-time QP with robust adaptive CLF and barrier constraints for unknown dynamics. Thus filtering an adaptation law through Lyapunov constraints already has published precedents. In the present construction, the parameters are freely chosen critic coefficients for a known plant, and a frozen critic need only satisfy uniform positivity; its decrease is enforced using bounded parameter motion whenever the joint constraints are feasible. Lyapunov-constrained reinforcement learning addresses several different stability or safety notions. Chow et al. [10] construct Lyapunov constraints for policies in constrained Markov decision processes with expected cumulative-cost limits. Han et al. [11] learn a Lyapunov critic and actor using a data-based stability condition for stochastic systems. Khaniki et al. [12] project finite policy-parameter updates using a linearized expected Lyapunov decrement, while updating the Lyapunov-network parameters separately by gradient descent. Here the hard continuous-time constraint acts on the critic’s own parameter velocity through the exact chain-rule term ∇θ V ⊤ ˙θ, evaluated with the actually applied input. A complementary line jointly synthesizes feedback laws and Lyapunov certificates before deploying the resulting controller. Neural Lyapunov Control [13] combines learning with counterexample search and formal verification, while Neural Lyapunov Redesign [14] alternates certificate estimation and policy improvement to enlarge the region of attraction. Recent state and output feedback synthesis [15] and continuous-time Zubov-based training [16] use scalable neural-network verification to certify regions for the synthesized controllers. Our critic continues to evolve along the physical trajectory; the reported large-excursion cart-pole evidence is numerical, supplemented by a separate local certificate. The present study therefore supplies a different implementation and guarantee scope from formally verified controller synthesis. Finally, combining Lyapunov decrease and set invariance in a QP is standard CLF/CBF methodology [17]. For the augmented state ( x, θ ), one can interpret v = ˙θ as a virtual control input and {0} × Θ as the target set. This interpretation identifies the established optimization machinery underlying our construction. The specific contribution is the bounded destination constraint on critic motion, its exact pointwise compensation budget and persistent-feasibility boundary, together with the convex sampled endpoint formulation and reproducible case study. 
+
+# 2 Projected Critic Adaptation 
+
+## 2.1 Plant and critic 
+
+Consider the known plant ˙x = f (x) + g(x)u, x ∈ X ⊆ Rn, u ∈ U, (1) where X is an open neighborhood of the target 0, f, g are locally Lipschitz, and U is an admissible input set. Let Θ ⊂ RN be compact and convex, and V be C1 on a neighborhood of X × Θ. Assume uniform positive-definite bounds on the domain of interest: 
+
+κlow (∥x∥) ≤ V (x, θ ) ≤ κup (∥x∥), θ ∈ Θ. (2) 2Here κlow and κup belong to class K: they are continuous, strictly increasing functions that vanish at zero. These bounds measure state size uniformly over the critic parameters. To ensure that solutions remain in a region where the assumptions hold, the stability results below additionally require a compact sublevel set contained in X × Θ. For periodic states the bounds are understood relative to distance to the target on the state space; a wrapped angle is not a global smooth coordinate. Choose a continuous positive-definite decay target w and an input law (in other words, policy) π(x, θ ) ∈ U.A possible choice is 
+
+π(x, θ ) := arg min 
+
+> u∈U
+
+{∇ xV (x, θ )⊤g(x)u + u⊤R(x, θ )u}, R ≻ 0. (3) For a scalar interval U = [ −¯u, ¯u], this is the saturated expression π = clip [−¯u, ¯u](−Lg V / (2 R)), where 
+
+Lg V := ∇xV ⊤g and clip [a,b ](z) := min {b, max {a, z }} . Other admissible laws can be used; the derivative constraint must always use the actually applied input. Define, with column gradients, 
+
+p := ∇θ V, a := ∇xV ⊤(f + gπ ) + w(x). (4) For any absolutely continuous parameter trajectory with velocity v,˙V = ∇xV ⊤(f + gπ ) + p⊤v, ˙V ≤ − w(x) ⇐⇒ p⊤v + a ≤ 0. (5) In the linear critic case V = θ⊤φ(x), p = φ(x). For π = −g⊤Dφ⊤θ, the state contribution is θ⊤Dφf −
+
+θ⊤Dφgg ⊤Dφ⊤θ, where Dφ denotes the Jacobian of φ with respect to x. Notice that there is no unknown plant parameter in this calculation: θ is the chosen critic parameter, and its velocity contributes the directly adjustable term p⊤v.
+
+## 2.2 One projection for two requirements 
+
+Let v0(x, θ ) be a preferred adaptation velocity and τ > 0 a design time constant. Let M be a symmetric positive-definite metric matrix, defining ∥z∥2 
+
+> M
+
+:= z⊤M z . Choose the closest admissible velocity to v0 in this weighted norm: 
+
+v∗(x, θ ) := arg min  
+
+> v
+> 12
+
+(v − v0)⊤M (v − v0)subject to θ + τ v ∈ Θ, p⊤v + a ≤ 0,
+
+˙θ = v∗(x, θ ).
+
+(6) The first constraint requires the destination θ + τ v to lie in Θ. Here τ limits the adaptation speed; it need not equal a numerical integration step. By convexity, the entire segment from θ to this destination remains in Θ. The resulting velocities belong to the tangent cone TΘ(θ) := cl ( {c(y − θ) : c ≥ 0, y ∈ Θ}), where cl ( ·)denotes closure. Unlike the whole tangent cone, the admissible velocity set is bounded: ∥v∥ ≤ diam(Θ) /τ ,where diam(Θ) := sup y,z ∈Θ ∥y − z∥. When feasible, the compact convex constraint set and strictly convex objective give a unique optimizer. Equivalently, define the admissible destination set 
+
+Kτ (x, θ ) := Θ ∩ { y : p⊤y ≤ p⊤θ − τ a }. (7) Its weighted projection y∗ := arg min y∈K τ ∥y − (θ + τ v 0)∥2 
+
+> M
+
+is the closest admissible destination in the norm defined by M . Substitution gives v∗ = ( y∗ − θ)/τ . Along a solution for which this selection is defined, 
+
+θ(t) = e−t/τ θ(0) + 1
+
+τ
+
+∫ t
+
+> 0
+
+e−(t−s)/τ y∗(s) ds ∈ Θ. (8) The inclusion follows from closed convexity: the nonnegative weights sum to one. Parameter invariance and critic decrease thus arise from separate constraints of the same optimization. 
+
+Proposition 1 (Pointwise feasibility) . The constraint set in (6) is nonempty precisely when 
+
+a ≤ p⊤θ − min y∈Θ p⊤yτ . (9) 
+
+Proof. Substitute v = ( y − θ)/τ into the decay constraint and minimize its left side over the compact set Θ. The minimum is attained. 3The right-hand side of (9) is the largest reduction −p⊤v that an admissible parameter velocity can contribute at the current ( x, θ ). It is nonnegative because y = θ is admissible, but it can be zero at a parameter boundary or when p = 0. At a fixed ( x, θ ), reducing τ allows larger parameter velocities and cannot reduce this available compensation. Along a closed-loop trajectory, however, the faster adaptation also changes future states and parameters; it therefore need not prevent later infeasibility. For a box Θ = [ θ−, θ +], put l = ( θ− − θ)/τ and r = ( θ+ − θ)/τ . The exact test is 
+
+a + ∑
+
+> pi>0
+
+pili + ∑
+
+> pi<0
+
+piri ≤ 0. (10) For diagonal M = diag ( mi), with mi > 0, introduce the nonnegative Lagrange multiplier λ of the decay constraint p⊤v + a ≤ 0. Minimizing the Lagrangian over the component bounds gives 
+
+vi(λ) := clip [li,r i](v0i − λp i/m i), λ ≥ 0. (11) Define the scalar residual F (λ) := a + ∑ 
+
+> i
+
+pivi(λ). If F (0) ≤ 0, the box projection v(0) is already the optimizer. Otherwise the decay constraint is active, and its multiplier satisfies F (λ) = 0. Each term pivi(λ)is continuous and nonincreasing, so the same holds for F . After checking (10), increase an upper trial value of λ until F ≤ 0, then use bisection between zero and that value. This summarizes the procedure. 
+
+## 2.3 Why feasibility is not automatic 
+
+Consider ˙ x = x + u, V (x, θ ) = θx 2, Θ = [0 .1, 1], and u = −∂xV = −2θx . The interior parameter θ = 0 .75 stabilizes the plant with ˙V = −0.75 x2. Nevertheless, at θ = 0 .1, the derivative is 0 .16 x2 + x2v. Every invariant-box velocity satisfies v ≥ 0 there, making strict decay impossible for x̸ = 0. Thus even a uniformly positive family containing a stabilizing member need not remain feasible from all admissible initial parameters. Generally speaking, feasibility can be achieved for suitably chosen critic models. Sequential projection also fails in general. At a corner of R2+, the decay halfspace v1 + v2 ≤ 1 contains (−1, 2), but its projection onto the positive orthant is (0 , 2), outside the halfspace. This explains why an invariance projection cannot simply be appended to an otherwise successful adaptation formula. 
+
+# 3 Conditional Stability and Sampled Implementation 
+
+Theorem 2 (State stability under feasible adaptation) . Suppose (2) holds, w is continuous positive definite, and f + gπ is continuous, bounded on compact subsets, and zero at x = 0 . Let Ωb := {(x, θ ) ∈ X × Θ : 
+
+V (x, θ ) ≤ b} be compact with state projection inside X. Suppose the adaptation law has absolutely continuous local solutions which admit continuation while remaining in compact subsets, and its constraints remain feasible on Ωb. Then every such solution starting in Ωb is forward complete, stays there, and has x(t) → 0.The state target is Lyapunov stable uniformly over initial parameters for sufficiently small initial states whose sublevels are covered by these assumptions. Proof. Equation (8) preserves the parameter set. The chain rule and the joint decay constraint give 
+
+V (x(t), θ (t)) + 
+
+∫ t
+
+> 0
+
+w(x(s)) ds ≤ V (x(0) , θ (0)) . (12) The trajectory therefore stays in the compact sublevel and extends for all positive time by the continuation hypothesis. The uniform bounds give stability: choose δ so that κup (δ) < κ low (ε) and the associated initial sublevel is covered. Then ∥x(0) ∥ < δ implies ∥x(t)∥ < ε , independently of θ(0). On the compact invariant set, the plant velocity is bounded, so x(t) is Lipschitz in time. Uniform continuity of w there makes w(x(t)) uniformly continuous. It is nonnegative and integrable by (12), hence tends to zero. Positive definiteness on the compact state projection then implies x(t) → 0. 
+
+Remark 3 (No parameter convergence) . The theorem does not assert parameter convergence to any particular vector. 
+
+Remark 4 (Regularity is a separate hypothesis) . Uniqueness of each convex optimizer does not imply continuity of the state-dependent optimizer map. Projected dynamical systems require explicit solution and regularity conditions [18]. For example, with ˙ x = −x, V = ax 2, decay target x2, and nominal ˙ a = 2(2 − a), the constraint at a = 1 is x2 ˙a ≤ x2. With bounds permitting both velocities, projection gives ˙ a = 1 for 
+
+x̸ = 0 but ˙ a = 2 at x = 0. Smooth data and a unique optimizer do not remove this discontinuity. This example diagnoses regularity, not instability. 43.1 A distinct endpoint-constrained realization 
+
+Choose a hold length h ≤ τ (in a sample-and-hold control regime) and let y = Φ h(x, π (x, θ )) be the exact held-input plant trajectory endpoint starting from x under constant control π(x, θ ). Set θ+ := θ + hv . In addition to the box and instantaneous constraints, impose 
+
+V (y, θ + hv ) − V (x, θ ) + h
+
+2 {w(x) + w(y)} + hδq (x) ≤ 0, δ ≥ 0, q ≥ 0. (13) If V (y, ·) is convex, this is a convex constraint in v for the fixed selected input. The sampled filter is not merely Euler integration of (6); it solves an additional endpoint requirement. The predicted flow is independent of the parameter destination because the physical input is held during the interval. 
+
+Lemma 5 (Exact sampled decay) . For fixed h > 0, suppose all exact held endpoints exist, all updates satisfy the admissible velocity set and (13) , and the critic has uniform bounds and a compact sublevel containing the initial pair. Then parameters remain in Θ, sampling states remain in that sublevel, and 
+
+xk → 0. The state is Lyapunov stable at sampling instants. Proof. Since θ + τ v ∈ Θ and h ≤ τ , the destination θ+ = (1 − h/τ )θ + ( h/τ )( θ + τ v ) belongs to Θ. Telescoping (13) gives h
+
+> 2
+
+∑N −1 
+
+> k=0
+
+{w(xk) + w(xk+1 )} ≤ V (x0, θ 0). For fixed h > 0, the nonnegative series ∑ 
+
+> k
+
+w(xk) is finite, hence w(xk) → 0. If xk did not converge to zero, some subsequence would stay at least a fixed distance ε > 0 from zero. Compactness of the state projection would give a further subsequence converging to ¯ x̸ = 0. Continuity would then imply w(¯ x) = 0, contradicting positive definiteness. For stability, fix ε > 0 and choose ρ > 0 such that κup (ρ) < κ low (ε) and the corresponding initial sublevel is covered by the assumptions. Then ∥x0∥ < ρ implies, for every k,
+
+κlow (∥xk∥) ≤ V (xk, θ k) ≤ V (x0, θ 0) ≤ κup (∥x0∥) < κ low (ε).
+
+Strict monotonicity of κlow gives ∥xk∥ < ε , uniformly over the admissible initial parameters. Full intersample convergence additionally follows if the held-flow excursion over [0 , h ] tends uniformly to zero as the initial state tends to zero, uniformly over admissible parameters. The local cart-pole construction below has this property. Numerically predicted endpoints do not satisfy the lemma automatically: rigorous prediction-error enclosures or exact flow would be needed for a machine-level claim. 
+
+# 4 A Generic Cart-Pole Critic 
+
+## 4.1 Physical model and periodic lift 
+
+Let s = ( x, v, ϑ, ω ) ∈ R2 × S1 × R, with upright ϑ = 0 and force |u| ≤ 12 N. A point-mass pole on a massless rod has dynamics ˙x = v, ˙ϑ = ω, 
+
+˙v = u + mℓ sin ϑ ω 2 − mg sin ϑ cos ϑM + m sin 2 ϑ , ˙ω = g sin ϑ − cos ϑ ˙vℓ . (14) The nominal parameters are M = 1 kg, m = 0 .2 kg, ℓ = 0 .8 m, g = 9 .81 m/s 2. There is no friction, rail-position constraint, actuator lag, slew-rate limit, measurement noise, or parameter mismatch in this study. The uncontrolled upright equilibrium is unstable. Use the generic lift and its degree-two monomials 
+
+z = ( x, v/ 2, 2 sin ϑ, 2(1 − cos ϑ), ω )⊤, ψ = ( zi, 14 zizj : 1 ≤ i ≤ j ≤ 5) ⊤ ∈ R20 . (15) Coordinates are numerically scaled in the stated SI conventions; their scales are design choices. Define 
+
+H(s) = 1 − exp[ − 12 {x2 + v2 + 8(1 − cos ϑ) + ω2/4}],ξκ(s) = ( x, v, sin ϑ + κ(1 − cos ϑ), ω )⊤, γ(s) = e−(1 −cos ϑ)/b 2
+
+. (16) Obtain P ≻ 0 from the upright continuous-time algebraic Riccati equation with Q0 = diag(2 , 1, 70 , 8) and 
+
+R0 = 0 .35. The local checks use the stored matrix without assuming that it solves the equation exactly in machine arithmetic. Define 
+
+V (s, L, η ) = H(s){ε ∥z∥2 + ∥Lψ ∥2} + W e η γ(s)ξ⊤ 
+
+> κ
+
+P ξ κ. (17) Here L ∈ [−3, 3] 5×20 , η ∈ [−7, 0.7], ε = 0 .002, W = 8, b = 1 .5, and κ ∈ {− 0.25 , 0.25 } is fixed after initialization. There are 101 adaptive parameters. 5Proposition 6. The critic family (17) is uniformly positive definite and proper on the cylindrical state space. In an upright coordinate chart, V = W e η s⊤P s + O(∥s∥3) uniformly over its parameter box. Proof. The lift z vanishes only at the target, and H > 0 elsewhere. Therefore V ≥ εH ∥z∥2 > 0 away from the target, independently of the parameters. As ∥(x, v, ω )∥ → ∞ , H → 1 and ∥z∥ → ∞ ; the angle is compact. Near the target, H = O(∥s∥2), ψ = O(∥s∥), ξκ = s + O(∥s∥2), and γ = 1 + O(∥s∥2). The bounded parameter set makes all remainders uniform; W e η has a strictly positive lower bound. It should be noted that this family is not structure-free: it uses the plant model, periodic coordinates, scales, and a local Riccati matrix. However, its features contain no mechanical-energy error or predesigned swing-up trajectory. The positive factorization is not an SOS certificate of a globally negative Lie derivative. In particular, ∇LV = 2 H(Lψ )ψ⊤ can vanish when Lψ = 0 even if L̸ = 0 and no coefficient lies on a box face. 
+
+## 4.2 Initialization and feedback 
+
+Write ξκ = Tκz and let rows of Nκ form an orthonormal basis of ker Tκ. Define 
+
+Cκ = T ⊤ 
+
+> κ
+
+P T κ + tr( T ⊤ 
+
+> κ
+
+P T κ)4 N ⊤ 
+
+> κ
+
+Nκ. (18) For each κ ∈ {− 0.25 , 0.25 }, compute an upper Cholesky factor Bκ satisfying B⊤ 
+
+> κ
+
+Bκ = Cκ. Set L(κ)0 := [√5Bκ/ ∥Bκ∥F 05×15 ] and η0 = 0, where ∥·∥ F is the Frobenius norm. At the initial state s0, evaluate 
+
+V (s0, L (κ)0 , 0) separately for these two candidates and retain the candidate with the smaller value. If the values are equal, choose κ = +0 .25. The selected κ remains fixed throughout the run; only L and η
+
+subsequently adapt. Thus each sign is evaluated with its own initialized factor, and the selection occurs once before applying the controller. The preferred adaptation is recovery toward the initialized parameters: v0 = 0 .5( θ0 − θ), with τ = 0 .01 s and M = I in (6). The required state decay is w = 0 .01 q, where 
+
+q(s) = x2 + 0 .2v2 + 12 ϑ2wrap + ω2. (19) The squared principal angle is continuous on S1, although it is not differentiable at the antipode. The critic remains smooth and periodic; the proofs require continuity, not differentiability, of q.To moderate force variation, use the penalty 
+
+R = Rf + (1 − H)( W e η R0 − Rf ) + tdHG GN , Rf = 0 .01 , td = 0 .002 s , (20) in (3). For a factor C⊤C = P , define residual vectors rG = √H(√εz, Lψ )⊤ and rA = √W e η γ Cξ κ; then 
+
+GGN := ∥D g rG∥2 + ∥D g rA∥2 ≥ 0. Here Dg r := ( Dsr)g(s) is the directional derivative along the input vector field, with the critic parameters held fixed. The derivative Dg rG has a continuous zero extension at the target; Dg rA generally does not vanish there. Since the input has no position or angle component, 
+
+∥D g rA∥2 = W e η γg ⊤P g exactly. The added penalty is O(∥s∥2) and does not change the local gain: 
+
+π(s, θ ) = −Ks + O(∥s∥2), K = R−10 B⊤P, (21) uniformly in boxed parameters. This nonnegative first-derivative surrogate is not a Hessian bound and does not itself guarantee feasibility, smooth commands, or a force slew limit. 
+
+## 4.3 Local persistent feasibility 
+
+Let A, B be the upright linearization, Ac = A − BK , Qc = −(P A c + A⊤ 
+
+> c
+
+P ), and S− = W e −7. Uniform Taylor bounds in (21) make s⊤P s a common local Lyapunov function for every fixed or varying boxed parameter selection. For a zero parameter velocity, the normalized critic derivative has leading term 
+
+−s⊤Qcs. Thus positive definiteness of Qc − (σ + ζ)Qs/S −, with σ = 0 .01, Qs = diag(1 , 0.2, 12 , 1), and a suitable reserve ζ ≥ 0, gives a uniform local feasible witness v = 0. For fixed hold h, let Ah = eAh , Bh = ∫ h 
+
+> 0
+
+eAt B dt , and Fh = Ah − BhK. The analogous leading matrix for (13) is 
+
+Dh = P − F ⊤
+
+> h
+
+(
+
+P + hσ 
+
+2S−
+
+Qs
+
+)
+
+Fh − h(σ/ 2 + δ + ζ)
+
+S−
+
+Qs. (22) 6When this and P − F ⊤ 
+
+> h
+
+P F h are positive definite, uniform remainders give a common sufficiently small invariant state ellipsoid on which the zero update is feasible. Box invariance is enforced directly, so this argument does not require an exact projection minimizer: any verified feasible boxed update is admissible. Standard local held-flow bounds cover the intersample state. This proves local persistent feasibility for the ideal nominal law, not entry from a hanging initial condition. For the specified critic, h = 0 .002 s and δ = 10 −4, conservative exact-rational remainder and matrix checks accept 
+
+r∗ = 2 −25 , s⊤P s ≤ 3.56591397745 × 10 −16 . (23) The sampled and continuous error-bound comparisons are, respectively, 0 .0003194091 < 0.0003770750 and 0.05970460 < 0.19093633 (rounded displays). The stored binary matrix coefficients are interpreted as exact rationals; matrix positivity is checked by exact elimination and matrix exponentials are enclosed with Taylor remainders. The ancillary certificate and executable checker record and reproduce the unrounded constants and matrix; Appendix B states the sufficient inequalities. The radius is extremely conservative and is not apractical estimate of the swing-up attraction region. The numerical simulations and a floating-point solver are not certified by this exact-arithmetic calculation. 
+
+# 5 Numerical Study 
+
+## 5.1 Protocol and implementation 
+
+The selected controller was frozen before the primary 300-state draw. Two hundred starts have independent uniform coordinates in [ −1, 1] × [−2, 2] × [−π, π ] × [−4, 4], using seed 20261024. One hundred near-hanging starts use independent uniforms x ∈ [−0.3, 0.3], v ∈ [−0.5, 0.5], ϑ ∈ π + [ −0.3, 0.3], ω ∈ [−0.7, 0.7], seed 20261025. The preceding twenty-start development screen compared curvature time constants 0 , 1, 2, 4 ms. Selection required all development paths to settle with clean numerical decay, a median paired variation ratio at most 0 .75, and a cost ratio at most 1 .1; eligible settings were ranked by variation, then cost, then time constant before drawing the fresh validation states. The initialization rule, model, force limit, and remaining coefficients were then held fixed. Simulations use Regelum 0.3.15 [19], with CasADi [20] CVODES plant integration at relative/absolute tolerances 10 −10 /10 −12 for the sampled controller. The continuous augmented state–parameter flow is integrated independently by DOP853 with 10 −7/10 −9 tolerances and maximum step 0 .02 s. The horizon is 45 s. A path is settled when its last two seconds remain within |s| < (0 .1, 0.2, 0.05 , 0.1); settling time is the earliest entry remaining inside through the horizon, with at least two seconds left. The held implementation retains the instantaneous halfspace and adds (13). At fixed y, the endpoint expression is quadratic in L+ and exponential in η+, hence convex. A conic formulation uses second-order and exponential cones and Clarabel [21]; rejected numerical candidates may be refined by SLSQP on the same convex constraints. A final segment repair toward a verified feasible witness is allowed only after checking the original constraints. This is not a different physical controller, and a repaired answer is not asserted to be the exact minimum-distance optimizer. Neither refinement nor repair can make a genuinely empty feasible set nonempty. Numerical success requires full-horizon completion, settling, and both the instantaneous residual and normalized endpoint residual at most 10 −6. Parameter-box and actual endpoint checks are retained. These finite tolerances are audit criteria, not replacements for the zero-tolerance inequalities in the theorems. Independent audits reintegrate recorded held inputs with DOP853 at 10 −12 /10 −14 . No audited interval with a genuinely positive reproduced violation is relabeled as numerical noise. 
+
+## 5.2 Validation and comparison 
+
+Table 1 reports the primary outcomes and a second draw. The second 300-state set, seeds 20261026/27 with the same distributions, was introduced to test a longer-hold candidate. The unchanged 2 ms controller was retained as its reference and passes all 300 sampled starts. A separate later evaluation of its unchanged continuous law passes the corresponding 200 box starts. These are distinct evaluations on reused states, not an additional 200 independent draws. The primary sample-and-hold candidate/reference median paired command variation ratios are 0.084829 for the box and 0.022127 near hanging. Median paired common-cost ratios are 0.99624 and 0.98584. This is not uniform improvement: the worst box cost ratio is 2.537 and median box cart travel increases by approximately 1.1%. Figure 1 shows the first near-hanging validation case, selected by its preexisting index rather than by best performance. 7Table 1: Nominal cart-pole results. Strict means the stated numerical decay checks, not a certified region. Continuous and sampled variants share starts. The two draw sets contain 600 distinct initial states. Draw Controller/evaluation Starts Settled Strict Primary CALF, 2 ms held 300 300 300 Primary CALF, continuous (box) 200 200 200 Primary No-curvature reference, 2 ms 300 300 299 Primary NMPC, 100 ms (near hanging) 100 100 –Second Unchanged CALF, 2 ms held 300 300 300 Second Unchanged CALF, continuous (box) 200 200 200 Second Longer-hold candidate, 4 ms 300 300 299 Second Longer-hold law, continuous (box) 200 199 199 The matched NMPC comparator uses the same plant and 12 N limit, a 100 ms control period, 30 stages (3 s), multiple shooting, and the common running cost 
+
+J =
+
+∫ 45 0
+
+{2x2 + v2 + 140(1 − cos ϑ) + 8 ω2 + 0 .35 u2} dt. (24) It uses a local terminal quadratic augmented by 70(1 − cos ϑ)2, but no certified terminal set. Warm starts are shifted after each solve. At startup, both angle-rotation directions and a stationary seed are considered; a stationary restart is added every ten updates. Failure of every solve is recorded, not hidden by a backup controller. The comparator is thus a practical numerical NMPC design, not a globally certified optimal controller. Both methods settle all 100 matched near-hanging starts. Median common cost is 1208.8 for CALF and 419.83 for NMPC; median settling times are 8.406 and 3.8375 s, and median peak cart displacements are 5.9557 and 1.794 m, respectively. Figure 2 retains the complete distributions. 
+
+## 5.3 Audits, computation, and a negative result 
+
+Thirty-two primary full replays reproduce their archived arrays exactly. Independent reintegration checks 720000 held intervals: all 16 selected candidate paths pass and 15 of 16 reference paths pass, reproducing the known reference failure. Maximum state disagreement is below 7 .03 × 10 −9. The audits include selected rather than all primary paths; they do not turn the full sampled batch into a validated enclosure. All 500 primary candidate numerical paths enter the very small local ellipsoid (23) and stay inside at subsequent logged nodes. Numerical entry is not an exact-flow proof that swing-up reaches that set. A quiet single-core benchmark replays six matched initial states for each controller with three sequential repeats. The median paired total CPU ratio NMPC/CALF is 1.6703. The respective median CPU rates are 0.3819 and 0.2277 s per simulated second. This measures different controllers at their respective 100 ms and 2 ms update periods, not equal-cost solves. Median steady deadline-miss fractions are 0.1114% and 0.7023%; worst steady calls are 431.43 and 4.93 ms. The simulated plant does not include these computation delays. Neither hard-real-time operation nor a worst-case execution-time bound is established. The longer-hold extension is important counterevidence. A 4 ms hold with a 4 ms curvature penalty passed all 20 reused development starts but failed the next draw: one sampled path had two reproduced endpoint violations despite physically settling, and one continuous path lost feasibility. The maximum sampled residual was 140.58064, not a roundoff-sized excursion. This candidate was not promoted. Changing the penalty changes the feedback, so this is not a discretization-convergence test of one fixed continuous law. 
+
+# 6 Discussion and Conclusion 
+
+The results demonstrate that an adaptive positive critic can support force-limited swing-up and stabilization without encoding mechanical-energy error, learning from replay data, or switching to a separate local controller. The local Riccati anchor and deterministic initialization remain meaningful prior structure; the method is neither model-free nor independent of design choices. Its role is to supply an online mechanism for enforcing a specified critic decrease, not to establish value-function optimality. The exact pointwise test identifies the compensation available from bounded parameter motion. It does not prove that the available compensation will persist along the future path. Both the counterexample and 80 2 4 6 8 10 12 14 Time [s] 0246Cart x [m] 0 2 4 6 8 10 12 14 Time [s] −3 −2 −1 0123Wrapped angle [rad] 0 2 4 6 8 10 12 14 Time [s] −10 −5 0510 Applied force [N] 0 5 10 15 20 25 30 35 40 45 Time [s] 10 −24                   
+
+> 10 −20
+> 10 −16
+> 10 −12
+> 10 −8
+> 10 −4
+> 10 0
+> Adaptive critic V 0510 15 20 25 30 35 40 45 Time [s] −10 2
+> −10 0
+> −10 −2
+> −10 −6
+> −10 −10
+> 010 −6
+> Instantaneous residual 0510 15 20 25 30 35 40 45 Time [s] −10 2
+> −10 0
+> −10 −2
+> −10 −6
+> −10 −10
+> 010 −6
+> Endpoint residual / h
+> Numerical threshold
+
+Figure 1: First near-hanging validation start with the frozen 12 N CALF. The first three panels show the maneuver; critic and residual panels cover all 45 s. Stored 20 ms bins preserve the minimum/maximum force and maximum residual over their ten 2 ms decisions. The dashed residual threshold is a numerical acceptance criterion, not the theorem’s bound. No energy-based swing-up controller or LQR handoff is used. the failed longer-hold experiment make this limitation explicit. Uniform positivity, existence of closed-loop solutions, and persistent feasibility cannot be replaced by critic richness or by successful trajectories. For the reported plant, the frozen 2 ms recipe has consistent nominal numerical evidence and a conservative ideal local certificate. The main remaining theoretical gap is a useful large-excursion feasibility or entry certificate. Robustness to disturbances, mismatch, actuator dynamics, and finite computation delay is also outside the present result. The comparison with NMPC exhibits a computational/performance trade-off, not general superiority. These qualifications define a reproducible continuous-time CALF construction and a concrete starting point for broader adaptive-stabilization studies. 
+
+# A Endpoint Optimization and Failure Diagnosis 
+
+For fixed predicted endpoint y and increment d = hv , write Hy = H(y), ψy = ψ(y), cy = ε ∥z(y)∥2, and 
+
+Ay = W γ (y)ξκ(y)⊤P ξ κ(y) ≥ 0. The endpoint constraint is 
+
+Hy ∥(L + ∆ L)ψy ∥2 + Ay eη+dη + Hy cy ≤ B, (25) where B is the decay budget from (13). Introduce epigraph variables t, e . Its conic representation is (t + 1 , 2√Hy (L + ∆ L)ψy , t − 1) ∈ Q ,
+
+(η + dη , 1, e ) ∈ K exp , t + Ay e + Hy cy ≤ B, (26) together with hl ≤ d ≤ hr and p⊤d + ha ≤ 0. The objective is 12 ∥d − hv 0∥2, with the same minimizer as the velocity objective. The second-order cone enforces t ≥ Hy ∥(L + ∆ L)ψy ∥2.A useful necessary endpoint test minimizes the critic over the reachable parameter box, omitting the derivative halfspace. Each row projection L+ 
+
+> i
+
+ψy ranges over a scalar interval [ ai, b i], obtained by 9CALF NMPC 400 600 800 1000 1200 1400 1600 1800 2000 Common cost J    
+
+> CALF NMPC 46810 12 Settling time [s]
+> CALF NMPC 12345678Peak |x| [m]
+> Box (200) Hanging (100) 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> Command variation: candidate / reference
+
+Figure 2: Left three panels: all 100 matched near-hanging starts, with lower values preferable. Right: paired command-variation ratios against the no-curvature CALF reference on all 300 primary starts. Boxes show quartiles and medians, whiskers extend to 1.5 interquartile ranges, and points beyond are retained. Cost/travel improvements over NMPC are not claimed. componentwise interval extrema. The minimum squared projection is dist(0 , [ai, b i]) 2. The anchor minimum uses the smallest reachable η+. Thus the relaxed endpoint minimum is explicit. If it exceeds B, the fixed-input joint update is infeasible. Evaluation in floating point is a diagnostic, not an interval proof; it also says nothing about every alternative input. When the box-minimizing witness satisfies both constraints, convexity permits bisection on the segment joining it to a rejected numerical candidate. Acceptance rechecks the original box, instantaneous inequality, and endpoint inequality. Otherwise no repair is accepted. This explains the difference between numerical projection error and an exhausted feasibility budget. 
+
+# B Sufficient Local Bounds 
+
+This appendix states the estimates used by the ancillary exact-arithmetic checker. They concern the nominal mathematical feedback, not numerical integration. All norms below are Euclidean or induced norms; upper bounds may be deliberately loose. Write r = ∥s∥ ≤ 1, d = 5, BL = 20 d 32, ¯P = tr P ,
+
+P = 1 / tr( P −1), K∗ ≥ ∥ K∥, B∗ = (1 + ℓ−1)/M , and T = 1 + 1 /6 + |κ|/2. Let E− ≤ e−7 and E2 ≥ e2 be positive rational bounds; put S∗ = W E −. These bounds cover both signs of the fixed initial angle bias. 
+
+## B.1 Critic and force remainders 
+
+The lift satisfies ∥z∥ ≤ 2r, ∥Dz ∥ ≤ 2, ∥ψ∥ ≤ √5r, ∥Dψ ∥ ≤ √8, H ≤ 2r2, and ∥∇ H∥ ≤ 4r. The monomial estimate follows from ∑ 
+
+> i≤j
+
+z2 
+
+> i
+
+z2 
+
+> j
+
+≤ ∥ z∥4. Consequently the generic gradient is at most CGr3, where 
+
+CG = 32 ε + 48 BL. The anchor coordinates satisfy 
+
+∥ξκ − s∥ ≤ | κ|r2/2 + r3/6, ∥Dξ κ − I∥ ≤ | κ|r + r2/2, ∥ξκ∥ ≤ T r. 
+
+Differentiating the gated quadratic, separating the gate, coordinate and Jacobian errors, gives anchor gradient coefficients 
+
+A2 = W ¯P |κ|(2 T + 1) , A3 = W ¯P {(1 + T 2)/b 2 + T + 1 /3}.
+
+Thus ∥∥∇s(W γξ ⊤ 
+
+> κ
+
+P ξ κ) − 2W P s ∥∥ ≤ A2r2 + A3r3. The input field obeys ∥g(s) − B∥ ≤ Cg r2, with 
+
+Cg = m/M 2 + {m/M 2 + 1 /(2 M )}/ℓ. 
+
+Before the Gauss–Newton penalty is added, the unsaturated force has |u + Ks | ≤ U2r2 + U3r3, where 
+
+U2 = E2A2B∗/(2 W R 0),U3 = E2
+
+{ ¯P C g /R 0 + A3B∗/(2 W R 0) + CGB∗/(2 S∗R0) + 2(1 + Rf /(S∗R0)) K∗
+
+} .
+
+Here the lower bound R ≥ e−2W e η R0 cancels the anchor weight before estimating its gradient error. For the added penalty, direct differentiation of rG and ∥a + b∥2 ≤ 2 ∥a∥2 + 2 ∥b∥2 give ∥D g rG∥2 ≤
+
+(20 ε + 37 BL)B2 
+
+> ∗
+
+r2. Indeed ( Dg H)2/(2 H) ≤ B2 
+
+> ∗
+
+away from the target, using 1 − e−t ≥ te −t; continuity 10 covers the target. Also ∥D g rA∥2 ≤ W e η ¯P B 2 
+
+> ∗
+
+. The relative added penalty is therefore at most CD r2, where 
+
+CD = 2tdE2B2
+
+> ∗
+
+R0
+
+(
+
+¯P + 20 ε + 37 BL
+
+S∗
+
+)
+
+.
+
+The identity unew + Ks = ( R/R new )( u + Ks ) + (1 − R/R new )Ks replaces U3 by U3 + CD K∗. Below U3
+
+denotes this enlarged value. 
+
+## B.2 Common state bounds 
+
+Set 
+
+Ca0 = ( K∗ + mg )/M, Ca = K∗m/M 2 + mℓ/M + 2 mg/ (3 M ) + m2g/M 2,Cω = ( g/ 6 + Ca + Ca0/2) /ℓ, F2 = B∗U2, F3 = Ca + Cω + B∗U3.
+
+Subtracting the upright linearization from the physical equations gives ∥f + gk − Acs∥ ≤ F2r2 + F3r3,provided the force bound below ensures that saturation is inactive. For qc = 1 / tr( Q−1 
+
+> c
+
+) > 0, sufficient continuous conditions are 2 ¯P (F2r + F3r2) ≤ qc/2, K∗r + U2r2 + U3r3 ≤ 12 .
+
+They make s⊤P s ≤ P r 2 invariant with strict quadratic state decrease for arbitrary boxed parameter variation. For the held flow, use Gh ≥ e∥A∥h and an integer β ≥ 2Gh{1 + hB ∗(K∗ + 1) }. Let Cd be Ca + Cω with 
+
+K∗ replaced by K∗ + 1. A bootstrap on [0 , h ] yields 
+
+∥∥s+ − Fhs∥∥ ≤ D2r2 + D3r3, D2 = hG hB∗U2, D3 = hG h(B∗U3 + Cdβ3),
+
+if βr ≤ 1, U2r + U3r2 ≤ 1, and GhhC dβ3r2 ≤ β/ 2. In particular ∥s(t)∥ ≤ β ∥s(0) ∥ during the hold. Let 
+
+qh > 0 lower-bound λmin (P − F ⊤ 
+
+> h
+
+P F h) and H∗ ≥ ∥ Fh∥. With Eh = D2r + D3r2, the additional condition ¯P (2 H∗Eh + E2
+
+> h
+
+) ≤ qh/2and the same force bound give common sampled state invariance and decay. 
+
+## B.3 Feasibility inequalities 
+
+After normalization by W e η , valid gradient and value error bounds are g2r2 + g3r3 and v3r3 + v4r4,respectively, where 
+
+g2 = ¯P |κ|(2 T + 1) , g3 = ¯P {(1 + T 2)/b 2 + T + 1 /3} + CG/S ∗,v3 = ¯P |κ|(T + 1) /2, v4 = ¯P {1/(2 b2) + ( T + 1) /6} + (8 ε + 10 BL)/S ∗.
+
+Also ∥∇ LV ∥ ≤ 20 √BLr4 and ∥∥ ˙L∥∥ ≤ 2√BL/τ . Let mc > 0 and mh > 0 be verified lower eigenvalue bounds for the continuous feasibility matrix and (22), using S∗ in place of S− and ζ = δ/ 10. This reserve covers the solver’s additional margin min(10 −4, δq/ 10). Let J∗ ≥ ∥ Ac∥ and T∗ ≥ ∥ P + hσQ s/(2 S∗)∥. The sufficient tests are 2 ¯P E c + ( g2r + g3r2)( J∗ + Ec) + 40 BLr2/(τ S ∗) ≤ mc/2, Ec = F2r + F3r2,T∗(2 H∗Eh + E2
+
+> h
+
+) + v3(1 + β3)r + v4(1 + β4)r2 ≤ mh/2.
+
+The first bounds the normalized total derivative with the anchor fixed, even for arbitrary allowed factor velocities. The second bounds both endpoint critic errors independently for arbitrary boxed factors with the anchor fixed. Thus zero parameter velocity is a feasible witness. Combining these tests with the common state bounds preserves a joint local state–parameter region for every verified feasible boxed update. 11 B.4 Exact numerical check 
+
+The ancillary implementation evaluates these constants as fractions. For any positive-definite rational matrix Z, exact symmetric elimination checks its positive pivots, and 1 / tr( Z−1) is a valid lower eigenvalue bound. Degree-12 Taylor polynomials enclose Fh; if 
+
+∥∥∥Fh −̂ Fh
+
+∥∥∥ ≤ eh, the pullback error is at most 
+
+∥T ∥ (2 
+
+∥∥∥̂ Fh
+
+∥∥∥ eh + e2
+
+> h
+
+) for the corresponding matrix T . Positive scalar exponentials use the rational bound 
+
+ea ≤
+
+> N
+
+∑
+
+> j=0
+
+aj
+
+j! + aN +1 
+
+(N + 1)! 11 − a/ (N + 2) , 0 ≤ a < N + 2 .
+
+Reciprocation supplies E−. Halving a rational radius until every sufficient inequality holds produces (23). The checker recomputes every stored final constant and rejects a changed matrix or arithmetic implementa-tion. It verifies this calculation conditional on the analytic estimates, not a formal proof of the software or a validated enclosure of the preceding swing-up. 
+
+# C Reproducibility and Claim Boundaries 
+
+The ancillary material contains the frozen cart-pole configuration, all compact primary and second-draw outcome tables, the supplementary continuous evaluation, matched NMPC and paired-reference tables, independent audit summaries, timing summaries, and exact local-certificate constants. The figure script regenerates the two figures from those data alone. A separate checker recomputes the exact local constants using the archived binary matrix, without dependence on a particular floating-point Riccati solver. The representative trajectory is a compact reduction of a full audited replay; its bin maxima preserve all positive residual excursions. Source hashes identify the underlying archived data. No double-pendulum or other plant result is used in this preprint. There are 600 distinct sampled initial conditions, not 1000 independent states obtained by adding 400 continuous evaluations. The matched NMPC table repeats 100 of the primary states, and replay/audit records repeat selected paths. A zero observed failure count is not a proof of a region or a probability-one guarantee. The local exact-arithmetic calculation concerns an ideal nominal controller and cannot be promoted to a machine-arithmetic or validated full-swing-up certificate. 
+
+# D Note on AI Use 
+
+AI was used to assist with the case study and to polish the mathematics and language. The idea and approach were created by the author. Prototypical forms appeared in the author’s earlier work [22]; see also the published actor-critic framework [4]. The motivation was to develop CALF (Critic as Lyapunov Function), an approach created by the author and defended in his habilitation, to remove the need for a fallback policy. The current work marks a milestone in this development. Further case studies and research are ongoing. 
+
+# References 
+
+[1] E. D. Sontag, “A ‘universal’ construction of Artstein’s theorem on nonlinear stabilization,” Systems & Control Letters , vol. 13, no. 2, pp. 117–123, 1989. doi:10.1016/0167-6911(89)90028-5. [2] M. Krstić and P. V. Kokotović, “Control Lyapunov functions for adaptive nonlinear stabilization,” 
+
+Systems & Control Letters , vol. 26, no. 1, pp. 17–23, 1995. doi:10.1016/0167-6911(94)00107-7. [3] P. Osinenko, L. Beckenbach, T. Göhrt, and S. Streif, “A reinforcement learning method with closed-loop stability guarantee,” IFAC-PapersOnLine , vol. 53, no. 2, pp. 8043–8048, 2020. doi:10.1016/j.ifacol.2020.12.2237. [4] P. Osinenko, G. Yaremenko, G. Malaniya, and A. Bolychev, “An actor-critic framework for on-line control with environment stability guarantee,” IEEE Access , vol. 11, pp. 89188–89204, 2023. doi:10.1109/ACCESS.2023.3306070. [5] P. Osinenko, G. Yaremenko, R. Zashchitin, A. Bolychev, S. Ibrahim, and D. Dobriborsci, “Critic as Lyapunov function (CALF): a model-free, stability-ensuring agent,” in 2024 IEEE 63rd Conference on Decision and Control (CDC) , pp. 2517–2524, IEEE, 2024. doi:10.1109/CDC56724.2024.10886034. 12 [6] K. G. Vamvoudakis and F. L. Lewis, “Online actor–critic algorithm to solve the continuous-time infinite horizon optimal control problem,” Automatica , vol. 46, no. 5, pp. 878–888, 2010. doi:10.1016/j.automatica.2010.02.018. [7] T. Dierks and S. Jagannathan, “Optimal control of affine nonlinear continuous-time sys-tems,” in Proceedings of the 2010 American Control Conference , pp. 1568–1573, IEEE, 2010. doi:10.1109/ACC.2010.5531586. [8] B. T. Lopez and J.-J. E. Slotine, “Universal adaptive control of nonlinear systems,” IEEE Control Systems Letters , vol. 6, pp. 1826–1830, 2022. doi:10.1109/LCSYS.2021.3133359. [9] K. Sinaei and D. Ebeigbe, “Safe adaptive control with vanishing conservativeness for robotic systems with unknown dynamics via barrier functions,” IEEE Robotics and Automation Letters , vol. 11, no. 5, pp. 6161–6168, 2026. doi:10.1109/LRA.2026.3678137. [10] Y. Chow, O. Nachum, E. Duenez-Guzman, and M. Ghavamzadeh, “A Lyapunov-based approach to safe reinforcement learning,” in Advances in Neural Information Processing Systems , vol. 31, Curran Associates, Inc., 2018. NeurIPS 2018 proceedings. [11] M. Han, L. Zhang, J. Wang, and W. Pan, “Actor-critic reinforcement learning for control with stability guarantee,” IEEE Robotics and Automation Letters , vol. 5, no. 4, pp. 6217–6224, 2020. doi:10.1109/LRA.2020.3011351. [12] M. A. L. Khaniki, M. Mirzaee, and E. Moradi, “Safe and adaptive control of non-stationary stochastic systems via Lyapunov-constrained distributional reinforcement learning,” Scientific Reports , vol. 16, no. 1, 2026. Article 26184. doi:10.1038/s41598-026-66485-2. [13] Y.-C. Chang, N. Roohi, and S. Gao, “Neural Lyapunov control,” in Advances in Neural Information Processing Systems , vol. 32, Curran Associates, Inc., 2019. NeurIPS 2019 proceedings. [14] A. Mehrjou, M. Ghavamzadeh, and B. Schölkopf, “Neural Lyapunov redesign,” in Proceedings of the 3rd Conference on Learning for Dynamics and Control , vol. 144 of Proceedings of Machine Learning Research , pp. 459–470, PMLR, 2021. https://proceedings.mlr.press/v144/mehrjou21a.html .[15] L. Yang, H. Dai, Z. Shi, C.-J. Hsieh, R. Tedrake, and H. Zhang, “Lyapunov-stable neural control for state and output feedback: a novel formulation,” in Proceedings of the 41st International Conference on Machine Learning , vol. 235 of Proceedings of Machine Learning Research , pp. 56033–56046, PMLR, 2024. https://proceedings.mlr.press/v235/yang24f.html .[16] H. Li, X. Zhong, B. Hu, and H. Zhang, “Two-stage learning of stabilizing neural controllers via Zubov sampling and iterative domain expansion,” in Advances in Neural Information Processing Systems ,vol. 38, pp. 73980–74009, Curran Associates, Inc., 2025. doi:10.52202/085713-2480. [17] A. D. Ames, X. Xu, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs for safety critical systems,” IEEE Transactions on Automatic Control , vol. 62, no. 8, pp. 3861–3876, 2017. doi:10.1109/TAC.2016.2638961. [18] A. Hauswirth, S. Bolognani, and F. Dörfler, “Projected dynamical systems on irregular, non-Euclidean domains for nonlinear optimization,” SIAM Journal on Control and Optimization , vol. 59, no. 1, pp. 635–668, 2021. doi:10.1137/18M1229225. [19] G. Malaniya, A. Bolychev, P. Osinenko, and G. Yaremenko, “Regelum: graph dependency reso-lution and execution orchestration for control systems,” in 2025 IEEE 26th International Confer-ence of Young Professionals in Electron Devices and Materials (EDM) , pp. 1470–1475, IEEE, 2025. doi:10.1109/EDM65517.2025.11096894. [20] J. A. E. Andersson, J. Gillis, G. Horn, J. B. Rawlings, and M. Diehl, “CasADi: a software framework for nonlinear optimization and optimal control,” Mathematical Programming Computation , vol. 11, no. 1, pp. 1–36, 2019. doi:10.1007/s12532-018-0139-4. [21] P. J. Goulart and Y. Chen, “Clarabel: an interior-point solver for conic programs with quadratic objectives.” arXiv:2405.12762, 2024. [22] P. Osinenko, G. Yaremenko, and G. Malaniya, “On stabilizing reinforcement learning without Lyapunov functions.” arXiv:2207.08730v2, 2022. 13

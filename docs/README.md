@@ -7,33 +7,39 @@
 
 ## 每次日报
 - 最新运行日期：2026-10-08
-- 运行时间：2026-10-08 00:22:27 UTC
+- 运行时间：2026-10-08 23:56:35 UTC
 - 运行状态：成功
-- 本次总论文数：4
-- 精读区：2
-- 速读区：2
+- 本次总论文数：6
+- 精读区：3
+- 速读区：3
 
 ### 今日简报（AI）
-2026-10-08日报：共处理4篇，精读2篇、速读2篇，主题集中在公式合成、符号回归与动力系统分析。  
-最值得看的是满分《Synthesizing Physics Formulae with Transformers》和8分的意大利区域医疗支出符号回归研究，前者用Transformer合成物理公式，后者用符号回归解释医疗支出差异。  
-普通读者建议先读这两篇精读，关注“复杂数据如何变成可解释公式/结论”，再按兴趣浏览两篇速读。
+1) 今日日报共6篇，精读3篇、速读3篇，Transformer合成物理公式与符号回归医疗支出领衔。
+2) 最值得看9.0分《Synthesizing Physics Formulae with Transformers》和8.0分《A study on healthcare expenditure in Italian regions via Symbolic Regression》，分别对应AI辅助物理发现与可解释医疗支出建模。
+3) 普通读者可先读这两篇精读摘要
 - 详情：[/202610/08/README](/202610/08/README)
 
 ### 精读区论文标签
 1. [Synthesizing Physics Formulae with Transformers](/202610/08/2610.03947v1-synthesizing-physics-formulae-with-transformers)  
-   标签：评分：10.0/10、query:sr
-   evidence：用预训练Transformer生成符号公式，即Transformer符号回归
+   标签：评分：9.0/10、query:sr
+   evidence：用transformer进行符号回归以合成物理公式
 2. [A study on healthcare expenditure in Italian regions via Symbolic Regression](/202610/08/2610.04439v1-a-study-on-healthcare-expenditure-in-italian-regions-via-symbolic-regression)  
    标签：评分：8.0/10、query:sr
-   evidence：使用符号回归识别可解释的解析模型
+   evidence：符号回归发现医疗支出的可解释解析模型
+3. [Continuous-Time Critic as a Lyapunov Function: Projected Adaptation and Cart-Pole Stabilization](/202610/08/2610.09988v1-continuous-time-critic-as-a-lyapunov-function-projected-adaptation-and-cart-pole-stabilization)  
+   标签：评分：8.0/10、query:lyapunov-ai
+   evidence：将参数化评论家作为李雅普诺夫候选函数
 
 ### 速读区论文标签
-1. [Higher-Order Kolmogorov-Arnold Networks for Dynamics](/202610/08/2610.02637v1-higher-order-kolmogorov-arnold-networks-for-dynamics)  
+1. [Input-to-state stability of second-order port-Hamiltonian systems under nonlinear dynamic boundary feedback](/202610/08/2609.39948v1-input-to-state-stability-of-second-order-port-hamiltonian-systems-under-nonlinear-dynamic-boundary-feedback)  
+   标签：评分：7.0/10、query:lyapunov-ai
+   evidence：用能量方法分析端口哈密顿系统稳定性，类似李雅普诺夫分析
+2. [SEDIMA: Cross-Run Hierarchical Insight Memory for Evolutionary Search Agents](/202610/08/2610.02361v1-sedima-cross-run-hierarchical-insight-memory-for-evolutionary-search-agents)  
    标签：评分：6.0/10、query:sr
-   evidence：数据驱动的控制方程发现，SINDy的替代方法
-2. [Wasserstein Contraction of Stochastic Systems on Manifolds: A Differential Approach](/202610/08/2610.03264v1-wasserstein-contraction-of-stochastic-systems-on-manifolds-a-differential-approach)  
-   标签：评分：6.0/10、query:lyapunov-ai
-   evidence：用微分李雅普诺夫函数刻画收缩稳定性
+   evidence：大模型驱动的进化搜索用于程序发现
+3. [Higher-Order Kolmogorov-Arnold Networks for Dynamics](/202610/08/2610.02637v1-higher-order-kolmogorov-arnold-networks-for-dynamics)  
+   标签：评分：6.0/10、query:sr
+   evidence：从数据中发现动力系统控制方程且无需候选库
 
 
 <div class="dpr-home-promo-card">

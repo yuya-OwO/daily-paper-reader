@@ -1,0 +1,507 @@
+Title: A study on healthcare expenditure in Italian regions via Symbolic Regression
+
+URL Source: https://arxiv.org/pdf/2610.04439v1
+
+Published Time: Tue, 06 Oct 2026 00:47:54 GMT
+
+Number of Pages: 48
+
+Markdown Content:
+# A study on healthcare expenditure in Italian regions via Symbolic Regression 
+
+# Rosseti Cristina a,b, †,∗, Nicola Caravaggio c, Giovanni Lamura d and Giuliano Resce c
+
+> a
+
+Department of Information Engineering, Marche Polytechnic University, Ancona – Italy 
+
+> b
+
+Department of Computer Science and Automation, Polytechnic of Turin, Turin – Italy 
+
+> c
+
+Department of Economics, University of Molise, Campobasso – Italy 
+
+> d
+
+Scientific Institute for Hospitalization and Care (INRCA), Ancona – Italy 
+
+> †
+
+c.rossetti@pm.univpm.it 
+
+October 6, 2026 
+
+Abstract 
+
+The study of the factors driving the dynamics of healthcare spending is of paramount importance to guide policymakers in the allocation of resources and to measure the effectiveness of the healthcare system under consideration. The identification of these drivers can be supported by the use of machine learning techniques, which enable the discovery of hidden patterns within vast amounts of data. In contrast to black-box methods, Symbolic Regression (SR) is an approach that allows for the identification of analytical models that explicitly capture the functional relationships within the data, thus enhancing interpretability. In this paper, we present the use of SR for identifying the drivers of healthcare expenditure in Italian regions. Given the dynamic and complex nature of this phenomenon, we generated several models based on distinct temporal windows, enabling us to analyze the drivers across different time horizons. In addition to identifying the main drivers based on variable frequency in the generated models, we also conducted a study on recurring substructures. The results show that SR was able to generate models with a good level of predictive accuracy for private healthcare expenditure, enabling a reliable analysis of its driving factors, but failed to do so for public healthcare expenditure. 
+
+> Keywords : Symbolic Regression, National Health System, Healthcare Expenditure.
+> JEL Classification : C54, H51, I10.
+
+1arXiv:2610.04439v1 [econ.GN] 3 Oct 2026 1 Introduction 
+
+Healthcare expenditure is a complex, multi-dimensional phenomenon influ-enced by a wide range of economic, demographic, and institutional factors. The empirical literature has identified several key determinants, including income levels (Roberts, 2000), the share of older population (Gerdtham et al. ,1992), technological advancements (White, 2007), and labor market conditions (Crivelli et al. , 2006). Despite extensive research, the relative importance and interaction of these drivers remain difficult to disentangle, partly due to nonlinear relationships and structural heterogeneity across countries and over time. Understanding the determinants of healthcare expenditure is of primary im-portance for both policymakers and researchers. On the one hand, healthcare spending represents a substantial and growing share of public budgets, raising concerns about fiscal sustainability. On the other hand, it reflects underlying population needs and system performance, making it a key indicator for evalu-ating health policy effectiveness. Accurately identifying its drivers is therefore crucial for designing efficient and equitable healthcare systems. In this context, recent advances in machine learning (ML) methodologies offer new opportunities to model complex relationships without imposing strong apriori assumptions. However, despite recent efforts to identify the drivers of healthcare spending using ML techniques (Irvin et al. , 2020; Vimont et al. , 2022; Caravaggio et al. , 2026), many studies still rely on black-box algorithms, raising concerns about interpretability and limiting their usefulness for policy-oriented analysis. This paper addresses this gap by employing Symbolic Regression (SR), a supervised ML technique whose goal is to retrieve an analytical expression that best fits the input data. Since the relationships between the dependent variable and independent variables are made explicit, SR can retrieve inter-pretable models (Angelis et al. , 2023). This has made SR of increasing interest to the research and scientific community (Dong and Zhong, 2025), including application domains such as healthcare and social sciences (Fong and Motani, 2024; Truscott and Korns, 2014). As such, SR represents an interpretable ML 2approach that combines the flexibility of data-driven modeling with the trans-parency of analytical expressions, with the aim of uncovering meaningful and interpretable relationships between healthcare expenditure and its underlying determinants. In this regard, it can be useful to remember that interpretability can be broadly defined as the ability to easily explain an ML model or solution to humans (Doshi-Velez and Kim, 2017) or, more specifically, as the possibility to extract “relevant knowledge from a model about relationships contained in the data or learned by the model” (Murdoch et al. , 2019). In many high-stakes contexts, such as healthcare or criminal justice, where models are used to inform decisions, the use of interpretable models is of paramount importance (Rudin, 2019; Markus et al. , 2021; Amarasinghe et al. , 2023). This makes interpretable modeling particularly relevant for healthcare expenditure analysis. Indeed, identifying the relevant relationships and drivers of this phenomenon can help guide policymakers in understanding the factors that drive spending over time, allocating resources accordingly, and adopting specific strategies. Motivated by these considerations, this study adopts SR in the context of health-care expenditure in Italian regions, with the aim of retrieving interpretable models that might help human experts to better inform policy-making through the detection of explicit analytical relationships between different drivers. The expressions are intended to support expert exploration of observational patterns rather than to estimate the effects of changing those indicators. Since our analysis covers a large temporal horizon, particular care must be taken to reduce the risk of data leakage on panel data, in order to avoid overly optimistic results by mixing past and future observations (Cerqua et al. , 2025a), thus weakening the reliability of the investigated relationships. Moreover, healthcare expenditure is a complex phenomenon, whose dynamics may depend on historical time periods. As such, its drivers can change over the years, requiring special attention to the training of a single model. For these reasons, we carefully split data for training and testing and created distinct temporal windows over different year intervals. In light of the above, the contributions of this paper can be summarized as follows: 3• using SR to retrieve explicit analytical expressions relating healthcare expenditure to socio-economic indicators. Rather than focusing only on predictive performance, we examine recurrent predictors and symbolic combinations across candidate models; 
+
+• explicitly addressing the problem of data leakage in temporally structured socio-economic data. This paper adopts a multiple splitting strategy in which SR is performed separately on different temporal windows, in order to avoid mixing temporal information between training and test sets and to carefully address changes in the relevance of drivers across different time horizons; 
+
+• evaluating the temporal transferability of the recovered expressions through out-of-time evaluation; 
+
+• analysing the stability of SR results across repeated runs, thus allow-ing us to detect the most common retrieved features and functional substructures. The paper is organized as follows. Section 2 presents a review of the literature on the determinants of healthcare expenditure, followed by a discussion of SR applications and issues related to data leakage in ML approaches. Section 3 describes the methodology adopted. Section 4 reports the results of the analysis, which are then discussed in Section 5. Finally, Section 6 formulates some concluding remarks. 
+
+# 2 Evidence from the literature 
+
+The empirical literature on healthcare expenditure identifies income, demo-graphic structure, technological progress, and institutional factors as the main determinants of spending dynamics. Early cross-country analyses, notably Kleiman (1974) and the seminal contribution of Newhouse (1977), documented a strong positive relationship between per capita GDP and healthcare ex-penditure, frequently reporting income elasticities greater than one and thus 4characterizing healthcare as a luxury good. This result was initially confirmed by subsequent studies that extended the baseline model by including demo-graphic and system-level controls, such as Leu (1986) and Gerdtham et al. 
+
+(1992). However, later econometric critiques highlighted methodological limi-tations related to non-stationarity and spurious correlations, questioning the robustness of early findings (Hansen and King, 1996; Blomqvist and Carter, 1997; Okunade and Karakus, 2001). With the adoption of panel data tech-niques and improved data coverage, more recent studies generally report income elasticities at or below unity, particularly for OECD and high-income countries, suggesting that healthcare should currently be considered a necessity rather than a luxury good (Gerdtham et al. , 1998; Mart´ ın et al. , 2011; Baltagi and Moscone, 2010). Although some contributions still find elasticities above one in specific contexts or periods (Roberts, 2000; Clemente et al. , 2004), global evidence increasingly points to a declining role of income as the dominant driver of healthcare expenditure (Baltagi et al. , 2017). Population aging has also been widely analyzed as a determinant of healthcare spending. Several studies docu-ment a positive association between older age structures and higher healthcare expenditure (Gerdtham et al. , 1992; Di Matteo and Di Matteo, 1998; Karatzas, 2000), while others find a more limited impact at the macro level (Getzen, 1992; Barros, 1998). A substantial strand of the literature shifts the focus from age to proximity to death, giving rise to the “red herring” hypothesis, according to which healthcare costs are driven primarily by expenditures concentrated in the final years of life, rather than by aging per se (Zweifel et al. , 1999; Felder et al. , 2000; Shang and Goldman, 2008). While this hypothesis is sup-ported by extensive micro-level evidence, conflicting results persist, especially in country-specific studies where age retains explanatory power (Atella and Conti, 2014; Karlsson and Klohn, 2014). Technological progress is commonly identified as a major driver of healthcare expenditure growth, often measured indirectly as a residual component once income and demographic effects are accounted for (Newhouse, 1992; White, 2007). Empirical contributions using proxies such as medical equipment, research and development expenditure, and time trends consistently find a positive and significant impact of techno-5logical change on healthcare spending (Okunade and Murthy, 2002; Murthy and Okunade, 2016). Finally, a broad set of additional determinants has been explored, including health system organization and decentralization (Mosca, 2007; L´ opez-Casasnovas and Saez, 2007), labor market conditions (Crivelli 
+
+et al. , 2006), and supply-side characteristics (Koenig et al. , 2003). Overall, the literature underscores the multifactorial nature of healthcare expenditure and the absence of a single dominant explanatory factor. The Italian literature largely confirms the relevance of income, demographic factors, and institutional settings in explaining healthcare expenditure. Early regional-level evidence by Giannoni and Hitiris (2002) shows that decentralization did not increase healthcare spending, while real GDP emerged as the main determinant, albeit with a low elasticity (0.33), consistent with healthcare being a normal good in Italy. Population aging played a secondary role, and supply-side variables suggested the presence of economies of scale alongside labor-intensive cost pressures. These findings are broadly confirmed by Lagravinese and Paradiso (2014), who also highlight the importance of institutional quality. Focusing on demographic dynamics, Lopreite and Mauro (2017) analyze Italian healthcare expenditure between 1990 and 2013 using a Bayesian framework, showing that aging exerts a stronger influence than GDP per capita and life expectancy, both in the short and long run. Their variance-decomposition results further indicate that demographic factors account for a substantial share of healthcare spending fluctuations, while feedback effects from expenditure to demographic and economic variables remain limited. Micro-level evidence provides more nuanced results. Using individual-level data on primary care expenditure, Atella and Conti (2014) find that age is a stronger predictor of healthcare costs than proximity to death, challenging the “red herring” hypothesis for the Italian case and contrasting with earlier findings by Raitano et al. (2007). Other disaggregated analyses examine the impact of macroeconomic shocks, with Sarti et al. (2017) showing that the 2008 financial crisis reduced healthcare spending among poorer households compared to non-poor ones. A comple-mentary strand of literature reverses the causal perspective by analyzing the effects of healthcare expenditure on health outcomes. Golinelli et al. (2017) 6find that higher public spending on directly provided services significantly re-duces short-term mortality, while expenditure financed by the National Health Service (NHS) but delivered by private providers shows no significant effect. Related studies examining post-crisis fiscal consolidation policies highlight heterogeneous effects: while recovery plans effectively reduced regional deficits without affecting utilization or health outcomes (Bordignon et al. , 2020), other contributions document increases in avoidable mortality, reduced hospital ca-pacity, and worsening mental health outcomes following austerity measures (Arc` a et al. , 2020; Cirulli and Marini, 2023). Recently, Caravaggio et al. (2026) used ML algorithms to identify the determinants of healthcare expenditure in Italy, confirming several of the major drivers already documented in the literature. 
+
+# 2.1 Applications of Symbolic Regression 
+
+SR has recently been applied in many fields of science and engineering, such as physics, material science, finance, and medicine, due to its inherent ability to retrieve interpretable models (Angelis et al. , 2023; Dong and Zhong, 2025). The discovery of explicit expressions can be useful in several domains. For instance, Rezaei et al. (2022) applied SR to predict the seismic response of bridges, while Yang et al. (2015) employed SR to model oil production and predict future trends. Lv et al. (2026) proposed a hybrid framework to forecast agricultural water-demand in which SR is used to extract interpretable predictive equations. Pan et al. (2019) detected the most influential factors for carbon emission intensity in different OECD countries via SR. Ferrari et al. (2022) proposed a multi-objective SR framework to support clinical decisions in the healthcare domain. Fong and Motani (2024) used SR to estimate a key indicator for kidney health, the Glomerular Filtration Rate, to support disease diagnosis. In the literature, many authors highlight the possibility of exploiting SR to support policy-makers, by extracting influential drivers to guide strategic decisions (Lv et al. , 2026; McDermott et al. , 2025). Truscott and Korns (2014) claims that SR can offer valuable support for socio-economic sciences applications, 7e.g., for the prediction of employment rates. Balla et al. (2025) supports the usefulness of SR to extract interpretable symbolic models capable of uncovering hidden non-linear and dynamical relationships within real-world social science data, especially economics and sociology. Miyazaki et al. (2023) demonstrates the benefit of SR in the psychology domain by evaluating it to discover a discount function for an inter-temporal choice experiment. McDermott et al. 
+
+(2025) created surrogate models through SR for the global energy-economy-climate system, thus obtaining interpretable expressions that estimate future decarbonization paths. Yang et al. (2015) modeled the relationship between the economic growth and carbon dioxide emission for 67 countries, while Liu et al. 
+
+(2023) explored the use of SR to detect influential factors, such as GDP and population, of sulfur dioxide emission in Chinese provinces. Finally, Claveria 
+
+et al. (2020) employed SR to retrieve country-specific confidence indicators from qualitative survey expectations on economic growth for both consumers and firms, retrieving interpretable expressions for GDP growth forecasting. Despite the increasing number of applications in the socio-economic field, to the best of our knowledge, no one has focused yet on the analysis of influential factors of healthcare expenditures via SR. 
+
+# 2.2 The Risk of Data Leakage 
+
+ML is typically applied following a standardized pipeline, from data processing to error analysis. However, practitioners often employ ML algorithms without paying much attention to the choices made and why the obtained model behaves in a certain way. In this regard, data leakage has been identified as one of the main challenges encountered in ML applications. Apicella et al. (2025) defines data leakage as “a problem where forbidden information is unintentionally introduced into the training data, thus affecting model performance evaluation” .Kapoor and Narayanan (2023) investigated reproducibility issues caused by data leakage in many ML scientific applications. Their analysis shows how the inflated performance of the model related to data leakage can lead to erroneous scientific evidence claims, thus causing unreproducible results. In 8their taxonomy, performance overestimation is due to several reasons, one of which is an unclear separation between training sets and test sets. Cerqua et al. 
+
+(2025b) discussed the challenges related to the use of ML algorithms on panel data. Their claim is that, when ignoring the cross-sectional and longitudinal structure of data, the phenomenon of data leakage becomes hard to detect. In fact, while standard ML typically splits the original dataset in training and test sets randomly, this approach can be dangerous for certain types of data. In the case of panel data, random splits cause temporal and cross-sectional leakage. This phenomenon has to be taken into account as neglecting it can cause inflated performance that do not reflect the real predictive power of the model. The aforementioned socio-economic sciences applications of SR do not consider the temporal perspective of datasets, at most focusing on county- or region-specific experiments (Pan et al. , 2019; Balla et al. , 2025; Liu et al. , 2023). Although some studies perform out-of-sample forecasting experiments on latest data, such as Claveria et al. (2020), the problem of temporal data leakage is not explicitly treated. Our goal in this contribution is to directly address this issue by adopting a methodology that carefully splits training and test sets to avoid inflated results, and creates temporal windows to train models over different time horizons. 
+
+# 3 Methodology 
+
+# 3.1 Data 
+
+The analysis is based primarily on administrative data supplied by the Italian National Institute of Statistics (Istat, 2025) through Health for All (HFA), a dedicated tool for health-related data (last update accessed: June 2025). This source consists of a comprehensive database of indicators on the Italian healthcare system and population health, structured to be queried via the HFA software developed by the World Health Organization (WHO), and adapted to national requirements. At present, the database includes approximately 4,000 9indicators disaggregated at the regional level, which constitutes the level of stratification adopted in this study. The sole variable which does not come from HFA is that of CO2 emissions, retrieved from Istat (2023). The initial dataset employed here consists of a total of 32 features, listed in Table A1, selected by domain experts. These features are measured for all Italian regions, from 1997 to 2019. Since the purpose is to create a forecasting model for healthcare expenditure, and past observations can strongly influence what happens in the future, all the features were lagged by one and two years with respect to the target variable. That is, for each feature x we generated lagged xt−1 and xt−2 features with respect to the target measured at year t.The SR algorithm will then select variables among these lagged features. In order to analyze both the public and private aspects of healthcare spend-ing, three different target variables were considered: private (out-of-pocket) healthcare expenditure ( he pri ); public healthcare expenditure ( he pub ); and total healthcare expenditure ( he tot ) (obtained by adding public spending to private spending). All these variables are expressed in current euros per capita. Three different datasets were then obtained, one for each target. Table A2 shows some statistics for each target and input variable, while Fig-ure A4 represents the heatmap for Pearson correlation among features in the datasets. 
+
+# 3.2 Data Leakage prevention 
+
+The typical ML pipeline involves random splitting to obtain training and test sets from the initial dataset. However, as outlined before, in panel data settings this procedure causes data leakage. In our work, following the principles laid down by Cerqua et al. (2025b), we focus on temporal leakage , defined as the phenomenon that “occurs when information from the future leaks into the past during the training and validation process” . As such, if this issue is ignored, temporal information gets mixed between the training and test sets. This causes the model to see nothing new in the testing phase, but rather to review patterns already learned in the training phase. 10 The initial dataset employed in this work gathers socio-economic features for Italian regions across several years. Since our goal is to propose an ML-based strategy that is robust, we introduce a training and test set splitting strategy into our pipeline that avoids temporal leakage, based on the following two steps: 
+
+• Time-wise splitting: the model is trained on earlier years and evaluated only on a separate set of future years. This is the solution proposed for sequential forecasting policy problems, where historical data are intended to be used for future predictions (Cerqua et al. , 2025b). In our case, the test set was built considering the 25% of the available years in the dataset. So the training set contains years from 1997 to 2013, while the test set the remaining years, i.e., 2014-2019; 
+
+• Time windows splitting: the socio-economic nature of the dataset means that there is heterogeneity of information across different time periods. In fact, healthcare expenditure can depend on various factors that may differ over the years due to political, historical, economic, and other significant changes. These considerations have led us to propose a further subdivision of the dataset across different time horizons. Four splits were obtained from the initial dataset, again using the time-wise strategy, placing more recent years in the training set and future years in the test set. This can help us capture different dynamics and see if obtained models return different results depending on the years considered. Table A3 shows the details of the proposed time windows. The subdivision in different time windows sought to take into account changes due to the 2007-2008 financial crisis, which may have influenced health-care expenditure management policies. Three time windows were therefore generated, corresponding respectively to the periods before, during, and after the crisis, together with a fourth window covering more recent years. 11 3.3 Symbolic Regression 
+
+This paper aims to employ a SR algorithm to detect drivers of healthcare expenditure in Italian regions, focusing on avoiding data leakage and discovering interpretable expressions. SR has the unique ability to predict the explicit function that links the dependent variable and the independent variables, making it a powerful tool for interpretability. SR is a ML technique that aims to retrieve the mathematical expression that best fits the input data. It differs from traditional regression techniques for its ability to simultaneously discover the structure and coefficients of the formula representing relationships within data, without the need for prior knowledge. Given a set of training data D = {X, y }, where X = {x1, . . . , x m} with X ∈ Rn×m is the set of features (independent variables) and y ∈ Rn is the regression target (dependent variable), the goal of SR is to find a function ˆf (x1, . . . , x m) = ˆ y which best approximates y, i.e., y − ˆy ≤ ϵ. Thus, SR allows to find a mathematical model that best approximates the relationship between input features and the target value, simultaneously estimating the functional structure and the variable coefficients. As such, the main advantage of SR is its intrinsic interpretability (Dong and Zhong, 2025). In fact, SR allows us to find symbolic expressions that make explicit the links between different features. Although lately deep learning has been used to develop SR methods, Genetic Programming-based SR algorithms still remain the predominant approach (La Cava et al. , 2021). Genetic Programming (GP), proposed by Koza (1994), is inspired by the Darwinian natural selection principle. A population of individuals (originally computer programs) is randomly generated and then evolved with mutation and crossover operators, iteratively adapting to the problem at hand. In the context of SR, individuals are represented by mathematical expressions. Iteration after iteration, the individuals, i.e., the expressions, that best represent the initial dataset, survive. The expressions in the initial population are built combining mathematical functions and operators, symbols and constants, representing the potential solution, i.e., the model which best fits the input data. At each iteration, new offspring of individuals are created by means of mutation and crossover. The mutation operator randomly changes the parent structure. The 12 crossover operator acts as reproduction between two individuals, by exchanging parts of the parents’ expressions. Figure A1 shows an example of mutation and crossover operators. The selection of the expressions is performed with a 
+
+fitness metric , which measures how well the expressions of the current offspring represent the dataset. In this paper, we employed Operon (Burlacu et al. , 2020), a GP-based C++ framework for SR, which has been ranked as one of the best methods in SRBench++ benchmark (Imai Aldeia et al. , 2025; La Cava et al. , 2021). In this work, we chose to use SR because of its ability to provide explicit and interpretable expressions. This makes it possible to study the analytical link between the factors that influence public and private healthcare spending. The resulting expressions can be useful tools for intuitively visualizing linear and nonlinear relationships, signs, coefficient values, and the overall structure of the function. Furthermore, the importance of variables can be studied. First, SR acts as an automatic feature selection tool, including in the final expressions only those variables considered as important. Secondly, the stability of the selection of these variables can be analyzed over multiple runs of the same experiment. In fact, for each dataset and splitting strategy, the SR algorithm is run 100 times, thus obtaining 100 expressions. By counting the occurrence of each feature in these expressions, it is possible to assess which are the most frequent variables, which are those that appear most consistently in different expressions, presumably suggesting that they are the most important (Kronberger et al. ,2024). However, this is an algorithm-dependent selection measure, rather than a direct measure of causal importance, statistical significance, or an intervention effect. Later, we also explored the frequency of functional substructures, which might be indicative for exploring multi-variable interactions. For each dataset (corresponding to he pri , he pub , or he tot targets), the SR algorithm was applied separately for each splitting strategy, in order to analyze their effects on the final results. It is worth saying that the algorithm is trained on standardized features and targets, thus the coefficients of the resulting expressions refer to standardized inputs and the output value does not correspond to the original unit. Two distinct metrics were taken into 13 account for models evaluation: the coefficient of determination R2 and the Mean Percentage Error ( MAPE ). R2 is one of the most commonly used error metrics for SR models assessment (La Cava et al. , 2021; Tian et al. , 2025; Dong and Zhong, 2025), measuring the goodness of fit of resulting models. However, using R2 values alone is not entirely indicative of the accuracy of results. As such, we decided to consider MAPE , recently used to evaluate SR models (Panczyk et al. , 2025; Megahed, 2025), to quantify prediction errors. 
+
+# 4 Results 
+
+# 4.1 Experimental settings 
+
+The SR algorithm was executed for a total of 100 runs for each dataset and splitting strategy (time-wise and temporal windows W1, W2, W3, W4). This was done in order to obtain as much variability as possible in the results, and thus assess the robustness of the proposed method. The general settings of the algorithm parameters were based on the results of the tuned SR methods shown by SRBench++ (La Cava et al. , 2021). After several trials, we decided to maintain the following setting: (i) function set = {+, −, ∗, /, sqrt }, as adding more complex operators (such as logarithmic or exponential functions) demonstrated lower performance and displayed less interpretable expressions; (ii) the objective was maintained to R2, as using other metrics or adding complexity constraint did not improve final results; (iii) the maximum depth and length were both maintained to 10, as their increase generated over-complicated expressions without improving fitness, thus causing bloating issues (Kronberger et al. , 2024). 
+
+# 4.2 Healthcare expenditures models 
+
+We now show the results obtained by running SR on the three different datasets 
+
+he pri , he pub , and he tot . Even if the random splitting strategy for panel data is not advisable, we still executed it to demonstrate the presence of data leakage. Figure A2 shows inflated performance in R2 values when using random 14 splitting strategy. While the R2 for private health expenditure ( he pri ) remains good (76%), results on public health expenditure ( he pub ) drop significantly (20%). Instead, MAPE decreases, showing better predictions for time-wise settings. These results confirm the claim that splitting panel data randomly is not a reliable strategy. For this reason, we focus on results obtained with time-wise and time windows splittings. The values of the average R2 and 
+
+MAPE scores are summarized in Figure A3. R2 score values for he pub remain low also for temporal windows splittings, while MAPE remains under 10% which according to Lewis (1982) is the threshold for highly accurate forecasting. This means that the models return predicted values close to the real ones on average, but fail to capture the dynamics of the phenomenon. Time window 
+
+W4 has the best results in terms of both R2 (for private and total healthcare spending), and MAPE . Instead, W3 shows the lowest R2 average scores and the highest MAPE average scores, especially for private spending, where MAPE is greater than 10%. This means that SR was able to identify relevant drivers of the phenomenon and the relationships between them for recent years ( W4 is trained and tested on the latest time horizon), while it failed to obtain good models for W3. The latter considers a time period characterized by the 2008 financial crisis, which probably had an impact on the healthcare spending as well as drivers guiding it. In light of the results obtained for public and total spending, we will now focus our analyses on private spending, a sector which shows more stable and reliable results. 
+
+4.2.1 Private healthcare expenditure models 
+
+As introduced earlier, the SR intrinsically performs feature selection by including in the solutions a subset of the input variables. Since the SR algorithm was run 100 times over the same dataset, this gives us the opportunity to analyze the frequencies of variables in the obtained expressions. As stated before, the occurrences of features in different expressions for the same data could suggest their importance. Therefore, we make the following assumption: if a variable is consistently chosen across different runs on the same configuration (algorithm parameters, dataset and splitting strategy), then it might be a relevant driver 15 for describing the dynamics of the phenomenon, but does not automatically demonstrate that it has a greater effect on expenditure. Table A4 shows the occurrences of the top-5 most frequent variables appearing in the models for 
+
+he pri . These frequencies were obtained by counting the number of times a variable appears in distinct resulting expressions, thus the unique occurrences within each model. The variable he pub p , representing the share of public health expenditure, is nearly always the most recurrent predictor across split types. Its first lag is selected 100 times in W3 and W4 and remains dominant in W2 and time-wise splittings; its second lag appears 95 times in W1. The a hh size variable, i.e., the average household size, also seems to be relevant, especially for W2 and 
+
+W3, while it appears with less frequency W4. Besides these two dominant features, technological-related variables ( CT scan , i.e., CT scanners per 1,000 inhabitants, and M RI scan , i.e., MRI scanners per 1,000 inhabitants) have a relevant role, even though with less strength when compared to he pub p 
+
+and a hh size . Features related to the labour market ( act rate and empl rate )appear less but still consistently. The analysis shifts then to the explicit expressions produced by the SR. Since displaying all 100 expressions for each split is impractical, we report a small set of high-performing expressions to provide qualitative insight into the types of analytical relationships recovered by SR. These equations are not intended as final deployable forecasting models, but as examples of the broader family of solutions generated by the method. Table A5 shows 3 high-performing models obtained for each splitting strategy ordered by R2 and M AP E values. Results for W3 were excluded for the poor performance of obtained models (see Figure A3) Time-wise and W1 splittings display linear models, while W2 and W4 present some non-linearities, suggesting more complex dynamics in specific temporal settings. All these models contain the variable he pub p , confirming its strong role in the private spending phenomenon, with a negative sign and similar coefficients. The GDP per capita is consistently present in all models, except for one expression for W4. M RI scan , one of the technological-related drivers, 16 is only absent in W4, and appears as a non-linear contribution in W2. It is worth noting that some variables appearing in these illustrative expressions do not belong to the top-5 most frequent features discussed above (see Table A4). For instance, h beds t−2, representing the number of hospital beds per 1,000 inhabitants, appears in all three reported time-wise expressions despite having a relatively low overall frequency of 7 out of 100 runs. Similarly, p r 75 ov p t−2
+
+occurs in two of the three reported expressions for W1, although it is not included among the five most frequent variables for that split and appears in 27 out of 100 runs overall. This suggests that frequency alone does not fully capture the potential relevance of a variable: some predictors may not be among the most recurrent across runs, yet still contribute to high-performing symbolic forms. More generally, these results indicate that SR does not return a single canonical equation, but rather a family of candidate analytical relationships, within which both highly recurrent variables and more occasional predictors may play a meaningful role. 
+
+Out-of-time models evaluation We assessed the generalization of the resulting models through their out-of-time evaluation on new temporal data, i.e., 2020 and 2021, which were not used during either model training or testing. The aim here is to understand to what extent the relationships recovered by SR remain informative when transferred to another temporal context. Tables A6a and A6b show comparisons of R2 and MAPE values between results on the testing set and this evaluation set. The most recent temporal window W4
+
+is the one for which the resulting models show the best temporal transfer to 2020. This is reasonable as these expressions have been trained over the closer years, thus better capturing recent expenditure dynamics. In fact, it is the only splitting in which the out-of-time evaluation for year 2020 returns good results in terms of both R2 and MAPE . By contrast, results strongly degrade for 2021, including W4. Although this period coincides with major changes associated with the COVID-19 pandemic, the present analysis cannot determine whether the decline in performance was caused by the pandemic. We also evaluated on 2020 the three illustrative high-performing expres-17 sions previously reported for the time-wise split and for W4. The other time windows were excluded from this analysis due to their weaker behaviors over out-of-time data. The time-wise models returned R2 values of 0 .73 for the first expression and 0 .77 for the other two, with MAPE values around 7%. The three W4 expressions obtained R2 values of 0 .83, 0 .83 and 0 .73, with corresponding MAPE values of 5 .80%, 7 .48%, and 8 .78%. These results further confirm that expressions performing well on the test set are not necessarily those that generalize best to later unseen years. This is consistent with the nature of healthcare expenditure as a complex and evolving socio-economic phenomenon, whose relevant drivers and functional relationships may vary across time horizons. For this reason, we further analyzed the expressions obtained over W4 temporal window for the 2020 data, since this split represents the most recent time period and its results over out-of-time data are the most convincing. Table A7 summarizes the top-10 best-performing expressions for 
+
+W4 on the 2020 out-of-time evaluation ranked by R2.These results suggest frequent and consistent substructures in the expres-sions with highest performance. To explore this hypothesis, we conducted a further analysis on the expressions obtained via SR to study the frequency of each functional structure and substructure. Formally, we define the structure 
+
+of an expression as its symbolic skeleton, where numerical coefficients are mapped to a generic placeholder, e.g., the structure of 2 ∗ a + 3 ∗ b + 4 ∗ c
+
+is C ∗ a + C ∗ b + C ∗ c. A substructure is defined as any valid sub-tree or combination of nodes derived from the expression tree. Following the previ-ous example, the substructures of C ∗ a + C ∗ b + C ∗ c include individual terms like C ∗ a, as well as partial combinations such as C ∗ a + C ∗ b or 
+
+C ∗ a + C ∗ c. This approach allows us to isolate the recurrent building blocks in the retrieveed expressions. We show here the results of this analysis for the 100 expressions of W4 temporal window and substructures with at least two variables (as considering one-variable substructure is equivalent to counting variable frequency). Table A8 shows the top-15 substructures for W4 ordered by their frequency, i.e., the number of times that substructure appears in distinct expressions. We can see that the interactions of the share of public health 18 expenditure ( he pub p ) with the foreign population and the average household size are the most frequent. It is interesting to observe the substructure of 
+
+C ∗ a hh size t−2 + C ∗ he pub p t−1 + C ∗ empl rate t−2 + C ∗ str r p t−2, com-posing the 17% of the resulting expressions, is present in 7 out of the best 10 expressions obtained for 2020, while the first two expressions include the same substructure but with a hh size t−1 instead. This analysis enriches the previous results in variable frequencies. Although the occurrence of a single variable can be indicative of its importance in describing the phenomenon at hand, the frequency of the interaction between different features highlights which functional substructure appears the most. However, these are recurring joint predictive patterns which should not be directly considered as interaction terms. The recurrence alone does not identify an underlying mechanism or establish that a substructure improves performance relative to an otherwise comparable expression without it. Nevertheless, we still believe that these analyses highlight structural combinations of terms that are worth to be investigated by domain experts. 
+
+# 5 Discussion 
+
+In this work we investigated the use of SR to provide interpretable expres-sions to better understand the role of potential determinants for healthcare expenditure in Italian regions. The splitting strategy adopted for the input dataset specifically addresses temporal data leakage, in order to avoid inflated performance. A comparison between random and time-wise splitting has also been made. Results show that the latter strategy leads to smaller R2 values, demonstrating that training the algorithm on randomly sampled data causes data leakage. This is due to the fact that random sampling mixes future and past information across training and test data, causing the algorithm to see nothing new in the test phase, as it has already learned future patterns in the training stage. Instead, time-wise splitting carefully separates time horizons, making the algorithm actually test on unseen temporal data. The effects of this phenomenon are particularly relevant for the public health expenditure, with 19 R2 decreasing from 0 .85 to 0 .20. However, even if time-wise splitting is useful to reduce data leakage, in the case of complex socio-economic phenomena such as healthcare spending, training over a large time interval that comprehends sev-eral political and historical changes may not be effective to obtain reliable and robust analytical models. Therefore, we proposed a splitting strategy including different temporal windows. Results showed that SR returned expressions with different structures, features, and performances for each temporal window, thus confirming our claims. In fact, in Figure A3 we can observe visible differences in error scores between different splitting strategies. The temporal window W3
+
+gives the worst performance overall, especially for the private expenditure in which the average MAPE reaches the 15 .57%. The training set corresponding to W3 includes years 2001 - 2009, while the model has been tested on years 2010 and 2011. The test set corresponds to a particularly relevant historical time, as it corresponds to the financial post-crisis period. SR struggled to find accurate models for this time window, probably due to the impact of the economic and political instability on the drivers of healthcare spending (Arc` a
+
+et al. , 2020; Bordignon et al. , 2020). For each splitting strategy, we also analyzed the frequency of variables appearing in the resulting expressions for the private healthcare expenditure. Using variable frequency as an algorithm-dependent measure of recurrence rather than of causal influence, the models obtained across temporal windows highlight different sets of recurrent predictors for private healthcare expen-diture (see Table A4). The use of multiple temporal splits allows to detect predictors that are consistent across different time horizons ( e.g. , the share of public health expenditure), as well as those that are relevant for specific time periods ( e.g. , the employment rate, which is relevant only for the W4 temporal window). Across splitting strategies, the models evolve from relatively simple, macro-driven specifications to more complex representations centered on health system dynamics. While income and public expenditure remain the structural backbone, later models highlight that out-of-pocket spending’s models contain interactions between policy, workforce, and system characteristics. A clear divergence in predictive performance emerges between private and 20 public healthcare expenditure. While random splitting initially masked this difference - yielding models with average R2 values around 0.85 - the adoption of time- and window-based splits reveals the intrinsic difficulty of forecasting public health spending. Using the same set of explanatory variables, the SR algorithm consistently struggles to identify stable and accurate relationships for public expenditure, with model performance not exceeding an R2 of 0.42. In contrast, models for private out-of-pocket expenditure achieve substantially higher predictive accuracy. This asymmetry can be largely explained by the institutional design of the Italian National Health Service (NHS). Public health-care expenditure is not primarily determined by market dynamics or short-term variations in population needs, but rather by a structured and rule-based allocation process. In particular, the bulk of funding is distributed through a capitation formula applied to the undifferentiated financing component, which represents the largest share of total resources. Although this formula incorpo-rates some demographic and need-based adjustments, it evolves slowly over time and is only partially captured by the variables included in the model. Additional funding components - such as earmarked resources and the premial quota - are allocated through discretionary and negotiated processes within the State-Regions Conference (Caruso et al. , 2019). Moreover, following the period of rapid expenditure growth and fiscal imbalances in the early 2000s, several Italian regions were placed under strict financial recovery plans. These regimes impose binding budget constraints, enforce expenditure ceilings, and promote convergence toward predefined fiscal targets. As a result, public healthcare spending exhibits relatively smooth and constrained dynamics, with adjustments driven more by policy decisions and administrative controls than by observable socio-economic or epidemiological factors. From a modeling perspective, this reduces the effective variability in the data and weakens the statistical relationship between expenditure and standard predictors, making it difficult for SR to uncover meaningful functional forms. By contrast, pri-vate health expenditure is inherently more responsive to individual behavior and market conditions. It reflects households’ decisions to seek care outside the public system, often influenced by income, demographic structure, per-21 ceived quality of services, waiting times, and availability of medical technology. These determinants are more directly reflected by the variables included in the model (such as GDP per capita, healthcare capacity, and utilization indicators), resulting in stronger and more stable empirical relationships. Additionally, private expenditure is not subject to the same institutional rigidities as public expenditure and therefore exhibits greater variability, which provides a richer signal for data-driven methods like symbolic regression. Overall, the contrast in predictive performance highlights a fundamental distinction: public healthcare expenditure in Italy is largely institutionally determined and only partially observable through standard covariates, whereas private expenditure is more demand-driven and closely aligned with measurable socio-economic and health-care system factors. This difference naturally translates into a substantially higher predictive accuracy for private healthcare expenditure models within the SR method, as it was able to find good models for private health expenditure, especially for W4 time window in which the average R2 is equal to 0 .92 (an excerpt of the resulting analytical models being shown in Table A5). While the study on the frequencies of variables highlighted different relevant drivers for each time window, the analysis of the resulting expression indicates different functions and relations between variables for each time window. This demonstrates that the considered time period has a strong impact on the form of the models obtained as well as the selected features. The variable 
+
+gdp cap , as expected, is included in all model specifications and consistently displays a positive coefficient. This is reasonable, as it proxies household well-being and their ability to rely on co-financing ( i.e. , ticket payments) and out-of-pocket healthcare expenditure. The presence of high-cost medical equipment within each region, such as CT and MRI scanners ( CT scans and 
+
+M RI scans , respectively), appears in all model specifications except for the last one, which corresponds to the years characterized by financial constraints within the Italian National Health Service (NHS) (Arc` a et al. , 2020). In the literature, the availability of such equipment is generally considered a proxy for technological advancement, which, in the original formulation of (Newhouse, 1977), explains the residual component of healthcare expenditure. 22 This mechanism undoubtedly applies to the private sector (both accredited and fully private providers), which must attract private demand by offering not only faster access but also higher quality services, particularly when the public sector falls short. The variable referring to the share of public healthcare expenditure (he pub p ) over total expenditure is consistently negatively associated with our target variable. However, the result does not identify substitution or crowding out between public and private healthcare. Similarly, the number of beds in public and accredited facilities follows the same pattern, although this variable appears less consistently across the different model specifications. It is noteworthy that, in the W4 specification, the share of public expenditure exhibits a less linear relationship with the dependent variable. This pattern likely reflects the period of fiscal imbalances and the placement of several Italian regions under government-appointed health commissioner administration. In some specifications, specifically the Time-Wise and W2 models, the short-run equations show a negative association between average family size and the dependent variable. This is compatible with hypotheses involving household composition and informal care discussed in (Marmot and Wilkinson, 2005; Dormont et al. , 2006; Cisotto et al. , 2023), but the available analysis cannot identify a household scale effect or a caregiving mechanism. However, this effect disappears in subsequent model specifications referring to more recent time horizons. This change likely reflects the increasing propensity of Italian households - already experiencing sustained demographic decline - to delegate primary caregiving responsibilities to external (privately paid) care workers, including for home care services (Lippi Bruni and Ugolini, 2016). Finally, the share of the population aged 75 and over ( p r 75 ov p ) exhibits a positive association, confirming previous findings reported by the literature on the determinants of healthcare expenditure (Gerdtham et al. , 1992; Giannoni and Hitiris, 2002). In order to evaluate the generalizability of the models to unseen years, we applied models obtained for private spending in 2020 and 2021 years (Tables A6a, A6b). The results show that the models obtained with the most recent temporal window W4 performed the best in 2020. Despite the decrease in 23 accuracy, the resulting R2 and MAPE values still make the models usable. It is a different case for 2021, where performance decreases significantly, with error values indicating useless models. The pandemic literature (Trentini et al. ,2023; Coccia and Benati, 2025) provides relevant context, but this study cannot attribute the deterioration specifically to COVID-19. In addition, we assessed the best-performing models obtained for 2020 data based on W4 expressions. The results in Table A7, displaying the top-10 analytical models, indicate consistent structures and interactions between variables. In fact, the obtained models nearly always contain interactions between the average household size (a hh size ), the share of public health expenditure ( he pub p ), the employment rate ( empl rate ), and the foreign population ( str r p ). This led us to conduct an additional analysis in which we studied the frequency of substructures obtained among the 100 runs of SR. Similarly to the frequency of variables, we can assume that if a substructure consistently appears in different runs for the same time window, it may represent a relevant relationship describing the phenomenon. For example, from Table A8 we can state that the additive terms involving he pub p and str r p , and he pub p and a hh size are the most common. To summarize, our goal was not to provide a unique best expression that describes the investigated phenomenon. In this regard, GP-based SR methods should be considered as hypotheses generating machines (Kronberger et al. ,2024), given their ability to return multiple models with similar accuracy for the same problem. Especially for complex phenomena like the one analyzed here, SR allows to return different interactions between variables that describe different aspects of the same dimension. This should not be seen as a flaw, because it contributes to analyze the healthcare expenditure from different perspectives, via the study of variables’ and structures’ frequencies, thus provid-ing interesting insights to assess the most relevant and influential interactions explaining the underlying dynamics of this phenomenon. 24 6 Conclusion 
+
+Identifying possible drivers in the dynamics of healthcare expenditure is es-sential to guide policymakers in strategic decisions, including the allocation of resources. This study investigates the use of SR to obtain interpretable analytical expressions in temporal constraint settings. In order to overcome temporal data leakage issues in panel data, we performed time-wise splitting for training and test data. Additionally, given the complexity of the phenomenon studied, we decided to consider different temporal windows, with results show-ing different expressions and recurrent variables depending on the time horizon. SR has demonstrated to be effective in retrieving formulas with good accuracy for private healthcare expenditure, especially for the most recent temporal window. By contrast, public healthcare expenditure remained harder to model, with lower predictive performance. This suggests that public spending is likely influenced by institutional and contextual factors that are only partially repre-sented in the dataset, thus the available variables are not sufficient to model this phenomenon. Although we retrieved high-performing formulas for private spending, our goal was not to pick out the best of all, but rather to exploit symbolic structures for the explicit analysis of relationships between input features, following the principle of SR as an hypotheses generating machine. The multiple runs performed over the same dataset and splitting strategy have been useful to study the robustness of the approach and the recurrence of features and substructures. The findings indicated that SR can provide useful information not only on the relevance of variables but also on how they combine within repeated analytical patterns. However, although SR has proved benefi-cial for deriving interesting insights from the generated expressions, this work has some limitations. Firstly, the relevance of the candidate drivers is based on how often the SR models include them in the final expressions, and is therefore not supported by additional causal analyses. Indeed, frequency-based analysis is intended to be exploratory rather than an established methodology for causal identification. Furthermore, the fact that the models vary significantly from one time horizon to another and that their out-of-time performance deteriorates 25 markedly for 2021 indicates their instability in the face of economic shocks, thereby limiting their applicability for long-term analysis. Another limitation concerns the SR algorithm used: GP-based methods are highly sensitive to their hyperparameters and do not always explore the search space efficiently. It is therefore worth exploring the use of alternative SR paradigms, such as those based on Large Language Models, and to assess whether the recovered variables and substructures remain stable across different algorithms. Overall, the paper shows that SR is a promising tool for the interpretable analysis of socio-economic phenomena, providing expert end-users a way to investigate explicit relationships between drivers of interest. At the same time, the results make clear that model quality depends strongly on the temporal setting, on the target variable considered, and on the availability of informative predictors. Future works should consider enriching the set of features, exploring more in-depth the analysis of recurrent substructures, and further testing the robustness of the recovered relationships on post-pandemic years and other territorial or national contexts. 
+
+# Statements and Declarations 
+
+# Funding 
+
+No funds, grants, or other support were received for conducting this study or preparing this manuscript. 
+
+# Competing interests 
+
+The authors have no relevant financial or non-financial interests to disclose. 
+
+# Ethics approval and consent to participate 
+
+This study used aggregated regional administrative data and did not involve human participants, human material, or animals. Ethics approval and informed consent to participate were therefore not required. 26 Consent for publication 
+
+Not applicable. 
+
+# Data availability 
+
+The processed data supporting the findings of this study are available from the corresponding author upon reasonable request. The underlying source data were obtained from the Italian National Institute of Statistics (Istat) Health for All database and Istat statistics, subject to the applicable terms of use. 
+
+# Materials availability 
+
+Materials supporting the findings of this study are available from the corre-sponding author upon reasonable request. 
+
+# Code availability 
+
+The code used to conduct data processing and the reported analyses is available from the corresponding author upon reasonable request. 
+
+# Author contributions 
+
+All the authors conceived the study. Cristina Rossetti and Nicola Caravaggio developed the theoretical framework and drafted the manuscript. Nicola Car-avaggio performed data collection and curation. Cristina Rossetti performed data cleaning and carried out the experiments. Giovanni Lamura and Giu-liano Resce supervised the project and critically revised the final version of the manuscript. All authors discussed the results, contributed to the final manuscript, and approved the submitted version. 27 References 
+
+Amarasinghe, K., Rodolfa, K. T., Lamba, H., and Ghani, R. (2023). Explainable machine learning for public policy: Use cases, gaps, and research directions. 
+
+Data & Policy , 5:e5. Angelis, D., Sofos, F., and Karakasidis, T. E. (2023). Artificial intelligence in physical sciences: Symbolic regression trends and perspectives. Archives of Computational Methods in Engineering , page 1. Apicella, A., Isgr` o, F., and Prevete, R. (2025). Don’t push the button! exploring data leakage risks in machine learning and transfer learning. Artificial Intelligence Review , 58(11):339. Arc` a, E., Principe, F., and Van Doorslaer, E. (2020). Death by austerity? The impact of cost containment on avoidable mortality in Italy. Health economics ,29(12):1500–1516. Atella, V. and Conti, V. (2014). The effect of age and time to death on primary care costs: The Italian experience. Social Science & Medicine , 114:10–17. Balla, J., Huang, S., Dugan, O., Dangovski, R., and Soljaˇ ci´ c, M. (2025). Ai-assisted discovery of quantitative and formal models in social science. 
+
+Humanities and Social Sciences Communications , 12(1):1–12. Baltagi, B. H., Lagravinese, R., Moscone, F., and Tosetti, E. (2017). Health care expenditure and income: A global perspective. Health Economics ,26(7):863–874. Baltagi, B. H. and Moscone, F. (2010). Health care expenditure and income in the OECD reconsidered: Evidence from panel data. Economic Modelling ,27(4):804–811. Barros, P. P. (1998). The black box of health care expenditure growth determi-nants. Health Economics , 7(6):533–544. 28 Blomqvist, ˚ A. G. and Carter, R. A. (1997). Is health care really a luxury? 
+
+Journal of Health Economics , 16(2):207–229. Bordignon, M., Coretti, S., Piacenza, M., and Turati, G. (2020). Hardening subnational budget constraints via administrative subordination: The Italian experience of recovery plans in regional health services. Health economics ,29(11):1378–1399. Burlacu, B., Kronberger, G., and Kommenda, M. (2020). Operon c++ an efficient genetic programming framework for symbolic regression. In Proceed-ings of the 2020 genetic and evolutionary computation conference companion ,pages 1562–1570. Caravaggio, N., Lagravinese, R., and Resce, G. (2026). The determinants of health expenditure: a machine learning approach. Empirical Economics ,70(2):30. Caruso, E., Dirindin, N., et al. (2019). Salute ed Economia-Questioni di economia e politica sanitaria . il Mulino. Cerqua, A., Letta, M., and Pinto, G. (2025a). On the (Mis) Use of Machine Learning with Panel Data. Oxford Bulletin of Economics and Statistics ,pages 1–13. Cerqua, A., Letta, M., and Pinto, G. (2025b). On the (mis) use of machine learning with panel data. Oxford Bulletin of Economics and Statistics .Cirulli, V. and Marini, G. (2023). Are austerity measures really distressing? Evidence from Italy. Economics & Human Biology , 49:101217. Cisotto, E., Cavrini, G., and De Rose, A. (2023). Informal old adult care provision and caregivers’ health status in italy. Italian journal of applied statistics , 35(3 Supplement):147–152. Claveria, O., Monte, E., and Torra, S. (2020). Economic forecasting with evolved confidence indicators. Economic Modelling , 93:576–585. 29 Clemente, J., Marcuello, C., Monta˜ n´ es, A., and Pueyo, F. (2004). On the international stability of health care expenditure functions: are government and private functions similar? Journal of Health Economics , 23(3):589–613. Coccia, M. and Benati, I. (2025). How dynamics of public debt and health ex-penditures affects response to health crises: Europe during covid 19 pandemic. 
+
+Economics and Business Letters , 14(1):51–62. Crivelli, L., Filippini, M., and Mosca, I. (2006). Federalism and regional health care expenditures: an empirical analysis for the Swiss cantons. Health Economics , 15(5):535–541. Di Matteo, L. and Di Matteo, R. (1998). Evidence on the determinants of Canadian provincial government health expenditures: 1965–1991. Journal of Health Economics , 17(2):211–228. Dong, J. and Zhong, J. (2025). Recent advances in symbolic regression. ACM Computing Surveys , 57(11):1–37. Dormont, B., Grignon, M., and Huber, H. (2006). Health expenditure growth: reassessing the threat of ageing. Health Economics , 15(9):947–963. Doshi-Velez, F. and Kim, B. (2017). Towards a rigorous science of interpretable machine learning. arXiv preprint arXiv:1702.08608 .Felder, S., Meier, M., and Schmitt, H. (2000). Health care expenditure in the last months of life. Journal of Health Economics , 19(5):679–695. Ferrari, D., Guidetti, V., and Mandreoli, F. (2022). Multi-objective sym-bolic regression for data-driven scoring system management. In 2022 IEEE International Conference on Data Mining (ICDM) , pages 945–950. IEEE. Fong, K. S. and Motani, M. (2024). Symbolic regression for discovery of medical equations: A case study on glomerular filtration rate estimation equations. In 2024 IEEE Conference on Artificial Intelligence (CAI) , pages 1373–1379. IEEE. 30 Gerdtham, U.-G., J¨ onsson, B., MacFarlan, M., and Oxley, H. (1998). The determinants of health expenditure in the OECD countries: a pooled data analysis. In Zweifel, P., editor, Health, the medical profession, and regulation ,chapter 6, pages 113–134. Springer, New York, NY-US. Gerdtham, U.-G., Søgaard, J., Andersson, F., and J¨ onsson, B. (1992). An econometric analysis of health care expenditure: A cross-section study of the OECD countries. Journal of Health Economics , 11(1):63–84. Getzen, T. E. (1992). Population aging and the growth of health expenditures. 
+
+Journal of Gerontology , 47(3):S98–S104. Giannoni, M. and Hitiris, T. (2002). The regional impact of health care expenditure: the case of Italy. Applied Economics , 34(14):1829–1836. Golinelli, D., Toscano, F., Bucci, A., Lenzi, J., Fantini, M. P., Nante, N., and Messina, G. (2017). Health Expenditure and All-Cause Mortality in the ‘Galaxy’ of Italian Regional Healthcare Systems: A 15-Year Panel Data Analysis. Applied Health Economics and Health Policy , 15:773–783. Hansen, P. and King, A. (1996). The determinants of health care expenditure: a cointegration approach. Journal of Health Economics , 15(1):127–137. Imai Aldeia, G. S., Zhang, H., Bomarito, G., Cranmer, M., Fonseca, A., Burlacu, B., La Cava, W. G., and de Fran¸ ca, F. O. (2025). Call for action: towards the next generation of symbolic regression benchmark. In Proceedings of the Genetic and Evolutionary Computation Conference Companion , pages 2529–2538. Irvin, J. A., Kondrich, A. A., Ko, M., Rajpurkar, P., Haghgoo, B., Landon, B. E., Phillips, R. L., Petterson, S., Ng, A. Y., and Basu, S. (2020). Incorporating machine learning and social determinants of health indicators into prospective risk adjustment for health plan payments. BMC Public Health , 20(1):608. Istat (2023). Istat Statistics. Italian Statistic Institute. Retrieved from: http: //dati.istat.it/?lang=en [Accessed April 20, 2023]. 31 Istat (2025). Health for All. Italian Statistic Institute. Retrieved from: https: //www.istat.it/it/archivio/14562 [Accessed September 1, 2025]. Kapoor, S. and Narayanan, A. (2023). Leakage and the reproducibility crisis in machine-learning-based science. Patterns , 4(9). Karatzas, G. (2000). On the determination of the US aggregate health care expenditure. Applied Economics , 32(9):1085–1099. Karlsson, M. and Klohn, F. (2014). Testing the red herring hypothesis on an aggregated level: ageing, time-to-death and care costs for older people in Sweden. The European Journal of Health Economics , 15:533–551. Kleiman, E. (1974). The determinants of national outlay on health. In Perlman, M., editor, The Economics of Health and Medical Care: Proceedings of a Conference Held by the International Economic Association at Tokyo , pages 66–88, London/Basingstoke, UK. Macmillan. Koenig, L., Siegel, J. M., Dobson, A., Hearle, K., Ho, S., and Rudowitz, R. (2003). Drivers of healthcare expenditures associated with physician services. 
+
+The American Journal of Managed Care , 9(S1):34–42. Koza, J. R. (1994). Genetic programming as a means for programming com-puters by natural selection. Statistics and computing , 4:87–112. Kronberger, G., Burlacu, B., Kommenda, M., Winkler, S. M., and Affenzeller, M. (2024). Symbolic regression . Chapman and Hall/CRC. La Cava, W., Burlacu, B., Virgolin, M., Kommenda, M., Orzechowski, P., de Fran¸ ca, F. O., Jin, Y., and Moore, J. H. (2021). Contemporary symbolic regression methods and their relative performance. Advances in neural information processing systems , 2021(DB1):1. Lagravinese, R. and Paradiso, M. (2014). Corruption and health expenditure in Italian regions. Economics Bulletin , 34(3):1498–1511. 32 Leu, R. (1986). The public-private mix and international health care costs. In Culyer, T. and Jonsson, B., editors, The public and private health services ,pages 41–63, Oxford, UK. Basil Blackwell. Lewis, C. D. (1982). Industrial and business forecasting methods: A practical guide to exponential smoothing and curve fitting . Butterworths, London, UK. Lippi Bruni, M. and Ugolini, C. (2016). Delegating home care for the elderly to external caregivers? an empirical study on italian data. Review of Economics of the Household , 14(1):155–183. Liu, C., Lyu, W., Zhao, W., Zheng, F., and Lu, J. (2023). Exploratory research on influential factors of china’s sulfur dioxide emission based on symbolic regression. Environmental Monitoring and Assessment , 195(1):41. L´ opez-Casasnovas, G. and Saez, M. (2007). A multilevel analysis on the determinants of regional health care expenditure: a note. The European Journal of Health Economics , 8:59–65. Lopreite, M. and Mauro, M. (2017). The effects of population ageing on health care expenditure: a Bayesian VAR analysis using data from Italy. Health Policy , 121(6):663–674. Lv, H., Zhao, Y., Wang, W., Hou, K., and Zheng, X. (2026). Hybrid pso-svm and symbolic regression model for agricultural water demand prediction. 
+
+Scientific Reports .Markus, A. F., Kors, J. A., and Rijnbeek, P. R. (2021). The role of explainability in creating trustworthy artificial intelligence for health care: a comprehensive survey of the terminology, design choices, and evaluation strategies. Journal of biomedical informatics , 113:103655. Marmot, M. and Wilkinson, R. (2005). Social determinants of health . Oxford University Press, Oxford, UK. 33 Mart´ ın, J. J. M., Puerto Lopez del Amo Gonzalez, M., and Dolores Cano Garcia, M. (2011). Review of the literature on the determinants of healthcare expenditure. Applied Economics , 43(1):19–46. McDermott, J., Glynn, J., Morrow, I., and Panos, E. (2025). Symbolic regres-sion for modelling decarbonisation pathways in the global energy-economy-climate system. In Proceedings of the Genetic and Evolutionary Computation Conference Companion , pages 871–874. Megahed, K. (2025). Symbolic regression for strength prediction of eccentrically loaded concrete-filled steel tubular columns. Scientific Reports , 15(1):3085. Miyazaki, M., Ishikawa, K.-I., Nakashima, K., Shimizu, H., Takahashi, T., and Takahashi, N. (2023). Application of the symbolic regression program ai-feynman to psychology. Frontiers in Artificial Intelligence , 6:1039438. Mosca, I. (2007). Decentralization as a determinant of health care expenditure: empirical analysis for OECD countries. Applied Economics Letters , 14(7):511– 515. Murdoch, W. J., Singh, C., Kumbier, K., Abbasi-Asl, R., and Yu, B. (2019). Definitions, methods, and applications in interpretable machine learning. 
+
+Proceedings of the National Academy of Sciences , 116(44):22071–22080. Murthy, V. N. and Okunade, A. A. (2016). Determinants of US health expen-diture: Evidence from autoregressive distributed lag (ARDL) approach to cointegration. Economic Modelling , 59:67–73. Newhouse, J. P. (1977). Medical-care expenditure: a cross-national survey. 
+
+The journal of human resources , 12(1):115–125. Newhouse, J. P. (1992). Medical care costs: how much welfare loss? Journal of Economic perspectives , 6(3):3–21. Okunade, A. A. and Karakus, M. C. (2001). Unit root and cointegration tests: timeseries versus panel estimates for international health expenditure models. 
+
+Applied Economics , 33(9):1131–1137. 34 Okunade, A. A. and Murthy, V. N. (2002). Technology as a ‘major driver’ of health care costs: a cointegration analysis of the Newhouse conjecture. 
+
+Journal of Health Economics , 21(1):147–159. Pan, X., Uddin, M. K., Ai, B., Pan, X., and Saima, U. (2019). Influential factors of carbon emissions intensity in oecd countries: evidence from symbolic regression. Journal of Cleaner Production , 220:1194–1201. Panczyk, N. R., Erdem, O. F., and Radaideh, M. I. (2025). Opening the ai black-box: Symbolic regression with kolmogorov-arnold networks for advanced energy applications. Energy and AI , page 100595. Raitano, M., Gabriele, C., Cislaghi, F., Costantini, F., Innocenti, F., Lepore, V., Tediosi, F., and Valerio, F. (2007). A Survey of the Impact of Death-Related costs on Health-Care Expenditure and Demographics and Health Costs in Italy. ENEPRI Policy Brief, No. 5. Rezaei, H., Zarfam, P., Golafshani, E. M., and Amiri, G. G. (2022). Seismic fragility analysis of rc box-girder bridges based on symbolic regression method. In Structures , volume 38, pages 306–322. Elsevier. Roberts, J. (2000). Spurious regression problems in the determinants of health care expenditure: a comment on Hitiris (1997). Applied Economics Letters ,7(5):279–283. Rudin, C. (2019). Stop explaining black box machine learning models for high stakes decisions and use interpretable models instead. Nature machine intelligence , 1(5):206–215. Sarti, S., Terraneo, M., and Bordogna, M. T. (2017). Poverty and private health expenditures in Italian households during the recent crisis. Health Policy , 121(3):307–314. Shang, B. and Goldman, D. (2008). Does age or life expectancy better predict health care expenditures? Health Economics , 17(4):487–501. 35 Tian, Y., Zhou, W., Viscione, M., Dong, H., Kammer, D. S., and Fink, O. (2025). Interactive symbolic regression with co-design mechanism through offline reinforcement learning. Nature Communications , 16(1):3930. Trentini, F., Ciani, O., Vanni, E., Ghislandi, S., Torbica, A., Azzolini, E., and Melegaro, A. (2023). A repeated cross-sectional analysis on the economic impact of sars-cov-2 pandemic at the hospital level in italy. Scientific reports ,13(1):12386. Truscott, P. and Korns, M. F. (2014). Explaining unemployment rates with symbolic regression. In Genetic Programming Theory and Practice XI , pages 119–135. Springer. Vimont, A., Leleu, H., and Durand-Zaleski, I. (2022). Machine learning versus regression modelling in predicting individual healthcare costs from a representative sample of the nationwide claims database in france. The European Journal of Health Economics , 23(2):211–223. White, C. (2007). Health care spending growth: how different is the United States from the rest of the OECD? Health Affairs , 26(1):154–161. Yang, G., Sun, T., Wang, J., and Li, X. (2015). Modeling the nexus between carbon dioxide emissions and economic growth. Energy Policy , 86:104–117. Zweifel, P., Felder, S., and Meiers, M. (1999). Ageing of population and health care expenditure: a red herring? Health Economics , 8(6):485–496. 36 Appendix 
+
+Figure A1: Mutation and crossover examples in Genetic Programming for Symbolic Regression. Here, the mutation operator transforms the parent expression ( x + 2 ∗ xy+z ) into its corresponding child ( x + 2 ∗ xy ) by replacing the substructure xy+z with xy . The crossover operator takes two parents ( x ∗ (x + y)and cos (z) + x ∗ (3 + y)) and recombines one of their substructure to create two different child expressions ( cos (z) ∗ x and ( x + y) + x ∗ (3 + y)). 
+
+Figure A2: Average R2 and MAPE for random and time-wise splittings 37 Figure A3: Average R2 and MAPE for time-wise and time windows splittings 38 Table A1: List of dataset features 
+
+Feature Meaning 
+
+area Region surface ( Km 2)he pub p Share of public health expenditure pop res Resident population dens Population density p r 04 p Population aged 0-4 (% of total) p r 65ov p Population aged 65+ (% of total) p r 75ov p Population aged 75+ (% of total) age ind Ageing index p r m p Male population (% of total) p r f p Female population (% of total) str r p Foreign population (% of total) a hh size Average household size fert rate Fertility rate birth rate Birth rate mort rate Mortality rate act rate Activity rate (15+) empl rate Employment rate (15+) unempl rate Unemployment rate (15+) obe p Obese individuals 15+ (% of total) obe 65ov p Obese individuals 65+ (% of total) ovweight p Overweight individuals 15+ (% of total) ovweight 65ov p Overweight individuals 65+ (% of total) smok p Smokers 18+ (% of total) smok 65ov p Smokers 65+ (% of total) big smok p Heavy smokers 19+ (% of total) gdp cap GDP per capita at current prices ( €)co2 cap CO 2 emissions per capita h beds Hospital beds per 1,000 inhabitants physicians Physicians per 1,000 inhabitants nurses Nurses per 1,000 inhabitants CT scan CT scanners per 1,000 inhabitants MRI scan MRI scanners per 1,000 inhabitants 39 Figure A4: Heatmap showing Pearson correlation between features in the datasets. 40 Table A2: Descriptive statistics of predictors at t − 1 and expenditure at t
+
+Variable Mean SD Median Min Max 
+
+area ( t − 1) 14,348.58 7,315.25 13,637.64 3,260.85 25,832.55 he pub p ( t − 1) 76.84 3.85 76.91 65.79 85.46 pop res ( t − 1) 2,718,406.48 2,358,489.36 1,625,306.50 117,329.00 10,053,264.00 dens ( t − 1) 169.36 106.98 152.67 35.98 443.98 p r 04 p ( t − 1) 4.47 0.60 4.40 3.12 6.49 p r 65ov p ( t − 1) 20.55 3.07 20.73 12.73 28.65 p r 75ov p ( t − 1) 9.91 2.12 9.93 4.62 15.86 age ind ( t − 1) 152.65 38.78 150.80 64.38 259.84 prmp ( t − 1) 48.57 0.44 48.60 47.15 49.48 prfp ( t − 1) 51.43 0.44 51.40 50.52 52.85 str r p ( t − 1) 4.83 3.34 3.75 0.31 12.06 a hh size ( t − 1) 2.51 0.23 2.48 1.91 3.12 fert rate ( t − 1) 1,302.37 155.74 1,291.50 959.00 1,756.73 birth rate ( t − 1) 8.77 1.31 8.62 5.40 12.32 mort rate ( t − 1) 101.15 14.21 99.41 74.51 144.73 act rate ( t − 1) 49.18 5.28 50.08 37.87 60.63 empl rate ( t − 1) 44.72 7.18 46.31 30.35 58.87 unempl rate ( t − 1) 9.58 5.93 7.86 1.85 28.01 obe p ( t − 1) 9.69 1.77 9.61 5.07 14.99 obe 65ov p ( t − 1) 13.69 2.99 13.45 5.38 22.82 ovweight p ( t − 1) 34.63 3.13 34.48 26.55 41.80 ovweight 65ov p ( t − 1) 43.71 3.90 43.79 26.66 57.30 smok p ( t − 1) 21.67 2.72 21.53 14.19 30.68 smok 65ov p ( t − 1) 9.46 1.99 9.39 4.24 15.68 big smok p ( t − 1) 7.03 2.95 6.81 0.00 16.27 gdp cap ( t − 1) 25,582.45 7,711.67 25,435.94 10,526.90 48,551.40 co2 cap ( t − 1) 8.91 2.79 8.30 3.15 17.31 h beds ( t − 1) 3.97 0.98 3.71 2.12 8.19 physicians ( t − 1) 2.01 0.28 2.00 1.14 3.14 nurses ( t − 1) 4.63 0.69 4.70 3.05 6.68 CT scan ( t − 1) 0.0266 0.0102 0.0257 0.0030 0.0575 MRI scan ( t − 1) 0.0181 0.0114 0.0175 0.00 0.0554 he pri 504.88 151.17 492.00 214.00 1,054.00 he pub 1,677.67 352.25 1,769.70 779.27 2,580.00 he tot 2,182.54 464.68 2,235.00 1,018.27 3,359.00 
+
+41 Table A3: Time windows splittings 
+
+Time Window Training set Test set 
+
+time -wise 1997-2013 2014-2019 
+
+W1 1997-2005 2006-2007 
+
+W2 2000-2007 2008-2009 
+
+W3 2001-2009 2010-2011 
+
+W4 2010-2017 2018-2019 Table A4: Unique occurrences of the top-5 most frequent variables for he pri 
+
+Variable time-wise W1 W2 W3 W4
+
+he pub p t−1 95 - 83 100 100 
+
+he pub p t−2 - 95 - - -
+
+a hh size t−2 85 47 - 94 45 
+
+a hh size t−1 - - 90 - -
+
+CT scan t−2 - - 89 49 -
+
+M RI scan t−2 80 50 - 45 -
+
+str r p t−1 71 - - - -
+
+str r p t−2 - 51 - - 49 
+
+act rate t−2 - 69 56 - -
+
+gdp cap t−2 23 - - 45 35 
+
+nurses t−2 - - 36 - -
+
+empl rate t−2 - - - - 30 42 Split Type Expression R2 MAPE 
+
+Time-wise 
+
+he pri = 0 .41 ∗ gdp cap t−2 − 0.54 ∗ he pub p t−1
+
+− 0.25 ∗ h beds t−2 + 0 .38 ∗ M RI scan t−2
+
+0.82 7.21 
+
+he pri = −0.15 ∗ a hh size t−2 + 0 .33 ∗ gdp cap t−2
+
+− 0.50 ∗ he pub p t−1 − 0.23 ∗ h beds t−2
+
++ 0 .35 ∗ M RI scan t−2
+
+0.81 7.37 
+
+he pri = −0.15 ∗ a hh size t−2 + 0 .33 ∗ gdp cap t−2
+
+− 0.50 ∗ he pub p t−1 − 0.23 ∗ h beds t−2
+
++ 0 .35 ∗ M RI scan t−2
+
+0.81 7.39 
+
+W1
+
+he pri = −1.1 ∗ gdp cap t−1 + 1 .58 ∗ gdp cap t−2
+
+− 0.44 ∗ he pub p t−2 + 0 .23 ∗ M RI scan t−1
+
++ 0 .21 ∗ p r 75 ov p t−2
+
+0.83 6.65 
+
+he pri = 0 .54 ∗ gdp cap t−2 − 0.44 ∗ he pub p t−2
+
+− 0.16 ∗ h beds t−2 + 0 .20 ∗ M RI scan t−1
+
+− 0.16 ∗ p r m p t−2
+
+0.82 6.32 
+
+he pri = 0 .54 ∗ gdp cap t−2 − 0.42 ∗ he pub p t−2
+
++ 0 .12 ∗ CT scan t−1 + 0 .13 ∗ M RI scan t−1
+
++ 0 .20 ∗ p r 75 ov p t−2
+
+0.82 6.65 
+
+W2
+
+he pri = −0.20 ∗ a hh size t−2 + 0 .35 ∗ gdp cap t−2
+
+− 0.51 ∗ he pub p t−1
+
++ 0 .93 ∗ p0.61 ∗ M RI scan t−1 + 1 .2 − 0.98 0.80 6.06 
+
+he pri = −0.18 ∗ a hh size t−1 + 0 .29 ∗ gdp cap t−2
+
+− 0.47 ∗ he pub p t−1 + 0 .15 ∗ nurses t−1
+
++ 0 .23 ∗ M RI scan t−1
+
+0.80 6.42 
+
+he pri = −0.18 ∗ a hh size t−1 + 0 .29 ∗ gdp cap t−2
+
+− 0.47 ∗ he pub p t−1 + 0 .14 ∗ nurses t−1
+
++ 0 .23 ∗ M RI scan t−1
+
+0.80 6.42 
+
+W4
+
+he pri = 0 .15 ∗ he pub p 2
+
+> t−1
+
++ 0 .17 ∗ he pub p t−1 ∗ nurses t−2
+
+− 0.75 ∗ he pub p t−1 + 0 .20 ∗ nurses t−2 − 0.09 0.95 3.92 
+
+he pri = 0 .26 ∗ gdp cap t−2 − 0.86 ∗ he pub p t−1
+
++ 0 .34 ∗ empl rate t−2 − 0.48 ∗ str r p t−2
+
+0.94 3.89 
+
+43 R2 MAPE (%) Type Test Out-of-time Evaluation Test Out-of-time Evaluation time-wise 0.76 0.51 8.49 10.01 
+
+W1 0.73 -7.51 8.41 14.97 
+
+W2 0.74 0.15 7.29 13.35 
+
+W3 0.25 0.22 15.57 12.34 
+
+W4 0.92 0.76 4.25 7.12   
+
+> (a) Out-of-time evaluation of he pri models on 2020 year
+
+R2 MAPE (%) Type Test Out-of-time Evaluation Test Out-of-time Evaluation time-wise 0.76 -0.03 8.49 15.88 
+
+W1 0.73 -1.27 8.41 17.77 
+
+W2 0.74 -0.86 7.29 25.66 
+
+W3 0.25 -0.81 15.57 25.31 
+
+W4 0.92 0.16 4.25 18.23   
+
+> (b) Out-of-time evaluation of he pri models on 2021 year
+
+44 Expression R2 MAPE 
+
+he pri = −0.19 ∗ a hh size t−1 − 0.81 ∗ he pub p t−1 + 0 .46 ∗
+
+empl rate t−2 − 0.44 ∗ str r p t−2
+
+0.90 5.85 
+
+he pri = −0.19 ∗ a hh size t−1 − 0.81 ∗ he pub p t−1 + 0 .46 ∗
+
+empl rate t−2 − 0.44 ∗ str r p t−2
+
+0.90 5.85 
+
+he pri = −0.89 ∗ he pub p t−1 + 0 .52 ∗ empl rate t−2 + 0 .62 ∗
+
+str r p t−2/(0 .53 ∗ empl rate t−2 − 1.4) + 0 .128 
+
+0.90 6.09 
+
+he pri = −0.07 ∗ area t−2 − 0.18 ∗ a hh size t−2 − 0.81 ∗ he pub p t−1 +0.43 ∗ empl rate t−2 − 0.41 ∗ str r p t−2
+
+0.90 5.46 
+
+he pri = −0.07 ∗ area t−2 − 0.18 ∗ a hh size t−2 − 0.80 ∗ he pub p t−1 +0.43 ∗ empl rate t−2 − 0.41 ∗ str r p t−2
+
+0.90 5.48 
+
+he pri = −0.07 ∗ area t−2 − 0.18 ∗ a hh size t−2 − 0.80 ∗ he pub p t−1 +0.43 ∗ empl rate t−2 − 0.41 ∗ str r p t−2
+
+0.90 5.48 
+
+he pri = −0.07 ∗ area t−2 − 0.19 ∗ a hh size t−2 − 0.80 ∗ he pub p t−1 +0.42 ∗ empl rate t−2 − 0.40 ∗ str r p t−2
+
+0.90 5.50 
+
+he pri = −0.20 ∗ a hh size t−2 − 0.81 ∗ he pub p t−1 + 0 .45 ∗
+
+empl rate t−2 − 0.44 ∗ str r p t−2
+
+0.89 5.86 
+
+he pri = −0.20 ∗ a hh size t−2 − 0.81 ∗ he pub p t−1 + 0 .45 ∗
+
+empl rate t−2 − 0.44 ∗ str r p t−2
+
+0.89 5.86 
+
+he pri = −0.20 ∗ a hh size t−2 − 0.81 ∗ he pub p t−1 + 0 .45 ∗
+
+empl rate t−2 − 0.44 ∗ str r p t−2
+
+0.89 5.86 Table A7: Top-10 he pri models over 2020 45 Substructure Frequency (%) R2 MAPE 
+
+C ∗ he pub p t−1 + C ∗ str r p t−2 46 0.93 4.24 
+
+C ∗ a hh size t−2 + C ∗ he pub p t−1 41 0.93 4.21 
+
+C ∗ gdp cap t−2 + C ∗ he pub p t−1 30 0.94 3.98 
+
+C ∗ he pub p t−1 + C ∗ empl rate t−2 29 0.92 4.21 
+
+C ∗ co 2 cap t−1 + C ∗ he pub p t−1 25 0.93 4.19 
+
+C ∗ a hh size t−2 + C ∗ str r p t−2 24 0.94 3.97 
+
+C ∗ a hh size t−2 + C ∗ he pub p t−1 + C ∗
+
+str r p t−2
+
+24 0.94 3.97 
+
+C ∗ a hh size t−2 + C ∗ empl rate t−2 21 0.93 3.99 
+
+C ∗ empl rate t−2 + C ∗ str r p t−2 20 0.94 3.90 
+
+C ∗ he pub p t−1 + C ∗ empl rate t−2 + C ∗
+
+str r p t−2
+
+20 0.94 3.90 
+
+C ∗ a hh size t−2 + C ∗ he pub p t−1 + C ∗
+
+empl rate t−2
+
+20 0.93 3.97 
+
+C ∗ a hh size t−2 + C ∗ empl rate t−2 + C ∗
+
+str r p t−2
+
+17 0.94 3.89 
+
+C ∗ a hh size t−2 + C ∗ he pub p t−1 + C ∗
+
+empl rate t−2 + C ∗ str r p t−2
+
+17 0.94 3.89 
+
+C ∗ co 2 cap t−1 + C ∗ gdp cap t−2 + C ∗
+
+he pub p t−1
+
+16 0.94 3.84 Table A8: Top 15 frequent substructures for expressions obtained in W4 time window. R2 and MAPE values correspond to the average error scores obtained when that substructure is present. 46 Statements and Declarations 
+
+# Funding 
+
+No funds, grants, or other support were received for conducting this study or preparing this manuscript. 
+
+# Competing interests 
+
+The authors have no relevant financial or non-financial interests to disclose. 
+
+# Ethics approval and consent to participate 
+
+This study used aggregated regional administrative data and did not involve human participants, human material, or animals. Ethics approval and informed consent to participate were therefore not required. 
+
+# Consent for publication 
+
+Not applicable. 
+
+# Data availability 
+
+The processed data supporting the findings of this study are available from the corresponding author upon reasonable request. The underlying source data were obtained from the Italian National Institute of Statistics (Istat) Health for All database and Istat statistics, subject to the applicable terms of use. 
+
+# Materials availability 
+
+Materials supporting the findings of this study are available from the corre-sponding author upon reasonable request. 47 Code availability 
+
+The code used to conduct data processing and the reported analyses is available from the corresponding author upon reasonable request. 
+
+# Author contributions 
+
+All the authors conceived the study. Cristina Rossetti and Nicola Caravaggio developed the theoretical framework and drafted the manuscript. Nicola Car-avaggio performed data collection and curation. Cristina Rossetti performed data cleaning and carried out the experiments. Giovanni Lamura and Giu-liano Resce supervised the project and critically revised the final version of the manuscript. All authors discussed the results, contributed to the final manuscript, and approved the submitted version. 48
